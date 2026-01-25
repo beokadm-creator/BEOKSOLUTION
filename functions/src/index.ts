@@ -632,7 +632,15 @@ export const verifyMemberIdentity = functions
                 const memberDoc = snap.docs[0];
                 const member = memberDoc.data();
 
-                // [Security] Expiry Check
+                // [Security] Used Check - One-Time Use Only
+                // Once a code is used, it cannot be reused by anyone
+                if (member.used === true) {
+                    return { success: false, message: "Code Already Used" };
+                }
+
+                // [Security] Expiry Check - Return isExpired flag instead of failing
+                // Expired members should be able to verify, but register at non-member price
+                let isExpired = false;
                 if (member.expiryDate) {
                     let exp = member.expiryDate;
                     // Handle Firestore Timestamp or Date string
@@ -641,16 +649,8 @@ export const verifyMemberIdentity = functions
                     } else if (typeof exp === 'string') {
                         exp = new Date(exp);
                     }
-                    
-                    if (new Date() > exp) {
-                         return { success: false, message: "Expired Code" };
-                    }
-                }
 
-                // [Security] Used Check - One-Time Use Only
-                // Once a code is used, it cannot be reused by anyone
-                if (member.used === true) {
-                    return { success: false, message: "Code Already Used" };
+                    isExpired = new Date() > exp;
                 }
 
                 // [Security] Immediate Lock (for MyPage)
@@ -663,17 +663,18 @@ export const verifyMemberIdentity = functions
                 }
 
                 const finalExpiry = member.expiryDate || member.expiry || null;
-                
+
                 // [FIX-DISCOUNT] Generate normalized price key for frontend matching
                 const serverGrade = member.grade || member.category || 'Member';
                 const priceKey = String(serverGrade)
                     .toLowerCase()
                     .replace(/\s+/g, '_');
-                
-                return { 
-                    success: true, 
+
+                return {
+                    success: true,
                     grade: serverGrade,
-                    memberData: { 
+                    isExpired: isExpired, // ✅ [FIX] 만료 여부 플래그 추가
+                    memberData: {
                         id: memberDoc.id, // [Critical] Return Doc ID for Locking
                         name: member.name,
                         grade: serverGrade,              // ✅ [FIX] 등급 정보 추가

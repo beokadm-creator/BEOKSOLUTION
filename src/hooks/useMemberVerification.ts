@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 interface VerificationResult {
     success: boolean;
     message: string;
+    isExpired?: boolean; // ✅ [FIX] 유효기간 만료 여부 플래그
     memberData?: any;
 }
 

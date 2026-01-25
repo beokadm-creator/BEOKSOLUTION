@@ -324,10 +324,36 @@ export default function RegistrationPage() {
                 setMemberVerificationData(result.memberData);
                 setIsVerified(true);
                 setShowVerificationModal(false);
-                toast.success(language === 'ko' ? "인증되었습니다." : "Verification successful.");
 
-                if (result.memberData?.grade) {
-                    // Improved matching: Case-insensitive, multiple fields check
+                // ✅ [FIX] 만료된 회원 체크 및 비회원 가격으로 자동 전환
+                if (result.isExpired) {
+                    toast(
+                        language === 'ko'
+                            ? "회원 등급이 만료되었습니다. 비회원 가격으로 진행합니다."
+                            : "Membership expired. Proceeding as non-member pricing.",
+                        { icon: '⚠️', duration: 5000 }
+                    );
+
+                    // 비회원 등급으로 자동 전환
+                    const nonMemberGrade = grades.find(g =>
+                        g.code?.toLowerCase().includes('non_member') ||
+                        g.name?.toLowerCase().includes('비회원')
+                    );
+                    if (nonMemberGrade) {
+                        setSelectedGradeId(nonMemberGrade.id);
+                        console.log('[RegistrationPage] Expired member - auto-switched to non-member:', nonMemberGrade.id);
+                    } else {
+                        // 비회원 등급이 없는 경우 기본값으로 설정
+                        const defaultGrade = grades[0];
+                        if (defaultGrade) {
+                            setSelectedGradeId(defaultGrade.id);
+                            console.warn('[RegistrationPage] No non-member grade found, using default:', defaultGrade.id);
+                        }
+                    }
+                } else if (result.memberData?.grade) {
+                    toast.success(language === 'ko' ? "인증되었습니다." : "Verification successful.");
+
+                    // 정상 회원: 회원 등급 선택
                     const serverGrade = result.memberData.grade.toLowerCase().trim();
                     const match = grades.find(g =>
                         g.code?.toLowerCase() === serverGrade ||
