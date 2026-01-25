@@ -647,14 +647,10 @@ export const verifyMemberIdentity = functions
                     }
                 }
 
-                // [Security] Used Check with Owner Pass
-                // If used, ONLY allow if usedBy matches current UID
+                // [Security] Used Check - One-Time Use Only
+                // Once a code is used, it cannot be reused by anyone
                 if (member.used === true) {
-                    const currentUid = context.auth?.uid;
-                    if (!currentUid || member.usedBy !== currentUid) {
-                        return { success: false, message: "Code Already Used" };
-                    }
-                    // If owner matches, allow pass (Re-verification)
+                    return { success: false, message: "Code Already Used" };
                 }
 
                 // [Security] Immediate Lock (for MyPage)

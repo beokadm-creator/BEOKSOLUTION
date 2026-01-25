@@ -17,7 +17,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/card';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
-import { CheckCircle2, Circle, AlertCircle, Loader2, ArrowRight, ArrowLeft, ChevronLeft, CheckSquare, ShieldCheck, UserPlus } from 'lucide-react';
+import { CheckCircle2, Circle, AlertCircle, Loader2, ArrowRight, ArrowLeft, ChevronLeft, CheckSquare, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import NicePaymentForm from '../components/payment/NicePaymentForm';
 import { httpsCallable } from 'firebase/functions';
@@ -1330,21 +1330,13 @@ export default function RegistrationPage() {
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+                                            <div className="pt-4">
                                                 <Button
                                                     onClick={(e) => { e.stopPropagation(); performMemberVerification(); }}
                                                     disabled={isLoading || verifyLoading}
-                                                    className="h-14 bg-[#003366] hover:bg-[#002244] text-white text-lg font-bold rounded-2xl shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
+                                                    className="w-full h-14 bg-[#003366] hover:bg-[#002244] text-white text-lg font-bold rounded-2xl shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
                                                 >
                                                     {verifyLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (language === 'ko' ? '인증하기' : 'Verify')}
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={(e) => { e.stopPropagation(); navigate('/auth?mode=signup'); }}
-                                                    className="h-14 border-2 border-gray-100 hover:border-[#003366]/20 text-gray-500 hover:text-[#003366] hover:bg-blue-50 font-bold rounded-2xl transition-all text-lg"
-                                                >
-                                                    <UserPlus className="w-5 h-5 mr-2" />
-                                                    {language === 'ko' ? '회원가입' : 'Sign Up'}
                                                 </Button>
                                             </div>
                                         </div>
