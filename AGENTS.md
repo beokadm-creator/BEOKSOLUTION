@@ -8,7 +8,7 @@ npm run dev              # Vite dev server (HMR, port 5173)
 npm run build           # TypeScript + Vite build (dist/)
 npm run lint            # ESLint check on all TS/TSX files
 
-# Testing
+# Testing (Jest: ts-jest preset, node env, 10s timeout)
 npm test                # Run all Jest tests
 npx jest --testPathPattern=MyComponent.test.ts  # Single file
 npx jest --testNamePattern="should render"    # Single test
@@ -37,10 +37,11 @@ import toast from 'react-hot-toast';
 ```
 
 ### Formatting & Linting
-- **ESLint**: Flat config with ts-eslint, react-hooks
+- **ESLint**: Flat config (ts-eslint + react-hooks + react-refresh)
 - **No Prettier**: Formatting handled by ESLint only
 - **Line length**: ~100 chars recommended, 120 soft limit
 - **Quotes**: Double for JS/TS, backticks for templates
+- **TypeScript**: strict mode is FALSE; use schema.ts interfaces, NOT 'any'
 
 ### TypeScript Best Practices
 - Use schema.ts interfaces, NOT 'any'
@@ -98,11 +99,12 @@ if (error.code === 'auth/user-not-found') toast.error('사용자를 찾을 수 �
 - **Non-members**: Register directly → `users/{uid}/participations/{regId}` exists, but `users/{uid}` may NOT exist
 - **Always handle both cases** - check `users/{uid}` existence with try-catch, fallback to participation data
 
-### Context Providers
+### Context Providers & Hooks
 - `GlobalContext` → Super admin access
 - `ConfContext` → Conference-specific data (confId, conference info)
 - `SocietyContext` → Society admin operations
 - Wrap pages with appropriate layout to activate context
+- **20+ custom hooks in src/hooks**: Use `useConference`, `useAuth`, `useConferenceAdmin` for domain logic
 
 ### Data Access Patterns
 ```typescript
@@ -135,7 +137,7 @@ src/
 │   ├── shared/         # Common modals, utilities
 │   └── ui/             # Radix UI primitives + Tailwind
 ├── contexts/          # React Context providers
-├── hooks/             # Custom hooks (useConference, useAuth, etc.)
+├── hooks/             # Custom hooks (20+ domain logic hooks)
 ├── layouts/           # Route-level layout wrappers
 ├── pages/             # Page components
 └── types/schema.ts     # All Firestore model definitions (USE THIS)
@@ -143,15 +145,14 @@ src/
 
 ---
 
-## Key Dependencies
+## Key Dependencies & Build
 
-- **React 19**: Hooks-based, `useParams` (v7 Router)
+- **React 19 + React Router 7**: Uses `useParams` (v7 API, not v6)
 - **Firebase**: Auth (session persistence), Firestore, Storage, Functions
-- **Radix UI**: Accessible primitives + Tailwind classes
-- **Tailwind**: CSS-in-JS, no global CSS files
+- **Radix UI + Tailwind**: Accessible primitives + CSS-in-JS
 - **Payment**: Toss (domestic), Nice (backup)
-- **Notifications**: react-hot-toast
-- **Charts**: recharts
+- **Notifications**: react-hot-toast, **Charts**: recharts
+- **Build Strategy**: Vite manual chunks - react-vendor, firebase-vendor, print-vendor, vendor
 
 ---
 
