@@ -1,0 +1,8 @@
+/* Reset default Vite styles to allow full-width layout */
+#root {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}

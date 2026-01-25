@@ -1,0 +1,10 @@
+{
+  "DASHBOARD_TITLE": "Academic Conference Admin Dashboard",
+  "MENU": {
+    "ManageSocieties": "Manage Societies",
+    "ManageConferences": "Manage Conferences",
+    "MemberManagement": "Member Management",
+    "VerificationCodes": "Verification Codes",
+    "PlatformSettings": "Platform Settings"
+  }
+}

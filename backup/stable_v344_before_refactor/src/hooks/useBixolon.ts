@@ -1,0 +1,108 @@
+import { useState } from 'react';
+import { BadgeElement } from '../types/schema';
+
+interface BixolonConfig {
+    printerName: string; // e.g., "SRP-350plusIII"
+    ip: string; // e.g., "localhost"
+    port: number; // e.g., 18080
+}
+
+export const useBixolon = () => {
+    const [printing, setPrinting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // Mock Config for now
+    const config: BixolonConfig = {
+        printerName: 'LabelPrinter',
+        ip: 'localhost',
+        port: 18080
+    };
+
+    const printBadge = async (
+        layout: { width: number; height: number; elements: BadgeElement[] },
+        userData: { name: string; org: string; qrData: string }
+    ) => {
+        setPrinting(true);
+        setError(null);
+
+        try {
+            console.log('[Bixolon] Preparing Print Job...', userData);
+            
+            // 1. Construct Bixolon Commands (SLCS / JSON for Web SDK)
+            // This is a simplified example of what the JSON might look like for Bixolon Web Print SDK
+            const printData = {
+                id: Math.floor(Math.random() * 1000),
+                functions: {
+                    func0: {
+                        checkStatus: []
+                    },
+                    func1: {
+                        // Clear Buffer
+                        clearBuffer: []
+                    },
+                    func2: {
+                        // Set Label Size (assuming layout.height is dots or mm, need conversion logic)
+                        // Bixolon usually takes dots. 1mm approx 8 dots (203dpi).
+                        setWidth: [layout.width]
+                    }
+                } as any
+            };
+
+            let funcIdx = 3;
+
+            // Map elements
+            layout.elements.forEach((el) => {
+                if (!el.isVisible) return;
+                
+                const key = `func${funcIdx++}`;
+                let content = '';
+                
+                if (el.type === 'NAME') content = userData.name;
+                else if (el.type === 'ORG') content = userData.org;
+                else if (el.type === 'QR') content = userData.qrData;
+
+                if (el.type === 'QR') {
+                    // Draw QR Code
+                    // drawQRCode: [data, x, y, model, size]
+                    printData.functions[key] = {
+                        drawQRCode: [content, el.x, el.y, 2, 4] 
+                    };
+                } else {
+                    // Draw Text
+                    // drawText: [data, x, y, font, size, rotation, bold, italic, alignment]
+                    // Need to map font size to Bixolon device font index or true type
+                    const fontSize = el.fontSize > 20 ? 2 : 1; 
+                    printData.functions[key] = {
+                        drawText: [content, el.x, el.y, 0, fontSize, 0, 0, 0, 0] 
+                    };
+                }
+            });
+
+            // Print Command
+            printData.functions[`func${funcIdx}`] = { printBuffer: [] };
+
+            // 2. Send to Local Agent
+            // In a real scenario, this would be a fetch call to the Bixolon Web Agent
+            // await fetch(`http://${config.ip}:${config.port}/WebPrintSDK`, {
+            //     method: 'POST',
+            //     body: JSON.stringify(printData)
+            // });
+            
+            // Simulation
+            console.log('[Bixolon] Sending Data to Agent:', JSON.stringify(printData, null, 2));
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+
+            console.log('[Bixolon] Print Success');
+            setPrinting(false);
+            return true;
+
+        } catch (err: any) {
+            console.error('[Bixolon] Print Failed:', err);
+            setError(err.message);
+            setPrinting(false);
+            return false;
+        }
+    };
+
+    return { printBadge, printing, error };
+};

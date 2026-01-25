@@ -1,0 +1,121 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- SUPER ADMIN GOD MODE ---
+    // If email matches, allow EVERYTHING.
+    // This must come FIRST and be most specific to override other rules
+    match /{document=**} {
+      allow read, write: if request.auth != null && request.auth.token.email == 'aaron@beoksolution.com';
+    }
+
+    // --- STANDARD RULES (For others) ---
+    
+    // Society Rules (Keep Protected)
+    match /societies/{societyId} {
+      allow read: if true;
+      allow write: if true; // OPEN PERMISSIONS (Legacy support, consider tightening)
+
+      match /{allSubcollections=**} { 
+         allow read, write: if true; 
+      }
+    }
+
+    // Platform System Settings (Terms, etc.)
+    match /system/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null; // Standard auth write (Super admin overrides this anyway)
+    }
+
+    // *** EMERGENCY FIX: OPEN CONFERENCE CREATION ***
+    match /conferences/{confId} {
+      // Open read/write for conference documents
+      allow read: if true;
+      allow write: if true;
+
+      // All conference subcollections - open read access
+      match /{document=**} {
+        allow read: if true;
+        // Write restricted to super admin unless specifically overridden
+        allow write: if request.auth != null && request.auth.token.email == 'aaron@beoksolution.com';
+      }
+
+      // Registrations: Owner-only access for security (override from above)
+      // [Fix-Step 370] Support guest auto-save with data field validation
+      // Allow write if: document owner, or saved data's userId matches auth, or super admin
+      match /registrations/{userId} {
+        allow read: if request.auth.uid == userId || request.auth.token.email == 'aaron@beoksolution.com';
+        allow write: if request.auth.uid == userId 
+                     || (request.auth != null && request.resource.data.userId == request.auth.uid) 
+                     || request.auth.token.email == 'aaron@beoksolution.com';
+        
+         match /logs/{logId} {
+           allow read, write: if request.auth.uid == userId; 
+         }
+      }
+
+      // Booth Visits: Vendor Ownership Logic (override from above)
+      match /booth_visits/{visitId} {
+         allow read: if request.auth != null && (resource.data.vendorId == request.auth.uid || resource.data.vendorId == request.auth.token.vendorId);
+         allow create: if request.auth != null && request.resource.data.vendorId == request.auth.uid;
+      }
+    }
+
+    // [FIX] Allow collection group queries for registrations (My Page issue)
+    // This allows queries from any path (e.g., collectionGroup('registrations'))
+    match /{path=**}/registrations/{regId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // [FIX] Allow collection group queries for abstracts (Abstracts Error)
+    match /{path=**}/submissions/{absId} {
+      // Support both member (userId/submitterId) and non-member (registrationId/submitterId)
+      allow read: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.submitterId == request.auth.uid ||
+        resource.data.registrationId == request.auth.uid  // Non-member support
+      );
+      allow create: if request.auth != null && (
+        request.resource.data.userId == request.auth.uid ||
+        request.resource.data.submitterId == request.auth.uid ||
+        request.resource.data.registrationId == request.auth.uid  // Non-member support
+      );
+      allow update: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.submitterId == request.auth.uid ||
+        resource.data.registrationId == request.auth.uid  // Non-member support
+      );
+      allow delete: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.submitterId == request.auth.uid ||
+        resource.data.registrationId == request.auth.uid  // Non-member support
+      );
+    }
+
+    // [BLOCK] Root registrations access permanently
+    match /registrations/{document=**} {
+      allow read, write: if false;
+    }
+
+    // Users: Owner can Read/Write their own data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // ALLOW SUBCOLLECTION WRITE 
+      match /society_guests/{guestId} { 
+        allow read, write: if request.auth != null && request.auth.uid == userId; 
+      }
+      
+      // ALLOW PARTICIPATION HISTORY READ (for My Page)
+      match /participations/{participationId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+    
+    // Members List (Allow Authenticated Search/Read/Update for Verification)
+    match /members/{document=**} {
+      allow read, update: if request.auth != null;
+    }
+  }
+}

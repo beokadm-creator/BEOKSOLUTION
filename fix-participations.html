@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Participations Recovery Tool</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #2d80c6;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, button {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #2d80c6;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #1a5a8c;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #output {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Participations 복구 도구</h1>
+        <p>결제 완료된 사용자가 마이페이지에서 등록 내역을 볼 수 없을 때 사용합니다.</p>
+        
+        <div class="form-group">
+            <label for="userId">User UID:</label>
+            <input type="text" id="userId" placeholder="예: K2ufvNWpJsNc0KbyrGdZLf4PdU32" value="K2ufvNWpJsNc0KbyrGdZLf4PdU32">
+        </div>
+        
+        <div class="form-group">
+            <label for="conferenceId">Conference ID (선택사항):</label>
+            <input type="text" id="conferenceId" placeholder="예: kadd_2026spring">
+        </div>
+        
+        <button id="recoverBtn" onclick="recoverParticipations()">🚀 참여 기록 복구 시작</button>
+        
+        <div id="output">결과가 여기에 표시됩니다...</div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyC7xR1tF3nY2qW5zX6vK7aB8cD9eF0gH1",
+            authDomain: "eregi-8fc1e.firebaseapp.com",
+            projectId: "eregi-8fc1e",
+            storageBucket: "eregi-8fc1e.appspot.com",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abcdef123456"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        async function recoverParticipations() {
+            const userId = document.getElementById('userId').value.trim();
+            const conferenceId = document.getElementById('conferenceId').value.trim();
+            const output = document.getElementById('output');
+            const btn = document.getElementById('recoverBtn');
+            
+            if (!userId) {
+                output.innerHTML = '<span class="error">❌ User UID를 입력하세요.</span>';
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = '⏳ 복구 중...';
+            output.innerHTML = '<span class="info">🔍 검색 중...</span>\n';
+            
+            try {
+                // Step 1: Find all paid registrations for this user
+                let registrationsQuery = db.collectionGroup('registrations')
+                    .where('userId', '==', userId)
+                    .where('status', '==', 'PAID');
+                
+                // If conferenceId is specified, also filter by conferenceId (path-based)
+                if (conferenceId) {
+                    // Need to query from specific conference path
+                    const specificQuery = db.collection(`conferences/${conferenceId}/registrations`)
+                        .where('userId', '==', userId)
+                        .where('status', '==', 'PAID');
+                    
+                    const specificSnap = await specificQuery.get();
+                    
+                    if (specificSnap.empty) {
+                        output.innerHTML += '<span class="info">📋 이 컨퍼런스에서는 결제 완료된 등록을 찾지 못했습니다. 전체 검색을 시도합니다...</span>\n';
+                    } else {
+                        output.innerHTML += `<span class="success">✅ ${specificSnap.size}개의 결제 완료된 등록을 찾았습니다.</span>\n`;
+                        await processRegistrations(specificSnap, userId, output);
+                        btn.disabled = false;
+                        btn.textContent = '🚀 참여 기록 복구 시작';
+                        return;
+                    }
+                }
+                
+                // Step 2: If no specific conference or not found, search all
+                const registrationSnap = await registrationsQuery.get();
+                
+                if (registrationSnap.empty) {
+                    output.innerHTML += '<span class="error">❌ 결제 완료된 등록을 찾지 못했습니다.</span>\n';
+                    btn.disabled = false;
+                    btn.textContent = '🚀 참여 기록 복구 시작';
+                    return;
+                }
+                
+                output.innerHTML += `<span class="success">✅ 전체 검색에서 ${registrationSnap.size}개의 결제 완료된 등록을 찾았습니다.</span>\n`;
+                
+                await processRegistrations(registrationSnap, userId, output);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                output.innerHTML += `<span class="error">❌ 오류 발생: ${error.message}</span>\n`;
+                if (error.message.includes('index')) {
+                    output.innerHTML += '<span class="info">⚠️ 컬렉션 그룹 인덱스가 필요합니다. Firebase Console에서 인덱스를 생성해 주세요.</span>\n';
+                }
+            }
+            
+            btn.disabled = false;
+            btn.textContent = '🚀 참여 기록 복구 시작';
+        }
+
+        async function processRegistrations(snap, userId, output) {
+            const participationRef = db.collection(`users/${userId}/participations`);
+            let recoveredCount = 0;
+            let skippedCount = 0;
+            const batch = db.batch();
+            
+            for (const doc of snap.docs) {
+                const regData = doc.data();
+                const regId = doc.id;
+                
+                // Check if participation already exists
+                const existingParticipation = await participationRef.doc(regId).get();
+                
+                if (existingParticipation.exists) {
+                    output.innerHTML += `<span class="info">ℹ️ 참여 기록 ${regId}은 이미 존재합니다. 건너뜁니다.</span>\n`;
+                    skippedCount++;
+                    continue;
+                }
+                
+                // Extract conference info
+                let confId = regData.conferenceId;
+                if (!confId && doc.ref.parent.parent) {
+                    confId = doc.ref.parent.parent.id;
+                }
+                
+                // Create participation record
+                const participationData = {
+                    conferenceId: confId || 'unknown',
+                    societyId: regData.societyId || 'kadd',
+                    slug: regData.slug || 'kadd_2026spring',
+                    userName: regData.userName || regData.userInfo?.name || 'Unknown',
+                    userEmail: regData.userEmail || regData.userInfo?.email || '',
+                    userPhone: regData.userPhone || regData.userInfo?.phone || '',
+                    userOrg: regData.userOrg || regData.userInfo?.org || regData.affiliation || '',
+                    licenseNumber: regData.licenseNumber || '',
+                    tier: regData.tier || regData.grade || 'UNKNOWN',
+                    paymentStatus: 'PAID',
+                    amount: regData.amount || 0,
+                    paymentKey: regData.paymentKey || '',
+                    paymentType: regData.paymentType || '카드',
+                    createdAt: regData.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
+                    paidAt: regData.paidAt || firebase.firestore.FieldValue.serverTimestamp(),
+                    earnedPoints: 0
+                };
+                
+                batch.set(participationRef.doc(regId), participationData);
+                recoveredCount++;
+                
+                output.innerHTML += `<span class="success">✅ 참여 기록 생성: ${regId} (${participationData.slug})</span>\n`;
+            }
+            
+            // Commit batch (max 500 operations)
+            if (recoveredCount > 0) {
+                await batch.commit();
+                output.innerHTML += `<span class="success">🎉 성공적으로 ${recoveredCount}개의 참여 기록을 복구했습니다! ${skippedCount}개는 이미 존재하여 건너뛰었습니다.</span>\n`;
+            } else {
+                output.innerHTML += '<span class="info">ℹ️ 복구할 참여 기록이 없습니다. (이미 모두 존재)</span>\n';
+            }
+        }
+    </script>
+</body>
+</html>

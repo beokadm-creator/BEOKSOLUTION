@@ -1,0 +1,61 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- SUPER ADMIN GOD MODE ---
+    // If email matches, allow EVERYTHING.
+    match /{document=**} {
+      allow read, write: if request.auth != null && request.auth.token.email == 'aaron@beoksolution.com';
+    }
+
+    // --- STANDARD RULES (For others) ---
+    
+    // Society Rules (Keep Protected)
+    match /societies/{societyId} {
+      allow read: if true;
+      allow write: if true; // OPEN PERMISSIONS (Legacy support, consider tightening)
+
+      match /{allSubcollections=**} { 
+         allow read, write: if true; 
+      }
+    }
+
+    // Platform System Settings (Terms, etc.)
+    match /system/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null; // Standard auth write (Super admin overrides this anyway)
+    }
+
+    // *** EMERGENCY FIX: OPEN CONFERENCE CREATION ***
+    match /conferences/{confId} {
+      allow read: if true;
+      allow write: if true; // <--- FORCE OPEN (TEMPORARY)
+
+      match /{document=**} {
+         allow read: if true;
+         allow write: if true;
+      }
+    }
+
+    // Allow Global Registrations (for Admin List)
+    match /registrations/{document=**} {
+      allow read, write: if true;
+    }
+
+    // Users: Owner can Read/Write their own data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // ALLOW SUBCOLLECTION WRITE 
+      match /society_guests/{guestId} { 
+        allow read, write: if request.auth != null && request.auth.uid == userId; 
+      } 
+    }
+    
+    // Members List (Allow Authenticated Search/Read/Update for Verification)
+    // CHANGED: {document=**} allows collection group queries
+    match /members/{document=**} {
+      allow read, update: if request.auth != null;
+    }
+  }
+}
