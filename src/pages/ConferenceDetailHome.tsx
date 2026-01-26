@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { SESSION_KEYS } from '../utils/cookie';
+import { SESSION_KEYS, clearNonMemberSessions } from '../utils/cookie';
 import { auth as firebaseAuth } from '../firebase';
+import { useAuth } from '../hooks/useAuth';
+import { useNonMemberAuth } from '../hooks/useNonMemberAuth';
 import toast from 'react-hot-toast';
 
 // 1. SAFE DATE UTILITY (Outside component)
@@ -23,6 +25,14 @@ const ConferenceDetailHome: React.FC = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
 
+  // Auth state for guest detection
+  const { auth } = useAuth('');
+  const user = auth.user;
+  const isAnonymous = (user as any)?.isAnonymous || false;
+
+  // Non-member auth hook
+  const { logout: logoutNonMember } = useNonMemberAuth(slug);
+
   // Non-member session state
   const [isNonMemberRegistered, setIsNonMemberRegistered] = useState(false);
   const [nonMemberSession, setNonMemberSession] = useState<any>(null);
@@ -38,7 +48,25 @@ const ConferenceDetailHome: React.FC = () => {
     exists: false // Flag to track if real data is loaded
   });
 
-  useEffect(() => {
+    // [CRITICAL] Clear stale non-member sessions on mount
+    // This prevents issues where users return to conference home after leaving registration page
+    useEffect(() => {
+        if (isAnonymous) {
+            console.log('[ConferenceDetailHome] Clearing stale non-member session for anonymous user');
+            // Clear sessionStorage NON_MEMBER session
+            try {
+                sessionStorage.removeItem('NON_MEMBER');
+            } catch (e) {
+                console.warn('[ConferenceDetailHome] Failed to clear NON_MEMBER session:', e);
+            }
+            // Call logout from useNonMemberAuth to clear any remaining state
+            if (logoutNonMember) {
+                logoutNonMember();
+            }
+        }
+    }, [isAnonymous, logoutNonMember]);
+
+    useEffect(() => {
     if (!slug) return;
     console.log("Fetching conference:", slug); // Debug Log
 
@@ -123,8 +151,8 @@ const ConferenceDetailHome: React.FC = () => {
       <header className="bg-white shadow-sm py-4 px-6 flex justify-between items-center sticky top-0 z-10">
         <div className="font-bold text-xl text-blue-900">{conf.societyName}</div>
         <div className="space-x-3">
-             <button onClick={() => navigate(`/${slug}/auth?mode=login`)} className="text-gray-600 font-medium text-sm">Log In</button>
-             <button onClick={() => navigate(`/${slug}/mypage`)} className="bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm font-bold">My Badge</button>
+             <button type="button" onClick={() => navigate(`/${slug}/auth?mode=login`)} className="text-gray-600 font-medium text-sm">Log In</button>
+             <button type="button" onClick={() => navigate(`/${slug}/mypage`)} className="bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm font-bold">My Badge</button>
         </div>
       </header>
 
@@ -138,28 +166,49 @@ const ConferenceDetailHome: React.FC = () => {
                 <p>📍 {conf.location}</p>
             </div>
 
-            {/* REGISTER BUTTON (Only show if data exists and not registered as non-member) */}
+            {/* REGISTER BUTTON - COMPLETE MEMBER/GUEST SEPARATION */}
             {conf.exists ? (
                 <>
-                    {isNonMemberRegistered ? (
-                        <div className="space-y-4">
+                    {/* [GUEST LOGIC] Anonymous users ALWAYS see Register button with mode=guest */}
+                    {isAnonymous ? (
+                        <>
                             <button
-                                onClick={() => navigate(`/${slug}/check-status`)}
-                                className="bg-green-600 text-white text-xl font-bold px-12 py-5 rounded-full shadow-lg hover:bg-green-700 hover:scale-105 transition-all"
+                                type="button"
+                                onClick={() => navigate(`/${slug}/register?mode=guest`)}
+                                className="bg-blue-600 text-white text-xl font-bold px-12 py-5 rounded-full shadow-lg hover:bg-blue-700 hover:scale-105 transition-all"
                             >
-                                비회원등록조회 (Check Status)
+                                사전등록 신청하기 (Register)
                             </button>
-                            <p className="text-gray-600 text-sm">
-                                이미 등록된 비회원입니다. 위 버튼을 클릭하여 등록 내역을 확인하세요.
+                            <p className="text-blue-600 text-sm mt-3">
+                                🔵 비회원으로 진행합니다. 이 브라우저에서만 접수 내역을 확인할 수 있습니다.
                             </p>
-                        </div>
+                        </>
                     ) : (
-                        <button
-                            onClick={() => navigate(`/${slug}/register?mode=guest`)}
-                            className="bg-blue-600 text-white text-xl font-bold px-12 py-5 rounded-full shadow-lg hover:bg-blue-700 hover:scale-105 transition-all"
-                        >
-                            사전등록 신청하기 (Register)
-                        </button>
+                        /* [MEMBER LOGIC] Logged-in users: Check if already registered */
+                        <>
+                            {isNonMemberRegistered ? (
+                                <div className="space-y-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate(`/${slug}/check-status`)}
+                                        className="bg-green-600 text-white text-xl font-bold px-12 py-5 rounded-full shadow-lg hover:bg-green-700 hover:scale-105 transition-all"
+                                    >
+                                        비회원등록조회 (Check Status)
+                                    </button>
+                                    <p className="text-gray-600 text-sm">
+                                        이미 등록된 비회원입니다. 위 버튼을 클릭하여 등록 내역을 확인하세요.
+                                    </p>
+                                </div>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => navigate(`/${slug}/register?mode=member`)}
+                                    className="bg-blue-600 text-white text-xl font-bold px-12 py-5 rounded-full shadow-lg hover:bg-blue-700 hover:scale-105 transition-all"
+                                >
+                                    사전등록 신청하기 (Register)
+                                </button>
+                            )}
+                        </>
                     )}
                 </>
             ) : (

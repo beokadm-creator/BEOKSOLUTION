@@ -1095,20 +1095,37 @@ export const resumeGuestRegistration = functions
             });
 
             // Check password if available
-            if (regData.password) {
+            if (regData.password && regData.password.trim() !== '') {
+                // Only validate if password exists and is not empty string
                 const simpleHash = Buffer.from(password + "_SALT_" + email).toString('base64');
                 let passwordMatch = regData.password === password || regData.password === simpleHash;
 
                 if (!passwordMatch) {
                     functions.logger.warn('[resumeGuestRegistration] Password mismatch in fallback', {
                         email,
-                        regId: regDoc.id
+                        regId: regDoc.id,
+                        hasPasswordInDoc: !!regData.password,
+                        passwordType: typeof regData.password,
+                        inputPasswordLength: password.length,
+                        docPasswordLength: regData.password.length
                     });
                     return {
                         success: false,
                         message: '이메일 또는 비밀번호가 일치하지 않습니다.'
                     };
                 }
+            } else {
+                // No password stored in registration document (or empty string)
+                functions.logger.warn('[resumeGuestRegistration] No password found in registration', {
+                    email,
+                    regId: regDoc.id,
+                    hasPassword: !!regData.password,
+                    passwordLength: regData.password?.length || 0
+                });
+                return {
+                    success: false,
+                    message: '등록된 비밀번호 정보를 찾을 수 없습니다. 관리자에게 문의해주세요.'
+                };
             }
 
             // Return registration data

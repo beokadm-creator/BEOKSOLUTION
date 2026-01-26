@@ -204,11 +204,11 @@ import { SESSION_KEYS } from '../utils/cookie';
 
              {/* 학술대회 홈페이지 바로 가기 버튼 */}
              <a
-               href={`https://${window.location.hostname}/${slug.split('_')[1]}`}
-               className="inline-block w-full mt-4 py-3 px-6 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors text-center"
-             >
-                학술대회 홈페이지 바로 가기
-             </a>
+                href={`https://${window.location.hostname}/${slug && slug.includes('_') ? slug.split('_')[1] : slug || ''}`}
+                className="inline-block w-full mt-4 py-3 px-6 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors text-center"
+              >
+                 학술대회 홈페이지 바로 가기
+              </a>
           </div>
         </div>
    );

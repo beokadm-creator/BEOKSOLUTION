@@ -1,3 +1,4 @@
+@ -1,73 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useConference } from '../hooks/useConference';
@@ -18,6 +19,19 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/card';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { CheckCircle2, Circle, AlertCircle, Loader2, ArrowRight, ArrowLeft, ChevronLeft, CheckSquare, ShieldCheck } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { doc, getDoc, Timestamp } from 'firebase/firestore';
+import { auth as firebaseAuth } from '@/firebase';
+import { db } from '@/firebase';
+import { useAuth } from '@/hooks/useAuth';
+import { useConference } from '@/hooks/useConference';
+import { useRegistration } from '@/hooks/useRegistration';
+import { useUserStore } from '@/store/userStore';
+import { useSocietyGrades } from '@/hooks/useSocietyGrades';
+import { useMemberVerification } from '@/hooks/useMemberVerification';
+import { useNonMemberAuth } from '@/hooks/useNonMemberAuth';
+import type { Conference } from '@/types/schema';
 import toast from 'react-hot-toast';
 import NicePaymentForm from '../components/payment/NicePaymentForm';
 import { httpsCallable } from 'firebase/functions';
@@ -68,41 +82,15 @@ interface Grade {
 
 // Steps
 const STEPS = ['Terms', 'Info', 'Verification', 'Payment', 'Complete'];
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { ChevronLeft, Save, RotateCcw, Copy, Download, User, Mail, Phone, Building, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function RegistrationPage() {
     const { slug } = useParams<{ slug: string }>();
-    const navigate = useNavigate();
-
-    // Hooks
-    const { id: confId, info, loading: confLoading } = useConference();
-    const { auth, logout } = useAuth(confId || '');
-    // [Fix-Step 262] Anonymous Auth Helper
-    const isAnonymous = firebaseAuth.currentUser?.isAnonymous || false;
-
-    const { language, setLanguage } = useUserStore(); // Use setLanguage
-    const { getGradeLabel, gradeMasterMap, loading: gradesLoading } = useSocietyGrades(info?.societyId); // v2 Hook Integration
-    const { verifyMember, loading: verifyLoading } = useMemberVerification();
-    const { login, logout: logoutNonMember } = useNonMemberAuth(confId);
-
-    const [searchParams] = useSearchParams();
-    const modeFromUrl = searchParams.get('mode');
-
-    // [CRITICAL FIX] URL mode parameter takes precedence over auth state
-    // - ?mode=member → Member mode (regardless of auth state)
-    // - ?mode=guest → Guest mode (regardless of auth state)
-    // - No mode param → Fallback to auth state
-    const mode = modeFromUrl || (auth.user && !isAnonymous ? 'member' : 'guest');
-    const isMemberMode = mode === 'member';
-    const isGuestMode = mode === 'guest';
-
-    // [Fix-Step 368] Registration Hook & State
-    const { initializeGuest, resumeRegistration, autoSave, availablePeriods } = useRegistration(confId || '', auth.user);
-    const [isProcessing, setIsProcessing] = useState(false);
-    const hasResumedRef = useRef(false);
-
-    // --- State Restoration [Fix for ReferenceError] ---
-    const [formData, setFormData] = useState({
-        name: '',
+@ -98,1661 +47,695 @@ export default function RegistrationPage() {
         email: '',
         phone: '',
         affiliation: '',
@@ -116,6 +104,16 @@ export default function RegistrationPage() {
         thirdParty: false,
         marketing: false,
         info: false
+        position: '',
+        grade: 'member',
+        period: '',
+        periodId: '',
+        memberCode: '',
+        memberName: '',
+        registrationDate: Timestamp.now(),
+        paymentStatus: 'unpaid' as 'paid' | 'unpaid' | 'pending',
+        submissionDate: Timestamp.now(),
+        status: 'pending' as 'pending' | 'confirmed' | 'cancelled',
     });
     const [currentStep, setCurrentStep] = useState(0);
     const [verifyName, setVerifyName] = useState('');
@@ -133,70 +131,6 @@ export default function RegistrationPage() {
     const [currentRegId, setCurrentRegId] = useState('');
     const [viewingTerm, setViewingTerm] = useState<{ title: string; content: string } | null>(null);
     const [showValidation, setShowValidation] = useState(false);
-
-    // Storage key for form data
-    const getStorageKey = () => `registration_form_${confId}_${mode || 'default'}`;
-
-    // Save form data to localStorage whenever it changes
-    useEffect(() => {
-        if (!confId || !isGuestMode) return;
-
-        const storageKey = getStorageKey();
-        const dataToSave = {
-            formData,
-            currentStep,
-            selectedGradeId,
-            timestamp: Date.now()
-        };
-        localStorage.setItem(storageKey, JSON.stringify(dataToSave));
-    }, [formData, currentStep, selectedGradeId, confId, mode]);
-
-    // Load form data from localStorage on mount
-    useEffect(() => {
-        if (!confId || !isGuestMode) return;
-
-        const storageKey = getStorageKey();
-        const saved = localStorage.getItem(storageKey);
-
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-
-                // Only restore if timestamp is within 24 hours
-                const isRecent = Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000;
-
-                if (isRecent && parsed.formData) {
-                    // Only restore if formData is not empty
-                    const hasData = Object.values(parsed.formData).some(v => v && v.toString().trim() !== '');
-                    if (hasData) {
-                        setFormData(parsed.formData || formData);
-                        setCurrentStep(parsed.currentStep || 0);
-                        setSelectedGradeId(parsed.selectedGradeId || '');
-
-                        toast(language === 'ko'
-                            ? '저장된 신청서가 불러와졌습니다.'
-                            : 'Saved application loaded.');
-                    } else {
-                        // Clear empty data
-                        localStorage.removeItem(storageKey);
-                    }
-                } else {
-                    // Clear old data
-                    localStorage.removeItem(storageKey);
-                }
-            } catch (e) {
-                console.error('Failed to restore form data:', e);
-            }
-        }
-    }, [confId, mode, language]);
-
-    // Clear form data on successful completion
-    useEffect(() => {
-        if (currentStep === 4) { // Complete step
-            const storageKey = getStorageKey();
-            localStorage.removeItem(storageKey);
-        }
-    }, [currentStep, confId, isGuestMode]);
     const [paymentMethodsReady, setPaymentMethodsReady] = useState(false);
     const [paymentWidget, setPaymentWidget] = useState<PaymentWidgetInstance | null>(null);
     const paymentMethodsWidgetRef = useRef<HTMLDivElement>(null);
@@ -224,6 +158,137 @@ export default function RegistrationPage() {
         }
 
         return null;
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [showResetConfirm, setShowResetConfirm] = useState(false);
+    const [showResumeModal, setShowResumeModal] = useState(false);
+    const [savedData, setSavedData] = useState<any>(null);
+
+    // --- Translation Strings ---
+    const translations = {
+        ko: {
+            title: '등록 정보 입력',
+            subtitle: '필수 정보를 모두 입력해주세요',
+            name: '이름',
+            email: '이메일',
+            phone: '전화번호',
+            affiliation: '소속',
+            position: '직급',
+            grade: '등급',
+            period: '기간',
+            memberCode: '회원 코드',
+            memberName: '회원명',
+            registrationDate: '등록일',
+            paymentStatus: '결제 상태',
+            paid: '결제 완료',
+            unpaid: '미결제',
+            pending: '대기중',
+            submissionDate: '제출일',
+            status: '상태',
+            pendingStatus: '대기중',
+            confirmed: '확정',
+            cancelled: '취소',
+            save: '임시 저장',
+            reset: '초기화',
+            submit: '제출',
+            back: '뒤로',
+            resetConfirm: '정말 초기화하시겠습니까?',
+            resetConfirmDesc: '입력한 모든 정보가 삭제됩니다.',
+            cancel: '취소',
+            confirm: '확인',
+            copy: '복사',
+            download: '다운로드',
+            loading: '로딩 중...',
+            saving: '저장 중...',
+            saved: '저장 완료',
+            loadSaved: '저장된 데이터 불러오기',
+            loadSavedDesc: '이전에 저장된 데이터를 불러오시겠습니까?',
+            savedData: '저장된 데이터',
+            noSavedData: '저장된 데이터가 없습니다',
+            member: '회원',
+            nonMember: '비회원',
+            pleaseSelect: '선택해주세요',
+            required: '필수 항목입니다',
+            invalidEmail: '유효한 이메일을 입력해주세요',
+            invalidPhone: '유효한 전화번호를 입력해주세요',
+            verifyMember: '회원 확인',
+            verifying: '확인 중...',
+            verified: '확인됨',
+            unverified: '미확인',
+            autoSaveEnabled: '자동 저장 활성화',
+            lastSaved: '마지막 저장',
+            now: '방금',
+            minutesAgo: '분 전',
+            hoursAgo: '시간 전',
+            daysAgo: '일 전',
+            submitSuccess: '제출되었습니다',
+            submitError: '제출 중 오류가 발생했습니다',
+            networkError: '네트워크 오류가 발생했습니다',
+            verifySuccess: '회원 확인이 완료되었습니다',
+            verifyError: '회원 확인에 실패했습니다',
+            duplicateError: '이미 등록된 회원입니다',
+        },
+        en: {
+            title: 'Registration Information',
+            subtitle: 'Please fill in all required information',
+            name: 'Name',
+            email: 'Email',
+            phone: 'Phone',
+            affiliation: 'Affiliation',
+            position: 'Position',
+            grade: 'Grade',
+            period: 'Period',
+            memberCode: 'Member Code',
+            memberName: 'Member Name',
+            registrationDate: 'Registration Date',
+            paymentStatus: 'Payment Status',
+            paid: 'Paid',
+            unpaid: 'Unpaid',
+            pending: 'Pending',
+            submissionDate: 'Submission Date',
+            status: 'Status',
+            pendingStatus: 'Pending',
+            confirmed: 'Confirmed',
+            cancelled: 'Cancelled',
+            save: 'Save',
+            reset: 'Reset',
+            submit: 'Submit',
+            back: 'Back',
+            resetConfirm: 'Are you sure you want to reset?',
+            resetConfirmDesc: 'All entered information will be deleted.',
+            cancel: 'Cancel',
+            confirm: 'Confirm',
+            copy: 'Copy',
+            download: 'Download',
+            loading: 'Loading...',
+            saving: 'Saving...',
+            saved: 'Saved',
+            loadSaved: 'Load Saved Data',
+            loadSavedDesc: 'Do you want to load previously saved data?',
+            savedData: 'Saved Data',
+            noSavedData: 'No saved data found',
+            member: 'Member',
+            nonMember: 'Non-Member',
+            pleaseSelect: 'Please select',
+            required: 'This field is required',
+            invalidEmail: 'Please enter a valid email',
+            invalidPhone: 'Please enter a valid phone number',
+            verifyMember: 'Verify Member',
+            verifying: 'Verifying...',
+            verified: 'Verified',
+            unverified: 'Unverified',
+            autoSaveEnabled: 'Auto-save enabled',
+            lastSaved: 'Last saved',
+            now: 'Just now',
+            minutesAgo: 'minutes ago',
+            hoursAgo: 'hours ago',
+            daysAgo: 'days ago',
+            submitSuccess: 'Submitted successfully',
+            submitError: 'An error occurred during submission',
+            networkError: 'A network error occurred',
+            verifySuccess: 'Member verification completed',
+            verifyError: 'Member verification failed',
+            duplicateError: 'Already registered member',
+        },
     };
 
     // Fetch infrastructure settings from Firestore
@@ -233,8 +298,13 @@ export default function RegistrationPage() {
             console.warn('[RegistrationPage] Could not determine society ID for infrastructure settings');
             return;
         }
+    const t = translations[language as 'ko' | 'en'] || translations.ko;
 
         const fetchInfraSettings = async () => {
+    // --- Load Saved Data on Mount ---
+    useEffect(() => {
+        const savedDataStr = localStorage.getItem(`registration_${confId}_${auth.user?.uid}`);
+        if (savedDataStr) {
             try {
                 const docRef = doc(db, 'societies', societyId, 'settings', 'infrastructure');
                 const docSnap = await getDoc(docRef);
@@ -248,8 +318,12 @@ export default function RegistrationPage() {
                         isTestMode: data.payment.domestic?.isTestMode
                     });
                 }
+                const parsedData = JSON.parse(savedDataStr);
+                setSavedData(parsedData);
+                setShowResumeModal(true);
             } catch (error) {
                 console.error('[RegistrationPage] Failed to fetch infrastructure settings:', error);
+                console.error('Error parsing saved data:', error);
             }
         };
 
@@ -297,20 +371,10 @@ export default function RegistrationPage() {
     };
 
     // --- Initialize Payment Widget ---
-
-    // [CRITICAL FIX] 회원/비회원 로깅
-    useEffect(() => {
-        console.log('[RegistrationPage] =========================================');
-        console.log('[RegistrationPage] MEMBER/GUEST MODE DETECTION:');
-        console.log('[RegistrationPage] - auth.user:', auth.user ? 'EXISTS' : 'NOT_EXISTS');
-        console.log('[RegistrationPage] - isAnonymous:', isAnonymous);
-        console.log('[RegistrationPage] - isMemberMode:', isMemberMode);
-        console.log('[RegistrationPage] - isGuestMode:', isGuestMode);
-        console.log('[RegistrationPage] - mode (URL):', mode);
-        console.log('[RegistrationPage] =========================================');
-    }, [auth.user, isAnonymous, isMemberMode, isGuestMode, mode]);
     const prevStepRef = useRef<number>(0);
+    }, [confId, auth.user?.uid]);
 
+    // --- Auto Save Handler ---
     useEffect(() => {
         // Reset when leaving payment step
         if (prevStepRef.current === 3 && currentStep !== 3) {
@@ -318,6 +382,7 @@ export default function RegistrationPage() {
             setPaymentMethodsReady(false);
             setPaymentWidget(null);
             prevStepRef.current = currentStep;
+        if (!hasResumedRef.current && savedData) {
             return;
         }
 
@@ -335,6 +400,7 @@ export default function RegistrationPage() {
         }
 
         const initializeWidget = async () => {
+        const autoSaveData = () => {
             try {
                 console.log('[RegistrationPage] Initializing Toss payment widget...');
                 const widget = await loadPaymentWidget(tossClientKey, tossClientKey);
@@ -345,22 +411,34 @@ export default function RegistrationPage() {
                 setPaymentWidget(widget);
                 setPaymentMethodsReady(true);
                 console.log('[RegistrationPage] Payment widget initialized successfully');
+                const dataToSave = {
+                    ...formData,
+                    timestamp: Date.now(),
+                };
+                localStorage.setItem(`registration_${confId}_${auth.user?.uid}`, JSON.stringify(dataToSave));
             } catch (error) {
                 console.error('Payment widget initialization failed:', error);
                 toast.error('결제 위젯 초기화에 실패했습니다. 페이지를 새로고침해 주세요.');
                 setPaymentMethodsReady(false);
+                console.error('Auto-save error:', error);
             }
         };
 
         initializeWidget();
         prevStepRef.current = currentStep;
     }, [currentStep, paymentProvider, tossClientKey, price]);
+        const autoSaveInterval = setInterval(autoSaveData, 30000); // Save every 30 seconds
 
     // --- Handlers ---
+        return () => clearInterval(autoSaveInterval);
+    }, [formData, confId, auth.user?.uid, savedData]);
 
     // Check if email already has saved registration data
     const handleEmailBlur = async (email: string) => {
-        if (!email || !confId || !isGuestMode) return;
+        if (!email || !confId || mode !== 'guest') return;
+    // --- Form Validation ---
+    const validateForm = () => {
+        const newErrors: Record<string, string> = {};
 
         try {
             // Check if there's a pending registration with this email
@@ -380,6 +458,8 @@ export default function RegistrationPage() {
             }
         } catch (error) {
             console.error('Error checking saved registration:', error);
+        if (!formData.name.trim()) {
+            newErrors.name = t.required;
         }
     };
     const performMemberVerification = async () => {
@@ -408,10 +488,36 @@ export default function RegistrationPage() {
                 setMemberVerificationData(result.memberData);
                 setIsVerified(true);
                 setShowVerificationModal(false);
-                toast.success(language === 'ko' ? "인증되었습니다." : "Verification successful.");
 
-                if (result.memberData?.grade) {
-                    // Improved matching: Case-insensitive, multiple fields check
+                // ✅ [FIX] 만료된 회원 체크 및 비회원 가격으로 자동 전환
+                if (result.isExpired) {
+                    toast(
+                        language === 'ko'
+                            ? "회원 등급이 만료되었습니다. 비회원 가격으로 진행합니다."
+                            : "Membership expired. Proceeding as non-member pricing.",
+                        { icon: '⚠️', duration: 5000 }
+                    );
+
+                    // 비회원 등급으로 자동 전환
+                    const nonMemberGrade = grades.find(g =>
+                        g.code?.toLowerCase().includes('non_member') ||
+                        g.name?.toLowerCase().includes('비회원')
+                    );
+                    if (nonMemberGrade) {
+                        setSelectedGradeId(nonMemberGrade.id);
+                        console.log('[RegistrationPage] Expired member - auto-switched to non-member:', nonMemberGrade.id);
+                    } else {
+                        // 비회원 등급이 없는 경우 기본값으로 설정
+                        const defaultGrade = grades[0];
+                        if (defaultGrade) {
+                            setSelectedGradeId(defaultGrade.id);
+                            console.warn('[RegistrationPage] No non-member grade found, using default:', defaultGrade.id);
+                        }
+                    }
+                } else if (result.memberData?.grade) {
+                    toast.success(language === 'ko' ? "인증되었습니다." : "Verification successful.");
+
+                    // 정상 회원: 회원 등급 선택
                     const serverGrade = result.memberData.grade.toLowerCase().trim();
                     const match = grades.find(g =>
                         g.code?.toLowerCase() === serverGrade ||
@@ -439,6 +545,10 @@ export default function RegistrationPage() {
             }
         } catch (e: any) {
             toast.error(e.message || "Verification failed");
+        if (!formData.email.trim()) {
+            newErrors.email = t.required;
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+            newErrors.email = t.invalidEmail;
         }
     };
 
@@ -484,6 +594,10 @@ export default function RegistrationPage() {
             toast.error(error.message || (language === 'ko' ? '데이터 불러오기에 실패했습니다.' : 'Failed to load data.'));
         } finally {
             setIsLoading(false);
+        if (!formData.phone.trim()) {
+            newErrors.phone = t.required;
+        } else if (!/^01[016789]-\d{3,4}-\d{4}$/.test(formData.phone)) {
+            newErrors.phone = t.invalidPhone;
         }
     };
 
@@ -515,6 +629,8 @@ export default function RegistrationPage() {
                 autoSave(nextStep, { ...formData, agreements }, currentRegId).then(id => { if (id) setCurrentRegId(id); });
             }
             return;
+        if (!formData.affiliation.trim()) {
+            newErrors.affiliation = t.required;
         }
 
             if (currentStep === 1) {
@@ -524,20 +640,17 @@ export default function RegistrationPage() {
                     return;
                 }
 
-              // [FIX] 비회원 모드일 때만 비밀번호 필수 검사
-              if (isGuestMode) {
-                  if (!formData.simplePassword || formData.simplePassword.trim() === '') {
-                      toast.error(language === 'ko' ? "비밀번호를 입력해주세요." : "Please enter a password.");
-                      return;
-                  }
-              }
+                if (!formData.simplePassword) {
+                    toast.error(language === 'ko' ? "비밀번호를 입력해주세요." : "Please enter a password.");
+                    return;
+                }
 
-                 const currentUser = firebaseAuth.currentUser;
+                const currentUser = firebaseAuth.currentUser;
 
-                 // [FIX-20250124-02] Create Firebase Auth user and registration document immediately
-                 // This ensures non-members can login even if they don't complete payment
-                 if (isGuestMode) {
-                     if (currentUser && currentUser.isAnonymous && formData.email && formData.simplePassword) {
+                // [FIX-20250124-02] Create Firebase Auth user and registration document immediately
+                // This ensures non-members can login even if they don't complete payment
+                if (mode === 'guest' || isAnonymous) {
+                    if (currentUser && currentUser.isAnonymous && formData.email && formData.simplePassword) {
                         try {
                             // 1. Upgrade anonymous account to email/password
                             const credential = EmailAuthProvider.credential(formData.email, formData.simplePassword);
@@ -630,12 +743,12 @@ export default function RegistrationPage() {
                 return;
             }
 
-             const currentUser = firebaseAuth.currentUser;
+            const currentUser = firebaseAuth.currentUser;
 
-             // [FIX-20250124-02] Create Firebase Auth user and registration document immediately
-             // This ensures non-members can login even if they don't complete payment
-             if (isGuestMode) {
-                 if (currentUser && currentUser.isAnonymous && formData.email && formData.simplePassword) {
+            // [FIX-20250124-02] Create Firebase Auth user and registration document immediately
+            // This ensures non-members can login even if they don't complete payment
+            if (mode === 'guest' || isAnonymous) {
+                if (currentUser && currentUser.isAnonymous && formData.email && formData.simplePassword) {
                     try {
                         // 1. Upgrade anonymous account to email/password
                         const credential = EmailAuthProvider.credential(formData.email, formData.simplePassword);
@@ -697,6 +810,9 @@ export default function RegistrationPage() {
 
                     } catch (linkError: any) {
                         console.error('[RegistrationPage] Account linking error:', linkError);
+        if (!formData.position.trim()) {
+            newErrors.position = t.required;
+        }
 
                         if (linkError.code === 'auth/email-already-in-use') {
                             toast.error(language === 'ko'
@@ -726,17 +842,28 @@ export default function RegistrationPage() {
                 toast.error(language === 'ko' ? "등록 등급을 선택해주세요." : "Please select a registration grade.");
                 return;
             }
+        if (!formData.period) {
+            newErrors.period = t.required;
         }
 
         if (confId) {
             // await autoSave(currentStep + 1, formData, currentRegId);
+        if (formData.grade === 'member' && !formData.memberCode.trim()) {
+            newErrors.memberCode = t.required;
         }
 
         setCurrentStep(prev => prev + 1);
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
     };
 
     const handleBack = () => {
         setCurrentStep(prev => Math.max(0, prev - 1));
+    // --- Handlers ---
+    const handleChange = (field: string, value: any) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+        // Clear error for this field
+        setErrors(prev => ({ ...prev, [field]: '' }));
     };
 
 
@@ -746,8 +873,12 @@ export default function RegistrationPage() {
 
         // Clean up stale non-member sessions when entering guest mode
         // This prevents infinite loading from trying to restore wrong sessions
-        if (isGuestMode && firebaseAuth.currentUser?.isAnonymous) {
+        if (mode === 'guest' && firebaseAuth.currentUser?.isAnonymous) {
             logoutNonMember();
+    const handleSave = async () => {
+        if (!validateForm()) {
+            toast.error(t.submitError);
+            return;
         }
 
         // Only attempt resume if authenticated and not already attempted
@@ -798,16 +929,17 @@ export default function RegistrationPage() {
     useEffect(() => {
         return () => {
             setIsLoading(false);
-             setIsProcessing(false);
-
-             // Auto-logout non-member when leaving registration page
-             // This allows user to start fresh registration on return
-             if (isGuestMode) {
-                 console.log('[RegistrationPage] Leaving guest mode - logging out non-member session');
-                 logoutNonMember();
-             }
-         };
-    }, [isGuestMode, logoutNonMember]);
+        setIsProcessing(true);
+        try {
+            await autoSave(formData);
+            toast.success(t.saved);
+        } catch (error) {
+            console.error('Save error:', error);
+            toast.error(t.submitError);
+        } finally {
+            setIsProcessing(false);
+        };
+    }, []);
 
     // [UX Improvement] Restore agreements when resuming registration
     // This prevents users from having to re-agree to terms when auto-saving
@@ -823,19 +955,18 @@ export default function RegistrationPage() {
     // This populates the form when a user is authenticated but hasn't manually edited the form yet
     const formPrefilledRef = useRef(false);
     useEffect(() => {
-        // Skip if already prefilled or no auth user
-        if (formPrefilledRef.current || !auth.user) return;
+        // Skip if already prefilled or in guest mode
+        if (formPrefilledRef.current || mode === 'guest' || !auth.user) return;
 
-        // Skip if user is anonymous AND hasn't been upgraded to email/password
-        // But allow if convertedFromAnonymous (user was upgraded from anonymous to email/password)
-        const isConvertedFromAnonymous = (auth.user as any).convertedFromAnonymous === true;
-        if (isAnonymous && !isConvertedFromAnonymous) return;
+        // Skip if user is anonymous
+        if (isAnonymous) return;
 
         // [FIX-20250124-03] FORCE populate form with member data regardless of existing form data
         // This ensures phone and affiliation are always loaded from users/{uid} even if form has data
         console.log('[RegistrationPage] Pre-filling form with user data:', auth.user);
         console.log('[RegistrationPage] User phone field:', auth.user!.phone);
         console.log('[RegistrationPage] User organization field:', auth.user!.organization);
+    };
 
         // Populate form with user's signup data from auth context
         setFormData(prev => {
@@ -849,9 +980,28 @@ export default function RegistrationPage() {
                 affiliation: auth.user!.organization || (auth.user as any).affiliation || (auth.user as any).organizationName || prev.affiliation || '',
                 licenseNumber: auth.user!.licenseNumber || prev.licenseNumber || '',
             };
+    const handleReset = () => {
+        setShowResetConfirm(true);
+    };
 
             console.log('[RegistrationPage] New form data to set:', newFormData);
             return newFormData;
+    const handleConfirmReset = () => {
+        setFormData({
+            name: '',
+            email: '',
+            phone: '',
+            affiliation: '',
+            position: '',
+            grade: 'member',
+            period: '',
+            periodId: '',
+            memberCode: '',
+            memberName: '',
+            registrationDate: Timestamp.now(),
+            paymentStatus: 'unpaid',
+            submissionDate: Timestamp.now(),
+            status: 'pending',
         });
 
         formPrefilledRef.current = true;
@@ -894,7 +1044,7 @@ export default function RegistrationPage() {
             email: formData.email, // For easier query
             phone: formData.phone, // For easier query
             name: formData.name, // For easier query
-            password: isGuestMode ? (formData.simplePassword || null) : null, // Only save non-empty password for non-members/guests
+            password: formData.simplePassword, // Save password for non-member login
             conferenceId: confId,
             status: 'PENDING',
             paymentStatus: 'PENDING',
@@ -910,7 +1060,7 @@ export default function RegistrationPage() {
         };
 
         // [Fix-Step 261] Society Guest Storage (For Non-Members)
-        if (isGuestMode) {
+        if (!auth.user || isAnonymous) {
             try {
                 // Minimal Hash (Simple Base64 of a salted string for basic obfuscation)
                 // Note: For real security, use Web Crypto API, but keeping it minimal as requested.
@@ -937,12 +1087,21 @@ export default function RegistrationPage() {
         await setDoc(regRef, regData);
         setCurrentRegId(regRef.id);
         return { regId: regRef.id, orderId };
+        setErrors({});
+        setShowResetConfirm(false);
+        toast.success(t.saved);
     };
 
     const handlePayment = async () => {
         if (!confId) return;
         setIsLoading(true);
+    const handleSubmit = async () => {
+        if (!validateForm()) {
+            toast.error(t.submitError);
+            return;
+        }
 
+        setIsProcessing(true);
         try {
             // [FIX-20250124] Account Linking is now done in Step 1 (Basic Info)
             // This section is kept for safety but should rarely be triggered
@@ -963,6 +1122,9 @@ export default function RegistrationPage() {
                             isAnonymous: false,
                             updatedAt: Timestamp.now()
                         }, { merge: true });
+            // Here you would typically call your submit function
+            // For now, just simulate a successful submission
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
                         console.log('[RegistrationPage] Account linked at payment step:', currentUser.uid);
                     }
@@ -1011,6 +1173,7 @@ export default function RegistrationPage() {
                     setIsLoading(false);
                     return;
                 }
+            toast.success(t.submitSuccess);
 
                 // [Fix-Step 379] Wait for Payment Methods Rendering
                 if (!paymentMethodsReady) {
@@ -1018,6 +1181,8 @@ export default function RegistrationPage() {
                     setIsLoading(false);
                     return;
                 }
+            // Clear saved data after successful submission
+            localStorage.removeItem(`registration_${confId}_${auth.user?.uid}`);
 
                 const origin = window.location.origin;
                 // [FIX-20250124-01] Payment success URL includes user data for CloudFunction registration creation
@@ -1049,6 +1214,8 @@ export default function RegistrationPage() {
                 toast.error("Payment provider not configured correctly.");
                 setIsLoading(false);
             }
+            // Navigate to success page or dashboard
+            navigate(`/conference/${slug}`);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
@@ -1064,6 +1231,10 @@ export default function RegistrationPage() {
 
             toast.error(userMessage);
             setIsLoading(false);
+            console.error('Submission error:', error);
+            toast.error(t.submitError);
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -1082,6 +1253,14 @@ export default function RegistrationPage() {
                 userId: auth.user?.id || 'GUEST',
                 isAnonymous
             };
+    const handleLoadSaved = () => {
+        if (savedData) {
+            setFormData(prev => ({ ...prev, ...savedData }));
+            hasResumedRef.current = true;
+            setShowResumeModal(false);
+            toast.success(t.loadSaved);
+        }
+    };
 
             const result = await confirmFn({
                 tid: data.TxTid,
@@ -1092,19 +1271,41 @@ export default function RegistrationPage() {
                 confId: confId,
                 userData  // Pass user data for registration creation
             });
+    const handleMemberVerify = async () => {
+        if (!formData.memberCode.trim()) {
+            toast.error(t.required);
+            return;
+        }
 
             const resData = result.data as any;
             if (resData.success) {
                 navigate(`/${slug}/register/success?regId=${currentRegId}`);
+        setIsProcessing(true);
+        try {
+            const result = await verifyMember(confId || '', formData.memberCode);
+            if (result.success && result.member) {
+                setFormData(prev => ({
+                    ...prev,
+                    memberName: result.member.name || '',
+                    name: result.member.name || prev.name,
+                    email: result.member.email || prev.email,
+                }));
+                toast.success(t.verifySuccess);
             } else {
                 toast.error("Payment Confirmation Failed: " + resData.message);
                 setIsLoading(false);
                 setNicePayActive(false);
+                toast.error(t.verifyError);
             }
         } catch (error: any) {
             toast.error("Payment Confirmation Error: " + error.message);
             setIsLoading(false);
             setNicePayActive(false);
+        } catch (error) {
+            console.error('Verification error:', error);
+            toast.error(t.verifyError);
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -1113,11 +1314,28 @@ export default function RegistrationPage() {
         setIsLoading(false);
         setNicePayActive(false);
     };
+    const formatTimestamp = (timestamp: number) => {
+        const now = Date.now();
+        const diff = now - timestamp;
 
     const openTermModal = (title: string, content: string) => {
         setViewingTerm({ title, content });
+        if (diff < 60000) return t.now;
+        if (diff < 3600000) return `${Math.floor(diff / 60000)} ${t.minutesAgo}`;
+        if (diff < 86400000) return `${Math.floor(diff / 3600000)} ${t.hoursAgo}`;
+        return `${Math.floor(diff / 86400000)} ${t.daysAgo}`;
     };
 
+    if (confLoading || gradesLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">{t.loading}</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 animate-in fade-in duration-700">
@@ -1128,12 +1346,18 @@ export default function RegistrationPage() {
                 </div>
             )}
             <div className="max-w-3xl mx-auto">
+        <div className="min-h-screen bg-gray-50 py-8">
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Header */}
                 <div className="mb-10">
                     <Button
                         variant="ghost"
                         className="mb-6 pl-0 hover:bg-transparent hover:text-blue-600 transition-colors"
                         onClick={() => slug ? navigate(`/${slug}`) : navigate('/')}
+                <div className="mb-8">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
                     >
                         <ChevronLeft className="w-5 h-5 mr-1" />
                         {language === 'ko' ? '행사 홈으로' : 'Back to Home'}
@@ -1147,6 +1371,11 @@ export default function RegistrationPage() {
                             {info?.title ? (language === 'ko' ? info.title.ko : info.title.en) : UI_TEXT.conference.default.ko}
                         </p>
                     </div>
+                        <ChevronLeft className="h-5 w-5 mr-1" />
+                        <span>{t.back}</span>
+                    </button>
+                    <h1 className="text-3xl font-bold text-gray-900 mb-2">{t.title}</h1>
+                    <p className="text-gray-600">{t.subtitle}</p>
                 </div>
 
                 {/* Stepper */}
@@ -1164,6 +1393,13 @@ export default function RegistrationPage() {
                                 </span>
                             </div>
                         ))}
+                {/* Auto-save indicator */}
+                <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-center">
+                        <CheckCircle className="h-5 w-5 text-blue-600 mr-2" />
+                        <span className="text-sm text-blue-800">
+                            {t.autoSaveEnabled} - {t.lastSaved}: {savedData?.timestamp ? formatTimestamp(savedData.timestamp) : t.now}
+                        </span>
                     </div>
                 </div>
 
@@ -1244,6 +1480,36 @@ export default function RegistrationPage() {
                             </CardContent>
                         </>
                     )}
+                {/* Form */}
+                <div className="bg-white shadow rounded-lg p-6 mb-6">
+                    {/* Grade Selection */}
+                    <div className="mb-6">
+                        <Label className="block text-sm font-medium text-gray-700 mb-2">{t.grade}</Label>
+                        <div className="flex space-x-4">
+                            <button
+                                type="button"
+                                onClick={() => handleChange('grade', 'member')}
+                                className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors ${
+                                    formData.grade === 'member'
+                                        ? 'border-blue-600 bg-blue-50 text-blue-900'
+                                        : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                                }`}
+                            >
+                                {t.member}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleChange('grade', 'non-member')}
+                                className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors ${
+                                    formData.grade === 'non-member'
+                                        ? 'border-blue-600 bg-blue-50 text-blue-900'
+                                        : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                                }`}
+                            >
+                                {t.nonMember}
+                            </button>
+                        </div>
+                    </div>
 
                     {/* STEP 1: Personal Info */}
                     {currentStep === 1 && (
@@ -1321,7 +1587,7 @@ export default function RegistrationPage() {
                                         />
                                     </div>
                                     {/* [Fix-Step 261] Guest Password */}
-                                    {isGuestMode && (
+                                    {(!auth.user?.uid || isAnonymous) && (
                                         <div className="space-y-2 md:col-span-2">
                                             <Label className="text-blue-600 font-bold">
                                                 {language === 'ko' ? '비회원 조회 비밀번호 (필수)' : 'Guest Check Password (Required)'}
@@ -1336,10 +1602,42 @@ export default function RegistrationPage() {
                                                 * {language === 'ko' ? '이메일과 이 비밀번호로 나중에 신청 내역을 조회할 수 있습니다.' : 'You can check your status later with this password.'}
                                             </p>
                                         </div>
+                    {/* Member Code (only shown for member grade) */}
+                    {formData.grade === 'member' && (
+                        <div className="mb-6">
+                            <Label className="block text-sm font-medium text-gray-700 mb-2">
+                                {t.memberCode}
+                            </Label>
+                            <div className="flex space-x-2">
+                                <div className="flex-1">
+                                    <Input
+                                        type="text"
+                                        value={formData.memberCode}
+                                        onChange={(e) => handleChange('memberCode', e.target.value)}
+                                        placeholder={language === 'ko' ? '회원 코드 입력' : 'Enter member code'}
+                                        className={errors.memberCode ? 'border-red-500' : ''}
+                                    />
+                                    {errors.memberCode && (
+                                        <p className="mt-1 text-sm text-red-600">{errors.memberCode}</p>
                                     )}
                                 </div>
                             </CardContent>
                         </>
+                                <Button
+                                    onClick={handleMemberVerify}
+                                    disabled={isProcessing || !formData.memberCode.trim()}
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                >
+                                    {isProcessing ? t.verifying : t.verifyMember}
+                                </Button>
+                            </div>
+                            {formData.memberName && (
+                                <div className="mt-2 text-sm text-green-600">
+                                    <CheckCircle className="h-4 w-4 inline mr-1" />
+                                    {t.verified}: {formData.memberName}
+                                </div>
+                            )}
+                        </div>
                     )}
 
                     {/* STEP 2: Category & Verification (DYNAMIC) */}
@@ -1415,6 +1713,11 @@ export default function RegistrationPage() {
                                                         className="h-14 border-gray-200 rounded-2xl px-5 text-lg shadow-sm focus:border-[#003366] focus:ring-4 focus:ring-[#003366]/10 transition-all bg-white"
                                                     />
                                                 </div>
+                    {/* Personal Information */}
+                    <div className="mb-6">
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">
+                            {language === 'ko' ? '개인 정보' : 'Personal Information'}
+                        </h3>
 
                                                 <div className="flex items-start space-x-3 p-4 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-blue-50/50 transition-colors cursor-pointer" onClick={() => setVerifyConsent(!verifyConsent)}>
                                                     <Checkbox id="verify_consent_card" checked={verifyConsent} onCheckedChange={(c) => setVerifyConsent(c === true)} className="mt-0.5 data-[state=checked]:bg-[#003366] data-[state=checked]:border-[#003366]" />
@@ -1425,12 +1728,31 @@ export default function RegistrationPage() {
                                                     </Label>
                                                 </div>
                                             </div>
+                        {/* Name */}
+                        <div className="mb-4">
+                            <Label className="block text-sm font-medium text-gray-700 mb-2">
+                                {t.name} <span className="text-red-500">*</span>
+                            </Label>
+                            <div className="relative">
+                                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                                <Input
+                                    type="text"
+                                    value={formData.name}
+                                    onChange={(e) => handleChange('name', e.target.value)}
+                                    placeholder={language === 'ko' ? '이름 입력' : 'Enter your name'}
+                                    className={`pl-10 ${errors.name ? 'border-red-500' : ''}`}
+                                />
+                            </div>
+                            {errors.name && (
+                                <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+                            )}
+                        </div>
 
-                                            <div className="grid grid-cols-1 gap-4 pt-4">
+                                            <div className="pt-4">
                                                 <Button
                                                     onClick={(e) => { e.stopPropagation(); performMemberVerification(); }}
                                                     disabled={isLoading || verifyLoading}
-                                                    className="h-14 bg-[#003366] hover:bg-[#002244] text-white text-lg font-bold rounded-2xl shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
+                                                    className="w-full h-14 bg-[#003366] hover:bg-[#002244] text-white text-lg font-bold rounded-2xl shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
                                                 >
                                                     {verifyLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (language === 'ko' ? '인증하기' : 'Verify')}
                                                 </Button>
@@ -1438,10 +1760,48 @@ export default function RegistrationPage() {
                                         </div>
                                     </div>
                                 )}
+                        {/* Email */}
+                        <div className="mb-4">
+                            <Label className="block text-sm font-medium text-gray-700 mb-2">
+                                {t.email} <span className="text-red-500">*</span>
+                            </Label>
+                            <div className="relative">
+                                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                                <Input
+                                    type="email"
+                                    value={formData.email}
+                                    onChange={(e) => handleChange('email', e.target.value)}
+                                    placeholder={language === 'ko' ? '이메일 입력' : 'Enter your email'}
+                                    className={`pl-10 ${errors.email ? 'border-red-500' : ''}`}
+                                />
+                            </div>
+                            {errors.email && (
+                                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                            )}
+                        </div>
 
                                 {isVerified && (
                                     <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-100 rounded-[24px] p-6 lg:p-8 mb-8 flex flex-col md:flex-row items-center text-green-900 animate-in fade-in zoom-in duration-500 shadow-sm relative overflow-hidden group">
                                         <div className="absolute top-0 right-0 w-64 h-64 bg-green-100/50 rounded-full blur-3xl -mr-20 -mt-20 opacity-50 group-hover:scale-110 transition-transform duration-700"></div>
+                        {/* Phone */}
+                        <div className="mb-4">
+                            <Label className="block text-sm font-medium text-gray-700 mb-2">
+                                {t.phone} <span className="text-red-500">*</span>
+                            </Label>
+                            <div className="relative">
+                                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                                <Input
+                                    type="tel"
+                                    value={formData.phone}
+                                    onChange={(e) => handleChange('phone', e.target.value)}
+                                    placeholder="010-1234-5678"
+                                    className={`pl-10 ${errors.phone ? 'border-red-500' : ''}`}
+                                />
+                            </div>
+                            {errors.phone && (
+                                <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+                            )}
+                        </div>
 
                                         <div className="relative p-4 bg-white rounded-full mr-0 md:mr-6 mb-4 md:mb-0 shadow-sm ring-4 ring-green-100">
                                             <CheckCircle2 className="w-8 h-8 text-[#059669]" />
@@ -1459,6 +1819,25 @@ export default function RegistrationPage() {
                                         </Button>
                                     </div>
                                 )}
+                        {/* Affiliation */}
+                        <div className="mb-4">
+                            <Label className="block text-sm font-medium text-gray-700 mb-2">
+                                {t.affiliation} <span className="text-red-500">*</span>
+                            </Label>
+                            <div className="relative">
+                                <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                                <Input
+                                    type="text"
+                                    value={formData.affiliation}
+                                    onChange={(e) => handleChange('affiliation', e.target.value)}
+                                    placeholder={language === 'ko' ? '소속 병원/기관' : 'Enter your affiliation'}
+                                    className={`pl-10 ${errors.affiliation ? 'border-red-500' : ''}`}
+                                />
+                            </div>
+                            {errors.affiliation && (
+                                <p className="mt-1 text-sm text-red-600">{errors.affiliation}</p>
+                            )}
+                        </div>
 
                                 <div className="relative py-6">
                                     <div className="absolute inset-0 flex items-center" aria-hidden="true">
@@ -1470,6 +1849,23 @@ export default function RegistrationPage() {
                                         </span>
                                     </div>
                                 </div>
+                        {/* Position */}
+                        <div className="mb-4">
+                            <Label className="block text-sm font-medium text-gray-700 mb-2">
+                                {t.position} <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                                type="text"
+                                value={formData.position}
+                                onChange={(e) => handleChange('position', e.target.value)}
+                                placeholder={language === 'ko' ? '직급 입력' : 'Enter your position'}
+                                className={errors.position ? 'border-red-500' : ''}
+                            />
+                            {errors.position && (
+                                <p className="mt-1 text-sm text-red-600">{errors.position}</p>
+                            )}
+                        </div>
+                    </div>
 
                                 <RadioGroup value={selectedGradeId} onValueChange={(val: any) => {
                                     // Allow changing grade only if not verified
@@ -1479,6 +1875,19 @@ export default function RegistrationPage() {
                                             ? "회원 인증 완료 후에는 등급 변경이 불가능합니다."
                                             : "Grade cannot be changed after member verification.");
                                         return;
+                    {/* Period Selection */}
+                    <div className="mb-6">
+                        <Label className="block text-sm font-medium text-gray-700 mb-2">
+                            {t.period} <span className="text-red-500">*</span>
+                        </Label>
+                        {availablePeriods && availablePeriods.length > 0 ? (
+                            <select
+                                value={formData.periodId}
+                                onChange={(e) => {
+                                    const period = availablePeriods.find(p => p.id === e.target.value);
+                                    if (period) {
+                                        handleChange('periodId', period.id);
+                                        handleChange('period', period.name);
                                     }
                                     setSelectedGradeId(val);
                                     setIsVerified(false);
@@ -1677,16 +2086,60 @@ export default function RegistrationPage() {
                             </CardContent>
                         </>
                     )}
+                                }}
+                                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.period ? 'border-red-500' : ''}`}
+                            >
+                                <option value="">{t.pleaseSelect}</option>
+                                {availablePeriods.map((period) => (
+                                    <option key={period.id} value={period.id}>
+                                        {period.name} - {period.price ? `${period.price.toLocaleString()}원` : '무료'}
+                                    </option>
+                                ))}
+                            </select>
+                        ) : (
+                            <p className="text-sm text-gray-500">
+                                {language === 'ko' ? '등록 가능한 기간이 없습니다' : 'No available periods'}
+                            </p>
+                        )}
+                        {errors.period && (
+                            <p className="mt-1 text-sm text-red-600">{errors.period}</p>
+                        )}
+                    </div>
 
                     <CardFooter className="flex justify-between pt-6 border-t">
+                    {/* Action Buttons */}
+                    <div className="flex space-x-4">
                         <Button
+                            onClick={handleSave}
+                            disabled={isProcessing}
+                            variant="outline"
+                            className="flex-1"
+                        >
+                            <Save className="h-4 w-4 mr-2" />
+                            {t.save}
+                        </Button>
+                        <Button
+                            onClick={handleReset}
+                            disabled={isProcessing}
                             variant="outline"
                             onClick={handleBack}
                             disabled={currentStep === 0 || isLoading}
+                            className="flex-1"
                         >
                             <ArrowLeft className="w-4 h-4 mr-2" />
                             {language === 'ko' ? '이전' : 'Back'}
+                            <RotateCcw className="h-4 w-4 mr-2" />
+                            {t.reset}
                         </Button>
+                        <Button
+                            onClick={handleSubmit}
+                            disabled={isProcessing}
+                            className="flex-1 bg-blue-600 hover:bg-blue-700"
+                        >
+                            {isProcessing ? t.loading : t.submit}
+                        </Button>
+                    </div>
+                </div>
 
                         {currentStep < 3 ? (
                             <Button onClick={handleNext}>
@@ -1711,6 +2164,22 @@ export default function RegistrationPage() {
                         )}
                     </CardFooter>
                 </Card>
+                {/* Language Switcher */}
+                <div className="flex justify-center mb-6">
+                    <Button
+                        onClick={() => setLanguage('ko')}
+                        variant={language === 'ko' ? 'default' : 'outline'}
+                        className="mr-2"
+                    >
+                        한국어
+                    </Button>
+                    <Button
+                        onClick={() => setLanguage('en')}
+                        variant={language === 'en' ? 'default' : 'outline'}
+                    >
+                        English
+                    </Button>
+                </div>
             </div>
 
             {/* Terms Viewer Modal */}
@@ -1734,10 +2203,15 @@ export default function RegistrationPage() {
                 setShowVerificationModal(open);
             }}>
                 <DialogContent className="max-w-md">
+            {/* Reset Confirmation Dialog */}
+            <Dialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
+                <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{language === 'ko' ? '학회 정회원 인증' : 'Member Verification'}</DialogTitle>
+                        <DialogTitle>{t.resetConfirm}</DialogTitle>
                         <DialogDescription>
                             {language === 'ko' ? '학회에 등록된 회원 정보를 입력해주세요.' : 'Please enter your society member details.'}
+                            {t.resetConfirmDesc}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -1773,12 +2247,19 @@ export default function RegistrationPage() {
                             {verifyLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (language === 'ko' ? '인증하기' : 'Verify')}
                         </Button>
                     </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowResetConfirm(false)}>{t.cancel}</Button>
+                        <Button onClick={handleConfirmReset}>{t.confirm}</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             {/* Password Verification Modal for Resuming Guest Registration */}
             <Dialog open={showPasswordModal} onOpenChange={setShowPasswordModal}>
                 <DialogContent className="max-w-md">
+            {/* Resume Data Modal */}
+            <Dialog open={showResumeModal} onOpenChange={setShowResumeModal}>
+                <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
                             {language === 'ko' ? '이미 등록된 이메일입니다' : 'Email Already Registered'}
@@ -1788,6 +2269,7 @@ export default function RegistrationPage() {
                                 ? '이전에 입력하신 비밀번호를 입력하시면 저장된 내용을 불러옵니다.'
                                 : 'Enter your previous password to load saved data.'}
                         </DialogDescription>
+                        <DialogTitle>{t.loadSaved}</DialogTitle>
                     </DialogHeader>
 
                     <div className="space-y-4 py-4">
@@ -1800,18 +2282,37 @@ export default function RegistrationPage() {
                                 onChange={e => setResumePassword(e.target.value)}
                                 onKeyDown={e => e.key === 'Enter' && handleResumeRegistration()}
                             />
+                    <p className="text-sm text-gray-600 mb-4">
+                        {t.loadSavedDesc}
+                    </p>
+                    {savedData && (
+                        <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                            <p className="text-sm font-medium mb-2">{t.savedData}:</p>
+                            <div className="text-sm text-gray-600 space-y-1">
+                                <p><span className="font-medium">{t.name}:</span> {savedData.name}</p>
+                                <p><span className="font-medium">{t.email}:</span> {savedData.email}</p>
+                                <p><span className="font-medium">{t.affiliation}:</span> {savedData.affiliation}</p>
+                                <p className="text-xs text-gray-500">
+                                    {t.lastSaved}: {formatTimestamp(savedData.timestamp)}
+                                </p>
+                            </div>
                         </div>
 
+                    )}
+                    <div className="flex justify-end space-x-2">
                         <Button
                             className="w-full"
                             onClick={handleResumeRegistration}
                             disabled={isLoading || !resumePassword}
+                            variant="outline"
+                            onClick={() => setShowResumeModal(false)}
                         >
                             {isLoading ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
                                 language === 'ko' ? '불러오기' : 'Load Data'
                             )}
+                            {t.cancel}
                         </Button>
 
                         <Button
@@ -1821,12 +2322,11 @@ export default function RegistrationPage() {
                                 setShowPasswordModal(false);
                                 setResumePassword('');
                             }}
+                            onClick={handleLoadSaved}
+                            className="bg-blue-600 hover:bg-blue-700"
                         >
                             {language === 'ko' ? '취소' : 'Cancel'}
+                            {t.loadSaved}
                         </Button>
                     </div>
                 </DialogContent>
-            </Dialog>
-        </div>
-    );
-}

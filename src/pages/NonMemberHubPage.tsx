@@ -187,27 +187,27 @@ const NonMemberHubPage: React.FC = () => {
                                 <span className="text-sm text-red-500 font-medium">※ 스크린샷을 저장해두시면 편리합니다.</span>
                             </p>
 
-                             {/* CRITICAL FIX: Use confirmationQr for info-desk scanning */}
-                             <div className="bg-white p-4 rounded-2xl shadow-lg border border-slate-100">
-                                 {!qrImageError ? (
-                                     <img
-                                         src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(registration.confirmationQr || registration.id)}`}
-                                         alt="Info Desk QR Code"
-                                         className="w-64 h-64 object-contain"
-                                         onError={() => setQrImageError(true)}
-                                         onLoad={() => setQrImageError(false)}
-                                     />
-                                 ) : (
-                                     <div className="w-64 h-64 bg-slate-100 rounded-2xl flex flex-col items-center justify-center text-slate-400 gap-2">
-                                         <AlertCircle className="w-12 h-12 text-slate-300" />
-                                         <span>QR 코드를 불러올 수 없습니다.</span>
-                                         <span className="text-xs">새로고침을 시도해주세요.</span>
-                                     </div>
-                                 )}
-                             </div>
+                              {/* CRITICAL FIX: Use confirmationQr for info-desk scanning (DIFFERENT from digital badge QR) */}
+                              <div className="bg-white p-4 rounded-2xl shadow-lg border border-slate-100">
+                                  {!qrImageError ? (
+                                      <img
+                                          src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(registration.confirmationQr || `CONF-${registration.id}`)}`}
+                                          alt="Info Desk QR Code (Confirmation QR)"
+                                          className="w-64 h-64 object-contain"
+                                          onError={() => setQrImageError(true)}
+                                          onLoad={() => setQrImageError(false)}
+                                      />
+                                  ) : (
+                                      <div className="w-64 h-64 bg-slate-100 rounded-2xl flex flex-col items-center justify-center text-slate-400 gap-2">
+                                          <AlertCircle className="w-12 h-12 text-slate-300" />
+                                          <span>QR 코드를 불러올 수 없습니다.</span>
+                                          <span className="text-xs">새로고침을 시도해주세요.</span>
+                                      </div>
+                                  )}
+                              </div>
 
                             <div className="mt-8 px-4 py-2 bg-slate-100 rounded-lg text-sm font-mono text-slate-500">
-                                QR: {registration.confirmationQr || registration.id}
+                                등록확인증 QR: {registration.confirmationQr || `CONF-${registration.id}`}
                             </div>
                         </EregiCard>
 

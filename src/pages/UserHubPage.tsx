@@ -953,7 +953,8 @@ const UserHubPage: React.FC = () => {
                                             variant="outline"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                navigate(`/${r.slug}/abstracts`);
+                                                const currentLang = searchParams.get('lang') || 'ko';
+                                                navigate(`/${r.slug}/abstracts?lang=${currentLang}`);
                                             }}
                                             className="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs gap-1.5 shadow-sm border border-slate-200"
                                         >

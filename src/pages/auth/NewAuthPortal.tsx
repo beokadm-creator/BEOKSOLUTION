@@ -734,7 +734,6 @@ const NewAuthPortal: React.FC = () => {
                         <div className="mt-8 text-center text-sm text-slate-500 space-y-3">
                             {mode === 'login' ? (
                                 <>
-                                    <p className="font-medium">계정이 없으신가요? <button onClick={() => setMode('signup')} className="text-blue-600 font-extrabold hover:underline transition-all">회원가입 (Signup)</button></p>
                                     <button onClick={() => { if (email) sendPasswordResetEmail(getAuth(), email); else toast.error('이메일을 입력해주세요'); }} className="text-xs text-slate-400 hover:text-slate-600 font-medium underline-offset-4 hover:underline transition-all">비밀번호 재설정 (Reset Password)</button>
                                 </>
                             ) : (
