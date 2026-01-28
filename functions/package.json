@@ -16,7 +16,7 @@
     "axios": "^1.13.2",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
-    "firebase-admin": "^11.8.0",
+    "firebase-admin": "^11.11.1",
     "firebase-functions": "^4.9.0",
     "rimraf": "^6.0.0"
   },
