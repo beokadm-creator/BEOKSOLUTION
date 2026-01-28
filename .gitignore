@@ -134,3 +134,10 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Environment files (keep local only)
+.env
+.env.development
+.env.test
+.env.production
+.env.local
