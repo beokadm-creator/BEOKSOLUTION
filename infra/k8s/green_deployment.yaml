@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-green
+  labels:
+    app: myapp
+    color: green
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: myapp
+      color: green
+  template:
+    metadata:
+      labels:
+        app: myapp
+        color: green
+    spec:
+      containers:
+        - name: app
+          image: registry.example.com/myapp:green-latest
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10

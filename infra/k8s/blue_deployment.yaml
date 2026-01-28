@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-blue
+  labels:
+    app: myapp
+    color: blue
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: myapp
+      color: blue
+  template:
+    metadata:
+      labels:
+        app: myapp
+        color: blue
+    spec:
+      containers:
+        - name: app
+          image: registry.example.com/myapp:blue-latest
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
