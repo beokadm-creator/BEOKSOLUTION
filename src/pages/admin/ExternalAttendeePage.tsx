@@ -124,6 +124,7 @@ const ExternalAttendeePage: React.FC = () => {
             badgeIssuedAt: null,
             registrationType,
             registeredBy: auth.user?.id || 'ADMIN',
+            deleted: false,
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now()
         };
