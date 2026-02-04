@@ -257,6 +257,9 @@ const ExternalAttendeePage: React.FC = () => {
         }
 
         setIsProcessing(true);
+        let successCount = 0;
+        let failCount = 0;
+
         try {
             // Check for duplicate emails
             const duplicateEmails: string[] = [];
@@ -274,15 +277,58 @@ const ExternalAttendeePage: React.FC = () => {
 
             const batch = bulkPreview.map(data => generateAttendeeData(data, 'MANUAL_BULK'));
 
+            // Process one by one to avoid overwhelming Cloud Functions
             for (const attendee of batch) {
-                await setDoc(doc(db, `conferences/${confId}/external_attendees`, attendee.id), attendee);
+                try {
+                    // 1. Create Firestore Document
+                    await setDoc(doc(db, `conferences/${confId}/external_attendees`, attendee.id), attendee);
 
-                await addDoc(collection(db, `conferences/${confId}/external_attendees/${attendee.id}/logs`), {
-                    type: 'REGISTERED',
-                    timestamp: Timestamp.now(),
-                    method: 'MANUAL_BULK',
-                    operator: auth.user?.email
-                });
+                    await addDoc(collection(db, `conferences/${confId}/external_attendees/${attendee.id}/logs`), {
+                        type: 'REGISTERED',
+                        timestamp: Timestamp.now(),
+                        method: 'MANUAL_BULK',
+                        operator: auth.user?.email
+                    });
+
+                    // 2. Auto-create Auth User
+                    // Use provided password or fallback to phone last 4 digits or default
+                    const passwordToUse = attendee.password || (attendee.phone ? attendee.phone.slice(-4) : '123456');
+
+                    const functions = getFunctions();
+                    const generateAuthUserFn = httpsCallable(functions, 'generateFirebaseAuthUserForExternalAttendee');
+                    const authResult = await generateAuthUserFn({
+                        confId,
+                        externalId: attendee.id,
+                        password: passwordToUse,
+                        email: attendee.email,
+                        name: attendee.name,
+                        phone: attendee.phone,
+                        organization: attendee.organization,
+                        licenseNumber: attendee.licenseNumber
+                    }) as { data: { success: boolean; uid: string; message: string } };
+
+                    if (authResult.data.success) {
+                        // Update with generated password if it was auto-generated
+                        if (!attendee.password) {
+                            await updateDoc(doc(db, `conferences/${confId}/external_attendees`, attendee.id), {
+                                password: passwordToUse,
+                                userId: authResult.data.uid, // Ensure sync
+                                authCreated: true
+                            });
+                        } else {
+                            // Just sync UID
+                            await updateDoc(doc(db, `conferences/${confId}/external_attendees`, attendee.id), {
+                                userId: authResult.data.uid,
+                                authCreated: true
+                            });
+                        }
+                    }
+
+                    successCount++;
+                } catch (err) {
+                    console.error(`Failed to register ${attendee.name}:`, err);
+                    failCount++;
+                }
             }
 
             // Update receipt serial number
@@ -292,13 +338,18 @@ const ExternalAttendeePage: React.FC = () => {
                 });
             }
 
-            setExternalAttendees(prev => [...batch, ...prev]);
+            setExternalAttendees(prev => [...batch, ...prev]); // Optimistic update, but snapshot will correct it
             setBulkPreview([]);
-            setCsvFile(null);
-            toast.success(`${batch.length}명의 외부 참석자가 등록되었습니다.`);
+
+            if (failCount > 0) {
+                toast(`완료되었으나 ${failCount}명의 처리에 실패했습니다.`, { icon: '⚠️' });
+            } else {
+                toast.success(`${successCount}명의 외부 참석자가 등록되었습니다.`);
+            }
+
         } catch (error) {
-            console.error('Bulk registration failed:', error);
-            toast.error('대량 등록에 실패했습니다.');
+            console.error('Bulk registration main error:', error);
+            toast.error('대량 등록 중 오류가 발생했습니다.');
         } finally {
             setIsProcessing(false);
         }
@@ -329,6 +380,51 @@ const ExternalAttendeePage: React.FC = () => {
         }
     };
 
+    // Handle create account manually
+    const handleCreateAccount = async (attendee: ExternalAttendee) => {
+        if (!confirm(`${attendee.name} 님의 회원 계정을 생성하시겠습니까?\n(비밀번호가 없으면 전화번호 뒷 4자리가 사용됩니다)`)) return;
+        if (!confId) return;
+
+        setIsProcessing(true);
+        try {
+            const passwordToUse = attendee.password || (attendee.phone ? attendee.phone.slice(-4) : '123456');
+
+            const functions = getFunctions();
+            const generateAuthUserFn = httpsCallable(functions, 'generateFirebaseAuthUserForExternalAttendee');
+            const authResult = await generateAuthUserFn({
+                confId,
+                externalId: attendee.id,
+                password: passwordToUse,
+                email: attendee.email,
+                name: attendee.name,
+                phone: attendee.phone,
+                organization: attendee.organization,
+                licenseNumber: attendee.licenseNumber
+            }) as { data: { success: boolean; uid: string; message: string } };
+
+            if (authResult.data.success) {
+                // Update local state is handled by onSnapshot, but let's force update if needed or just wait
+                // Actually onSnapshot might not catch the deep update if it only listens to doc changes? 
+                // Wait, generateAuthUserFn updates the doc with userId, so onSnapshot WILL pick it up.
+                toast.success(`계정이 생성되었습니다.\n비밀번호: ${passwordToUse}`);
+
+                // If password was auto-generated, update the doc so we have record of it (optional, but good for admin to know)
+                if (!attendee.password) {
+                    await updateDoc(doc(db, `conferences/${confId}/external_attendees`, attendee.id), {
+                        password: passwordToUse
+                    });
+                }
+            } else {
+                throw new Error(authResult.data.message);
+            }
+        } catch (error: any) {
+            console.error('Account creation failed:', error);
+            toast.error(`계정 생성 실패: ${error.message}`);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     // Handle issue badge
     const handleIssueBadge = async (attendee: ExternalAttendee) => {
         if (!confirm(`${attendee.name} 님의 명찰을 발급하시겠습니까?`)) return;
@@ -338,22 +434,25 @@ const ExternalAttendeePage: React.FC = () => {
         try {
             // STEP 1: Generate Firebase Auth User if not exists
             let firebaseUid = attendee.userId || attendee.uid;
-            if (!firebaseUid || firebaseUid.startsWith('EXT-')) {
-                // Generate Firebase Auth user for external attendee
-                const functions = getFunctions();
-                const generateAuthUserFn = httpsCallable(functions, 'generateFirebaseAuthUserForExternalAttendee');
-                const authResult = await generateAuthUserFn({
-                    confId,
-                    externalId: attendee.id,
-                    password: attendee.password // Pass password from external attendee document
-                }) as { data: { success: boolean; uid: string; message: string } };
 
-                if (!authResult.data.success) {
-                    throw new Error('Failed to generate Firebase Auth user');
+            // Check if we need to generate auth user (if userId is missing or placeholder)
+            if (!firebaseUid || firebaseUid.startsWith('EXT-') || !attendee.authCreated) {
+                try {
+                    const functions = getFunctions();
+                    const generateAuthUserFn = httpsCallable(functions, 'generateFirebaseAuthUserForExternalAttendee');
+                    const authResult = await generateAuthUserFn({
+                        confId,
+                        externalId: attendee.id,
+                        password: attendee.password || (attendee.phone ? attendee.phone.slice(-4) : '123456')
+                    }) as { data: { success: boolean; uid: string; message: string } };
+
+                    if (authResult.data.success) {
+                        firebaseUid = authResult.data.uid;
+                    }
+                } catch (e) {
+                    console.warn("Auto-creation of auth user failed during badge issue, proceeding with simple badge...", e);
+                    // Decide if we stop or continue. Let's continue but warn.
                 }
-
-                firebaseUid = authResult.data.uid;
-                console.log(`[ExternalAttendee] Generated Firebase Auth user: ${firebaseUid}`);
             }
 
             // STEP 2: Generate badge prep token if not exists
@@ -466,7 +565,8 @@ const ExternalAttendeePage: React.FC = () => {
                                     개별 등록
                                 </CardTitle>
                                 <CardDescription>
-                                    외부 참석자를 한 명씩 수동으로 등록합니다.
+                                    외부 참석자를 한 명씩 수동으로 등록합니다. <br />
+                                    <span className="text-blue-600 font-semibold">* 등록 시 회원 계정이 자동으로 생성됩니다. (비밀번호 미입력 시 전화번호 뒷 4자리)</span>
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
@@ -522,13 +622,13 @@ const ExternalAttendeePage: React.FC = () => {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>비밀번호 (선택 - Firebase Auth 생성 시 사용)</Label>
+                                        <Label>비밀번호 (선택)</Label>
                                         <div className="relative">
                                             <Input
                                                 type={showPassword ? 'text' : 'password'}
                                                 value={formData.password}
                                                 onChange={e => setFormData({ ...formData, password: e.target.value })}
-                                                placeholder="비밀번호 입력 (최소 6자)"
+                                                placeholder="미입력 시 전화번호 뒷 4자리"
                                             />
                                             <button
                                                 type="button"
@@ -538,6 +638,7 @@ const ExternalAttendeePage: React.FC = () => {
                                                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                             </button>
                                         </div>
+                                        <p className="text-xs text-gray-500">회원가입에 사용될 비밀번호입니다.</p>
                                     </div>
                                 </div>
                             </CardContent>
@@ -546,12 +647,12 @@ const ExternalAttendeePage: React.FC = () => {
                                     {isProcessing ? (
                                         <>
                                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                            등록 중...
+                                            처리 중...
                                         </>
                                     ) : (
                                         <>
                                             <UserPlus className="w-4 h-4 mr-2" />
-                                            등록하기
+                                            등록 및 계정 생성
                                         </>
                                     )}
                                 </Button>
@@ -568,7 +669,8 @@ const ExternalAttendeePage: React.FC = () => {
                                     대량 등록
                                 </CardTitle>
                                 <CardDescription>
-                                    CSV 파일로 외부 참석자를 일괄 등록합니다.
+                                    CSV 파일로 외부 참석자를 일괄 등록합니다. <br />
+                                    <span className="text-blue-600 font-semibold">* 등록된 모든 참석자에 대해 회원 계정이 자동 생성됩니다.</span>
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
@@ -624,7 +726,7 @@ const ExternalAttendeePage: React.FC = () => {
                                     {isProcessing ? (
                                         <>
                                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                            등록 중...
+                                            일괄 등록 및 계정 생성 중...
                                         </>
                                     ) : (
                                         <>
@@ -653,65 +755,88 @@ const ExternalAttendeePage: React.FC = () => {
                                             <tr>
                                                 <th className="px-4 py-3 text-left font-semibold">이름</th>
                                                 <th className="px-4 py-3 text-left font-semibold">이메일</th>
-                                                <th className="px-4 py-3 text-left font-semibold">전화번호</th>
-                                                <th className="px-4 py-3 text-left font-semibold">소속</th>
-                                                <th className="px-4 py-3 text-left font-semibold">면허번호</th>
-                                                <th className="px-4 py-3 text-left font-semibold">비밀번호</th>
+                                                <th className="px-4 py-3 text-left font-semibold">전화번호 / 소속</th>
+                                                <th className="px-4 py-3 text-center font-semibold">계정상태</th>
                                                 <th className="px-4 py-3 text-center font-semibold">명찰</th>
-                                                <th className="px-4 py-3 text-center font-semibold">바우처</th>
-                                                <th className="px-4 py-3 text-center font-semibold">삭제</th>
+                                                <th className="px-4 py-3 text-center font-semibold">관리</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {externalAttendees.map(attendee => (
-                                                <tr key={attendee.id} className="border-t hover:bg-gray-50">
-                                                    <td className="px-4 py-3 font-medium">{attendee.name}</td>
-                                                    <td className="px-4 py-3">{attendee.email}</td>
-                                                    <td className="px-4 py-3">{attendee.phone}</td>
-                                                    <td className="px-4 py-3">{attendee.organization}</td>
-                                                    <td className="px-4 py-3">{attendee.licenseNumber || '-'}</td>
-                                                    <td className="px-4 py-3">
-                                                        {attendee.password ? '●●●●●●●' : '-'}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center">
-                                                        {attendee.badgeIssued ? (
-                                                            <CheckCircle2 className="w-5 h-5 text-green-600 mx-auto" />
-                                                        ) : (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                onClick={() => handleIssueBadge(attendee)}
-                                                                disabled={isProcessing}
-                                                            >
-                                                                <Badge className="w-4 h-4 mr-1" />
-                                                                발급
-                                                            </Button>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center">
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => {
-                                                                setSelectedAttendee(attendee);
-                                                                setShowVoucherModal(true);
-                                                            }}
-                                                        >
-                                                            <FileText className="w-4 h-4 mr-1" />
-                                                            바우처
-                                                        </Button>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center">
-                                                        <Button
-                                                            size="sm"
-                                                            variant="destructive"
-                                                            onClick={() => handleDelete(attendee)}
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </Button>
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                            {externalAttendees.map(attendee => {
+                                                const hasAccount = attendee.authCreated || (attendee.userId && !attendee.userId.startsWith('EXT-'));
+                                                return (
+                                                    <tr key={attendee.id} className="border-t hover:bg-gray-50">
+                                                        <td className="px-4 py-3 font-medium">{attendee.name}</td>
+                                                        <td className="px-4 py-3">{attendee.email}</td>
+                                                        <td className="px-4 py-3">
+                                                            <div>{attendee.phone}</div>
+                                                            <div className="text-gray-500 text-xs">{attendee.organization}</div>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            {hasAccount ? (
+                                                                <div className="flex flex-col items-center">
+                                                                    <span className="text-green-600 text-xs font-semibold bg-green-100 px-2 py-1 rounded-full">생성완료</span>
+                                                                    {attendee.password && (
+                                                                        <span className="text-xs text-gray-400 mt-1 cursor-pointer" onClick={() => {
+                                                                            navigator.clipboard.writeText(attendee.password!);
+                                                                            toast.success('비밀번호 복사됨');
+                                                                        }} title="비밀번호 복사">PW복사</span>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="default"
+                                                                    className='bg-blue-600 hover:bg-blue-700 h-7 text-xs'
+                                                                    onClick={() => handleCreateAccount(attendee)}
+                                                                    disabled={isProcessing}
+                                                                >
+                                                                    계정 생성
+                                                                </Button>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            {attendee.badgeIssued ? (
+                                                                <CheckCircle2 className="w-5 h-5 text-green-600 mx-auto" />
+                                                            ) : (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-7 text-xs"
+                                                                    onClick={() => handleIssueBadge(attendee)}
+                                                                    disabled={isProcessing}
+                                                                >
+                                                                    <Badge className="w-3 h-3 mr-1" />
+                                                                    발급
+                                                                </Button>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <div className="flex justify-center gap-1">
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    className="h-8 w-8 p-0"
+                                                                    onClick={() => {
+                                                                        setSelectedAttendee(attendee);
+                                                                        setShowVoucherModal(true);
+                                                                    }}
+                                                                >
+                                                                    <FileText className="w-4 h-4" />
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                                    onClick={() => handleDelete(attendee)}
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </Button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
