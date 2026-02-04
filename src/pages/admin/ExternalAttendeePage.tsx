@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useConference } from '../../hooks/useConference';
 import { useAuth } from '../../hooks/useAuth';
-import { collection, getDoc, doc, setDoc, updateDoc, Timestamp, addDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, getDoc, getDocs, doc, setDoc, updateDoc, Timestamp, addDoc, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { httpsCallable, getFunctions } from 'firebase/functions';
 import { v4 as uuidv4 } from 'uuid';
@@ -517,6 +517,45 @@ const ExternalAttendeePage: React.FC = () => {
         }
     };
 
+    // Handle restore data (fix missing deleted flag)
+    const handleRestoreData = async () => {
+        if (!confirm('보이지 않는 데이터를 복구하시겠습니까? (이전에 등록했으나 목록에 없는 경우)')) return;
+        if (!confId) return;
+
+        setIsProcessing(true);
+        try {
+            const attendeesRef = collection(db, `conferences/${confId}/external_attendees`);
+            const snapshot = await getDocs(attendeesRef);
+
+            let restoredCount = 0;
+            const updates = [];
+
+            for (const docSnap of snapshot.docs) {
+                const data = docSnap.data();
+                // Fix missing deleted flag
+                if (data.deleted === undefined) {
+                    updates.push(updateDoc(doc(db, `conferences/${confId}/external_attendees`, docSnap.id), {
+                        deleted: false
+                    }));
+                    restoredCount++;
+                }
+            }
+
+            await Promise.all(updates);
+
+            if (restoredCount > 0) {
+                toast.success(`${restoredCount}개의 데이터를 복구했습니다. 목록을 확인해주세요.`);
+            } else {
+                toast.success('복구할 데이터가 없습니다 (모두 정상).');
+            }
+        } catch (error) {
+            console.error('Restore failed:', error);
+            toast.error('복구 작업 실패');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     // Download CSV template
     const downloadTemplate = () => {
         const template = 'name,email,phone,organization,licenseNumber,amount,password\n홍길동,hong@example.com,010-1234-5678,서울대학교,12345,0,mypassword123';
@@ -744,10 +783,22 @@ const ExternalAttendeePage: React.FC = () => {
                     <TabsContent value="list">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <UserPlus className="w-5 h-5" />
-                                    등록된 외부 참석자 ({externalAttendees.length})
-                                </CardTitle>
+                                <div className="flex justify-between items-center">
+                                    <CardTitle className="flex items-center gap-2">
+                                        <UserPlus className="w-5 h-5" />
+                                        등록된 외부 참석자 ({externalAttendees.length})
+                                    </CardTitle>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleRestoreData}
+                                        disabled={isProcessing}
+                                        className="text-amber-600 border-amber-200 hover:bg-amber-50"
+                                    >
+                                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                                        데이터 복구
+                                    </Button>
+                                </div>
                             </CardHeader>
                             <CardContent>
                                 <div className="overflow-x-auto">
