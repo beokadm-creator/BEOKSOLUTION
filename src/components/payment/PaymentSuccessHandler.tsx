@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Loader2 } from 'lucide-react';
@@ -15,10 +15,17 @@ interface InfraSettings {
 
 const PaymentSuccessHandler: React.FC = () => {
     const [searchParams] = useSearchParams();
-    const navigate = useNavigate();
     const [isProcessing, setIsProcessing] = useState(true);
 
     useEffect(() => {
+        // Prevent double execution using sessionStorage (persists across remounts)
+        const processingKey = `payment_processing_${searchParams.get('paymentKey')}`;
+        if (sessionStorage.getItem(processingKey)) {
+            console.log("Payment already being processed, skipping duplicate call");
+            return;
+        }
+        sessionStorage.setItem(processingKey, 'true');
+
         const processPayment = async () => {
             const paymentKey = searchParams.get('paymentKey');
             const orderId = searchParams.get('orderId');
@@ -29,7 +36,6 @@ const PaymentSuccessHandler: React.FC = () => {
             const societyId = searchParams.get('societyId');
             const confId = searchParams.get('confId');
             const regId = searchParams.get('regId');
-            const userDataStr = searchParams.get('userData');
 
             if (!paymentKey || !orderId || !amount || !slug || !confId || !regId) {
                 console.error("Missing params:", { paymentKey, orderId, amount, slug, confId, regId });
@@ -38,18 +44,42 @@ const PaymentSuccessHandler: React.FC = () => {
                 return;
             }
 
-            if (!userDataStr) {
-                console.error("Missing userData parameter");
-                toast.error("필요한 사용자 정보가 누락되었습니다.");
-                setIsProcessing(false);
-                return;
-            }
-
             try {
                 console.log("Processing Payment Success...", { orderId, amount, confId });
 
-                // Decode user data from URL parameter
-                const userData = JSON.parse(decodeURIComponent(userDataStr));
+                // Fetch registration data to get user information
+                const regDoc = await getDoc(doc(db, 'conferences', confId, 'registrations', regId));
+                if (!regDoc.exists()) {
+                    console.error("Registration not found:", regId);
+                    toast.error("등록 정보를 찾을 수 없습니다.");
+                    setIsProcessing(false);
+                    return;
+                }
+
+                const regData = regDoc.data();
+
+                // Idempotency check: If already PAID, redirect to success page
+                if (regData.paymentStatus === 'PAID') {
+                    console.log("Registration already paid, redirecting to success page");
+                    const pureSlug = confId.includes('_') ? confId.split('_').slice(1).join('_') : confId;
+                    const userName = regData.userInfo?.name || regData.name || '';
+                    sessionStorage.removeItem(`payment_processing_${paymentKey}`); // Cleanup
+                    window.location.href = `/${pureSlug}/register/success?orderId=${orderId}&name=${encodeURIComponent(userName)}`;
+                    return;
+                }
+
+                const userData = {
+                    name: regData.userInfo.name,
+                    email: regData.userInfo.email,
+                    phone: regData.userInfo.phone,
+                    affiliation: regData.userInfo.affiliation,
+                    userId: regData.userId || 'GUEST',
+                    tier: regData.tier,
+                    categoryName: regData.categoryName,
+                    licenseNumber: regData.userInfo.licenseNumber || '',
+                    // 회원 인증 정보가 있으면 포함하여 Cloud Function으로 전달
+                    memberVerificationData: regData.memberVerificationData || null
+                };
 
                 // 1. FETCH SOCIETY INFRASTRUCTURE SETTINGS FOR PAYMENT KEYS
                 let widgetSecretKey = "";
@@ -107,22 +137,25 @@ const PaymentSuccessHandler: React.FC = () => {
                     // Redirect to Success Page
                     // Use pure slug (extract from confId like "kadd_2026spring" -> "2026spring")
                     const pureSlug = confId.includes('_') ? confId.split('_').slice(1).join('_') : confId;
+                    sessionStorage.removeItem(`payment_processing_${paymentKey}`); // Cleanup
                     window.location.href = `/${pureSlug}/register/success?orderId=${orderId}&name=${encodeURIComponent(userData.name)}`;
                 } else {
                     console.error("Payment Confirmation Failed:", resData);
                     toast.error("결제 확인에 실패했습니다. 관리자에게 문의해주세요.");
+                    sessionStorage.removeItem(`payment_processing_${paymentKey}`); // Cleanup
                     setIsProcessing(false);
                 }
 
-            } catch (error: any) {
+            } catch (error: unknown) {
                 console.error("Payment Processing Error:", error);
-                toast.error("결제 처리 중 오류가 발생했습니다: " + (error.message || "Unknown error"));
+                toast.error("결제 처리 중 오류가 발생했습니다: " + (error instanceof Error ? error.message : "Unknown error"));
+                sessionStorage.removeItem(`payment_processing_${paymentKey}`); // Cleanup
                 setIsProcessing(false);
             }
         };
 
         processPayment();
-    }, [searchParams, navigate]);
+    }, [searchParams]);
 
     if (isProcessing) {
         return (

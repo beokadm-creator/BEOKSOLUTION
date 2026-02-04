@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useConference } from '../../hooks/useConference';
 import { useCMS } from '../../hooks/useCMS';
-import { Page } from '../../types/schema';
 import toast from 'react-hot-toast';
 
 const PageEditor: React.FC = () => {
@@ -17,9 +16,12 @@ const PageEditor: React.FC = () => {
         if (selectedPageId) {
             const page = pages.find(p => p.id === selectedPageId);
             if (page) {
+                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setSlug(page.slug);
+                 
                 setTitle(page.title.ko);
-                setContent(page.content.ko); // Assuming ko for demo
+                 
+                setContent(page.content.ko);
             }
         } else {
             setSlug(''); setTitle(''); setContent('');
@@ -33,7 +35,7 @@ const PageEditor: React.FC = () => {
             content: { ko: content },
             isPublished: true
         };
-        await savePage(pageData as any, selectedPageId || undefined);
+        await savePage(pageData as { slug: string; title: { ko: string }; content: { ko: string }; isPublished: boolean }, selectedPageId || undefined);
         toast.success('Page Saved');
         setSelectedPageId(null);
         // ideally refresh pages

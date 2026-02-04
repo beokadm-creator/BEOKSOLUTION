@@ -1,31 +1,29 @@
-import { useState } from 'react';
-import { db, auth, functions } from '../firebase';
-import { collection, doc, setDoc, addDoc, Timestamp } from 'firebase/firestore';
+import { useState, useCallback } from 'react';
+import { functions } from '../firebase';
 import { httpsCallable } from 'firebase/functions';
 import toast from 'react-hot-toast';
 
 interface VerificationResult {
     success: boolean;
     message: string;
-    isExpired?: boolean; // ✅ [FIX] 유효기간 만료 여부 플래그
-    memberData?: any;
+    isExpired?: boolean;
+    isReserved?: boolean;
+    isAlreadyUsed?: boolean;
+    memberData?: Record<string, unknown>;
 }
 
 export const useMemberVerification = () => {
     const [loading, setLoading] = useState(false);
 
-    const verifyMember = async (
-        societyId: string, 
-        name: string, 
-        code: string, 
+    const verifyMember = useCallback(async (
+        societyId: string,
+        name: string,
+        code: string,
         consent: boolean,
-        targetGradeId?: string | null, // [Fix-Step 345] Made optional for Smart Verification
-        guestEmail?: string,      
-        guestPhone?: string,      
-        guestPassword?: string,
-        lockNow?: boolean // [Fix-Step 357] Immediate Lock
+        reserveTTLMinutes: number = 5, // NEW: 5-minute TTL for reservation
+        lockNow: boolean = false
     ): Promise<VerificationResult> => {
-        
+
         // 1. Basic Validation
         if (!consent) {
             toast.error("개인정보 제공에 동의해야 합니다.");
@@ -35,89 +33,70 @@ export const useMemberVerification = () => {
             toast.error("이름과 면허번호(코드)를 입력해주세요.");
             return { success: false, message: "Missing inputs" };
         }
-        
+
         setLoading(true);
 
         try {
-            const currentUser = auth.currentUser;
-            const isAnonymous = currentUser?.isAnonymous || false;
-            const uid = currentUser?.uid;
-
-            // [Fix-Step 346] Ensure UID exists for storage (Guests should be anon-signed-in by now)
-            if (!uid) {
-                 setLoading(false);
-                 return { success: false, message: "Session not initialized. Please refresh the page." };
-            }
-
-            // [Fix-Step 292] Use Cloud Function
             const verifyFn = httpsCallable(functions, 'verifyMemberIdentity');
-            const { data }: any = await verifyFn({
+            const { data } = await verifyFn<{
+                success: boolean;
+                message: string;
+                memberData?: Record<string, unknown>;
+                isExpired?: boolean;
+                isReserved?: boolean;
+                isAlreadyUsed?: boolean;
+            }>({
                 societyId,
                 name,
                 code,
-                lockNow: lockNow || false // Pass lock flag
-                // The function will use context.auth to identify user/guest
+                lockNow,
+                reserveTTLMinutes
             });
 
             if (!data.success) {
                 setLoading(false);
-                return { success: false, message: data.message || "Verification failed" };
+                return {
+                    success: false,
+                    message: data.message || "회원 정보를 찾을 수 없습니다.",
+                    isExpired: data.isExpired || false,
+                    isReserved: data.isReserved || false, // NEW: Reserved flag
+                    isAlreadyUsed: data.isAlreadyUsed || false // NEW: Already Used flag
+                };
             }
 
-            // [Fix-Step 345] Auto-Grade Selection Support (Removed Mismatch Check)
-            const serverGrade = data.grade; // e.g., 'Dental Hygienist' or 'MEMBER'
-            
-            // [Deleted] Mismatch Logic
-            // We now trust the server's returned grade and will use it to auto-select in the UI.
-
-            // 3. Persistence (Fix-Step 292)
-            // Guests -> users/{uid}/society_guests (Subcollection)
-            
-            if (!isAnonymous && uid) {
-                // PERMANENT USER -> Update Profile
-                const serverExpiry = data.memberData?.expiryDate || data.memberData?.expiry;
-                const userRef = doc(db, 'users', uid);
-                await setDoc(userRef, {
-                    affiliations: {
-                        [societyId.toLowerCase()]: {
-                            verified: true,
-                            grade: serverGrade,
-                            verifiedAt: Timestamp.now(),
-                            expiry: serverExpiry,     // 화면 표시용
-                            expiryDate: serverExpiry  // 관리자/백업용
-                        }
-                    }
-                }, { merge: true });
-
-            } else {
-                // ANONYMOUS GUEST -> users/{uid}/society_guests
-                // [Fix-Step 292] Changed from root 'society_guests' to subcollection
-                
-                const simpleHash = guestPassword 
-                    ? btoa(guestPassword + "_SALT_" + guestEmail) 
-                    : 'NO_PASS';
-                
-                await addDoc(collection(db, 'users', uid, 'society_guests'), {
-                    email: guestEmail || 'unknown@guest.com',
-                    name: name,
-                    phone: guestPhone || '',
-                    societyId: societyId.toLowerCase(),
-                    isVerifiedGuest: true,
-                    simplePassword: simpleHash,
-                    createdAt: Timestamp.now(),
-                    grade: serverGrade
-                });
-            }
-
+            // Member found - return verification data
             setLoading(false);
-            return { success: true, message: "Verified", memberData: data };
 
-        } catch (error: any) {
+            // Debug: Log the member data received from Cloud Function
+            console.log('[useMemberVerification] Member verified successfully, memberData:', {
+                success: true,
+                message: "회원 인증이 완료되었습니다.",
+                isExpired: data.isExpired || false,
+                memberData: {
+                    name: data.memberData?.name,
+                    grade: data.grade || data.memberData?.grade,  // FIX: grade는 top-level data.grade에서 읽기
+                    code: data.memberData?.code,
+                    expiry: data.memberData?.expiry,
+                    fullData: data.memberData
+                }
+            });
+
+            return {
+                success: true,
+                message: "회원 인증이 완료되었습니다.",
+                isExpired: data.isExpired || false,
+                memberData: {
+                    ...data.memberData,
+                    grade: data.grade
+                }
+            };
+        } catch (error: unknown) {
             console.error("Verification Error:", error);
             setLoading(false);
-            return { success: false, message: error.message || "System Error" };
+            const message = error instanceof Error ? error.message : "System Error";
+            return { success: false, message };
         }
-    };
+    }, []);
 
     return { verifyMember, loading };
 };

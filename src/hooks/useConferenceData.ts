@@ -3,9 +3,9 @@ import { db } from '../firebase';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 
 export const useConferenceData = (slug: string) => {
-  const [conference, setConference] = useState<any>(null);
-  const [society, setSociety] = useState<any>(null);
-  const [speakers, setSpeakers] = useState<any[]>([]);
+  const [conference, setConference] = useState<Record<string, unknown> | null>(null);
+  const [society, setSociety] = useState<Record<string, unknown> | null>(null);
+  const [speakers, setSpeakers] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,11 +31,10 @@ export const useConferenceData = (slug: string) => {
           const data = docSnap.data();
           // --- Fetch Sub-collections ---
           
-          // Fees
           const feesRef = doc(db, `${path}/settings/registration`);
           const feesSnap = await getDoc(feesRef);
-          let feesData: any[] = [];
-          let periodsData: any[] = [];
+          let feesData: Record<string, unknown>[] = [];
+          let periodsData: Record<string, unknown>[] = [];
           let refundPolicyData: string = "";
 
           if (feesSnap.exists()) {
@@ -101,9 +100,10 @@ export const useConferenceData = (slug: string) => {
           setError(`Conference not found`);
           setConference(null);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('[DataFetch] Error:', err);
-        setError(err.message);
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        setError(message);
       } finally {
         setLoading(false);
       }

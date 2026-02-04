@@ -33,34 +33,34 @@ const shouldLog = (level: LogLevel) => {
   return true;
 };
 
-const formatMessage = (context: string, message: string, data?: any) => {
+const formatMessage = (context: string, message: string, data?: unknown) => {
   const timestamp = getTimestamp();
   const formatted = `[${timestamp}][${context}] ${message}`;
   return data ? { formatted, data } : { formatted };
 };
 
 export const logger = {
-  debug: (context: string, message: string, data?: any) => {
+  debug: (context: string, message: string, data?: unknown) => {
     if (!shouldLog(LogLevel.DEBUG)) return;
-    const { formatted, ...rest } = formatMessage(context, message, data);
+    const { formatted } = formatMessage(context, message, data);
     console.debug(`${LOG_PREFIX.DEBUG}`, formatted, ...(data ? [data] : []));
   },
-  
-  info: (context: string, message: string, data?: any) => {
+
+  info: (context: string, message: string, data?: unknown) => {
     if (!shouldLog(LogLevel.INFO)) return;
-    const { formatted, ...rest } = formatMessage(context, message, data);
+    const { formatted } = formatMessage(context, message, data);
     console.info(`${LOG_PREFIX.INFO}`, formatted, ...(data ? [data] : []));
   },
-  
-  warn: (context: string, message: string, data?: any) => {
+
+  warn: (context: string, message: string, data?: unknown) => {
     if (!shouldLog(LogLevel.WARN)) return;
-    const { formatted, ...rest } = formatMessage(context, message, data);
+    const { formatted } = formatMessage(context, message, data);
     console.warn(`${LOG_PREFIX.WARN}`, formatted, ...(data ? [data] : []));
   },
-  
-  error: (context: string, message: string, error?: any) => {
+
+  error: (context: string, message: string, error?: unknown) => {
     if (!shouldLog(LogLevel.ERROR)) return;
-    const { formatted, ...rest } = formatMessage(context, message, error);
+    const { formatted } = formatMessage(context, message, error);
     console.error(`${LOG_PREFIX.ERROR}`, formatted, ...(error ? [error] : []));
   }
 };

@@ -1,10 +1,12 @@
 
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, ReactNode } from 'react';
+import type { Conference } from '../types/schema';
 
 interface ConfContextType {
   confId: string;
-  conference: any; // Replace with proper Conference type
-  societyId?: string; // Add societyId for compatibility
+  conference: Conference | null;
+  societyId?: string;
 }
 
 const ConfContext = createContext<ConfContextType | undefined>(undefined);

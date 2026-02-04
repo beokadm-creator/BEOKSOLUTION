@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent } from '../../components/ui/card';
-import { Loader2, LogIn, LogOut, RefreshCw, CheckCircle, FileText, X, Search, Clock, MapPin, Calendar, AlertCircle, ArrowRight } from 'lucide-react';
+import { Loader2, LogIn, LogOut, RefreshCw, CheckCircle, FileText, X, Search, Clock, MapPin, Calendar, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../../lib/utils';
 
@@ -27,6 +27,10 @@ interface DailyRule {
     date: string;
     globalGoalMinutes: number;
     zones: ZoneRule[];
+    // 계산 방식: DAILY_SEPARATE = 날짜별 독립 완료, CUMULATIVE = 전체 기간 누적 합산
+    completionMode?: 'DAILY_SEPARATE' | 'CUMULATIVE';
+    // 전체 기간 누적 목표 (CUMULATIVE 모드일 때 사용)
+    cumulativeGoalMinutes?: number;
 }
 
 interface Registration {
@@ -165,12 +169,14 @@ const AttendanceLivePage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [cid, cid, selectedDate]);
+     
+    }, [cid, selectedDate]);
 
     useEffect(() => {
         console.log('[AttendanceLive] useEffect triggered, cid:', cid, 'selectedDate:', selectedDate);
         refreshData();
-    }, [cid, selectedDate, refreshData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cid, selectedDate]);
 
     const handleCheckIn = async (regId: string, zoneId: string) => {
         try {
@@ -236,15 +242,20 @@ const AttendanceLivePage: React.FC = () => {
                 });
             }
 
-            const finalMinutes = Math.max(0, durationMinutes - deduction);
+             const finalMinutes = Math.max(0, durationMinutes - deduction);
             const regRef = doc(db, 'conferences', cid!, 'registrations', regId);
-
-            const goal = (zoneRule?.goalMinutes && zoneRule.goalMinutes > 0)
-                ? zoneRule.goalMinutes
-                : rules.globalGoalMinutes;
-
+            
+            // 목표 설정: CUMULATIVE 모드면 전체 누적 목표, 아니면 날짜별 목표
+            const goal = rules.completionMode === 'CUMULATIVE' && rules.cumulativeGoalMinutes
+                ? rules.cumulativeGoalMinutes
+                : (zoneRule?.goalMinutes && zoneRule.goalMinutes > 0)
+                    ? zoneRule.goalMinutes
+                    : rules.globalGoalMinutes;
+            
             const currentTotal = registrations.find(r => r.id === regId)?.totalMinutes || 0;
             const newTotal = currentTotal + finalMinutes;
+            
+            // 완료 여부 판정: 누적 시간이 목표 이상인지
             const isCompleted = newTotal >= goal;
 
             await updateDoc(regRef, {

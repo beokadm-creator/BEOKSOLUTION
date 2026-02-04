@@ -33,6 +33,7 @@ export interface Society {
   id: string; // societyId
   name: LocalizedText;
   description?: LocalizedText;
+  introduction?: LocalizedText;
   logoUrl?: string;
   homepageUrl?: string;
   adminEmails: string[];
@@ -42,11 +43,32 @@ export interface Society {
   };
   footerInfo?: {
     bizRegNumber?: string;
-    representativeName?: string;
-    address?: string;
+    representativeName?: LocalizedText;
+    address?: LocalizedText;
     contactEmail?: string;
     contactPhone?: string;
+    operatingHours?: LocalizedText;
+    emailNotice?: LocalizedText;
+    privacyPolicy?: LocalizedText;
+    termsOfService?: LocalizedText;
   };
+  membershipFeeTiers?: MembershipFeeTier[]; // 회원등급별 금액 설정
+  // Content Fields
+  presidentGreeting?: {
+    message?: LocalizedText;
+    images?: string[];
+    // Backward compatibility
+    ko?: string;
+    en?: string;
+  } | string | LocalizedText;
+  notices?: {
+    id: string;
+    title: LocalizedText;
+    content: LocalizedText;
+    category: string;
+    date: Timestamp;
+    isPinned?: boolean;
+  }[];
   createdAt: Timestamp;
 }
 
@@ -215,6 +237,53 @@ export interface Whitelist {
 export type UserTier = 'MEMBER' | 'STUDENT' | 'NON_MEMBER' | 'VIP' | 'COMMITTEE';
 
 /**
+ * ==========================================
+ * G. Society Membership Fee Settings
+ * ==========================================
+ */
+
+/**
+ * Collection: `societies/{societyId}/settings/membership-fees`
+ * Path: `societies/{societyId}/settings/membership-fees`
+ */
+export interface MembershipFeeTier {
+  id: string;
+  name: string;        // 정회원, 준회원, 준비회원
+  amount: number;      // 금액 (원)
+  validityMonths?: number; // 유효기간 (개월) - 기존 필드
+  validityYears?: number;  // 유효기간(년) - 신규 필드
+  isActive: boolean;    // 활성화 여부
+}
+
+/**
+ * Collection: `societies/{societyId}/membership-payments`
+ * Path: `societies/{societyId}/membership-payments`
+ */
+export interface MembershipPaymentHistory {
+  id: string;
+  societyId: string;
+  userId: string; // 결제한 회원 ID
+  userName: string; // 결제한 회원 이름
+  feeTierId: string; // 선택한 등급 ID
+  amount: number; // 결제 금액
+  paymentMethod: 'TOSS' | 'NICE'; // 결제 수단
+  paymentStatus: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
+  orderId: string; // PG사 주문번호
+  paymentDetails: {
+    tid?: string;
+    authCode?: string;
+  };
+  expiryExtended: {
+    memberId?: string; // 기존 회원 ID (연장의 경우)
+    newMemberCode?: string; // 신규 코드 (신규 생성의 경우)
+    previousExpiry?: string; // 이전 유효기간 (연장의 경우)
+    newExpiry: string; // 새로운 유효기간
+  };
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+/**
  * Collection: `users`
  * Path: `conferences/{confId}/users/{userId}`
  */
@@ -274,7 +343,8 @@ export interface Registration {
   // Two-Step QR Logic
   confirmationQr: string;
   badgeQr: string | null;
-  badgePrepToken?: string;       // Reference to badge_tokens collection
+  /** @deprecated Use badge_tokens/{token} collection as SSOT. Kept for backward compatibility only. */
+  badgePrepToken?: string;       // Reference to badge_tokens collection (DEPRECATED - use badge_tokens SSOT)
   
   isCheckedIn: boolean; // Default: false
   checkInTime: Timestamp | null;
@@ -329,6 +399,37 @@ export interface Speaker {
   abstractUrl?: string;
   agendaId?: string;
   sessionTime?: string; // e.g., "10:00 - 10:20"
+}
+
+/**
+ * Sponsor tier levels for display ordering and styling
+ */
+export type SponsorTier = 'PLATINUM' | 'GOLD' | 'SILVER' | 'BRONZE';
+
+/**
+ * Collection: `sponsors`
+ * Path: `conferences/{confId}/sponsors/{sponsorId}`
+ *
+ * Firestore document structure (without id field)
+ */
+export interface SponsorDoc {
+  name: string;           // Sponsor company name
+  logoUrl: string;        // Logo image URL (Firebase Storage)
+  description: string;    // One-line introduction
+  websiteUrl: string;     // Homepage URL
+  tier?: SponsorTier;     // Sponsor tier for ordering/styling (optional)
+  order?: number;         // Display order (lower = first)
+  isActive: boolean;      // Enable/disable without deleting
+  useTiers?: boolean;     // Conference-level setting: enable tier-based styling
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+/**
+ * UI representation of Sponsor (includes document ID)
+ */
+export interface Sponsor extends SponsorDoc {
+  id: string;  // Document ID (not stored in Firestore)
 }
 
 /**
@@ -388,16 +489,28 @@ export interface AccessLog {
 /**
  * Collection: `badge_tokens`
  * Path: `conferences/{confId}/badge_tokens/{token}`
+ *
+ * SSOT (Single Source of Truth) for voucher/badge token management
+ * All token operations MUST go through badge_tokens collection
+ *
+ * STATE TRANSITIONS:
+ * 1. ACTIVE: Token created, ready for validation (onRegistrationCreated)
+ * 2. ISSUED: Digital badge issued at InfoDesk (issueDigitalBadge)
+ * 3. EXPIRED: Token expired (conference.end + 24h) - can be reissued
+ *
+ * BACKWARD COMPATIBILITY:
+ * Registration.badgePrepToken is deprecated - use badge_tokens/{token} instead
  */
 export interface BadgeToken {
-  token: string;              // TKN-{random-32-char}
-  registrationId: string;      // Reference to registration
+  token: string;              // TKN-{random-32-char} - DOCUMENT ID = token value
+  registrationId: string;      // Reference to registration OR external_attendees
   conferenceId: string;
   userId: string;
   status: 'ACTIVE' | 'ISSUED' | 'EXPIRED';
   createdAt: Timestamp;
   issuedAt?: Timestamp;
-  expiresAt: Timestamp;        // 24 hours after creation
+  expiresAt: Timestamp;        // conference.end + 24h (fallback: 7 days)
+  reissuedCount?: number;      // Track reissue history for analytics
 }
 
 /**
@@ -534,6 +647,47 @@ export interface NotificationTemplate {
 
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+/**
+ * Collection: `external_attendees`
+ * Path: `conferences/{confId}/external_attendees/{externalId}`
+ */
+export interface ExternalAttendee {
+   id: string; // External attendee ID (same as generated UID)
+   uid: string; // Generated UID (UUID v4) - used for badge, voucher, attendance tracking
+   userId?: string; // Firebase Auth user ID (generated for external attendees)
+   conferenceId: string;
+   name: string;
+   email: string;
+   phone: string;
+   organization: string;
+   licenseNumber?: string; // Optional
+   password?: string; // Optional - password for Firebase Auth (only stored temporarily until user creation)
+
+   // Registration snapshot for compatibility
+   paymentStatus: PaymentStatus;
+   paymentMethod: PaymentMethod;
+   amount: number;
+   receiptNumber: string;
+
+   // Badge & Check-in fields
+   confirmationQr: string;
+   badgeQr: string | null;
+   badgePrepToken?: string;
+   isCheckedIn: boolean;
+   checkInTime: Timestamp | null;
+   badgeIssued?: boolean;
+   badgeIssuedAt?: Timestamp;
+
+   // Deletion status
+   deleted?: boolean;
+
+   // Metadata
+   registrationType: 'MANUAL_INDIVIDUAL' | 'MANUAL_BULK';
+   registeredBy: string; // Admin user ID who registered
+   createdAt: Timestamp;
+   updatedAt: Timestamp;
 }
 
 /**

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { doc, getDoc, updateDoc, Timestamp, addDoc, collection, increment } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, Timestamp, addDoc, collection, increment, query, where, getDocs, limit, type QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Loader2, AlertCircle, CheckCircle, X } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -109,67 +109,101 @@ const AttendanceScannerPage: React.FC = () => {
                 return;
             }
 
-            const regRef = doc(db, 'conferences', cid, 'registrations', code);
-            const regSnap = await getDoc(regRef);
+            // === CHANGED: 명찰 QR로 조회 (badgeQr = UUID) ===
+            // 1. registrations 컬렉션에서 badgeQr 검색
+            const regQuery = query(
+                collection(db, `conferences/${cid}/registrations`),
+                where('badgeQr', '==', code),
+                limit(1)
+            );
+            const regSnap = await getDocs(regQuery);
 
-            if (!regSnap.exists()) {
-                throw new Error("Invalid Registration Code");
+            let regDoc: QueryDocumentSnapshot | null = null;
+            let isExternal = false;
+
+            if (!regSnap.empty) {
+                regDoc = regSnap.docs[0];
+                isExternal = false;
+            } else {
+                // 2. external_attendees 컬렉션에서 badgeQr 검색
+                const extQuery = query(
+                    collection(db, `conferences/${cid}/external_attendees`),
+                    where('badgeQr', '==', code),
+                    limit(1)
+                );
+                const extSnap = await getDocs(extQuery);
+
+                if (!extSnap.empty) {
+                    regDoc = extSnap.docs[0];
+                    isExternal = true;
+                }
             }
 
-            const regData = regSnap.data();
+            // 3. 명찰 QR을 찾지 못함
+            if (!regDoc) {
+                throw new Error("❌ Invalid Badge QR\n\n명찰이 발급되지 않았습니다.\n인포데스크에서 명찰 발급을 먼저 받으세요.");
+            }
+
+            const regData = regDoc.data();
+
+            // === NEW: 보안 검증 (명찰 발급 여부) ===
+            if (!regData.badgeIssued) {
+                throw new Error("❌ Badge Not Issued\n\n인포데스크에서 명찰 발급이 필요합니다.\n바우처 QR로는 입장할 수 없습니다.");
+            }
+            // === END NEW ===
+
             if (regData.status !== 'PAID') {
                 throw new Error("Registration NOT PAID");
             }
-            if (regData.slug !== cid) {
-                throw new Error("Wrong Conference");
-            }
 
-            const userName = regData.userName || 'Unknown';
+            const regId = regDoc.id; // Use registration ID from query result
+
+            const userName = regData.userName || regData.name || 'Unknown';
             const userAffiliation = regData.affiliation || regData.userEmail || '';
             const currentStatus = regData.attendanceStatus || 'OUTSIDE';
             const currentZone = regData.currentZone;
 
             // 2. Logic Switch
             let action = '';
-            
+
             if (mode === 'ENTER_ONLY') {
                 if (currentStatus === 'INSIDE') {
                     if (currentZone === selectedZoneId) throw new Error(`${userName} Already Inside`);
                     // Auto-Switch
-                    await performCheckOut(code, currentZone, regData.lastCheckIn);
-                    await performCheckIn(code, selectedZoneId);
+                    await performCheckOut(regId, currentZone, regData.lastCheckIn);
+                    await performCheckIn(regId, selectedZoneId);
                     action = 'Switched & Checked In';
                 } else {
-                    await performCheckIn(code, selectedZoneId);
+                    await performCheckIn(regId, selectedZoneId);
                     action = '입장 완료 (Checked In)';
                 }
-            } 
+            }
             else if (mode === 'EXIT_ONLY') {
                 if (currentStatus !== 'INSIDE') throw new Error(`${userName} Not Entered`);
-                await performCheckOut(code, currentZone, regData.lastCheckIn);
+                await performCheckOut(regId, currentZone, regData.lastCheckIn);
                 action = '퇴장 완료 (Checked Out)';
             }
             else if (mode === 'AUTO') {
                 if (currentStatus === 'INSIDE') {
                     if (currentZone !== selectedZoneId) {
-                        await performCheckOut(code, currentZone, regData.lastCheckIn);
-                        await performCheckIn(code, selectedZoneId);
+                        await performCheckOut(regId, currentZone, regData.lastCheckIn);
+                        await performCheckIn(regId, selectedZoneId);
                         action = 'Zone Switched';
                     } else {
-                        await performCheckOut(code, currentZone, regData.lastCheckIn);
+                        await performCheckOut(regId, currentZone, regData.lastCheckIn);
                         action = '퇴장 완료 (Checked Out)';
                     }
                 } else {
-                    await performCheckIn(code, selectedZoneId);
+                    await performCheckIn(regId, selectedZoneId);
                     action = '입장 완료 (Checked In)';
                 }
             }
 
             // Success
-            setScannerState({ 
-                status: 'SUCCESS', 
-                message: action, 
-                subMessage: userName, 
+            setScannerState({
+                status: 'SUCCESS',
+                message: action,
+                subMessage: userName,
                 lastScanned: code,
                 userData: { name: userName, affiliation: userAffiliation }
             });
@@ -207,14 +241,34 @@ const AttendanceScannerPage: React.FC = () => {
         const start = lastIn && typeof lastIn === 'object' && 'toDate' in lastIn ? (lastIn as { toDate: () => Date }).toDate() : now;
         const diffMins = Math.floor((now.getTime() - start.getTime()) / 60000);
         
+        // 휴게 시간 차감 로직 추가
+        const zoneRule = zones.find(z => typeof z === 'object' && z !== null && 'id' in z && (z as { id: string }).id === zoneId) as { id: string; breaks?: Array<{ start: string; end: string }> } | undefined;
+        let deduction = 0;
+        if (zoneRule && typeof zoneRule === 'object' && zoneRule !== null && 'breaks' in zoneRule && Array.isArray(zoneRule.breaks)) {
+            zoneRule.breaks.forEach((brk: { start: string; end: string }) => {
+                // 현재 날짜 사용 (기본값: 오늘)
+                const selectedDate = new Date().toISOString().split('T')[0];
+                const breakStart = new Date(`${selectedDate}T${brk.start}:00`);
+                const breakEnd = new Date(`${selectedDate}T${brk.end}:00`);
+                const overlapStart = Math.max(start.getTime(), breakStart.getTime());
+                const overlapEnd = Math.min(now.getTime(), breakEnd.getTime());
+                if (overlapEnd > overlapStart) {
+                    const overlapMins = Math.floor((overlapEnd - overlapStart) / 60000);
+                    deduction += overlapMins;
+                }
+            });
+        }
+        
+        const finalMinutes = Math.max(0, diffMins - deduction); // 휴게 시간 차감 후 저장
+        
         await updateDoc(doc(db, 'conferences', cid, 'registrations', id), {
             attendanceStatus: 'OUTSIDE',
             currentZone: null,
-            totalMinutes: increment(diffMins),
+            totalMinutes: increment(finalMinutes), // 휴게 시간 차감된 값
             lastCheckOut: Timestamp.now()
         });
         await addDoc(collection(db, 'conferences', cid, 'registrations', id, 'logs'), {
-            type: 'EXIT', zoneId, timestamp: Timestamp.now(), method: 'KIOSK', recognizedMinutes: diffMins
+            type: 'EXIT', zoneId, timestamp: Timestamp.now(), method: 'KIOSK', recognizedMinutes: finalMinutes
         });
     };
 

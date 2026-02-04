@@ -1,5 +1,5 @@
 
-import React, { useEffect, useMemo, useCallback } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { GlobalProvider } from '../contexts/GlobalContext';
 import { useAuth } from '../hooks/useAuth';
@@ -16,7 +16,7 @@ export default function SuperLayout() {
   // Memoize the super admin check to prevent infinite renders
   const isSuper = useMemo(
     () => !!(user && SUPER_ADMINS.includes(user.email || '')),
-    [user?.email]
+    [user]
   );
 
   // 🔧 [FIX] Guard logic - moved to useEffect with proper dependency check
@@ -27,7 +27,7 @@ export default function SuperLayout() {
       console.log('[SuperLayout] Not super admin, redirecting to login');
       navigate('/admin/login', { replace: true });
     }
-  }, [isSuper, loading]); // Only depend on actual data, not navigate function
+  }, [isSuper, loading, navigate]);
 
   if (loading) return <div>Loading Auth...</div>;
 

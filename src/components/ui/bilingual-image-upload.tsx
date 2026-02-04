@@ -26,8 +26,6 @@ export default function BilingualImageUpload({
   onChangeEN,
   pathBaseKO,
   pathBaseEN,
-  labelKO = '🇰🇷 한국어',
-  labelEN = '🇺🇸 English',
   recommendedSize = '1920x600 recommended',
   className,
   required = false

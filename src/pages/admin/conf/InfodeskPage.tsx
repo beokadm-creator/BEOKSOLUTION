@@ -34,7 +34,7 @@ interface IssueOption {
 const InfodeskPage: React.FC = () => {
     const navigate = useNavigate();
     const { cid } = useParams<{ cid: string }>();
-    const { selectedConferenceId, selectedConferenceSlug } = useAdminStore();
+    const { selectedConferenceId } = useAdminStore();
     const [loading, setLoading] = useState(true);
     
     // Config
@@ -139,28 +139,38 @@ const InfodeskPage: React.FC = () => {
             const regRef = doc(db, 'conferences', targetConferenceId, 'registrations', code);
             const regSnap = await getDoc(regRef);
 
-            if (!regSnap.exists()) {
+            // Check if external attendee
+            const extRef = doc(db, 'conferences', targetConferenceId, 'external_attendees', code);
+            const extSnap = await getDoc(extRef);
+
+            let regData: { userName?: string; affiliation?: string; userEmail?: string; name?: string; organization?: string; status?: string; } | null = null;
+            let isExternal = false;
+
+            if (regSnap.exists()) {
+                regData = regSnap.data();
+                isExternal = false;
+            } else if (extSnap.exists()) {
+                regData = extSnap.data();
+                isExternal = true;
+            } else {
                 throw new Error("Invalid Registration Code");
             }
 
-            const regData = regSnap.data();
-            if (regData.status !== 'PAID') {
+            if (!isExternal && regData.status !== 'PAID') {
                 throw new Error("Registration NOT PAID");
             }
-            if (regData.slug !== selectedConferenceSlug) {
-                // Double check slug match if possible, or rely on ID path
-            }
 
-            const userName = regData.userName || 'Unknown';
-            const userAffiliation = regData.affiliation || regData.userEmail || '';
+            const userName = isExternal ? (regData?.name || 'Unknown') : (regData?.userName || 'Unknown');
+            const userAffiliation = isExternal ? (regData?.organization || '') : (regData?.affiliation || regData?.userEmail || '');
 
-            // Logic: Issue Badge using Cloud Function
+            // Logic: Issue Badge using Cloud Function (supports both regular and external attendees)
             const functions = getFunctions();
             const issueDigitalBadgeFn = httpsCallable(functions, 'issueDigitalBadge');
             const result = await issueDigitalBadgeFn({
                 confId: targetConferenceId,
                 regId: code,
-                issueOption: issueOption
+                issueOption: issueOption,
+                isExternalAttendee: isExternal
             }) as { data: { success: boolean; badgeQr: string } };
 
             if (!result.data.success) {

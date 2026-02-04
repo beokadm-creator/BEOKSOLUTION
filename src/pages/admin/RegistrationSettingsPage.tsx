@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Timestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { useSocietyGrades } from '../../hooks/useSocietyGrades';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { Button } from '../../components/ui/button';
@@ -11,7 +12,7 @@ import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
 import { Trash2, Plus, Save, FileText } from 'lucide-react';
-import { useSocietyGrades } from '../../hooks/useSocietyGrades';
+
 
 interface RegistrationPeriod {
     id: string;
@@ -25,11 +26,6 @@ interface RegistrationPeriod {
 interface RegistrationSettings {
     periods: RegistrationPeriod[];
     refundPolicy: string;
-}
-
-interface Grade {
-    id: string;
-    name: string;
 }
 
 const RegistrationSettingsPage: React.FC = () => {

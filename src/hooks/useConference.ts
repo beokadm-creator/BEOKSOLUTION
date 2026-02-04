@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { db } from '../firebase';
-import { ConferenceInfo, Page, Agenda, Conference, Speaker } from '../types/schema';
+import { ConferenceInfo, Page, Agenda, Speaker, Sponsor, RegistrationPeriod } from '../types/schema';
 import { useParams } from 'react-router-dom';
 
 interface ConferenceData {
@@ -11,13 +11,15 @@ interface ConferenceData {
   pages: Page[];
   agendas: Agenda[];
   speakers: Speaker[];
+  sponsors: Sponsor[];
+  pricing: RegistrationPeriod[]; // Add registration periods
   loading: boolean;
   error: string | null;
   societyId?: string;
   slug?: string;
 }
 
-export const useConference = () => {
+  export const useConference = (targetId?: string) => {
   const params = useParams<{ slug: string }>(); // React Router v6 params
   const [data, setData] = useState<ConferenceData>({
     isPlatform: false,
@@ -26,11 +28,15 @@ export const useConference = () => {
     pages: [],
     agendas: [],
     speakers: [],
+    sponsors: [],
+    pricing: [],
     loading: true,
     error: null,
   });
 
   useEffect(() => {
+    const slug = targetId || params.slug?.toLowerCase();
+    console.log('[useConference] useEffect triggered, slug:', slug);
     let isMounted = true;
     const timeoutId = setTimeout(() => {
         if (isMounted) {
@@ -45,16 +51,24 @@ export const useConference = () => {
     const fetchConferenceData = async () => {
       try {
         const hostname = window.location.hostname;
-        const slug = params.slug?.toLowerCase(); // Case-insensitive match
 
         // 1. Determine Environment
         let societyId: string | null = null;
         let isPlatform = false;
 
         // Dev overrides (e.g. localhost)
-        const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+        const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost');
         const isFirebaseApp = hostname.includes('web.app') || hostname.includes('firebaseapp.com');
         const parts = hostname.split('.');
+
+        console.log('[useConference] Environment detection:', {
+            hostname,
+            isLocalhost,
+            isFirebaseApp,
+            parts,
+            slug,
+            societyId
+        });
 
         if (isLocalhost || isFirebaseApp) {
              // On Localhost/Platform, if there is a slug, we treat it as Conference Mode for testing.
@@ -100,7 +114,6 @@ export const useConference = () => {
 
         // 3. Query Firestore: Find Conference
         // [Fix-Step 110] Multi-Path Search & Rescue
-        let confDocRef;
         let confId = '';
         let confData = {} as Conference;
         let basePath = '';
@@ -116,36 +129,39 @@ export const useConference = () => {
             pathsToTry.push({ path: `conferences/${slug}`, type: 'root_simple' });
         }
 
-        // console.log(`[useConference] Searching paths:`, pathsToTry); // Debug removed
+        console.log('[useConference] Searching paths:', pathsToTry);
 
         for (const candidate of pathsToTry) {
             try {
                 const docRef = doc(db, candidate.path);
                 const docSnap = await getDoc(docRef);
-                
+
                 if (docSnap.exists()) {
-                    // console.log(`✅ SUCCESS PATH: ${candidate.path}`); // Debug removed
+                    console.log(`[useConference] ✅ SUCCESS PATH: ${candidate.path}`);
                     confId = docSnap.id;
                     confData = { ...docSnap.data(), societyId: societyId || '' } as Conference;
                     basePath = candidate.path;
                     found = true;
-                    break; 
+                    break;
                 }
             } catch (e) {
-                // console.warn(`Error checking path ${candidate.path}`, e); // Keep clean
+                console.log(`[useConference] ❌ ERROR checking path ${candidate.path}:`, e);
             }
         }
 
         if (!found) {
             // Final fallback: Query by slug if direct path failed (legacy)
+            console.log('[useConference] Trying fallback query by slug:', slug);
             const q = query(collection(db, 'conferences'), where('slug', '==', slug), limit(1));
             const querySnapshot = await getDocs(q);
             if (!querySnapshot.empty) {
-                // console.log(`✅ SUCCESS QUERY: slug=${slug}`); // Debug removed
+                console.log(`[useConference] ✅ SUCCESS QUERY: slug=${slug}, confId=${querySnapshot.docs[0].id}`);
                 confId = querySnapshot.docs[0].id;
                 confData = querySnapshot.docs[0].data() as Conference;
                 basePath = `conferences/${confId}`;
                 found = true;
+            } else {
+                console.log('[useConference] ❌ Fallback query returned no results');
             }
         }
 
@@ -157,24 +173,35 @@ export const useConference = () => {
             return;
         }
 
-        // console.log(`[useConference] Final Base Path: ${basePath}`); // Debug removed
+        console.log('[useConference] Final Base Path:', basePath);
+        console.log('[useConference] Conference ID:', confId);
+        console.log('[useConference] Slug:', slug);
 
         // 4. Manual Merge of Sub-docs (Fix-Step 109)
         // Fetch all potential settings documents in parallel
-        const [infoSnap, basicSnap, identitySnap, visualSnap] = await Promise.all([
+        // Fix: Ensure societyId is available. If confData.societyId is missing, try to derive from confId
+        const effectiveSocietyId = confData.societyId || (confId.includes('_') ? confId.split('_')[0] : societyId);
+        
+        console.log('[useConference] Effective Society ID for fetching identity:', effectiveSocietyId);
+
+        const [infoSnap, basicSnap, identitySnap, visualSnap, registrationSnap, societyIdentitySnap] = await Promise.all([
             getDoc(doc(db, `${basePath}/info/general`)),
             getDoc(doc(db, `${basePath}/settings/basic`)),
             getDoc(doc(db, `${basePath}/settings/identity`)),
-            getDoc(doc(db, `${basePath}/settings/visual`))
+            getDoc(doc(db, `${basePath}/settings/visual`)),
+            getDoc(doc(db, `${basePath}/settings/registration`)),
+            effectiveSocietyId ? getDoc(doc(db, `societies/${effectiveSocietyId}/settings/identity`)) : Promise.resolve(null)
         ]);
 
         const basicData = basicSnap.exists() ? basicSnap.data() : {};
         const identityData = identitySnap.exists() ? identitySnap.data() : {};
         const visualData = visualSnap.exists() ? visualSnap.data() : {};
         const infoGeneralData = infoSnap.exists() ? infoSnap.data() : {};
+        const societyIdentityData = societyIdentitySnap && societyIdentitySnap.exists() ? societyIdentitySnap.data() : {};
+        const registrationData = registrationSnap.exists() ? registrationSnap.data() : {};
 
         // Construct Final Info Object manually
-        const infoData: ConferenceInfo & { societyId?: string } = {
+        const infoData: ConferenceInfo & { societyId?: string; bannerUrl?: string; posterUrl?: string } = {
             // Base
             title: confData.title,
             dates: confData.dates,
@@ -184,16 +211,32 @@ export const useConference = () => {
             ...infoGeneralData,
 
             // Merged Fields
-            venueName: basicData.venueName || (confData as any).venueName,
-            venueAddress: basicData.venueAddress || (confData as any).venueAddress,
-            subTitle: identityData.subTitle || (confData as any).subTitle,
-            welcomeMessage: basicData.welcomeMessage || basicData.greetings || (confData as any).welcomeMessage,
+            venueName: basicData.venueName || infoGeneralData.venueName || '',
+            venueAddress: basicData.venueAddress || infoGeneralData.venueAddress || '',
+            subTitle: identityData.subTitle || infoGeneralData.subTitle,
+            welcomeMessage: basicData.welcomeMessage || basicData.greetings || infoGeneralData.welcomeMessage,
             
+            // Terms & Conditions (From Society Identity + Conference Overrides)
+            termsOfService: societyIdentityData.termsOfService,
+            termsOfService_en: societyIdentityData.termsOfService_en,
+            privacyPolicy: societyIdentityData.privacyPolicy,
+            privacyPolicy_en: societyIdentityData.privacyPolicy_en,
+            thirdPartyConsent: societyIdentityData.thirdPartyConsent,
+            thirdPartyConsent_en: societyIdentityData.thirdPartyConsent_en,
+            marketingConsentText: societyIdentityData.marketingConsentText,
+            marketingConsentText_en: societyIdentityData.marketingConsentText_en,
+            infoConsentText: societyIdentityData.infoConsentText,
+            infoConsentText_en: societyIdentityData.infoConsentText_en,
+            
+            // Refund Policy: Conference Settings > Society Identity
+            refundPolicy: registrationData.refundPolicy || societyIdentityData.refundPolicy,
+            refundPolicy_en: registrationData.refundPolicy_en || societyIdentityData.refundPolicy_en,
+
             // Venue Object Construction
             venue: {
                 name: typeof basicData.venueName === 'string' 
                     ? { ko: basicData.venueName, en: basicData.venueName } 
-                    : basicData.venueName || infoGeneralData.venue?.name,
+                    : basicData.venueName || infoGeneralData.venue?.name || { ko: '', en: '' },
                 address: typeof basicData.venueAddress === 'string'
                     ? { ko: basicData.venueAddress, en: basicData.venueAddress } 
                     : basicData.venueAddress || infoGeneralData.venue?.address,
@@ -202,14 +245,17 @@ export const useConference = () => {
 
             // Visuals
             visuals: {
-                bannerUrl: visualData.mainBannerUrl || visualData.bannerUrl || (confData as any).bannerUrl,
-                posterUrl: visualData.posterUrl || (confData as any).posterUrl,
+                bannerUrl: visualData.mainBannerUrl || visualData.bannerUrl || infoGeneralData.bannerUrl,
+                posterUrl: visualData.posterUrl || infoGeneralData.posterUrl,
             },
+            
+            bannerUrl: visualData.mainBannerUrl || visualData.bannerUrl || infoGeneralData.bannerUrl,
+            posterUrl: visualData.posterUrl || infoGeneralData.posterUrl,
             
             // Defaults
             badgeLayout: infoGeneralData.badgeLayout || { width: 400, height: 600, elements: [] },
             receiptConfig: infoGeneralData.receiptConfig || { issuerName: confData.title.ko, stampUrl: '', nextSerialNo: 1 },
-        } as any;
+        };
 
 
         const pagesRef = collection(db, `${basePath}/pages`);
@@ -224,6 +270,47 @@ export const useConference = () => {
         const speakersSnap = await getDocs(speakersRef);
         const speakers = speakersSnap.docs.map(d => ({ id: d.id, ...d.data() } as Speaker));
 
+        const sponsorsRef = collection(db, `${basePath}/sponsors`);
+        const sponsorsSnap = await getDocs(sponsorsRef);
+        const sponsors = sponsorsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Sponsor));
+
+        // Fetch registration periods from settings/registration document
+        let pricing: RegistrationPeriod[] = [];
+
+        try {
+            console.log('[useConference] Using pre-fetched registration settings');
+
+            console.log('[useConference] Registration settings query result:', {
+                path: `${basePath}/settings/registration`,
+                exists: registrationSnap.exists(),
+                hasData: !!registrationData
+            });
+
+            if (registrationSnap.exists()) {
+                console.log('[useConference] Full registration data keys:', Object.keys(registrationData));
+                const periods = registrationData.periods || [];
+                console.log('[useConference] Registration periods array:', periods);
+                console.log('[useConference] Periods length:', periods.length);
+
+                pricing = periods.map((p: RegistrationPeriod, index: number) => ({
+                    id: p.id || `period_${index}`,
+                    ...p
+                })).sort((a, b) => {
+                    const aStart = a.startDate?.toDate ? a.startDate.toDate() : new Date(a.startDate || 0);
+                    const bStart = b.startDate?.toDate ? b.startDate.toDate() : new Date(b.startDate || 0);
+                    return aStart.getTime() - bStart.getTime();
+                });
+            } else {
+                console.log('[useConference] Registration document does not exist');
+            }
+        } catch (err) {
+            console.error('[useConference] Error processing registration periods:', err);
+            pricing = [];
+        }
+
+        console.log('[useConference] Final pricing array:', pricing);
+        console.log('[useConference] Pricing array length:', pricing.length);
+
         if (isMounted) {
             setData({
                 isPlatform: false,
@@ -234,23 +321,26 @@ export const useConference = () => {
                 pages,
                 agendas,
                 speakers,
+                sponsors,
+                pricing,
                 loading: false,
                 error: null
             });
             clearTimeout(timeoutId);
         }
 
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (isMounted) {
+            const error = err instanceof Error ? err : new Error(String(err));
             // Handle permission errors gracefully - still load page with minimal data
-            const isPermissionError = (err as { code?: string }).code === 'permission-denied' || (err instanceof Error && err.message?.includes('permission'));
+            const isPermissionError = (err as { code?: string }).code === 'permission-denied' || (error.message?.includes('permission'));
             if (isPermissionError) {
 
                 // Force loading false to prevent infinite loading state
                 setData(prev => ({ ...prev, loading: false, error: 'Permission denied. Some data may not be available.' }));
                 clearTimeout(timeoutId);
             } else {
-                setData(prev => ({ ...prev, loading: false, error: err.message }));
+                setData(prev => ({ ...prev, loading: false, error: error.message }));
                 clearTimeout(timeoutId);
             }
         }
@@ -263,7 +353,7 @@ export const useConference = () => {
         isMounted = false;
         clearTimeout(timeoutId);
     };
-  }, [params.slug]);
+  }, [params.slug, targetId]);
 
   return data;
 };

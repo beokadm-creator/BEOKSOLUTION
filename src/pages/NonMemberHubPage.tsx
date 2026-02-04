@@ -22,7 +22,7 @@ const NonMemberHubPage: React.FC = () => {
     const { id: cid, loading: confLoading, info: confInfo } = useConference();
 
     // Only initialize auth hook after conference data is loaded
-    const { nonMember, loading: authLoading, initialLoadComplete, logout } = useNonMemberAuth(cid);
+    const { nonMember, initialLoadComplete, logout } = useNonMemberAuth(cid);
     
     const [registration, setRegistration] = useState<Registration | null>(null);
     const [loadingReg, setLoadingReg] = useState(false);
@@ -70,6 +70,7 @@ const NonMemberHubPage: React.FC = () => {
         if (initialLoadComplete && cid && !nonMember) {
             console.log('[NonMemberHubPage] No session found after loading, redirecting to check-status');
             navigate(`/${slug}/check-status`);
+            return;
         }
     }, [initialLoadComplete, nonMember, cid, navigate, slug]);
 
@@ -79,6 +80,32 @@ const NonMemberHubPage: React.FC = () => {
 
     if (!nonMember || !cid) {
         return null; // Will redirect
+    }
+
+    // [FIX-20250126] Show payment required message if not PAID
+    if (registration && registration.paymentStatus !== 'PAID') {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+                <EregiCard className="max-w-md w-full p-8 text-center">
+                    <div className="mb-6">
+                        <AlertCircle className="w-16 h-16 text-orange-500 mx-auto" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-900 mb-4">
+                        결제가 필요합니다
+                    </h2>
+                    <p className="text-slate-600 mb-6">
+                        등록이 아직 결제되지 않았습니다.<br/>
+                        결제를 완료한 후 다시 접속해주세요.
+                    </p>
+                    <EregiButton
+                        onClick={() => navigate(`/${slug}/register`)}
+                        className="w-full"
+                    >
+                        결제하러 가기
+                    </EregiButton>
+                </EregiCard>
+            </div>
+        );
     }
 
     const handleLogout = () => {

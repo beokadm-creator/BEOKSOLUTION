@@ -79,7 +79,7 @@ export interface Speaker {
   name: { [key: string]: string } | string;
   organization: { [key: string]: string } | string;
   bio?: { [key: string]: string } | string;
-  lectureTitle?: { [key: string]: string } | string;
+  presentationTitle?: { [key: string]: string } | string;
   photoUrl?: string;
   order?: number;
 }

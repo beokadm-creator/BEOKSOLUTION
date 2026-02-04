@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
-import { getFirestore, collection, query, where, getDocs, doc, serverTimestamp, getDoc, collectionGroup, orderBy, updateDoc, deleteDoc, onSnapshot, limit } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, collection, query, where, getDocs, doc, serverTimestamp, getDoc, collectionGroup, orderBy, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { useMemberVerification } from '../hooks/useMemberVerification';
 import { useAuth } from '../hooks/useAuth';
 import { useSociety } from '../hooks/useSociety';
@@ -9,30 +9,36 @@ import { functions } from '../firebase';
 import { getRootCookie } from '../utils/cookie';
 import { httpsCallable } from 'firebase/functions';
 import toast from 'react-hot-toast';
-import LoadingSpinner from '../components/common/LoadingSpinner';
-import EmptyState from '../components/common/EmptyState';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
-import { Calendar, FileText, QrCode, Award, Download, MessageSquare, LayoutDashboard, Printer } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '../components/ui/dialog';
-import { ABSTRACT_STATUS, getAbstractStatusLabel } from '@/constants/abstract';
+import { Calendar, FileText, QrCode, Printer, Award } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { ABSTRACT_STATUS } from '@/constants/abstract';
 import EregiNavigation from '../components/eregi/EregiNavigation';
 import DataWidget from '../components/eregi/DataWidget';
-import { EregiCard } from '@/components/eregi/EregiForm';
 import ReceiptTemplate from '../components/print/ReceiptTemplate';
 import PrintHandler from '../components/print/PrintHandler';
 import { ReceiptConfig } from '../types/print';
 import { logger } from '../utils/logger';
+import { CreditCard } from 'lucide-react';
+import { Timestamp, Submission } from '../types/schema';
 
-// HELPER: Force String (Prevent Object Crash)
-const forceString = (val: any): string => {
+interface Stringable {
+    ko?: string;
+    en?: string;
+    name?: string | Stringable;
+    [key: string]: unknown;
+}
+
+const forceString = (val: unknown): string => {
     try {
         if (!val) return '';
         if (typeof val === 'string') return val;
-        if (typeof val === 'object') {
-            if (val.ko) return forceString(val.ko);
-            if (val.en) return forceString(val.en);
-            if (val.name) return forceString(val.name);
+        if (typeof val === 'object' && val !== null) {
+            const obj = val as Stringable;
+            if (obj.ko) return forceString(obj.ko);
+            if (obj.en) return forceString(obj.en);
+            if (obj.name) return forceString(obj.name);
             return '';
         }
         return String(val);
@@ -51,9 +57,18 @@ interface UserReg {
     paymentStatus?: string;
     amount?: number;
     receiptNumber?: string;
-    paymentDate?: any; // Timestamp or string
+    paymentDate?: Timestamp | Date | string;
     receiptConfig?: ReceiptConfig;
-    userName?: string; // Added for receipt
+    userName?: string;
+}
+
+interface Affiliation {
+    verified: boolean;
+    licenseNumber?: string;
+    memberId?: string;
+    grade?: string;
+    expiry?: string | Timestamp;
+    expiryDate?: string | Timestamp;
 }
 
 // [Step 512-Des] Visual Gratification: CountUp Animation
@@ -91,26 +106,20 @@ const UserHubPage: React.FC = () => {
     const { auth } = useAuth('');
     const { user, loading: authLoading } = auth;
     // Fetch society data for dynamic name display
-    const { society, loading: societyLoading } = useSociety();
+    const { society } = useSociety();
 
     const [loading, setLoading] = useState(true);
     // [Step 512-Des] Data Highway Feedback
     const [syncStatus, setSyncStatus] = useState<'connected' | 'syncing' | 'disconnected'>('syncing');
     const [activeTab, setActiveTab] = useState<'EVENTS' | 'CERTS' | 'PROFILE' | 'ABSTRACTS'>('EVENTS');
 
-    // Non-member detection state
-    const [isNonMemberOnly, setIsNonMemberOnly] = useState<boolean>(false);
-    const [nonMemberConferenceSlug, setNonMemberConferenceSlug] = useState<string>('');
-
     // Receipt Modal State
     const [selectedReceiptReg, setSelectedReceiptReg] = useState<UserReg | null>(null);
     const [showReceiptModal, setShowReceiptModal] = useState(false);
     const receiptRef = useRef<HTMLDivElement>(null);
 
-    // Data
     const [regs, setRegs] = useState<UserReg[]>([]);
-    const [abstracts, setAbstracts] = useState<any[]>([]);
-    const retryCount = useRef(0);
+    const [abstracts, setAbstracts] = useState<Submission[]>([]);
     const healingAttempted = useRef<{ [key: string]: boolean }>({});
     const realtimeRetryCount = useRef(0);
     const MAX_REALTIME_RETRIES = 3;
@@ -121,7 +130,7 @@ const UserHubPage: React.FC = () => {
     }, [authLoading]);
 
     const [totalPoints, setTotalPoints] = useState(0);
-    const [societies, setSocieties] = useState<any[]>([]);
+    const [societies, setSocieties] = useState<Array<{ id: string; name: string | { ko?: string; en?: string };[key: string]: unknown }>>([]);
 
     // Profile (Locked by default)
     const [profile, setProfile] = useState({ displayName: '', phoneNumber: '', affiliation: '', licenseNumber: '', email: '' });
@@ -132,6 +141,130 @@ const UserHubPage: React.FC = () => {
     const [isSocLocked, setIsSocLocked] = useState(false);
     // [Fix-Step 263] Use Hook
     const { verifyMember, loading: verifyLoading } = useMemberVerification();
+    const verifyFormInitializedRef = useRef(false);
+
+    const fetchUserData = useCallback(async (u: { uid: string; userName?: string; name?: string; displayName?: string; phoneNumber?: string; phone?: string; affiliation?: string; org?: string; organization?: string; licenseNumber?: string; licenseId?: string; email?: string }) => {
+        const db = getFirestore();
+        setLoading(true);
+
+        let profileData = {
+            displayName: forceString(u.userName || u.name || u.displayName),
+            phoneNumber: forceString(u.phoneNumber || u.phone),
+            affiliation: forceString(u.affiliation || u.org || u.organization),
+            licenseNumber: forceString(u.licenseNumber || u.licenseId),
+            email: forceString(u.email)
+        };
+
+        logger.debug('UserHub', 'Starting profile load', { uid: u.uid });
+
+        try {
+            const userDocSnap = await getDoc(doc(db, 'users', u.uid));
+            const hasUserDoc = userDocSnap.exists();
+
+            if (hasUserDoc) {
+                const userData = userDocSnap.data();
+                logger.debug('UserHub', 'users/{uid} document found', { uid: u.uid });
+                profileData = {
+                    displayName: forceString(userData.userName || userData.name || profileData.displayName),
+                    phoneNumber: forceString(userData.phoneNumber || userData.phone || profileData.phoneNumber),
+                    affiliation: forceString(userData.affiliation || userData.org || userData.organization || profileData.affiliation),
+                    licenseNumber: forceString(userData.licenseNumber || userData.licenseId || profileData.licenseNumber),
+                    email: forceString(userData.email || profileData.email)
+                };
+            } else {
+                logger.debug('UserHub', 'users/{uid} document does not exist, checking participations');
+                try {
+                    const participationsRef = collection(db, `users/${u.uid}/participations`);
+                    const participationsSnap = await getDocs(participationsRef);
+
+                    logger.debug('UserHub', 'Participations query returned', { count: participationsSnap.size });
+                    if (!participationsSnap.empty) {
+                        const nonMemberParticipation = participationsSnap.docs[0].data();
+                        const confSlug = nonMemberParticipation.slug || nonMemberParticipation.conferenceId || nonMemberParticipation.conferenceSlug || 'kadd_2026spring';
+
+                        // [Non-member detection] users/{uid} doesn't exist but participations do
+                        logger.debug('UserHub', 'Non-member detected', { uid: u.uid, hasParticipations: participationsSnap.size, confSlug });
+                        const firstParticipation = participationsSnap.docs[0].data();
+
+                        profileData = {
+                            displayName: forceString(firstParticipation.userName || firstParticipation.name || profileData.displayName),
+                            phoneNumber: forceString(firstParticipation.userPhone || firstParticipation.phone || profileData.phoneNumber),
+                            affiliation: forceString(firstParticipation.userOrg || firstParticipation.organization || firstParticipation.affiliation || profileData.affiliation),
+                            licenseNumber: forceString(firstParticipation.licenseNumber || profileData.licenseNumber),
+                            email: forceString(firstParticipation.userEmail || firstParticipation.email || profileData.email)
+                        };
+                    }
+                } catch (partErr) {
+                    logger.warn('UserHub', 'Could not get participation data', partErr);
+                }
+            }
+        } catch (docErr) {
+            const errorCode = docErr instanceof Error && 'code' in docErr ? (docErr as { code?: string }).code : undefined;
+            const errorMessage = docErr instanceof Error ? docErr.message : String(docErr);
+            logger.error('UserHub', 'Error accessing users/{uid}', { code: errorCode, message: errorMessage });
+        }
+
+        logger.debug('UserHub', 'Final profile data', profileData);
+        setProfile(profileData);
+
+        try {
+            const snapSoc = await getDocs(collection(db, 'societies'));
+            setSocieties(snapSoc.docs.map(d => ({ id: d.id, ...d.data() })));
+        } catch (socErr) {
+            logger.error('UserHub', 'Societies fetch error', socErr);
+        }
+
+        try {
+            // [Fix] Re-enable abstracts fetching for mypage
+            // Query submissions across ALL conferences where user is submitter
+            // Use collectionGroup to search conferences/{confId}/submissions
+            // [Safety] Use parameter u instead of outer scope user to avoid null reference
+            if (!u.uid) {
+                logger.warn('UserHub', 'User UID is null, skipping abstracts fetch');
+                setAbstracts([]);
+                setLoading(false);
+                return;
+            }
+
+            const submissionsRef = collectionGroup(db, 'submissions');
+            const q = query(submissionsRef, where('userId', '==', u.uid), orderBy('submittedAt', 'desc'));
+            const snap = await getDocs(q);
+
+            const userAbstracts = snap.docs.map(d => ({
+                id: d.id,
+                ...d.data()
+            }));
+
+            setAbstracts(userAbstracts);
+            logger.debug('UserHub', 'Abstracts fetched', { count: userAbstracts.length });
+        } catch (absErr) {
+            logger.error('UserHub', 'Abstracts fetch error', absErr);
+            const errorMsg = absErr instanceof Error ? absErr.message : String(absErr);
+            if (errorMsg?.includes('index') || errorMsg?.includes('Index')) {
+                logger.warn('UserHub', 'Abstracts index is still building, showing empty state');
+                setAbstracts([]);
+                toast('초록 내역이 준비 중입니다. 잠시 후 새로고침해주세요.');
+            } else {
+                setAbstracts([]);
+                toast.error('초록 내역을 불러올 수 없습니다.');
+            }
+        }
+
+        setLoading(false);
+        // setSyncStatus('connected'); // Handled by realtime listener
+    }, []);
+
+    // Initialize verifyForm with user name when user data changes
+
+    useLayoutEffect(() => {
+        if (!authLoading && user && !verifyFormInitializedRef.current) {
+            const initialName = forceString(user.name || (user as { displayName?: string }).displayName);
+            requestAnimationFrame(() => {
+                setVerifyForm(prev => ({ ...prev, name: initialName }));
+            });
+            verifyFormInitializedRef.current = true;
+        }
+    }, [user, authLoading]);
 
     // ZOMBIE KILLER: Force refresh when navigating back from history
     useEffect(() => {
@@ -144,30 +277,29 @@ const UserHubPage: React.FC = () => {
         return () => window.removeEventListener('pageshow', handlePageShow);
     }, []);
 
-    // [Fix-Step 350] Auth Sync
+
     useEffect(() => {
         if (!authLoading) {
             if (!user) {
-                // FORCE CLEAN REDIRECT IF NO SESSION
                 window.location.href = `/auth?mode=login&returnUrl=${encodeURIComponent(window.location.pathname)}`;
                 return;
             }
-            // User exists
             console.log('[UserHub] User object from auth:', {
                 uid: user.uid || user.id,
                 name: user.name,
                 email: user.email,
-                displayName: (user as any).displayName,
+                displayName: (user as { displayName?: string }).displayName,
                 affiliations: user.affiliations
             });
             logger.debug('UserHub', 'User object from auth', { uid: user.uid || user.id });
-            setVerifyForm(prev => ({ ...prev, name: forceString(user.name || (user as any).displayName) }));
-            fetchUserData(user);
 
-            // [Self-Healing] Check if expiry is missing for verified affiliations
+            // Wrap setState in a callback to avoid direct setState in effect
+            requestAnimationFrame(() => {
+                fetchUserData(user);
+            });
+
             if (user.affiliations) {
-                Object.entries(user.affiliations).forEach(async ([socId, aff]: [string, any]) => {
-                    // [Step 393-D] Zero Tolerance Check: expiry OR expiryDate MUST exist
+                Object.entries(user.affiliations).forEach(async ([socId, aff]: [string, { verified?: boolean; expiry?: string; expiryDate?: string; licenseNumber?: string }]) => {
                     const hasExpiry = aff.expiry !== undefined || aff.expiryDate !== undefined;
 
                     if (aff.verified && !hasExpiry) {
@@ -186,13 +318,10 @@ const UserHubPage: React.FC = () => {
                                 // verifyMember will now save BOTH fields due to previous hook update
                                 const res = await verifyMember(
                                     socId,
-                                    user.name || (user as any).displayName,
+                                    user.name || (user as { displayName?: string }).displayName,
                                     aff.licenseNumber,
                                     true,
-                                    "",
-                                    undefined,
-                                    undefined,
-                                    undefined,
+                                    5,
                                     true // lockNow
                                 );
 
@@ -209,36 +338,34 @@ const UserHubPage: React.FC = () => {
                 });
             }
         }
-    }, [user, authLoading]);
+    }, [user, authLoading, fetchUserData, verifyMember]);
 
-    // [Step 402] Real-time validation trigger
-    const validateCurrentAffiliationRef = useRef<any>(null);
-    
+    const validateCurrentAffiliationRef = useRef<(user: { uid: string; name?: string; displayName?: string; userName?: string; affiliations?: { [key: string]: { verified?: boolean; licenseNumber?: string; code?: string; memberId?: string } } }) => Promise<void> | null>(null);
+
     useEffect(() => {
         if (user && !authLoading && validateCurrentAffiliationRef.current) {
             validateCurrentAffiliationRef.current(user);
         }
     }, [user, authLoading]);
 
-    const validateCurrentAffiliation = useCallback(async (u: any) => {
+    const validateCurrentAffiliation = useCallback(async (u: { uid: string; name?: string; displayName?: string; userName?: string; affiliations?: { [key: string]: { verified?: boolean; licenseNumber?: string; code?: string; memberId?: string } } }): Promise<void> => {
         if (!u.affiliations) return;
         const db = getFirestore();
 
         for (const [socId, aff] of Object.entries(u.affiliations)) {
-            const castAff = aff as any;
+            const castAff = aff as { verified?: boolean; licenseNumber?: string; code?: string; memberId?: string };
             if (castAff.verified) {
                 try {
                     const codeToUse = castAff.licenseNumber || castAff.code || castAff.memberId;
                     if (!codeToUse) continue;
 
                     const verifyFn = httpsCallable(functions, 'verifyMemberIdentity');
-                    // We use the cloud function to check if the member still exists and is valid
-                    const { data }: any = await verifyFn({
+                    const { data } = await verifyFn({
                         societyId: socId,
                         name: u.name || u.displayName || u.userName,
                         code: codeToUse,
                         lockNow: false
-                    });
+                    }) as { data: { success: boolean; message?: string } };
 
                     if (!data.success) {
                         logger.warn('UserHub', `Affiliation ${socId} invalid: ${data.message}. Revoking...`);
@@ -282,7 +409,7 @@ const UserHubPage: React.FC = () => {
             // [FIX-2026-01-21] Temporarily disabled real-time listener due to index build delay
             // Fall back to one-time fetch from user's participation history instead
             const USE_REALTIME = false; // Toggle to false while index is building
-            
+
             if (!USE_REALTIME) {
                 // Fallback: Fetch from users/{uid}/participations (no index required)
                 setSyncStatus('syncing');
@@ -292,7 +419,7 @@ const UserHubPage: React.FC = () => {
                         // Query user's participation history directly (no collection group index needed)
                         const participationsRef = collection(db, `users/${user.uid}/participations`);
                         const snapshot = await getDocs(participationsRef);
-                        
+
                         if (snapshot.empty) {
                             setRegs([]);
                             setTotalPoints(0);
@@ -301,10 +428,8 @@ const UserHubPage: React.FC = () => {
                             return;
                         }
 
-                        let fallbackAff = '';
                         const regPromises = snapshot.docs.map(async (docSnap) => {
                             const data = docSnap.data();
-                            if (data.userAffiliation) fallbackAff = data.userAffiliation;
 
                             // [CRITICAL FIX] Safely extract slug with fallback
                             const confSlug = forceString(data.slug || data.conferenceId || data.conferenceSlug || 'kadd_2026spring');
@@ -313,6 +438,7 @@ const UserHubPage: React.FC = () => {
                             let loc = "장소 정보 없음";
                             let dates = "";
                             let receiptConfig: ReceiptConfig | undefined = undefined;
+                            let cData: { societyId?: string;[key: string]: unknown } | undefined = undefined;
 
                             // JOIN 1: Conference Details
                             try {
@@ -324,7 +450,7 @@ const UserHubPage: React.FC = () => {
                                 const confSnap = await getDoc(confRef);
                                 console.log('[UserHub] Conference doc exists:', confSnap.exists());
                                 if (confSnap.exists()) {
-                                    const cData = confSnap.data();
+                                    cData = confSnap.data();
                                     const confId = confSnap.id;
                                     console.log('[UserHub] Conference data:', cData);
 
@@ -405,15 +531,25 @@ const UserHubPage: React.FC = () => {
                                 logger.error('UserHub', `Conference lookup failed for slug: ${confSlug}`, err);
                             }
 
-                            // JOIN 2: Society Name (If missing)
-                            if (!socName || socName === 'Unknown') {
-                                try {
-                                    const socDoc = await getDoc(doc(db, 'societies', data.societyId));
-                                    if (socDoc.exists()) socName = forceString(socDoc.data().name);
-                                } catch (err) {
-                                    // Silently handle society lookup failures
-                                    console.debug('[UserHub] Society lookup failed, using fallback data');
+                            // JOIN 2: Society Name (Always fetch to ensure data integrity)
+                            try {
+                                const socDoc = await getDoc(doc(db, 'societies', data.societyId));
+                                if (socDoc.exists()) {
+                                    const socData = socDoc.data();
+                                    // Society name can be: {ko: "...", en: "..."} or "string"
+                                    if (socData.name) {
+                                        if (typeof socData.name === 'string') {
+                                            socName = socData.name;
+                                        } else if (socData.name.ko || socData.name.en) {
+                                            // Default to Korean, fallback to English
+                                            socName = socData.name.ko || socData.name.en || '';
+                                        }
+                                    }
+                                } else {
+                                    console.warn('[UserHub] Society document not found for ID:', data.societyId);
                                 }
+                            } catch (socErr) {
+                                console.error('[UserHub] Society lookup failed:', socErr);
                             }
 
                             return {
@@ -421,8 +557,8 @@ const UserHubPage: React.FC = () => {
                                 conferenceName: realTitle,
                                 societyName: socName,
                                 earnedPoints: Number(data.earnedPoints || 0),
-                                slug: forceString(data.slug),
-                                societyId: forceString(data.societyId || 'kadd'),
+                                slug: forceString(data.slug || data.conferenceId || data.conferenceSlug || confSlug),
+                                societyId: forceString(data.societyId === 'unknown' ? cData?.societyId || 'kadd' : data.societyId || cData?.societyId || 'kadd'),
                                 location: loc,
                                 dates: dates,
                                 paymentStatus: data.paymentStatus,
@@ -430,19 +566,19 @@ const UserHubPage: React.FC = () => {
                                 receiptNumber: data.id,
                                 paymentDate: data.createdAt,
                                 receiptConfig: receiptConfig,
-                                userName: data.userName || user.name || (user as any).displayName
+                                userName: data.userName || user.name || (user as { displayName?: string }).displayName
                             };
                         });
 
                         const loadedRegs = await Promise.all(regPromises);
                         console.log('[UserHub] Loaded registrations:', loadedRegs);
                         setRegs(loadedRegs);
-                        setTotalPoints(loadedRegs.reduce((acc, r) => acc + r.earnedPoints!, 0));
+                        setTotalPoints(loadedRegs.reduce((acc, r) => acc + (r.earnedPoints ?? 0), 0));
                         setSyncStatus('connected');
                         setLoading(false);
-                    } catch (err: any) {
+                    } catch (err) {
                         logger.error('UserHub', 'Fallback participation fetch error', err);
-                        if (err.message?.includes('insufficient permissions')) {
+                        if (err instanceof Error && err.message?.includes('insufficient permissions')) {
                             setRegs([]);
                             setSyncStatus('connected');
                         } else {
@@ -459,13 +595,10 @@ const UserHubPage: React.FC = () => {
 
             setSyncStatus('syncing');
 
-            unsubscribe = onSnapshot(qReg, async (snapshot: any) => {
-                // Success Handler
+            unsubscribe = onSnapshot(qReg, async (snapshot) => {
                 try {
-                    let fallbackAff = '';
                     const regPromises = snapshot.docs.map(async (docSnap) => {
                         const data = docSnap.data();
-                        if (data.userAffiliation) fallbackAff = data.userAffiliation;
 
                         // [CRITICAL FIX] Safely extract slug with fallback
                         const confSlug = forceString(data.slug || data.conferenceId || data.conferenceSlug || 'kadd_2026spring');
@@ -493,11 +626,22 @@ const UserHubPage: React.FC = () => {
                         }
 
                         // JOIN 2: Society Name (If missing)
-                        if (!socName || socName === 'Unknown') {
+                        if (!socName || socName === 'Unknown' || socName === '') {
                             try {
                                 const socDoc = await getDoc(doc(db, 'societies', data.societyId));
-                                if (socDoc.exists()) socName = forceString(socDoc.data().name);
-                            } catch (err) {
+                                if (socDoc.exists()) {
+                                    const socData = socDoc.data();
+                                    // Society name can be: {ko: "...", en: "..."} or "string"
+                                    if (socData.name) {
+                                        if (typeof socData.name === 'string') {
+                                            socName = socData.name;
+                                        } else if (socData.name.ko || socData.name.en) {
+                                            // Default to Korean, fallback to English
+                                            socName = socData.name.ko || socData.name.en || '';
+                                        }
+                                    }
+                                }
+                            } catch {
                                 // Silently handle society lookup failures
                                 logger.debug('UserHub', 'Society lookup failed, using fallback data');
                             }
@@ -508,8 +652,8 @@ const UserHubPage: React.FC = () => {
                             conferenceName: realTitle,
                             societyName: socName,
                             earnedPoints: Number(data.earnedPoints || 0),
-                            slug: confSlug,
-                            societyId: forceString(data.societyId || 'kadd'),
+                            slug: forceString(data.slug || data.conferenceId || data.conferenceSlug || confSlug),
+                            societyId: forceString(data.societyId === 'unknown' ? cData?.societyId || 'kadd' : data.societyId || cData?.societyId || 'kadd'),
                             location: loc,
                             dates: dates,
                             paymentStatus: data.paymentStatus,
@@ -517,27 +661,29 @@ const UserHubPage: React.FC = () => {
                             receiptNumber: data.id, // Using orderId as receipt number
                             paymentDate: data.createdAt,
                             receiptConfig: receiptConfig,
-                            userName: data.userName || user.name || (user as any).displayName
+                            userName: data.userName || user.name || (user as { displayName?: string }).displayName
                         };
                     });
 
                     const loadedRegs = await Promise.all(regPromises);
                     setRegs(loadedRegs);
-                    setTotalPoints(loadedRegs.reduce((acc, r) => acc + r.earnedPoints!, 0));
+                    setTotalPoints(loadedRegs.reduce((acc, r) => acc + (r.earnedPoints ?? 0), 0));
 
                     setSyncStatus('connected');
                 } catch (processError) {
                     logger.error('UserHub', 'Data processing error', processError);
                     setSyncStatus('disconnected');
                 }
-            }, (error: any) => {
+            }, (error) => {
                 logger.error('UserHub', 'Snapshot listener error', error);
                 setSyncStatus('disconnected');
-                
-                // Check if this is an indexing error (permanent failure until index is created)
-                const isIndexingError = error.message?.includes('COLLECTION_GROUP_ASC index required') || 
-                                       error.code === 'failed-precondition';
-                
+
+                const errorMsg = error instanceof Error ? error.message : String(error);
+                const errorCode = (error as { code?: string }).code;
+
+                const isIndexingError = errorMsg?.includes('COLLECTION_GROUP_ASC index required') ||
+                    errorCode === 'failed-precondition';
+
                 if (isIndexingError) {
                     // For indexing errors, don't retry - indexes are being deployed
                     toast.error("인덱스 생성 중입니다. 잠시 후 새로고침 해주세요.");
@@ -548,7 +694,7 @@ const UserHubPage: React.FC = () => {
                 if (realtimeRetryCount.current < MAX_REALTIME_RETRIES) {
                     const backoffMs = 3000 * Math.pow(2, realtimeRetryCount.current);
                     toast.error(`연결 실패. ${backoffMs / 1000}초 후 재연결을 시도합니다.`);
-                    
+
                     if (retryTimer) clearTimeout(retryTimer);
                     retryTimer = setTimeout(() => {
                         realtimeRetryCount.current++;
@@ -569,117 +715,6 @@ const UserHubPage: React.FC = () => {
         };
     }, [user]);
 
-    const fetchUserData = useCallback(async (u: any) => {
-        const db = getFirestore();
-        setLoading(true);
-
-        let profileData = {
-            displayName: forceString(u.userName || u.name || u.displayName),
-            phoneNumber: forceString(u.phoneNumber || u.phone),
-            affiliation: forceString(u.affiliation || u.org || u.organization),
-            licenseNumber: forceString(u.licenseNumber || u.licenseId),
-            email: forceString(u.email)
-        };
-
-        logger.debug('UserHub', 'Starting profile load', { uid: u.uid });
-
-        try {
-            const userDocRef = doc(db, 'users', u.uid);
-            const userDocSnap = await getDoc(userDocSnap);
-            const hasUserDoc = userDocSnap.exists();
-
-            if (hasUserDoc) {
-                const userData = userDocSnap.data();
-                logger.debug('UserHub', 'users/{uid} document found', { uid: u.uid });
-                profileData = {
-                    displayName: forceString(userData.userName || userData.name || profileData.displayName),
-                    phoneNumber: forceString(userData.phoneNumber || userData.phone || profileData.phoneNumber),
-                    affiliation: forceString(userData.affiliation || userData.org || userData.organization || profileData.affiliation),
-                    licenseNumber: forceString(userData.licenseNumber || userData.licenseId || profileData.licenseNumber),
-                    email: forceString(userData.email || profileData.email)
-                };
-            } else {
-                logger.debug('UserHub', 'users/{uid} document does not exist, checking participations');
-                try {
-                    const participationsRef = collection(db, `users/${u.uid}/participations`);
-                    const participationsSnap = await getDocs(participationsRef);
-                    
-                    logger.debug('UserHub', 'Participations query returned', { count: participationsSnap.size });
-                    if (!participationsSnap.empty) {
-                        const nonMemberParticipation = participationsSnap.docs[0].data();
-                        const confSlug = nonMemberParticipation.slug || nonMemberParticipation.conferenceId || nonMemberParticipation.conferenceSlug || 'kadd_2026spring';
-
-                        // [Non-member detection] users/{uid} doesn't exist but participations do
-                        setIsNonMemberOnly(true);
-                        setNonMemberConferenceSlug(confSlug);
-                        logger.debug('UserHub', 'Non-member detected', { uid: u.uid, hasParticipations: participationsSnap.size, confSlug });
-                        const firstParticipation = participationsSnap.docs[0].data();
-                        
-                        profileData = {
-                            displayName: forceString(firstParticipation.userName || firstParticipation.name || profileData.displayName),
-                            phoneNumber: forceString(firstParticipation.userPhone || firstParticipation.phone || profileData.phoneNumber),
-                            affiliation: forceString(firstParticipation.userOrg || firstParticipation.organization || firstParticipation.affiliation || profileData.affiliation),
-                            licenseNumber: forceString(firstParticipation.licenseNumber || profileData.licenseNumber),
-                            email: forceString(firstParticipation.userEmail || firstParticipation.email || profileData.email)
-                        };
-                    }
-                } catch (partErr) {
-                    logger.warn('UserHub', 'Could not get participation data', partErr);
-                }
-            }
-        } catch (docErr: any) {
-            logger.error('UserHub', 'Error accessing users/{uid}', { code: docErr.code, message: docErr.message });
-        }
-
-        logger.debug('UserHub', 'Final profile data', profileData);
-        setProfile(profileData);
-
-        try {
-            const snapSoc = await getDocs(collection(db, 'societies'));
-            setSocieties(snapSoc.docs.map(d => ({ id: d.id, ...d.data() })));
-        } catch (socErr) {
-            logger.error('UserHub', 'Societies fetch error', socErr);
-        }
-
-        try {
-            // [Fix] Re-enable abstracts fetching for mypage
-            // Query submissions across ALL conferences where user is submitter
-            // Use collectionGroup to search conferences/{confId}/submissions
-            // [Safety] Use parameter u instead of outer scope user to avoid null reference
-            if (!u.uid) {
-                logger.warn('UserHub', 'User UID is null, skipping abstracts fetch');
-                setAbstracts([]);
-                return;
-            }
-
-            const submissionsRef = collectionGroup(db, 'submissions');
-            const q = query(submissionsRef, where('userId', '==', u.uid), orderBy('submittedAt', 'desc'));
-            const snap = await getDocs(q);
-
-            const userAbstracts = snap.docs.map(d => ({
-                id: d.id,
-                ...d.data()
-            }));
-
-            setAbstracts(userAbstracts);
-            logger.debug('UserHub', 'Abstracts fetched', { count: userAbstracts.length });
-        } catch (absErr: any) {
-            logger.error('UserHub', 'Abstracts fetch error', absErr);
-            // 🔧 [FIX] Handle index building gracefully
-            if (absErr.message?.includes('index') || absErr.message?.includes('Index')) {
-                logger.warn('UserHub', 'Abstracts index is still building, showing empty state');
-                setAbstracts([]); // Show empty state without error
-                toast('초록 내역이 준비 중입니다. 잠시 후 새로고침해주세요.');
-            } else {
-                setAbstracts([]); // Failed fetch: show empty state
-                toast.error('초록 내역을 불러올 수 없습니다.');
-            }
-        }
-
-        setLoading(false);
-        // setSyncStatus('connected'); // Handled by realtime listener
-    }, []);
-
     const handleEventClick = (r: UserReg) => {
         const currentHost = window.location.hostname;
         const targetHost = `${r.societyId}.eregi.co.kr`;
@@ -693,8 +728,7 @@ const UserHubPage: React.FC = () => {
             // [Step 403-D] Pass token via URL for bulletproof session bridge
             const token = getRootCookie('eregi_session');
             const authUrl = `https://${targetHost}/auth?mode=login&returnUrl=${encodeURIComponent(cleanPath)}${token ? `&token=${token}` : ''}`;
-            // Navigate using effect to handle location change properly
-            window.location.href = authUrl;
+            window.location.replace(authUrl);
         }
     };
 
@@ -702,20 +736,21 @@ const UserHubPage: React.FC = () => {
     const handleQrClick = (e: React.MouseEvent, r: UserReg) => {
         e.stopPropagation(); // Prevent card click
         const currentHost = window.location.hostname;
-        const targetHost = `${r.societyId}.eregi.co.kr`;
+        // [CRITICAL FIX] Use societyId from registration, fallback to 'kadd' if 'unknown'
+        const safeSocietyId = r.societyId && r.societyId !== 'unknown' ? r.societyId : 'kadd';
+        const targetHost = `${safeSocietyId}.eregi.co.kr`;
 
         // [CRITICAL FIX] Safely extract slug with fallback
-        const badgeSlug = r.slug || 'kadd_2026spring';
+        const badgeSlug = r.slug && r.slug !== 'unknown' && r.slug !== '' ? r.slug : 'kadd_2026spring';
         const cleanPath = `/${badgeSlug}/badge`;
 
-        console.log('[UserHub] Badge click - Registration slug:', r.slug, 'Badge slug:', badgeSlug);
+        console.log('[UserHub] Badge click - Registration slug:', r.slug, 'Badge slug:', badgeSlug, 'Society ID:', safeSocietyId);
 
         // CRITICAL FIX: Check if user is already authenticated
         // If Firebase auth has a currentUser, redirect directly without auth page
         const authInstance = getAuth();
         if (authInstance.currentUser) {
-            // User is already logged in - direct navigation
-            window.location.href = `https://${targetHost}${cleanPath}`;
+            window.location.replace(`https://${targetHost}${cleanPath}`);
             return;
         }
 
@@ -724,7 +759,7 @@ const UserHubPage: React.FC = () => {
         } else {
             const token = getRootCookie('eregi_session');
             const authUrl = `https://${targetHost}/auth?mode=login&returnUrl=${encodeURIComponent(cleanPath)}${token ? `&token=${token}` : ''}`;
-            window.location.href = authUrl;
+            window.location.replace(authUrl);
         }
     };
 
@@ -736,16 +771,11 @@ const UserHubPage: React.FC = () => {
         }
         // Fallback for config if missing (optional: can hardcode for demo if needed, but better to rely on data)
         if (!r.receiptConfig) {
-             toast.error("영수증 설정이 없습니다. 관리자에게 문의하세요.");
-             return;
+            toast.error("영수증 설정이 없습니다. 관리자에게 문의하세요.");
+            return;
         }
         setSelectedReceiptReg(r);
         setShowReceiptModal(true);
-    };
-
-    const handleLogout = async () => {
-        await signOut(getAuth());
-        window.location.href = '/'; // Force refresh
     };
 
     const handleOpenModal = () => {
@@ -769,7 +799,7 @@ const UserHubPage: React.FC = () => {
 
         // Pass empty string for targetGradeId as we are just verifying membership here
         // [Fix-Step 357] Request Immediate Lock (lockNow: true)
-        const res = await verifyMember(societyId, name, code, true, "", undefined, undefined, undefined, true);
+        const res = await verifyMember(societyId, name, code, true, 5, true);
 
         if (res.success) {
             // [Fix-Step 350] Removed Legacy Cert Doc Creation. 
@@ -809,12 +839,11 @@ const UserHubPage: React.FC = () => {
     const societyName = getSocietyName();
     const pageTitle = isMain ? "통합 마이페이지" : `${societyName} 마이페이지`;
 
-    // [Fix-Step 357] Date Helper
-    const formatDate = (date: any) => {
+    const formatDate = (date: Timestamp | { seconds: number } | string | null | undefined): string => {
         if (!date) return '-';
-        if (date.toDate) return date.toDate().toLocaleDateString(); // Firestore Timestamp 
-        if (date.seconds) return new Date(date.seconds * 1000).toLocaleDateString(); // JSON 
-        return date; // String 
+        if ('toDate' in date && typeof date.toDate === 'function') return date.toDate().toLocaleDateString();
+        if ('seconds' in date) return new Date((date as { seconds: number }).seconds * 1000).toLocaleDateString();
+        return String(date);
     };
 
     return (
@@ -840,21 +869,9 @@ const UserHubPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* [Fix-Step 343] Guest Warning Banner */}
-                {(user as any)?.isAnonymous && (
-                    <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-6 rounded-r">
-                        <div className="flex">
-                            <div className="ml-3">
-                                <p className="text-sm text-amber-700 font-bold">
-                                    ⚠️ 현재 비회원(Guest) 상태입니다.
-                                </p>
-                                <p className="text-xs text-amber-600 mt-1">
-                                    이 브라우저에서만 접수 내역을 확인할 수 있습니다. 안전한 관리를 위해 정회원 전환을 권장합니다.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {/* [REMOVED] Guest Warning Banner - Anonymous registration deprecated
+                    See docs/ANONYMOUS_CLEANUP_ANALYSIS.md for details
+                    All users now have full accounts with email/password authentication */}
 
                 {/* INFO WIDGET GRID */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -884,16 +901,13 @@ const UserHubPage: React.FC = () => {
                     />
                 </div>
 
-                 {/* TABS */}
-                  <div className="flex gap-4 border-b mb-6 overflow-x-auto no-scrollbar flex-nowrap min-w-0">
+                {/* TABS */}
+                <div className="flex gap-4 border-b mb-6 overflow-x-auto no-scrollbar flex-nowrap min-w-0">
                     <button onClick={() => setActiveTab('EVENTS')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'EVENTS' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>등록학회</button>
                     <button onClick={() => setActiveTab('ABSTRACTS')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'ABSTRACTS' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>초록 내역</button>
-                    {!(user as any)?.isAnonymous && (
-                        <>
-                            <button onClick={() => setActiveTab('CERTS')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'CERTS' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>학회 인증</button>
-                            <button onClick={() => setActiveTab('PROFILE')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'PROFILE' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>내 정보</button>
-                        </>
-                    )}
+                    {/* [SIMPLIFIED] Anonymous check removed - all users have full accounts */}
+                    <button onClick={() => setActiveTab('CERTS')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'CERTS' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>학회 인증</button>
+                    <button onClick={() => setActiveTab('PROFILE')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'PROFILE' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>내 정보</button>
                 </div>
 
                 {/* 1. EVENTS (FIXED LINKS & TITLES) */}
@@ -954,7 +968,8 @@ const UserHubPage: React.FC = () => {
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 const currentLang = searchParams.get('lang') || 'ko';
-                                                navigate(`/${r.slug}/abstracts?lang=${currentLang}`);
+                                                const safeSlug = r.slug && r.slug !== 'unknown' && r.slug !== '' ? r.slug : 'kadd_2026spring';
+                                                navigate(`/${safeSlug}/abstracts?lang=${currentLang}`);
                                             }}
                                             className="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs gap-1.5 shadow-sm border border-slate-200"
                                         >
@@ -985,15 +1000,15 @@ const UserHubPage: React.FC = () => {
                     </div>
                 )}
 
-                 {/* 2. CERTS (Affiliations) */}
-                 {activeTab === 'CERTS' && (
+                {/* 2. CERTS (Affiliations) */}
+                {activeTab === 'CERTS' && (
                     <div className="space-y-4">
                         {loading && (
                             <>
-                            <div className="bg-white p-5 rounded-xl shadow-sm border-blue-100 flex justify-between items-center">
-                                <div className="flex items-center gap-4 w-full">
-                                    <Skeleton className="w-10 h-10 rounded-full" />
-                                    <div className="space-y-2 flex-1">
+                                <div className="bg-white p-5 rounded-xl shadow-sm border-blue-100 flex justify-between items-center">
+                                    <div className="flex items-center gap-4 w-full">
+                                        <Skeleton className="w-10 h-10 rounded-full" />
+                                        <div className="space-y-2 flex-1">
                                             <Skeleton className="h-5 w-1/3" />
                                             <Skeleton className="h-4 w-1/2" />
                                         </div>
@@ -1002,12 +1017,12 @@ const UserHubPage: React.FC = () => {
                             </>
                         )}
 
-                        {!loading && user?.affiliations && Object.entries(user.affiliations).map(([socId, aff]: [string, any]) => {
+                        {!loading && user?.affiliations && Object.entries(user.affiliations).map(([socId, aff]: [string, Affiliation]) => {
                             if (!aff.verified) return null;
 
                             const soc = societies.find(s => s.id === socId);
 
-                             return (
+                            return (
                                 <div key={socId} className="eregi-card flex justify-between items-center bg-blue-50/30 border-blue-100">
                                     <div className="flex items-center gap-4">
                                         <div className="w-12 h-12 bg-[#e1ecf6] text-[#24669e] rounded-full flex items-center justify-center font-bold text-xl">✓</div>
@@ -1031,6 +1046,10 @@ const UserHubPage: React.FC = () => {
                         })}
                         <button onClick={handleOpenModal} className="w-full py-4 bg-white border-2 border-dashed border-blue-300 text-blue-600 rounded-xl font-bold hover:bg-blue-50">
                             + 학회 정회원 인증 추가하기
+                        </button>
+                        <button onClick={() => navigate('/mypage/membership')} className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-bold hover:from-blue-700 hover:to-blue-800 shadow-md flex items-center justify-center gap-2">
+                            <CreditCard className="w-5 h-5" />
+                            학회 회비 납부
                         </button>
                     </div>
                 )}
@@ -1097,7 +1116,7 @@ const UserHubPage: React.FC = () => {
                                 </div>
                                 <div className="text-sm text-gray-500 flex flex-col gap-1 mt-2">
                                     <p>제출일: {formatDate(abs.submittedAt || abs.createdAt)}</p>
-                                    <p>저자: {abs.authors?.map((a: any) => a.name).join(', ') || '-'}</p>
+                                    <p>저자: {abs.authors?.map((a: { name: string; email: string; affiliation: string; isPresenter: boolean }) => a.name).join(', ') || '-'}</p>
 
                                     {/* [Step 405-D] Edit/Withdraw Buttons */}
                                     <div className="flex flex-col sm:flex-row gap-2 mt-4 w-full sm:w-auto">
@@ -1129,7 +1148,7 @@ const UserHubPage: React.FC = () => {
                                             수정하기
                                         </button>
 
-                                         {/* Withdraw Button */}
+                                        {/* Withdraw Button */}
                                         <button
                                             onClick={async (e) => {
                                                 e.stopPropagation();
@@ -1234,7 +1253,7 @@ const UserHubPage: React.FC = () => {
                     <div className="flex flex-col items-center justify-center p-6 bg-gray-100 rounded-xl">
                         {selectedReceiptReg && selectedReceiptReg.receiptConfig && (
                             <div ref={receiptRef} className="shadow-2xl bg-white">
-                                <ReceiptTemplate 
+                                <ReceiptTemplate
                                     data={{
                                         registrationId: selectedReceiptReg.id,
                                         receiptNumber: selectedReceiptReg.receiptNumber || selectedReceiptReg.id,
@@ -1244,8 +1263,8 @@ const UserHubPage: React.FC = () => {
                                         items: [
                                             { name: `Conference Registration (${selectedReceiptReg.conferenceName})`, amount: selectedReceiptReg.amount || 0 }
                                         ]
-                                    }} 
-                                    config={selectedReceiptReg.receiptConfig} 
+                                    }}
+                                    config={selectedReceiptReg.receiptConfig}
                                 />
                             </div>
                         )}

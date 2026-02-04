@@ -17,7 +17,7 @@ export default function AdminUsersPage() {
     const [name, setName] = useState('');
     
     // Linking State
-    const [linkMode, setLinkMode] = useState<{ active: boolean, existingUser?: any }>({ active: false });
+    const [linkMode, setLinkMode] = useState<{ active: boolean, existingUser?: { uid: string; email: string } }>({ active: false });
 
     if (societyLoading) return <div>로딩 중...</div>;
     if (!society) return <div>No society context found.</div>;
@@ -48,7 +48,7 @@ export default function AdminUsersPage() {
                 forceLink: forceLink || linkMode.active
             });
 
-            const data = result.data as any;
+            const data = result.data as { success: boolean; code?: string; warning?: string; existingUser?: { uid: string; email: string } };
 
             if (data.success === false && data.code === 'auth/email-already-exists') {
                 // Prompt to link
@@ -65,12 +65,10 @@ export default function AdminUsersPage() {
             }
             
             resetForm();
-            // In a real app, we might need to refresh the society doc manually if real-time listener isn't fast enough
-            // But useSociety uses onSnapshot, so it should auto-update.
 
-        } catch (err: any) {
+        } catch (err) {
             console.error(err);
-            toast.error(err.message || 'Failed to create/link admin');
+            toast.error(err instanceof Error ? err.message : 'Failed to create/link admin');
         } finally {
             setLoadingAction(false);
         }
@@ -85,9 +83,9 @@ export default function AdminUsersPage() {
         try {
             await removeFn({ email: targetEmail, societyId: society.id });
             toast.success('Access removed');
-        } catch (err: any) {
+        } catch (err) {
             console.error(err);
-            toast.error(err.message || 'Failed to remove admin');
+            toast.error(err instanceof Error ? err.message : 'Failed to remove admin');
         } finally {
             setLoadingAction(false);
         }

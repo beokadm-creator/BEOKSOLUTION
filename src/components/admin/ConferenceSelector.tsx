@@ -3,7 +3,6 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAdminStore } from '../../store/adminStore';
 import { Button } from '../ui/button';
-import { Card, CardContent } from '../ui/card';
 import { Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -49,7 +48,7 @@ const ConferenceSelector: React.FC = () => {
                 setAvailableConferences(conferences);
                 autoSelectIfOnlyOne();
                 
-            } catch (err) {
+            } catch {
                 setError('Failed to load conferences');
             } finally {
                 setLoading(false);

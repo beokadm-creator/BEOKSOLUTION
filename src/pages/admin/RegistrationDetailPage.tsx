@@ -5,11 +5,12 @@ import { db } from '../../firebase';
 import { Button } from '../../components/ui/button';
 import { ArrowLeft, Printer, XCircle, CheckCircle, CreditCard } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Registration } from '../../types/schema';
 
 const getConferenceIdByDomain = () => {
     const hostname = window.location.hostname;
     if (hostname.includes('kap.eregi')) {
-        return 'kap_2026Spring';
+        return 'kap_2026spring';
     }
     if (hostname.includes('kadd.eregi')) {
         return 'kadd_2026spring';
@@ -30,9 +31,10 @@ const paymentMethodToKorean = (method: string | undefined): string => {
 };
 
 const RegistrationDetailPage: React.FC = () => {
-    const { cid, id } = useParams<{ cid: string; id: string }>();
+    const { cid, regId } = useParams<{ cid: string; regId: string }>();
+    const id = regId;
     const navigate = useNavigate();
-    const [data, setData] = useState<any>(null);
+    const [data, setData] = useState<Registration | null>(null);
     const [loading, setLoading] = useState(true);
     const [canceling, setCanceling] = useState(false);
     const [effectiveCid, setEffectiveCid] = useState<string | null>(null);
@@ -54,7 +56,7 @@ const RegistrationDetailPage: React.FC = () => {
                 const snap = await getDoc(ref);
                 if (snap.exists()) {
                     const docData = snap.data();
-                    const flattened = { id: snap.id, ...docData } as any;
+                    const flattened = { id: snap.id, ...docData } as Registration & { id: string };
 
                     // Flatten userInfo fields to top level for display
                     if (docData.userInfo) {
@@ -63,6 +65,21 @@ const RegistrationDetailPage: React.FC = () => {
                         flattened.userPhone = docData.userInfo.phone || docData.userPhone;
                         flattened.affiliation = docData.userInfo.affiliation || docData.affiliation;
                         flattened.licenseNumber = docData.userInfo.licenseNumber || docData.licenseNumber;
+                    }
+
+                    // [Fix] Extract payment details from nested object if available
+                    if (docData.paymentDetails) {
+                        if (!flattened.paymentKey && docData.paymentDetails.paymentKey) {
+                            flattened.paymentKey = docData.paymentDetails.paymentKey;
+                        }
+                        if (!flattened.paymentMethod && docData.paymentDetails.method) {
+                            flattened.paymentMethod = docData.paymentDetails.method;
+                        }
+                        // Handle paidAt / approvedAt
+                        if (!flattened.paidAt && docData.paymentDetails.approvedAt) {
+                            // approvedAt is ISO string, convert to Date object for consistent handling
+                            flattened.paidAt = new Date(docData.paymentDetails.approvedAt);
+                        }
                     }
 
                     setData(flattened);
@@ -101,7 +118,7 @@ const RegistrationDetailPage: React.FC = () => {
             });
 
             toast.success('결제가 취소되었습니다.');
-            setData((prev: any) => ({ ...prev, status: 'CANCELED' }));
+            setData((prev) => prev ? { ...prev, status: 'CANCELED' as const } : null);
         } catch (error) {
             console.error('Cancel error:', error);
             toast.error('취소 실패: ' + (error instanceof Error ? error.message : 'Unknown error'));
@@ -128,10 +145,36 @@ const RegistrationDetailPage: React.FC = () => {
             });
 
             toast.success('환불 요청 상태로 변경되었습니다.');
-            setData((prev: any) => ({ ...prev, status: 'REFUND_REQUESTED' }));
+            setData((prev) => prev ? { ...prev, status: 'REFUND_REQUESTED' as const } : null);
         } catch (error) {
             console.error('Refund request error:', error);
             toast.error('상태 변경 실패');
+        }
+    };
+
+    const handleManualApprove = async () => {
+        if (!effectiveCid || !id || !data) return;
+        if (!confirm('수동으로 결제 완료 처리하시겠습니까? (시스템 오류로 결제되었으나 반영되지 않은 경우 등)')) return;
+
+        try {
+            const regRef = doc(db, 'conferences', effectiveCid, 'registrations', id);
+            await updateDoc(regRef, {
+                status: 'PAID',
+                paidAt: Timestamp.now(),
+                paymentMethod: 'ADMIN_MANUAL'
+            });
+
+            await addDoc(collection(db, `conferences/${effectiveCid}/registrations/${id}/logs`), {
+                type: 'MANUAL_APPROVE',
+                timestamp: Timestamp.now(),
+                method: 'ADMIN_MANUAL'
+            });
+
+            toast.success('결제 완료 처리되었습니다.');
+            setData((prev) => prev ? { ...prev, status: 'PAID' as const } : null);
+        } catch (error) {
+            console.error('Manual approve error:', error);
+            toast.error('처리 실패');
         }
     };
 
@@ -140,6 +183,7 @@ const RegistrationDetailPage: React.FC = () => {
 
     const canCancel = data.status === 'PAID' && data.paymentKey;
     const canRequestRefund = data.status === 'PAID';
+    const canManualApprove = data.status === 'PENDING' || data.status === 'FAILED';
 
     return (
         <div className="p-8 max-w-4xl mx-auto bg-white min-h-screen">
@@ -196,11 +240,11 @@ const RegistrationDetailPage: React.FC = () => {
 
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">면허번호 (License)</h3>
-                    <p className="text-lg">{data.licenseNumber || '-'}</p>
+                    <p className="text-lg">{data.licenseNumber || data.userInfo?.licenseNumber || '-'}</p>
                 </div>
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">등록등급 (Grade)</h3>
-                    <p className="text-lg">{data.grade}</p>
+                    <p className="text-lg">{data.tier || data.categoryName || data.grade || '-'}</p>
                 </div>
 
                 <div className="col-span-2 border-t my-2"></div>
@@ -216,7 +260,15 @@ const RegistrationDetailPage: React.FC = () => {
 
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">결제일시 (Paid At)</h3>
-                    <p className="text-lg">{data.paidAt && typeof data.paidAt === 'object' && 'toDate' in data.paidAt ? (data.paidAt as { toDate: () => Date }).toDate().toLocaleString() : '-'}</p>
+                    <p className="text-lg">
+                        {data.paidAt 
+                            ? (data.paidAt instanceof Date 
+                                ? data.paidAt.toLocaleString() 
+                                : (typeof data.paidAt === 'object' && 'toDate' in data.paidAt 
+                                    ? (data.paidAt as { toDate: () => Date }).toDate().toLocaleString() 
+                                    : String(data.paidAt)))
+                            : '-'}
+                    </p>
                 </div>
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">PG 거래번호 (Payment Key)</h3>
@@ -253,8 +305,29 @@ const RegistrationDetailPage: React.FC = () => {
                         )}
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
-                        * 결제 취소는 PG사直接 환불 처리됩니다.
+                        * 결제 취소는 PG사 직접 환불 처리됩니다.
                     </p>
+                </div>
+            )}
+
+            {canManualApprove && (
+                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h3 className="font-bold mb-3 flex items-center gap-2 text-blue-800">
+                        <CheckCircle className="w-4 h-4" /> 수동 관리 (Manual Action)
+                    </h3>
+                    <div className="flex gap-3 items-center">
+                        <Button
+                            variant="default"
+                            onClick={handleManualApprove}
+                            className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+                        >
+                            <CheckCircle className="w-4 h-4" />
+                            수동 결제 완료 처리 (Force Approve)
+                        </Button>
+                        <p className="text-sm text-blue-600 ml-2">
+                            * 실제 결제가 되었으나 시스템 오류로 대기 상태인 경우 사용하세요.
+                        </p>
+                    </div>
                 </div>
             )}
         </div>

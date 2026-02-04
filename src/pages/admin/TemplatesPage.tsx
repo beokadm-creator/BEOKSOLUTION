@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { collection, query, orderBy, getDocs, addDoc, doc, setDoc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAdminStore } from '../../store/adminStore';
 import { Button } from '../../components/ui/button';
@@ -7,24 +7,13 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Badge } from '../../components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
 import { Plus, Trash2, RefreshCw, Mail, MessageCircle, Info, Save, ToggleLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { NotificationEventType, NotificationChannelType, TemplateVariable, AlimTalkButton, EmailConfig, KakaoConfig, NotificationTemplate, EVENT_TYPE_PRESETS } from '../../types/schema';
-
-// Legacy Template (for backward compatibility)
-interface LegacyTemplate {
-    id: string;
-    code: string;
-    name: string;
-    content: string;
-    buttons: AlimTalkButton[];
-    status: 'PENDING' | 'APPROVED' | 'REJECTED';
-    createdAt: Timestamp;
-}
+import { NotificationEventType, AlimTalkButton, EmailConfig, KakaoConfig, NotificationTemplate, EVENT_TYPE_PRESETS } from '../../types/schema';
 
 export default function TemplatesPage() {
     const { selectedSocietyId } = useAdminStore();

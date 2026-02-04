@@ -6,7 +6,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
-import { Shield, Plus, X, Globe, Save, RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Shield, Plus, X, Globe, RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
 import LoadingSpinner from '../common/LoadingSpinner';
 import toast from 'react-hot-toast';
 

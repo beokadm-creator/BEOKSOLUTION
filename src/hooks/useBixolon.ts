@@ -45,7 +45,7 @@ export const useBixolon = () => {
                         // Bixolon usually takes dots. 1mm approx 8 dots (203dpi).
                         setWidth: [layout.width]
                     }
-                } as any
+                } as Record<string, unknown>
             };
 
             let funcIdx = 3;
@@ -105,17 +105,17 @@ export const useBixolon = () => {
                 console.log('[Bixolon] Print Success', result);
                 setPrinting(false);
                 return true;
-            } catch (netError: any) {
+            } catch (netError: unknown) {
                 console.warn('[Bixolon] Hardware not found or network error (Mocking Success for Dev):', netError);
-                // Fallback to Mock for development if hardware not present
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 setPrinting(false);
-                return true; 
+                return true;
             }
 
-        } catch (err: any) {
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
             console.error('[Bixolon] Print Failed:', err);
-            setError(err.message);
+            setError(message);
             setPrinting(false);
             return false;
         }

@@ -82,12 +82,14 @@ const BadgeEditorPage: React.FC = () => {
                         el.isVisible && (
                             <Draggable
                                 key={idx}
+                                nodeRef={nodeRefs.current[idx]}
                                 position={{ x: el.x, y: el.y }}
                                 onStop={(e, data) => handleDragStop(idx, e, data)}
                                 onStart={() => setSelectedIdx(idx)}
                                 bounds="parent"
                             >
                                 <div
+                                    ref={nodeRefs.current[idx]}
                                     style={{
                                         position: 'absolute',
                                         cursor: 'move',

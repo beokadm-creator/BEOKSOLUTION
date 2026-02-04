@@ -6,6 +6,7 @@ import { Loader2, ArrowLeft, AlertCircle, CheckCircle, X, Settings, Palette } fr
 import { Button } from '../../../components/ui/button';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { Registration } from '../../../types/schema';
 
 interface ScannerState {
     status: 'IDLE' | 'PROCESSING' | 'SUCCESS' | 'ERROR';
@@ -36,6 +37,7 @@ const GatePage: React.FC = () => {
     const [mode, setMode] = useState<'ENTER_ONLY' | 'EXIT_ONLY' | 'AUTO'>('ENTER_ONLY');
     const [conferenceTitle, setConferenceTitle] = useState('');
     const [conferenceSubtitle, setConferenceSubtitle] = useState('');
+    const [selectedDate] = useState<string>(new Date().toISOString().slice(0, 10)); // 현재 날짜 기본
 
     // Design State
     const [showSettings, setShowSettings] = useState(false);
@@ -162,59 +164,88 @@ const GatePage: React.FC = () => {
                 regId = code.replace('BADGE-', '');
             }
 
-            // [Fix] Use conference-specific path instead of global registrations
-            const regRef = doc(db, `conferences/${selectedConferenceId}/registrations`, regId);
-            const regSnap = await getDoc(regRef);
+            // Check if external attendee (EXT- prefix)
+            const isExternalAttendee = regId.startsWith('EXT-');
 
-            if (!regSnap.exists()) {
-                throw new Error("Invalid Registration Code");
-            }
+            let regData: Registration | { name?: string; affiliation?: string; paymentStatus?: string };
+            let userName: string;
+            let userAffiliation: string;
+            let currentStatus: string;
+            let currentZone: string | null;
 
-            const regData = regSnap.data();
-            if (regData.status !== 'PAID') {
-                throw new Error("Registration NOT PAID");
-            }
-            if (regData.slug !== selectedConferenceSlug) {
-                throw new Error("Wrong Conference");
-            }
+            if (isExternalAttendee) {
+                // External attendee path
+                const extRef = doc(db, `conferences/${selectedConferenceId}/external_attendees`, regId);
+                const extSnap = await getDoc(extRef);
 
-            const userName = regData.userName || 'Unknown';
-            const userAffiliation = regData.affiliation || regData.userEmail || '';
-            const currentStatus = regData.attendanceStatus || 'OUTSIDE';
-            const currentZone = regData.currentZone;
+                if (!extSnap.exists()) {
+                    throw new Error("Invalid Registration Code");
+                }
+
+                regData = extSnap.data();
+                if (regData.paymentStatus !== 'PAID') {
+                    throw new Error("Registration NOT PAID");
+                }
+
+                userName = regData.name || 'Unknown';
+                userAffiliation = regData.organization || regData.email || '';
+                currentStatus = regData.attendanceStatus || 'OUTSIDE';
+                currentZone = regData.currentZone;
+            } else {
+                // Regular registration path
+                const regRef = doc(db, `conferences/${selectedConferenceId}/registrations`, regId);
+                const regSnap = await getDoc(regRef);
+
+                if (!regSnap.exists()) {
+                    throw new Error("Invalid Registration Code");
+                }
+
+                regData = regSnap.data();
+                if (regData.status !== 'PAID') {
+                    throw new Error("Registration NOT PAID");
+                }
+                if (regData.slug !== selectedConferenceSlug) {
+                    throw new Error("Wrong Conference");
+                }
+
+                userName = regData.userName || 'Unknown';
+                userAffiliation = regData.affiliation || regData.userEmail || '';
+                currentStatus = regData.attendanceStatus || 'OUTSIDE';
+                currentZone = regData.currentZone;
+            }
 
             // 2. Logic Switch
             let action = '';
-            
+
             if (mode === 'ENTER_ONLY') {
                 if (currentStatus === 'INSIDE') {
                     if (currentZone === selectedZoneId) throw new Error(`${userName} Already Inside`);
                     // Auto-Switch
-                    await performCheckOut(regId, currentZone, regData.lastCheckIn);
-                    await performCheckIn(regId, selectedZoneId);
+                    await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee);
+                    await performCheckIn(regId, selectedZoneId, isExternalAttendee);
                     action = 'Switched & Checked In';
                 } else {
-                    await performCheckIn(regId, selectedZoneId);
+                    await performCheckIn(regId, selectedZoneId, isExternalAttendee);
                     action = '입장 완료 (Checked In)';
                 }
             }
             else if (mode === 'EXIT_ONLY') {
                 if (currentStatus !== 'INSIDE') throw new Error(`${userName} Not Entered`);
-                await performCheckOut(regId, currentZone, regData.lastCheckIn);
+                await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee);
                 action = '퇴장 완료 (Checked Out)';
             }
             else if (mode === 'AUTO') {
                 if (currentStatus === 'INSIDE') {
                     if (currentZone !== selectedZoneId) {
-                        await performCheckOut(regId, currentZone, regData.lastCheckIn);
-                        await performCheckIn(regId, selectedZoneId);
+                        await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee);
+                        await performCheckIn(regId, selectedZoneId, isExternalAttendee);
                         action = 'Zone Switched';
                     } else {
-                        await performCheckOut(regId, currentZone, regData.lastCheckIn);
+                        await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee);
                         action = '퇴장 완료 (Checked Out)';
                     }
                 } else {
-                    await performCheckIn(regId, selectedZoneId);
+                    await performCheckIn(regId, selectedZoneId, isExternalAttendee);
                     action = '입장 완료 (Checked In)';
                 }
             }
@@ -227,14 +258,14 @@ const GatePage: React.FC = () => {
                 lastScanned: regId,
                 userData: { name: userName, affiliation: userAffiliation }
             });
-            
+
         } catch (e) {
             console.error(e);
             const errorMessage = e instanceof Error ? e.message : 'Scan Failed';
-            setScannerState({ 
-                status: 'ERROR', 
-                message: errorMessage, 
-                lastScanned: code 
+            setScannerState({
+                status: 'ERROR',
+                message: errorMessage,
+                lastScanned: code
             });
         }
 
@@ -244,32 +275,53 @@ const GatePage: React.FC = () => {
         }, 3000); // 3s delay for readability
     };
 
-    const performCheckIn = async (id: string, zoneId: string) => {
+    const performCheckIn = async (id: string, zoneId: string, isExternal: boolean = false) => {
         if (!selectedConferenceId) return;
-        await updateDoc(doc(db, `conferences/${selectedConferenceId}/registrations/${id}`), {
+        const collectionPath = isExternal ? 'external_attendees' : 'registrations';
+        await updateDoc(doc(db, `conferences/${selectedConferenceId}/${collectionPath}/${id}`), {
             attendanceStatus: 'INSIDE',
             currentZone: zoneId,
             lastCheckIn: Timestamp.now()
         });
-        await addDoc(collection(db, `conferences/${selectedConferenceId}/registrations/${id}/logs`), {
+        await addDoc(collection(db, `conferences/${selectedConferenceId}/${collectionPath}/${id}/logs`), {
             type: 'ENTER', zoneId, timestamp: Timestamp.now(), method: 'KIOSK'
         });
     };
 
-    const performCheckOut = async (id: string, zoneId: string, lastIn: { toDate: () => Date } | null | undefined) => {
+    const performCheckOut = async (id: string, zoneId: string, lastIn: { toDate: () => Date } | null | undefined, isExternal: boolean = false) => {
         if (!selectedConferenceId) return;
+        const collectionPath = isExternal ? 'external_attendees' : 'registrations';
         const now = new Date();
         const start = lastIn?.toDate() || now;
         const diffMins = Math.floor((now.getTime() - start.getTime()) / 60000);
         
-        await updateDoc(doc(db, `conferences/${selectedConferenceId}/registrations/${id}`), {
+        // 휴게 시간 차감 로직 추가
+        const zoneRule = zones.find(z => z.id === zoneId);
+        let deduction = 0;
+        if (zoneRule && zoneRule.breaks && zoneRule.breaks.length > 0) {
+            zoneRule.breaks.forEach(brk => {
+                // selectedDate를 사용하여 휴게 시간 계산
+                const breakStart = new Date(`${selectedDate}T${brk.start}:00`);
+                const breakEnd = new Date(`${selectedDate}T${brk.end}:00`);
+                const overlapStart = Math.max(start.getTime(), breakStart.getTime());
+                const overlapEnd = Math.min(now.getTime(), breakEnd.getTime());
+                if (overlapEnd > overlapStart) {
+                    const overlapMins = Math.floor((overlapEnd - overlapStart) / 60000);
+                    deduction += overlapMins;
+                }
+            });
+        }
+        
+        const finalMinutes = Math.max(0, diffMins - deduction); // 휴게 시간 차감 후 저장
+        
+        await updateDoc(doc(db, `conferences/${selectedConferenceId}/${collectionPath}/${id}`), {
             attendanceStatus: 'OUTSIDE',
             currentZone: null,
-            totalMinutes: increment(diffMins),
+            totalMinutes: increment(finalMinutes), // 휴게 시간 차감된 값
             lastCheckOut: Timestamp.now()
         });
-        await addDoc(collection(db, `conferences/${selectedConferenceId}/registrations/${id}/logs`), {
-            type: 'EXIT', zoneId, timestamp: Timestamp.now(), method: 'KIOSK', recognizedMinutes: diffMins
+        await addDoc(collection(db, `conferences/${selectedConferenceId}/${collectionPath}/${id}/logs`), {
+            type: 'EXIT', zoneId, timestamp: Timestamp.now(), method: 'KIOSK', rawDuration: diffMins, deduction, recognizedMinutes: finalMinutes
         });
     };
 

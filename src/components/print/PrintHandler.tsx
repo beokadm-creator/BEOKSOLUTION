@@ -16,7 +16,7 @@ const PrintHandler: React.FC<PrintHandlerProps> = ({
 }) => {
   const handlePrint = useReactToPrint({
     contentRef: contentRef,
-    // @ts-ignore
+    // @ts-expect-error - useReactToPrint may not have this property typed correctly
     onBeforeGetContent: onBeforePrint,
     onAfterPrint: onAfterPrint,
     pageStyle: `
@@ -34,7 +34,7 @@ const PrintHandler: React.FC<PrintHandlerProps> = ({
   });
 
   // Clone the trigger button to attach the onClick handler
-  return React.cloneElement(triggerButton as React.ReactElement<any>, {
+  return React.cloneElement(triggerButton as React.ReactElement<Record<string, unknown>>, {
     onClick: handlePrint
   });
 };

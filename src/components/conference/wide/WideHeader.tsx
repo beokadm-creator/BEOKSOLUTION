@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../ui/button';
-import { User, Globe, LogIn, UserPlus } from 'lucide-react';
+import { User, Globe } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 
 interface WideHeaderProps {
@@ -49,10 +49,10 @@ export const WideHeader: React.FC<WideHeaderProps> = ({ lang, setLang, societyNa
                         variant="ghost"
                         size="sm"
                         onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
-                        className={`rounded-full transition-colors ${buttonGhostClass}`}
+                        className={`rounded-full px-3 font-medium transition-colors ${buttonGhostClass}`}
                     >
                         <Globe className="w-4 h-4 mr-1.5" />
-                        <span className="font-medium text-xs md:text-sm">{lang === 'ko' ? 'EN' : 'KR'}</span>
+                        {lang === 'ko' ? 'English' : '한국어'}
                     </Button>
 
                     <div className={`h-4 w-px mx-1 ${isScrolled ? 'bg-slate-300' : 'bg-white/40'}`}></div>

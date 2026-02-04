@@ -1,8 +1,6 @@
 import React from 'react';
 import { EregiButton } from '../../eregi/EregiForm';
 
-type LocalizedString = { [lang: string]: string } | string;
-
 interface WideMobileFooterProps {
   onRegisterClick: () => void;
   lang: string;
@@ -16,9 +14,8 @@ interface WideMobileFooterProps {
 
 export const WideMobileFooter: React.FC<WideMobileFooterProps> = ({
   onRegisterClick,
-  lang,
+  deadline,
   labels,
-  deadline
 }) => {
   // Calculate D-Day
   const today = new Date();

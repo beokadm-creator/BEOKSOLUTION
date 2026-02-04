@@ -21,9 +21,9 @@ export class GlobalErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // In a real app, you might log this to Sentry or Firebase Crashlytics
-    // console.error('Uncaught error:', error, errorInfo);
+  public componentDidCatch(_error: Error, _errorInfo: ErrorInfo) {
+    // TODO: Log this to Sentry or Firebase Crashlytics
+    console.error('Uncaught error:', _error, _errorInfo);
   }
 
   public render() {

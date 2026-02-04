@@ -17,18 +17,18 @@ export const PaymentIntegrationCenter: React.FC<PaymentIntegrationCenterProps> =
     const [requests, setRequests] = useState<Registration[]>([]);
     const [processingId, setProcessingId] = useState<string | null>(null);
 
-    const loadRequests = async () => {
+    const loadRequests = useCallback(async () => {
         try {
             const data = await fetchRefundRequests();
             setRequests(data);
         } catch (e) {
             console.error("Failed to load refund requests", e);
         }
-    };
+    }, [fetchRefundRequests]);
 
     useEffect(() => {
         if (conferenceId) loadRequests();
-    }, [conferenceId]);
+    }, [conferenceId, loadRequests]);
 
     const handleProcess = async (reg: Registration) => {
         const amountStr = prompt(`환불 금액을 입력하세요 (최대: ${reg.amount.toLocaleString()}원)`, reg.amount.toString());
@@ -47,7 +47,7 @@ export const PaymentIntegrationCenter: React.FC<PaymentIntegrationCenterProps> =
             await processRefund(reg.id, amount);
             toast.success('환불 처리가 완료되었습니다.');
             loadRequests();
-        } catch (e) {
+        } catch {
             toast.error('환불 처리 실패');
         } finally {
             setProcessingId(null);

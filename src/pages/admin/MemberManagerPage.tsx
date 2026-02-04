@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, addDoc, doc, deleteDoc, query, Timestamp, updateDoc, where, deleteField } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, deleteDoc, query, Timestamp, updateDoc, where, deleteField, writeBatch, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useSocietyGrades } from '../../hooks/useSocietyGrades';
 import { useAdminStore } from '../../store/adminStore';
@@ -23,7 +23,6 @@ import {
     Trash2,
     RefreshCw,
     Upload,
-    Users,
     Search,
     Settings,
     RotateCcw,
@@ -32,9 +31,13 @@ import {
     ShieldCheck,
     Calendar,
     X,
-    Filter
+    Filter,
+    Edit,
+    CheckSquare,
+    Square
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
 
 interface Grade {
     id: string;
@@ -55,32 +58,49 @@ interface Member {
     usedAt?: Timestamp;
 }
 
-export default function MemberManagerPage() {
+const MemberManagerPage: React.FC = () => {
     const { selectedSocietyId } = useAdminStore();
     const [members, setMembers] = useState<Member[]>([]);
     const [grades, setGrades] = useState<Grade[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Single Add State
+    // Tab 2: Manual Add
     const [newName, setNewName] = useState('');
     const [newCode, setNewCode] = useState('');
     const [newExpiry, setNewExpiry] = useState('');
     const [newGrade, setNewGrade] = useState('');
 
-    // Bulk Add State
+    // Tab 3: Bulk Upload
     const [bulkData, setBulkData] = useState('');
 
     // Grade Settings State
     const [newGradeName, setNewGradeName] = useState('');
     const [newGradeCode, setNewGradeCode] = useState('');
 
+    // Bulk Expiry Update State (NEW)
+    const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
+    const [bulkNewExpiry, setBulkNewExpiry] = useState('');
+    const [selectAll, setSelectAll] = useState(false);
+
+    // Edit Member State (NEW)
+    const [editingMember, setEditingMember] = useState<Member | null>(null);
+    const [editForm, setEditForm] = useState({
+        name: '',
+        code: '',
+        grade: '',
+        expiryDate: ''
+    });
+
     // Determine Society ID
     const getSocietyId = () => {
         if (selectedSocietyId) return selectedSocietyId;
         const hostname = window.location.hostname;
         const parts = hostname.split('.');
+        // Handle subdomain format: kadd.localhost, kadd.eregi.co.kr
         if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') return parts[0];
+        // Handle kadd.localhost format explicitly
+        if (parts.length === 2 && parts[1] === 'localhost') return parts[0];
         if (hostname === 'localhost' || hostname === '127.0.0.1') return 'kap';
         return null;
     };
@@ -143,13 +163,6 @@ export default function MemberManagerPage() {
         }
     }, [targetId]);
 
-    useEffect(() => {
-        if (targetId) {
-            fetchGrades();
-            fetchMembers();
-        }
-    }, [targetId, fetchGrades, fetchMembers]);
-
     const handleAddGrade = async () => {
         if (!targetId) return;
         if (!newGradeName || !newGradeCode) {
@@ -158,6 +171,17 @@ export default function MemberManagerPage() {
         }
         try {
             const colRef = collection(db, 'societies', targetId, 'settings', 'grades', 'list');
+            
+            // Check for duplicate ID (which is the code)
+            const docRef = doc(colRef, newGradeCode);
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+                toast.error("이미 존재하는 코드입니다.");
+                return;
+            }
+
+            // Also check for duplicate code field just in case (legacy mixed data)
             const q = query(colRef, where('code', '==', newGradeCode));
             const snapshot = await getDocs(q);
 
@@ -168,12 +192,15 @@ export default function MemberManagerPage() {
 
             const newGradeObj = {
                 code: newGradeCode,
-                name: { ko: newGradeName, en: newGradeName }
+                name: { ko: newGradeName, en: newGradeCode }
             };
 
-            await addDoc(colRef, newGradeObj);
+            // Use setDoc with the code as the document ID to maintain consistency with legacy format
+            // and ensure the ID is readable (e.g., 'Member_LM' instead of random string)
+            console.log(`[MemberManager] Creating grade with ID: ${newGradeCode}`);
+            await setDoc(doc(colRef, newGradeCode), newGradeObj);
 
-            toast.success("등급이 추가되었습니다.");
+            toast.success(`등급이 추가되었습니다. (ID: ${newGradeCode})`);
             setNewGradeName('');
             setNewGradeCode('');
             fetchGrades();
@@ -231,7 +258,114 @@ export default function MemberManagerPage() {
     };
 
     const handleBulkUpload = async () => {
-        toast.error("CSV/Excel 업로드 기능은 더 이상 지원되지 않습니다. (Purged)");
+        if (!bulkData.trim()) {
+            toast.error('CSV 데이터가 비어 있습니다.');
+            return;
+        }
+        
+        if (!newGrade) {
+            toast.error('등급을 선택해주세요.');
+            return;
+        }
+        
+        // CSV 파싱
+        const lines = bulkData.trim().split('\n').filter(line => line.trim());
+        
+        if (lines.length === 0) {
+            toast.error('CSV 파일이 비어 있습니다.');
+            return;
+        }
+        
+        const parsedData = [];
+        const errors: string[] = [];
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            // 파이프(|)로 분리
+            const parts = line.split('|');
+            
+            // 필드 수 검증 (NAME|CODE|GRADE|EXPIRY_DATE)
+            if (parts.length !== 4) {
+                errors.push(`줄 ${i+1}: 형식이 올바르지 않습니다. (NAME|CODE|GRADE|EXPIRY_DATE)`);
+                continue;
+            }
+            
+            const [name, code, grade, expiryDate] = parts;
+            
+            // 필수 필드 검증
+            if (!name.trim() || !code.trim() || !grade.trim() || !expiryDate.trim()) {
+                errors.push(`줄 ${i+1}: 필수 필드가 누락되어 있습니다.`);
+                continue;
+            }
+            
+            // 날짜 형식 검증
+            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+            if (!dateRegex.test(expiryDate.trim())) {
+                errors.push(`줄 ${i+1}: 날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)`);
+                continue;
+            }
+
+            parsedData.push({
+                name: name.trim(),
+                code: code.trim(),
+                grade: grade.trim(),
+                expiryDate: expiryDate.trim()
+            });
+        }
+        
+        if (errors.length > 0) {
+            toast.error(`CSV 파싱 오류:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n... 외 ${errors.length - 5}개 오류` : ''}`);
+            return;
+        }
+        
+        if (parsedData.length === 0) {
+            toast.error('파싱된 데이터가 없습니다.');
+            return;
+        }
+        
+        try {
+            // Firestore Batch 사용
+            const batches: Promise<unknown>[] = [];
+            let currentBatch = writeBatch(db);
+            let batchCount = 0;
+            
+            for (const member of parsedData) {
+                const newDocRef = doc(collection(db, `societies/${targetId}/members`));
+                currentBatch.set(newDocRef, {
+                    societyId: targetId,
+                    name: member.name,
+                    code: member.code,
+                    grade: member.grade,
+                    expiryDate: member.expiryDate,
+                    used: false,
+                    createdAt: Timestamp.now(),
+                    updatedAt: Timestamp.now()
+                });
+                batchCount++;
+                
+                // Firestore batch 제한 (500개)
+                if (batchCount >= 500) {
+                    batches.push(currentBatch.commit());
+                    currentBatch = writeBatch(db);
+                    batchCount = 0;
+                }
+            }
+            
+            if (batchCount > 0) {
+                batches.push(currentBatch.commit());
+            }
+            
+            await Promise.all(batches);
+            
+            toast.success(`${parsedData.length}명의 회원이 업로드되었습니다.`);
+            setBulkData('');
+            fetchMembers();
+        } catch (error) {
+            console.error("CSV Upload error:", error);
+            toast.error('업로드 실패');
+        }
     };
 
     // [Fix-Step 257] Fix Delete Logic (Root Collection)
@@ -270,6 +404,122 @@ export default function MemberManagerPage() {
         }
     };
 
+    // Bulk Expiry Update Handlers (NEW)
+    const handleSelectAll = (checked: boolean) => {
+        if (checked) {
+            const allIds = members
+                .filter(m => !m.used) // 사용 안 된 회원만 선택 가능
+                .map(m => m.id);
+            setSelectedMemberIds(new Set(allIds));
+        } else {
+            setSelectedMemberIds(new Set());
+        }
+        setSelectAll(checked);
+    };
+
+    const handleSelectMember = (memberId: string, checked: boolean) => {
+        const newSelected = new Set(selectedMemberIds);
+        if (checked) {
+            newSelected.add(memberId);
+        } else {
+            newSelected.delete(memberId);
+        }
+        setSelectedMemberIds(newSelected);
+    };
+
+    const handleBulkExpiryUpdate = async () => {
+        if (!targetId || !bulkNewExpiry || selectedMemberIds.size === 0) {
+            toast.error('선택된 회원이 없거나 유효기간을 설정해주세요.');
+            return;
+        }
+
+        // 날짜 형식 검증 (YYYY-MM-DD)
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(bulkNewExpiry)) {
+            toast.error('날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식으로 입력해주세요.');
+            return;
+        }
+
+        try {
+            const batch = writeBatch(db);
+            let count = 0;
+
+            selectedMemberIds.forEach(memberId => {
+                const memberRef = doc(db, 'societies', targetId, 'members', memberId);
+                batch.update(memberRef, {
+                    expiryDate: bulkNewExpiry,
+                    updatedAt: Timestamp.now()
+                });
+                count++;
+
+                // Firestore batch 제한 (500개)
+                if (count % 500 === 0) {
+                    batch.commit();
+                }
+            });
+
+            if (count > 0) {
+                await batch.commit();
+            }
+
+            toast.success(`${selectedMemberIds.size}명의 회원 유효기간이 ${bulkNewExpiry}로 수정되었습니다.`);
+            setSelectedMemberIds(new Set());
+            setBulkNewExpiry('');
+            setSelectAll(false);
+            fetchMembers();
+        } catch (error) {
+            console.error("Bulk update error:", error);
+            toast.error('대량 수정 실패');
+        }
+    };
+
+    // Edit Member Handlers (NEW)
+    const handleEditClick = (member: Member) => {
+        if (!targetId) return;
+        setEditingMember(member);
+        setEditForm({
+            name: member.name,
+            code: member.code,
+            grade: member.grade,
+            expiryDate: member.expiryDate
+        });
+    };
+
+    const handleEditSave = async () => {
+        if (!targetId || !editingMember) return;
+
+        try {
+            const memberRef = doc(db, 'societies', targetId, 'members', editingMember.id);
+            await updateDoc(memberRef, {
+                name: editForm.name.trim(),
+                code: editForm.code.trim(),
+                grade: editForm.grade.trim(),
+                expiryDate: editForm.expiryDate, // YYYY-MM-DD
+                updatedAt: Timestamp.now()
+            });
+
+            toast.success('회원 정보가 수정되었습니다.');
+            setEditingMember(null);
+            setEditForm({
+                name: '',
+                code: '',
+                grade: '',
+                expiryDate: ''
+            });
+            fetchMembers();
+        } catch (error) {
+            console.error("Edit member error:", error);
+            toast.error('수정 실패');
+        }
+    };
+
+    useEffect(() => {
+        if (targetId) {
+            fetchGrades();
+            fetchMembers();
+        }
+    }, [targetId, fetchGrades, fetchMembers]);
+
     // Filtering
     const filteredMembers = members.filter(m =>
         m.name.includes(searchTerm) || m.code.includes(searchTerm)
@@ -291,7 +541,6 @@ export default function MemberManagerPage() {
         </div>
     );
 
-    const usedCount = members.filter(m => m.used).length;
     const availableCount = members.filter(m => !m.used && !isExpired(m.expiryDate)).length;
 
     return (
@@ -321,7 +570,7 @@ export default function MemberManagerPage() {
             </div>
 
             <Tabs defaultValue="list" className="w-full space-y-8">
-                <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-14 p-1.5 bg-slate-100/80 rounded-xl">
+                <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-14 p-1.5 bg-slate-100/80 rounded-xl">
                     <TabsTrigger value="list" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm">
                         Member List
                         <Badge variant="secondary" className="ml-2 bg-indigo-100 text-indigo-700 hover:bg-indigo-200">{members.length}</Badge>
@@ -331,6 +580,9 @@ export default function MemberManagerPage() {
                     </TabsTrigger>
                     <TabsTrigger value="bulk" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm">
                         Bulk Upload
+                    </TabsTrigger>
+                    <TabsTrigger value="bulk-expiry" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm">
+                        Bulk Expiry Update
                     </TabsTrigger>
                     <TabsTrigger value="settings" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm">
                         Grade Settings
@@ -375,6 +627,9 @@ export default function MemberManagerPage() {
                                 <Table>
                                     <TableHeader className="bg-slate-50/50">
                                         <TableRow className="hover:bg-transparent">
+                                            <TableHead className="w-[60px] font-bold text-slate-600 pl-6">
+                                                {selectAll ? <CheckSquare className="w-5 h-5 cursor-pointer" onClick={() => handleSelectAll(false)} /> : <Square className="w-5 h-5 cursor-pointer" onClick={() => handleSelectAll(true)} />}
+                                            </TableHead>
                                             <TableHead className="w-[180px] font-bold text-slate-600 pl-6">Name</TableHead>
                                             <TableHead className="font-bold text-slate-600">Verification Code</TableHead>
                                             <TableHead className="font-bold text-slate-600">Grade</TableHead>
@@ -398,7 +653,20 @@ export default function MemberManagerPage() {
                                         ) : (
                                             filteredMembers.map((member) => (
                                                 <TableRow key={member.id} className="group hover:bg-slate-50/50 transition-colors">
-                                                    <TableCell className="font-bold text-slate-700 pl-6">{member.name}</TableCell>
+                                                        <TableCell className="pl-6">
+                                                        {!member.used && (
+                                                            <div className="flex items-center">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedMemberIds.has(member.id)}
+                                                                    onChange={(e) => handleSelectMember(member.id, e.target.checked)}
+                                                                    className="w-5 h-5 cursor-pointer mr-3"
+                                                                />
+                                                                <span className="font-bold text-slate-700">{member.name}</span>
+                                                            </div>
+                                                        )}
+                                                        {member.used && <span className="font-bold text-slate-700 pl-6">{member.name}</span>}
+                                                    </TableCell>
                                                     <TableCell className="font-mono text-sm text-slate-500">{member.code}</TableCell>
                                                     <TableCell><Badge variant="outline" className="text-slate-600 bg-slate-50 border-slate-200">{getGradeName(member.grade)}</Badge></TableCell>
                                                     <TableCell className="text-sm text-slate-600 font-medium tabular-nums">{member.expiryDate}</TableCell>
@@ -428,6 +696,17 @@ export default function MemberManagerPage() {
                                                                     title="Reset Status"
                                                                 >
                                                                     <RotateCcw className="w-4 h-4" />
+                                                                </Button>
+                                                            )}
+                                                            {!member.used && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={() => handleEditClick(member)}
+                                                                    className="h-8 w-8 text-slate-300 hover:text-slate-600 hover:bg-slate-50"
+                                                                    title="Edit Member"
+                                                                >
+                                                                    <Edit className="w-4 h-4" />
                                                                 </Button>
                                                             )}
                                                             <Button
@@ -461,7 +740,7 @@ export default function MemberManagerPage() {
                                 </div>
                                 <div>
                                     <CardTitle className="text-lg font-bold text-slate-800">Add New Member</CardTitle>
-                                    <CardDescription className="text-indigo-600/80 font-medium mt-0.5">Manually register a single member to the whitelist.</CardDescription>
+                                    <CardDescription className="text-indigo-600/80 font-medium mt-0.5">Manually register a single member to whitelist.</CardDescription>
                                 </div>
                             </div>
                         </CardHeader>
@@ -522,7 +801,7 @@ export default function MemberManagerPage() {
                     </Card>
                 </TabsContent>
 
-                {/* Tab 3: Bulk Upload */}
+                {/* Tab 3: Bulk Upload (NEW) */}
                 <TabsContent value="bulk" className="animate-in fade-in slide-in-from-bottom-2">
                     <Card className="border-none shadow-lg shadow-slate-200/50 bg-white rounded-2xl">
                         <CardHeader className="bg-emerald-50/50 border-b border-emerald-100">
@@ -531,79 +810,101 @@ export default function MemberManagerPage() {
                                     <FileSpreadsheet className="w-5 h-5" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-lg font-bold text-slate-800">Bulk Upload</CardTitle>
-                                    <CardDescription className="text-emerald-600/80 font-medium mt-0.5">Upload multiple members via CSV/Excel copy-paste.</CardDescription>
+                                    <CardTitle className="text-lg font-bold text-slate-800">CSV 대량 업로드</CardTitle>
+                                    <CardDescription className="text-emerald-600/80 font-medium mt-0.5">회원 정보를 CSV 형식으로 대량 업로드합니다.</CardDescription>
                                 </div>
                             </div>
                         </CardHeader>
                         <CardContent className="p-8 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                <div className="md:col-span-2 space-y-4">
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase">Target Grade for All</Label>
-                                        <select
-                                            className="flex h-11 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-emerald-500 transition-colors"
-                                            value={newGrade}
-                                            onChange={e => setNewGrade(e.target.value)}
-                                        >
-                                            <option value="">Select Grade...</option>
-                                            {grades.map(g => (
-                                                <option key={g.id} value={g.code}>{g.name}</option>
-                                            ))}
-                                        </select>
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-bold text-slate-700">CSV 파일 입력</Label>
+                                    <Textarea
+                                        placeholder="CSV 데이터를 여기에 붙여넣으세요..."
+                                        rows={12}
+                                        value={bulkData}
+                                        onChange={e => setBulkData(e.target.value)}
+                                        className="font-mono text-sm leading-relaxed bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500 transition-colors rounded-xl resize-none p-4"
+                                    />
+                                </div>
+                                <Button onClick={handleBulkUpload} size="lg" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-200 rounded-xl h-12">
+                                    <Upload className="w-5 h-5 mr-2" />
+                                    CSV 업로드 처리
+                                </Button>
+                            </div>
+                            
+                            <div className="p-6 bg-yellow-50 rounded-xl border border-yellow-200">
+                                <h4 className="font-bold text-yellow-800 mb-4">CSV 파일 형식 가이드</h4>
+                                <p className="text-sm text-slate-600 mb-4">
+                                    CSV 형식: <code className="bg-white px-2 py-1 rounded border border-slate-200">NAME|CODE|GRADE|EXPIRY_DATE</code>
+                                </p>
+                                
+                                <div className="space-y-2">
+                                    <p className="text-xs font-bold text-slate-400 uppercase">CSV 파일 예시</p>
+                                    <div className="bg-white border border-slate-200 rounded-lg p-3 font-mono text-xs text-slate-600 space-y-1 shadow-sm">
+                                        <p>홍길동|1001|정회원|2026-12-31</p>
+                                        <p>김철수|1002|준회원|2026-06-30</p>
+                                        <p>이영희|1003|준비회원|2026-03-31</p>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase">Data Input</Label>
-                                        <Textarea
-                                            placeholder="Paste your data here..."
-                                            rows={12}
-                                            value={bulkData}
-                                            onChange={e => setBulkData(e.target.value)}
-                                            className="font-mono text-sm leading-relaxed bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500 transition-colors rounded-xl resize-none p-4"
-                                        />
-                                    </div>
-                                    <Button onClick={handleBulkUpload} size="lg" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-200 rounded-xl h-12">
-                                        <Upload className="w-5 h-5 mr-2" />
-                                        Process Bulk Upload
+                                </div>
+                                
+                                <div className="pt-2">
+                                    <p className="text-xs text-slate-400">
+                                        • 구분자: 파이프(|)<br/>
+                                        • 형식: 이름|코드|등급|유효기간(YYYY-MM-DD)
+                                    </p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* Tab 4: Bulk Expiry Update (NEW) */}
+                <TabsContent value="bulk-expiry" className="animate-in fade-in slide-in-from-bottom-2">
+                    <Card className="border-none shadow-lg shadow-slate-200/50 bg-white rounded-2xl max-w-3xl mx-auto">
+                        <CardHeader className="bg-blue-50/50 border-b border-blue-100">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-blue-100 rounded-xl text-blue-600">
+                                    <Calendar className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-lg font-bold text-slate-800">대량 유효기간 수정</CardTitle>
+                                    <CardDescription className="text-blue-600/80 font-medium mt-0.5">선택된 회원들의 유효기간을 일괄로 수정합니다.</CardDescription>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-8 space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
+                                <div className="space-y-4 flex-1">
+                                    <Label className="text-sm font-bold text-slate-700">새로운 유효기간</Label>
+                                    <Input
+                                        type="date"
+                                        value={bulkNewExpiry}
+                                        onChange={(e) => setBulkNewExpiry(e.target.value)}
+                                        placeholder="YYYY-MM-DD"
+                                        className="h-11 bg-slate-50 border-slate-200 focus:bg-white transition-colors"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">형식: YYYY-MM-DD</p>
+                                </div>
+                                <div className="space-y-4">
+                                    <Button
+                                        onClick={handleBulkExpiryUpdate}
+                                        disabled={selectedMemberIds.size === 0 || !bulkNewExpiry}
+                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 h-12"
+                                    >
+                                        선택된 회원들 ({selectedMemberIds.size}명) 유효기간 수정
                                     </Button>
                                 </div>
-
-                                <div className="space-y-4">
-                                    <Label className="text-xs font-bold text-slate-500 uppercase">Format Guide</Label>
-                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
-                                        <p className="text-sm text-slate-600 leading-relaxed">
-                                            Copy data from Excel or a text file. Ensure there are no header rows.
-                                        </p>
-
-                                        <div className="space-y-2">
-                                            <p className="text-xs font-bold text-slate-400 uppercase">Supported Formats</p>
-                                            <div className="bg-white border border-slate-200 rounded-lg p-3 font-mono text-xs text-slate-600 space-y-1 shadow-sm">
-                                                <div className="flex gap-2">
-                                                    <span className="text-emerald-600 font-bold">NAME</span>
-                                                    <span className="text-slate-300">|</span>
-                                                    <span className="text-indigo-600 font-bold">CODE</span>
-                                                    <span className="text-slate-300">|</span>
-                                                    <span className="text-amber-600 font-bold">YYYY-MM-DD</span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <p className="text-xs font-bold text-slate-400 uppercase">Example Data</p>
-                                            <div className="bg-slate-900 rounded-lg p-3 font-mono text-xs text-emerald-400 space-y-1 shadow-inner">
-                                                <p>Hong Gil, 1001, 2026-12-31</p>
-                                                <p>Kim Chul, 1002, 2026-12-31</p>
-                                                <p>Lee Young, 1003, 2026-12-31</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="pt-2">
-                                            <p className="text-xs text-slate-400">
-                                                * Delimiters: Comma (,) or Tab
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
+                            </div>
+                            <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                <p className="text-sm text-gray-600">
+                                    <strong className="text-gray-800">선택 팁:</strong>
+                                    <ul className="list-disc list-inside mt-2 space-y-1 text-gray-600">
+                                        <li>사용 완료된 회원은 선택할 수 없습니다.</li>
+                                        <li>최대 500명씩 일괄로 처리됩니다.</li>
+                                        <li>수정 완료 후 선택이 해제됩니다.</li>
+                                    </ul>
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -619,7 +920,7 @@ export default function MemberManagerPage() {
                                 </div>
                                 <div>
                                     <CardTitle className="text-lg font-bold text-slate-800">Grade Configuration</CardTitle>
-                                    <CardDescription className="text-slate-500 font-medium mt-0.5">Define member grades and codes (e.g., Regular, Associate).</CardDescription>
+                                    <CardDescription className="text-slate-500 font-medium mt-0.5">Define member grades and codes (e.g., Regular, Associate). (v_fix_id)</CardDescription>
                                 </div>
                             </div>
                         </CardHeader>
@@ -695,6 +996,78 @@ export default function MemberManagerPage() {
                     </Card>
                 </TabsContent>
             </Tabs>
+
+            {/* Edit Member Dialog (NEW) */}
+            <Dialog open={!!editingMember} onOpenChange={(open) => !open && setEditingMember(null)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>회원 정보 수정</DialogTitle>
+                        <DialogDescription>
+                            회원의 유효기간 및 기본 정보를 수정합니다.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div>
+                            <Label>이름</Label>
+                            <Input
+                                value={editForm.name}
+                                onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                                placeholder="홍길동"
+                            />
+                        </div>
+
+                        <div>
+                            <Label>면허번호/코드</Label>
+                            <Input
+                                value={editForm.code}
+                                onChange={(e) => setEditForm({...editForm, code: e.target.value})}
+                                placeholder="MEMBER001"
+                                className="font-mono"
+                            />
+                        </div>
+
+                        <div>
+                            <Label>회원등급</Label>
+                            <select
+                                value={editForm.grade}
+                                onChange={(e) => setEditForm({...editForm, grade: e.target.value})}
+                                className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white transition-colors appearance-none cursor-pointer"
+                            >
+                                <option value="">등급 선택...</option>
+                                {grades.map(g => (
+                                    <option key={g.id} value={g.code}>{g.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <Label>유효기간</Label>
+                            <div className="relative">
+                                <Input
+                                    type="date"
+                                    value={editForm.expiryDate}
+                                    onChange={(e) => setEditForm({...editForm, expiryDate: e.target.value})}
+                                    className="h-11 bg-slate-50 border-slate-200 focus:bg-white transition-colors"
+                                />
+                                <Calendar className="absolute right-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">형식: YYYY-MM-DD</p>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditingMember(null)}>
+                            취소
+                        </Button>
+                        <Button onClick={handleEditSave}>
+                            저장
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
-}
+};
+
+export default MemberManagerPage;

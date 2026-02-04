@@ -5,7 +5,7 @@ import { ConferenceInfo, Society } from '../types/schema';
 
 // Mock Auth for Super Admin (In real app, use Firebase Auth + Custom Claims or DB lookup)
 // For demo, we just simulate "am I super admin?" check.
-const checkIsSuperAdmin = async (email: string): Promise<boolean> => {
+const checkIsSuperAdmin = async (): Promise<boolean> => {
     // In real app:
     // const docRef = doc(db, 'super_admins', email);
     // const snap = await getDoc(docRef);
@@ -21,7 +21,7 @@ export const useSuperAdmin = () => {
 
     useEffect(() => {
         // Simulate auth check
-        checkIsSuperAdmin('admin@eregi.co.kr').then(setIsSuper);
+        checkIsSuperAdmin().then(setIsSuper);
         fetchSocieties();
     }, []);
 
@@ -134,8 +134,8 @@ export const useSuperAdmin = () => {
             setLoading(false);
             return true;
 
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : String(err));
             setLoading(false);
             return false;
         }

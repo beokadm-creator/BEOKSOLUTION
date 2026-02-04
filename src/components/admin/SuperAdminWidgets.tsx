@@ -34,7 +34,15 @@ export default function SuperAdminWidgets() {
         fetchStats();
     }, []);
 
-    const Widget = ({ label, count, icon: Icon, color, delay }: any) => (
+    interface WidgetProps {
+        label: string;
+        count: number;
+        icon: React.ComponentType<{ className?: string }>;
+        color: string;
+        delay: number;
+    }
+
+    const Widget = ({ label, count, icon: Icon, color, delay }: WidgetProps) => (
         <div className={`relative overflow-hidden bg-gray-900 border border-gray-800 rounded-xl p-5 flex items-center justify-between group hover:border-${color}-500/50 transition-all duration-500`}>
             {/* Neon Glow Background */}
             <div className={`absolute top-0 right-0 w-32 h-32 bg-${color}-500/10 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-${color}-500/20 transition-all`}></div>

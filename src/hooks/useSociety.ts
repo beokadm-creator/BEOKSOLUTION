@@ -40,9 +40,10 @@ export const useSociety = () => {
                     console.error(`[useSociety] Society document not found: ${societyId}`);
                     setError('Society not found');
                 }
-            } catch (err: any) {
+            } catch (err: unknown) {
                 console.error(`[useSociety] Error fetching society:`, err);
-                setError(err.message);
+                const message = err instanceof Error ? err.message : 'Unknown error';
+                setError(message);
             } finally {
                 setLoading(false);
             }

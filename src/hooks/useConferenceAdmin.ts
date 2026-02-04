@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, collection, getDocs, query, orderBy, limit, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Registration } from '../types/schema';
 
@@ -56,21 +56,51 @@ export const useConferenceAdmin = (conferenceId: string, userEmail?: string) => 
             
             let totalRevenue = 0;
             const dailyCounts: Record<string, number> = {};
-            const allRegs = snap.docs.map(d => d.data() as Registration);
+            const allRegs = snap.docs.map(d => ({ id: d.id, ...d.data() }) as Registration & { id: string });
 
+            // Group by userId to handle duplicates (users who tried multiple times)
+            const userRegistrations = new Map<string, (Registration & { id: string })[]>();
             allRegs.forEach(reg => {
+                if (reg.userId) {
+                    if (!userRegistrations.has(reg.userId)) {
+                        userRegistrations.set(reg.userId, []);
+                    }
+                    userRegistrations.get(reg.userId)!.push(reg);
+                }
+            });
+
+            // Count each user once, using their best registration
+            const deduplicatedRegs: (Registration & { id: string })[] = [];
+            userRegistrations.forEach((regs) => {
+                // Sort by status priority: PAID > others
+                const sorted = regs.sort((a, b) => {
+                    if (a.paymentStatus === 'PAID' && b.paymentStatus !== 'PAID') return -1;
+                    if (a.paymentStatus !== 'PAID' && b.paymentStatus === 'PAID') return 1;
+                    // If same status, newer first
+                    const aTime = a.createdAt.seconds;
+                    const bTime = b.createdAt.seconds;
+                    return bTime - aTime;
+                });
+                const best = sorted[0];
+                // Only include if status is one of the allowed statuses
+                if (['PAID', 'REFUNDED', 'CANCELED', 'REFUND_REQUESTED'].includes(best.paymentStatus)) {
+                    deduplicatedRegs.push(best);
+                }
+            });
+
+            deduplicatedRegs.forEach(reg => {
                 if (reg.paymentStatus === 'PAID') {
                     totalRevenue += reg.amount;
                 }
                 
-                // Daily Trend
+                // Daily Trend (count only successful registrations)
                 const date = new Date(reg.createdAt.seconds * 1000).toISOString().split('T')[0];
                 dailyCounts[date] = (dailyCounts[date] || 0) + 1;
             });
 
             // Recent 5 (Client-side sort for simplicity or use query)
             // Using query for efficiency in real app, but here we have allRegs
-            const recentRegistrations = allRegs
+            const recentRegistrations = deduplicatedRegs
                 .sort((a, b) => b.createdAt.seconds - a.createdAt.seconds)
                 .slice(0, 5);
 
@@ -79,7 +109,7 @@ export const useConferenceAdmin = (conferenceId: string, userEmail?: string) => 
                 .map(date => ({ date, count: dailyCounts[date] }));
 
             setStats({
-                totalRegistrants: allRegs.length,
+                totalRegistrants: deduplicatedRegs.length,
                 totalRevenue,
                 recentRegistrations,
                 dailyTrend

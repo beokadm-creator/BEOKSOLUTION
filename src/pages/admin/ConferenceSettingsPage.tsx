@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { doc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../../firebase';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Card, CardContent } from '../../components/ui/card';
 import BilingualInput from '../../components/ui/bilingual-input';
 import BilingualImageUpload from '../../components/ui/bilingual-image-upload';
-import { Calendar, MapPin, Globe, FileText, ImageIcon, Save, Loader2, Info } from 'lucide-react';
+import RichTextEditor from '../../components/ui/RichTextEditor';
+import { Calendar, MapPin, Globe, FileText, ImageIcon, Save, Loader2, Info, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Skeleton } from '../../components/ui/skeleton';
 
@@ -27,6 +29,7 @@ interface ConferenceData {
         poster: { ko: string; en: string };
     };
     welcomeMessage: { ko: string; en: string };
+    welcomeMessageImages?: string[]; // Array of image URLs
     abstractDeadlines: {
         submissionDeadline?: string;
         editDeadline?: string;
@@ -48,6 +51,7 @@ const defaultData: ConferenceData = {
         poster: { ko: '', en: '' }
     },
     welcomeMessage: { ko: '', en: '' },
+    welcomeMessageImages: [],
     abstractDeadlines: {
         submissionDeadline: '',
         editDeadline: ''
@@ -59,6 +63,7 @@ export default function ConferenceSettingsPage() {
     const [data, setData] = useState<ConferenceData>(defaultData);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [uploadingImage, setUploadingImage] = useState(false);
 
     useEffect(() => {
         if (!cid) return;
@@ -112,7 +117,8 @@ export default function ConferenceSettingsPage() {
                         welcomeMessage: {
                             ko: snapData.welcomeMessage?.ko || snapData.welcomeMessage || '',
                             en: snapData.welcomeMessage?.en || ''
-                        }
+                        },
+                        welcomeMessageImages: snapData.welcomeMessageImages || []
                     });
                 }
             } catch (error) {
@@ -124,7 +130,7 @@ export default function ConferenceSettingsPage() {
         };
 
         fetchData();
-    }, [cid, cid]);
+    }, [cid]);
 
     const handleSave = async () => {
         if (!cid) return;
@@ -146,6 +152,7 @@ export default function ConferenceSettingsPage() {
                 posterUrl: data.visualAssets.poster.ko,
                 visualAssets: data.visualAssets,
                 welcomeMessage: data.welcomeMessage,
+                welcomeMessageImages: data.welcomeMessageImages || [],
                 abstractSubmissionDeadline: data.abstractDeadlines.submissionDeadline ? Timestamp.fromDate(new Date(data.abstractDeadlines.submissionDeadline)) : null,
                 abstractEditDeadline: data.abstractDeadlines.editDeadline ? Timestamp.fromDate(new Date(data.abstractDeadlines.editDeadline)) : null,
                 updatedAt: Timestamp.now()
@@ -159,6 +166,46 @@ export default function ConferenceSettingsPage() {
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleImageUpload = async (file: File): Promise<string> => {
+        setUploadingImage(true);
+        try {
+            const fileName = `welcome_${cid}_${Date.now()}_${file.name}`;
+            const storageRef = ref(storage, `conferences/${cid}/welcome/${fileName}`);
+            await uploadBytes(storageRef, file);
+            const downloadURL = await getDownloadURL(storageRef);
+            return downloadURL;
+        } catch (error) {
+            console.error('Image upload error:', error);
+            toast.error('이미지 업로드 실패 / Image upload failed');
+            throw error;
+        } finally {
+            setUploadingImage(false);
+        }
+    };
+
+    const handleAddImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        try {
+            const url = await handleImageUpload(file);
+            setData(prev => ({
+                ...prev,
+                welcomeMessageImages: [...(prev.welcomeMessageImages || []), url]
+            }));
+            toast.success('이미지가 추가되었습니다 / Image added');
+        } catch {
+            // Error already handled in handleImageUpload
+        }
+    };
+
+    const handleRemoveImage = (index: number) => {
+        setData(prev => ({
+            ...prev,
+            welcomeMessageImages: prev.welcomeMessageImages?.filter((_, i) => i !== index) || []
+        }));
     };
 
     if (!cid) {
@@ -499,30 +546,90 @@ export default function ConferenceSettingsPage() {
                         </div>
                         <p className="text-slate-500 leading-relaxed text-sm">
                             학술대회 조직위원장 또는 회장의 인사말을 입력합니다.<br />
-                            HTML 태그는 지원하지 않으며, 줄바꿈은 자동으로 적용됩니다.
+                            HTML 편집과 이미지 추가를 지원합니다.
                         </p>
                     </div>
 
-                    <div className="lg:col-span-8">
+                    <div className="lg:col-span-8 space-y-6">
                         <Card className="border-0 shadow-sm ring-1 ring-slate-200 bg-white overflow-hidden rounded-2xl">
                             <CardContent className="p-6 md:p-8 space-y-8">
-                                <BilingualInput
-                                    label="초대의 글 (Welcome Message)"
-                                    valueKO={data.welcomeMessage.ko}
-                                    valueEN={data.welcomeMessage.en}
-                                    onChangeKO={(value) => setData(prev => ({
-                                        ...prev,
-                                        welcomeMessage: { ...prev.welcomeMessage, ko: value }
-                                    }))}
-                                    onChangeEN={(value) => setData(prev => ({
-                                        ...prev,
-                                        welcomeMessage: { ...prev.welcomeMessage, en: value }
-                                    }))}
-                                    placeholderKO="예: 존경하는 회원 여러분, 안녕하십니까..."
-                                    placeholderEN="e.g. Dear Colleagues and Friends..."
-                                    type="textarea"
-                                    rows={8}
-                                />
+                                {/* Korean Editor */}
+                                <div>
+                                    <Label className="text-base font-medium text-slate-700 mb-2 block">
+                                        🇰🇷 한국어 / Korean
+                                    </Label>
+                                    <RichTextEditor
+                                        value={data.welcomeMessage.ko}
+                                        onChange={(value) => setData(prev => ({
+                                            ...prev,
+                                            welcomeMessage: { ...prev.welcomeMessage, ko: value }
+                                        }))}
+                                        placeholder="예: 존경하는 회원 여러분, 안녕하십니까..."
+                                    />
+                                </div>
+
+                                {/* English Editor */}
+                                <div>
+                                    <Label className="text-base font-medium text-slate-700 mb-2 block">
+                                        🇺🇸 English
+                                    </Label>
+                                    <RichTextEditor
+                                        value={data.welcomeMessage.en}
+                                        onChange={(value) => setData(prev => ({
+                                            ...prev,
+                                            welcomeMessage: { ...prev.welcomeMessage, en: value }
+                                        }))}
+                                        placeholder="e.g. Dear Colleagues and Friends..."
+                                    />
+                                </div>
+
+                                {/* Image Upload */}
+                                <div>
+                                    <Label className="text-base font-medium text-slate-700 mb-2 flex items-center gap-2">
+                                        <ImageIcon size={18} />
+                                        이미지 추가 / Add Images
+                                    </Label>
+                                    <div className="flex items-center gap-4">
+                                        <label className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer transition">
+                                            <ImageIcon size={18} />
+                                            <span className="text-sm font-bold text-slate-700">
+                                                {uploadingImage ? '업로드 중 / Uploading...' : '이미지 선택 / Choose Image'}
+                                            </span>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleAddImage}
+                                                className="hidden"
+                                                disabled={uploadingImage}
+                                            />
+                                        </label>
+                                        <span className="text-xs text-slate-500">
+                                            JPG, PNG (최대 5MB)
+                                        </span>
+                                    </div>
+
+                                    {/* Image Preview */}
+                                    {data.welcomeMessageImages && data.welcomeMessageImages.length > 0 && (
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                                            {data.welcomeMessageImages.map((url, index) => (
+                                                <div key={index} className="relative group">
+                                                    <img
+                                                        src={url}
+                                                        alt={`Welcome ${index + 1}`}
+                                                        className="w-full h-32 object-cover rounded-lg border border-slate-200"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveImage(index)}
+                                                        className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition"
+                                                    >
+                                                        <X size={16} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </CardContent>
                         </Card>
                     </div>

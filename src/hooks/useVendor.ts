@@ -20,13 +20,13 @@ const resolveVendorAndConference = async (vid: string) => {
         const q = query(collectionGroup(db, 'vendors'), where('id', '==', vid), limit(1));
         const snap = await getDocs(q);
         if (!snap.empty) {
-            const doc = snap.docs[0];
-            const ref = doc.ref; 
+            const d = snap.docs[0];
+            const ref = d.ref;
             const confRef = ref.parent.parent;
             if (confRef) {
-                return { 
-                    vendor: { id: doc.id, ...doc.data() } as any, 
-                    conferenceId: confRef.id 
+                return {
+                    vendor: { id: d.id, ...d.data() },
+                    conferenceId: confRef.id
                 };
             }
         }
@@ -46,7 +46,7 @@ export interface VisitLog {
 }
 
 export const useVendor = (vid: string | undefined) => {
-    const [vendor, setVendor] = useState<any>(null);
+    const [vendor, setVendor] = useState<Record<string, unknown> | null>(null);
     const [conferenceId, setConferenceId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -55,7 +55,6 @@ export const useVendor = (vid: string | undefined) => {
     
     // Auth Integration
     const navigate = useNavigate();
-    const currentUser = auth.currentUser; // Direct access or use hook if reactive needed
 
     // 1. Initialize & Resolve Vendor
     useEffect(() => {
@@ -216,9 +215,9 @@ export const useVendor = (vid: string | undefined) => {
 
         setLoading(true);
         try {
-            const visitData: any = {
-                vendorId: vendor.id, // Doc ID
-                ownerUid: auth.currentUser.uid, // Stamp the creator!
+            const visitData: Record<string, unknown> = {
+                vendorId: vendor.id,
+                ownerUid: auth.currentUser.uid,
                 vendorName: vendor.name,
                 visitorId: scanResult.user.id,
                 timestamp: Timestamp.now(),
@@ -256,17 +255,17 @@ export const useVendor = (vid: string | undefined) => {
         setError(null);
     };
 
-    return { 
-        vendor, 
-        conferenceId, 
-        loading, 
-        error, 
-        scanResult, 
-        visits, 
-        scanBadge, 
+    return {
+        vendor,
+        conferenceId,
+        loading,
+        error,
+        scanResult,
+        visits,
+        scanBadge,
         processVisit,
         resetScan,
         logout: () => auth.signOut(),
-        login: (code?: string) => navigate('/admin/login')
+        login: () => navigate('/admin/login')
     };
 };

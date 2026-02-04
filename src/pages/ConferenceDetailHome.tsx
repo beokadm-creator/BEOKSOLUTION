@@ -2,21 +2,22 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { SESSION_KEYS, clearNonMemberSessions } from '../utils/cookie';
-import { auth as firebaseAuth } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
-import { useNonMemberAuth } from '../hooks/useNonMemberAuth';
-import toast from 'react-hot-toast';
+import { useUserStore } from '../store/userStore';
+import TermsAgreementModal from '../components/conference/TermsAgreementModal';
 
 // 1. SAFE DATE UTILITY (Outside component)
-const safeDate = (val: any): string => {
+const safeDate = (val: unknown): string => {
   try {
     if (!val) return '';
     if (typeof val === 'string') return val;
-    if (val.toDate && typeof val.toDate === 'function') return val.toDate().toLocaleDateString();
-    if (val.seconds) return new Date(val.seconds * 1000).toLocaleDateString();
-    return String(val); // Fallback
-  } catch (e) {
+    if (typeof val === 'object' && val !== null) {
+      const dateVal = val as { toDate?: () => Date; seconds?: number };
+      if (dateVal.toDate && typeof dateVal.toDate === 'function') return dateVal.toDate().toLocaleDateString();
+      if (dateVal.seconds) return new Date(dateVal.seconds * 1000).toLocaleDateString();
+    }
+    return String(val);
+  } catch {
     return 'Date Error';
   }
 };
@@ -25,21 +26,32 @@ const ConferenceDetailHome: React.FC = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
 
-  // Auth state for guest detection
+  // Auth state (simplified - no member/non-member distinction)
   const { auth } = useAuth('');
   const user = auth.user;
-  const isAnonymous = (user as any)?.isAnonymous || false;
+  const { language, setLanguage } = useUserStore();
 
-  // Non-member auth hook
-  const { logout: logoutNonMember } = useNonMemberAuth(slug);
+  // Legal Agreement Modal state
+  const [showAgreementModal, setShowAgreementModal] = useState(false);
+  const [targetPath, setTargetPath] = useState('');
+  const [terms, setTerms] = useState<{ title?: string; content?: string; required?: boolean } | null>(null);
 
-  // Non-member session state
-  const [isNonMemberRegistered, setIsNonMemberRegistered] = useState(false);
-  const [nonMemberSession, setNonMemberSession] = useState<any>(null);
-  const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
+  // Registration state
+  const [isRegistered, setIsRegistered] = useState(false);
 
-  //2. INITIALIZE WITH DEFAULT DATA (Prevent White Screen)
-  const [conf, setConf] = useState({
+  // Footer Info state
+  const [footerInfo, setFooterInfo] = useState<{
+    bizRegNumber?: string;
+    representativeName?: string;
+    address?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    operatingHours?: string;
+    emailNotice?: string;
+  } | null>(null);
+
+    //2. INITIALIZE WITH DEFAULT DATA (Prevent White Screen)
+    const [conf, setConf] = useState({
     title: "Loading Conference...",
     societyName: "e-Regi",
     location: "Loading...",
@@ -47,24 +59,6 @@ const ConferenceDetailHome: React.FC = () => {
     endDate: "",
     exists: false // Flag to track if real data is loaded
   });
-
-    // [CRITICAL] Clear stale non-member sessions on mount
-    // This prevents issues where users return to conference home after leaving registration page
-    useEffect(() => {
-        if (isAnonymous) {
-            console.log('[ConferenceDetailHome] Clearing stale non-member session for anonymous user');
-            // Clear sessionStorage NON_MEMBER session
-            try {
-                sessionStorage.removeItem('NON_MEMBER');
-            } catch (e) {
-                console.warn('[ConferenceDetailHome] Failed to clear NON_MEMBER session:', e);
-            }
-            // Call logout from useNonMemberAuth to clear any remaining state
-            if (logoutNonMember) {
-                logoutNonMember();
-            }
-        }
-    }, [isAnonymous, logoutNonMember]);
 
     useEffect(() => {
     if (!slug) return;
@@ -78,6 +72,7 @@ const ConferenceDetailHome: React.FC = () => {
         if (!snap.empty) {
           const d = snap.docs[0].data();
           const confId = d.id;
+          const societyId = (d as { societyId?: string }).societyId || '';
 
           // 3. APPLY SAFE PARSER
           setConf({
@@ -89,8 +84,14 @@ const ConferenceDetailHome: React.FC = () => {
             exists: true
           });
 
-          // 4. Check non-member registration status (including payment verification)
-          checkNonMemberRegistration(confId);
+          // 4. Check registration status
+          checkRegistrationStatus(confId);
+
+          // 5. Fetch terms from Firestore
+          fetchTerms(societyId);
+
+          // 6. Fetch footer info
+          fetchFooterInfo(societyId);
         } else {
           setConf(prev => ({ ...prev, title: "Conference Not Found", exists: false }));
         }
@@ -100,49 +101,105 @@ const ConferenceDetailHome: React.FC = () => {
       }
     };
 
-    const checkNonMemberRegistration = async (confId: string) => {
-      // Check non-member session and verify payment status
+    const checkRegistrationStatus = async (confId: string) => {
+      // Check if user is registered for this conference
       try {
-        const session = sessionStorage.getItem(SESSION_KEYS.NON_MEMBER);
-        if (!session) return;
+        if (!user?.uid) {
+          console.log('[ConferenceDetailHome] No user logged in');
+          return;
+        }
 
-        const sessionData = JSON.parse(session);
+        // Check in users/{uid}/participations
+        const participationsRef = collection(db, 'users', user.uid, 'participations');
+        const q = query(participationsRef, where('conferenceId', '==', confId));
+        const snap = await getDocs(q);
 
-        // Check if session is for this conference
-        if (sessionData.cid !== confId) return;
+        if (!snap.empty) {
+          const docData = snap.docs[0].data();
+          const status = docData?.paymentStatus || 'PENDING';
 
-        // CRITICAL FIX: Verify payment status from Firestore
-        if (sessionData.registrationId) {
-          const regDocRef = doc(db, `conferences/${confId}/registrations/${sessionData.registrationId}`);
-          const regDoc = await getDoc(regDocRef);
+          setPaymentStatus(status);
+          setRegistrationData(docData);
 
-          if (regDoc.exists()) {
-            const regData = regDoc.data();
-            const status = regData?.paymentStatus || 'PENDING';
-
-            setPaymentStatus(status);
-
-            // Only set as "registered" if payment is completed
-            if (status === 'PAID') {
-              setNonMemberSession(sessionData);
-              setIsNonMemberRegistered(true);
-            } else {
-              // Payment not completed - clear session and show register button
-              console.log(`[ConferenceDetailHome] Payment not completed: ${status}. Clearing session.`);
-              setIsNonMemberRegistered(false);
-              setNonMemberSession(null);
-              // Optionally clear the session to prevent confusion
-              // sessionStorage.removeItem(SESSION_KEYS.NON_MEMBER);
-            }
+          // Only set as "registered" if payment is completed
+          if (status === 'PAID') {
+            setIsRegistered(true);
+          } else {
+            // Payment not completed - show register button
+            console.log(`[ConferenceDetailHome] Payment not completed: ${status}`);
+            setIsRegistered(false);
+            setRegistrationData(null);
           }
         }
       } catch (e) {
-        console.error("Failed to check non-member registration:", e);
+        console.error("Failed to check registration:", e);
+      }
+    };
+
+    const fetchTerms = async (societyId: string) => {
+      if (!societyId) {
+        console.log('[ConferenceDetailHome] No societyId to fetch terms');
+        return;
+      }
+
+      try {
+        const identityDocRef = doc(db, 'societies', societyId, 'settings', 'identity');
+        const docSnap = await getDoc(identityDocRef);
+
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          console.log('[ConferenceDetailHome] Terms loaded from Firestore:', societyId);
+          console.log('[ConferenceDetailHome] Terms data keys:', Object.keys(data));
+          console.log('[ConferenceDetailHome] Terms data:', JSON.stringify(data, null, 2));
+          setTerms(data);
+        } else {
+          console.warn('[ConferenceDetailHome] No terms document found in Firestore');
+          setTerms(undefined); // Explicitly undefined - TermsAgreementModal will handle this
+        }
+      } catch (e) {
+        console.error('[ConferenceDetailHome] Failed to fetch terms:', e);
+        setTerms(undefined);
+      } finally {
+        console.log('[ConferenceDetailHome] Terms loading complete');
+      }
+    };
+
+    const fetchFooterInfo = async (societyId: string) => {
+      if (!societyId) {
+        console.log('[ConferenceDetailHome] No societyId to fetch footer info');
+        return;
+      }
+
+      try {
+        const societyDocRef = doc(db, 'societies', societyId);
+        const docSnap = await getDoc(societyDocRef);
+
+        if (docSnap.exists()) {
+          const sData = docSnap.data();
+          setFooterInfo(sData.footerInfo);
+          console.log('[ConferenceDetailHome] Footer info loaded:', societyId);
+        }
+      } catch (e) {
+        console.error('[ConferenceDetailHome] Failed to fetch footer info:', e);
       }
     };
 
     fetchConf();
-  }, [slug]);
+  }, [slug, user?.uid]);
+
+  // Handle register button click - show agreement modal first
+  const handleRegisterClick = () => {
+    setShowAgreementModal(true);
+    setTargetPath(`/${slug}/register?mode=new-flow`);
+  };
+
+  // Handle agreement confirmation - navigate to registration
+  const handleAgreementConfirm = () => {
+    setShowAgreementModal(false);
+    if (targetPath) {
+      navigate(targetPath);
+    }
+  };
 
   // 4. ALWAYS RENDER UI (No early returns that hide HTML)
   return (
@@ -150,79 +207,99 @@ const ConferenceDetailHome: React.FC = () => {
       {/* HEADER */}
       <header className="bg-white shadow-sm py-4 px-6 flex justify-between items-center sticky top-0 z-10">
         <div className="font-bold text-xl text-blue-900">{conf.societyName}</div>
-        <div className="space-x-3">
-             <button type="button" onClick={() => navigate(`/${slug}/auth?mode=login`)} className="text-gray-600 font-medium text-sm">Log In</button>
-             <button type="button" onClick={() => navigate(`/${slug}/mypage`)} className="bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm font-bold">My Badge</button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setLanguage(language === 'ko' ? 'en' : 'ko')}
+          className="px-3 py-1 rounded text-sm font-bold bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+        >
+          {language === 'ko' ? 'EN' : 'KO'}
+        </button>
       </header>
 
       {/* BODY */}
       <main className="flex-grow flex flex-col items-center justify-center p-6 text-center">
         <div className="bg-white p-10 rounded-3xl shadow-xl max-w-4xl w-full border-t-8 border-blue-600">
-            <h1 className="text-3xl md:text-5xl font-black text-gray-900 mb-6">{conf.title}</h1>
-            
-            <div className="text-lg text-gray-600 mb-10 space-y-2">
-                <p>📅 {conf.startDate} {conf.endDate ? `~ ${conf.endDate}` : ''}</p>
-                <p>📍 {conf.location}</p>
-            </div>
+          <h1 className="text-3xl md:text-5xl font-black text-gray-900 mb-6">{conf.title}</h1>
 
-            {/* REGISTER BUTTON - COMPLETE MEMBER/GUEST SEPARATION */}
-            {conf.exists ? (
-                <>
-                    {/* [GUEST LOGIC] Anonymous users ALWAYS see Register button with mode=guest */}
-                    {isAnonymous ? (
-                        <>
-                            <button
-                                type="button"
-                                onClick={() => navigate(`/${slug}/register?mode=guest`)}
-                                className="bg-blue-600 text-white text-xl font-bold px-12 py-5 rounded-full shadow-lg hover:bg-blue-700 hover:scale-105 transition-all"
-                            >
-                                사전등록 신청하기 (Register)
-                            </button>
-                            <p className="text-blue-600 text-sm mt-3">
-                                🔵 비회원으로 진행합니다. 이 브라우저에서만 접수 내역을 확인할 수 있습니다.
-                            </p>
-                        </>
-                    ) : (
-                        /* [MEMBER LOGIC] Logged-in users: Check if already registered */
-                        <>
-                            {isNonMemberRegistered ? (
-                                <div className="space-y-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => navigate(`/${slug}/check-status`)}
-                                        className="bg-green-600 text-white text-xl font-bold px-12 py-5 rounded-full shadow-lg hover:bg-green-700 hover:scale-105 transition-all"
-                                    >
-                                        비회원등록조회 (Check Status)
-                                    </button>
-                                    <p className="text-gray-600 text-sm">
-                                        이미 등록된 비회원입니다. 위 버튼을 클릭하여 등록 내역을 확인하세요.
-                                    </p>
-                                </div>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={() => navigate(`/${slug}/register?mode=member`)}
-                                    className="bg-blue-600 text-white text-xl font-bold px-12 py-5 rounded-full shadow-lg hover:bg-blue-700 hover:scale-105 transition-all"
-                                >
-                                    사전등록 신청하기 (Register)
-                                </button>
-                            )}
-                        </>
-                    )}
-                </>
-            ) : (
-                <div className="text-red-500 font-bold">
-                    {conf.title === 'Loading Conference...' ? '불러오는 중...' : '행사 정보를 찾을 수 없습니다.'}
+          <div className="text-lg text-gray-600 mb-10 space-y-2">
+            <p>📅 {conf.startDate} {conf.endDate ? `~ ${conf.endDate}` : ''}</p>
+            <p>📍 {conf.location}</p>
+          </div>
+
+          {/* REGISTER BUTTON */}
+          {conf.exists ? (
+            <>
+              {/* NOT REGISTERED - Show Register Button */}
+              {!isRegistered ? (
+                <button
+                  type="button"
+                  onClick={handleRegisterClick}
+                  className="bg-blue-600 text-white text-xl font-bold px-12 py-5 rounded-full shadow-lg hover:bg-blue-700 hover:scale-105 transition-all"
+                >
+                  사전등록 신청하기 (Register)
+                </button>
+              ) : (
+                /* REGISTERED - Show Check Status Button */
+                <div className="space-y-4">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/${slug}/check-status`)}
+                    className="bg-green-600 text-white text-xl font-bold px-12 py-5 rounded-full shadow-lg hover:bg-green-700 hover:scale-105 transition-all"
+                  >
+                    비회원등록조회 (Check Status)
+                  </button>
+                  <p className="text-gray-600 text-sm">
+                    이미 등록된 비회원입니다. 위 버튼을 클릭하여 등록 내역을 확인하세요.
+                  </p>
                 </div>
-            )}
+              )}
+            </>
+          ) : (
+            <div className="text-red-500 font-bold">
+              {conf.title === 'Loading Conference...' ? '불러오는 중...' : '행사 정보를 찾을 수 없습니다.'}
+            </div>
+          )}
         </div>
       </main>
-      
-      {/* DEBUG FOOTER */}
-      <footer className="py-6 text-center text-xs text-gray-400">
-         Slug: {slug} | Status: {conf.exists ? 'LOADED' : 'WAITING'} | V186
+
+      {/* FOOTER */}
+      <footer className="bg-white py-12 px-6 border-t border-slate-100">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white text-xs font-black">e</div>
+            <span className="text-lg font-black text-slate-900 tracking-tighter">eRegi</span>
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-8 text-xs font-bold text-slate-400 uppercase tracking-widest">
+            <button type="button" onClick={() => navigate('/terms')} className="hover:text-slate-900 transition-colors">이용약관</button>
+            <button type="button" onClick={() => navigate('/privacy')} className="hover:text-slate-900 transition-colors">개인정보처리방침</button>
+          </div>
+
+          <div className="flex flex-col items-center md:items-end gap-2 text-right">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">
+              {footerInfo?.representativeName || '대표'} | Biz No: {footerInfo?.bizRegNumber || '-'}
+            </p>
+            <p className="text-[10px] text-slate-400">
+              {footerInfo?.address || 'Address not available'}
+            </p>
+            <p className="text-[10px] text-slate-400">
+              {footerInfo?.contactPhone ? `TEL ${footerInfo.contactPhone}` : ''} {footerInfo?.contactEmail ? `/ ${footerInfo.contactEmail}` : ''}
+            </p>
+            <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mt-2">
+              &copy; 2026 eRegi. All rights reserved.
+            </p>
+          </div>
+        </div>
       </footer>
+
+      {/* Terms Agreement Modal */}
+      <TermsAgreementModal
+        isOpen={showAgreementModal}
+        onClose={() => setShowAgreementModal(false)}
+        onAgree={handleAgreementConfirm}
+        lang="ko"
+        terms={terms}
+      />
     </div>
   );
 };

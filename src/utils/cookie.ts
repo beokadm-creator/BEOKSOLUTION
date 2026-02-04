@@ -29,22 +29,20 @@ export const removeRootCookie = (name: string) => {
 };
 
 export const SESSION_KEYS = {
-  NON_MEMBER: 'eregi_nonmember_session',
   OPERATOR_TOKEN: 'operatorToken',
-  MAIN_COOKIE: 'eregi_session'
+  MAIN_COOKIE: 'eregi_session',
+  NON_MEMBER: 'eregi_non_member_session'
 } as const;
 
 export const clearAllSessions = () => {
-  sessionStorage.removeItem(SESSION_KEYS.NON_MEMBER);
   sessionStorage.removeItem(SESSION_KEYS.OPERATOR_TOKEN);
+  removeRootCookie(SESSION_KEYS.MAIN_COOKIE);
+};
+
+export const clearAuthSessions = () => {
   removeRootCookie(SESSION_KEYS.MAIN_COOKIE);
 };
 
 export const clearNonMemberSessions = () => {
   sessionStorage.removeItem(SESSION_KEYS.NON_MEMBER);
-  sessionStorage.removeItem(SESSION_KEYS.OPERATOR_TOKEN);
-};
-
-export const clearAuthSessions = () => {
-  removeRootCookie(SESSION_KEYS.MAIN_COOKIE);
 };

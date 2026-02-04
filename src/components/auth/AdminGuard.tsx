@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Navigate, Outlet, useLocation, useSearchParams, useParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { useSubdomain } from '../../hooks/useSubdomain';
 import LoadingSpinner from '../common/LoadingSpinner';
 import { httpsCallable } from 'firebase/functions';
 import { functions, db } from '../../firebase';
@@ -12,6 +13,7 @@ const AdminGuard: React.FC = () => {
   const { auth: { user, loading } } = useAuth();
   const location = useLocation();
   const { cid, sid } = useParams();
+  const { subdomain } = useSubdomain();  // ✅ Get subdomain (kadd, kap)
   const [searchParams, setSearchParams] = useSearchParams();
   const [isBypassing, setIsBypassing] = useState(false);
   const [bypassLoading, setBypassLoading] = useState(false);
@@ -21,13 +23,20 @@ const AdminGuard: React.FC = () => {
   const isSuperAdmin = userEmail && SUPER_ADMINS.includes(userEmail);
 
   const currentSocietyId = useMemo(() => {
+    // ✅ 1순위: URL 파라미터 sid (/admin/society/:sid)
     if (sid) return sid;
+    
+    // ✅ 2순위: Subdomain (kadd.eregi.co.kr → kadd)
+    if (subdomain) return subdomain;
+    
+    // ✅ 3순위: cid에서 추출 (kap_2026spring → kap)
     if (cid) {
-      const parts = cid.split('_');
-      if (parts.length >= 1) return parts[0];
+        const parts = cid.split('_');
+        if (parts.length >= 1) return parts[0];
     }
+    
     return null;
-  }, [cid, sid]);
+  }, [cid, sid, subdomain]);  // ✅ subdomain 추가
 
   // 🔧 [FIX] Memoize auth param to prevent infinite loops
   const authParam = useMemo(() => searchParams.get('auth'), [searchParams]);
@@ -64,7 +73,7 @@ const AdminGuard: React.FC = () => {
               if (authParam) {
                   const verifyFn = httpsCallable(functions, 'verifyAccessLink');
                   const result = await verifyFn({ token: authToken });
-                  const data = result.data as any;
+                  const data = result.data as { valid: boolean };
 
                   if (data.valid) {
                       sessionStorage.setItem('operatorToken', authToken);
@@ -77,7 +86,7 @@ const AdminGuard: React.FC = () => {
                   setIsBypassing(true);
               }
 
-          } catch (e: any) {
+          } catch {
               sessionStorage.removeItem('operatorToken');
           } finally {
               setBypassLoading(false);
@@ -88,38 +97,78 @@ const AdminGuard: React.FC = () => {
   }, [authParam, location.pathname, isBypassing, searchParams, setSearchParams]);
 
   const checkSocietyAdminCallback = useCallback(async () => {
+      console.log(`🛡️ [AdminGuard] Checking admin access...`);
+      console.log(`🛡️ [AdminGuard] currentSocietyId: ${currentSocietyId}`);
+      console.log(`🛡️ [AdminGuard] userEmail: ${userEmail}`);
+      console.log(`🛡️ [AdminGuard] isSuperAdmin: ${isSuperAdmin}`);
+      
       if (isSuperAdmin) {
+          console.log(`🛡️ [AdminGuard] ✅ Super Admin bypass`);
           setIsAdminAuthorized(true);
           return;
       }
 
       if (!currentSocietyId || !userEmail) {
+          console.log(`🛡️ [AdminGuard] ❌ Missing societyId or email`);
           setIsAdminAuthorized(false);
           return;
       }
 
       try {
+          console.log(`🛡️ [AdminGuard] Fetching society document: ${currentSocietyId}`);
           const socRef = doc(db, 'societies', currentSocietyId);
           const socSnap = await getDoc(socRef);
+          
+          console.log(`🛡️ [AdminGuard] Document exists: ${socSnap.exists()}`);
           
           if (socSnap.exists()) {
               const data = socSnap.data();
               const adminEmails = data.adminEmails || [];
+              console.log(`🛡️ [AdminGuard] adminEmails:`, adminEmails);
+              console.log(`🛡️ [AdminGuard] Checking if ${userEmail} in adminEmails`);
               const isAuthorized = adminEmails.includes(userEmail);
+              console.log(`🛡️ [AdminGuard] isAuthorized: ${isAuthorized}`);
               setIsAdminAuthorized(isAuthorized);
           } else {
+              console.log(`🛡️ [AdminGuard] ❌ Society document not found`);
               setIsAdminAuthorized(false);
           }
       } catch (error) {
+          console.log(`🛡️ [AdminGuard] ❌ Exception:`, error);
           setIsAdminAuthorized(false);
       }
   }, [isSuperAdmin, userEmail, currentSocietyId]);
 
   useEffect(() => {
+      console.log(`🛡️ [AdminGuard] useEffect triggered`);
+      console.log(`🛡️ [AdminGuard] user:`, user);
+      console.log(`🛡️ [AdminGuard] loading:`, loading);
+      console.log(`🛡️ [AdminGuard] isBypassing:`, isBypassing);
+      
+      // ✅ sessionStorage 체크 (로그인 직후 빠른 확인용)
+      const societyAdmin = sessionStorage.getItem('societyAdmin');
+      const storedSocietyId = sessionStorage.getItem('societyId');
+      const storedIsSuperAdmin = sessionStorage.getItem('isSuperAdmin');
+      
+      console.log(`🛡️ [AdminGuard] sessionStorage societyAdmin: ${societyAdmin}`);
+      console.log(`🛡️ [AdminGuard] sessionStorage societyId: ${storedSocietyId}`);
+      console.log(`🛡️ [AdminGuard] sessionStorage isSuperAdmin: ${storedIsSuperAdmin}`);
+      
       if (user && !loading && !isBypassing) {
+          console.log(`🛡️ [AdminGuard] Calling checkSocietyAdminCallback...`);
           checkSocietyAdminCallback();
+      } else if (!user && societyAdmin === 'true' && storedSocietyId === currentSocietyId) {
+          // ✅ 로그인 직후 sessionStorage에 있는 경우 임시 통과
+          console.log(`🛡️ [AdminGuard] ✅ Bypassing via sessionStorage (login just succeeded)`);
+          setIsAdminAuthorized(true);
+      } else if (storedIsSuperAdmin === 'true') {
+          // ✅ Super Admin bypass
+          console.log(`🛡️ [AdminGuard] ✅ Super Admin bypass via sessionStorage`);
+          setIsAdminAuthorized(true);
+      } else {
+          console.log(`🛡️ [AdminGuard] Skipped: user=${!!user}, loading=${loading}, isBypassing=${isBypassing}`);
       }
-  }, [user, loading, isBypassing, checkSocietyAdminCallback]);
+  }, [user, loading, isBypassing, checkSocietyAdminCallback, currentSocietyId]);
 
   if (loading || bypassLoading) return <LoadingSpinner />;
   
@@ -129,6 +178,15 @@ const AdminGuard: React.FC = () => {
   }
 
   if (!user) {
+    // ✅ sessionStorage에 admin 정보가 있으면 통과 (로그인 직후)
+    const societyAdmin = sessionStorage.getItem('societyAdmin');
+    const storedSocietyId = sessionStorage.getItem('societyId');
+    const storedIsSuperAdmin = sessionStorage.getItem('isSuperAdmin');
+    
+    if ((societyAdmin === 'true' && storedSocietyId === currentSocietyId) || storedIsSuperAdmin === 'true') {
+      return <Outlet />;
+    }
+    
     return <Navigate to="/admin/login" state={{ from: location }} replace />;
   }
 

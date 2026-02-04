@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { collection, query, where, getDocs, addDoc, Timestamp, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, Timestamp, limit } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Registration, AccessLog } from '../types/schema';
+import { Registration } from '../types/schema';
 
 export const useAccessControl = (conferenceId: string, locationId: string = 'ROOM_A') => {
     const [log, setLog] = useState<{ message: string; type: 'SUCCESS' | 'ERROR' | 'INFO' }>({ 
@@ -32,7 +32,6 @@ export const useAccessControl = (conferenceId: string, locationId: string = 'ROO
             const regData = snapshot.docs[0].data() as Registration;
 
             // 3. Role/Tier Check (Policy Engine)
-            const allowedTiers = ['MEMBER', 'VIP', 'COMMITTEE', 'SPEAKER', 'STUDENT', 'NON_MEMBER'];
             // If user has no valid tier or status is not COMPLETED
             if (regData.status !== 'COMPLETED' && regData.status !== 'PAID') {
                  setLog({ message: `ERROR: Status is ${regData.status}`, type: 'ERROR' });
@@ -52,9 +51,10 @@ export const useAccessControl = (conferenceId: string, locationId: string = 'ROO
 
             setLog({ message: `SUCCESS: Welcome, ${regData.userTier || 'Guest'}`, type: 'SUCCESS' });
 
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
-            setLog({ message: `System Error: ${err.message}`, type: 'ERROR' });
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            setLog({ message: `System Error: ${message}`, type: 'ERROR' });
         }
     };
 

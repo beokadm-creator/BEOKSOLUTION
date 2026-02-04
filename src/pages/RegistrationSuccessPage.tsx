@@ -1,8 +1,8 @@
 import React from 'react';
-import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { CheckCircle2, Download, Home, FileText } from 'lucide-react';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { useUserStore } from '../store/userStore';
 import { useConference } from '../hooks/useConference';
 

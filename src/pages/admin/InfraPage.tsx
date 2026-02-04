@@ -208,7 +208,7 @@ export default function InfraPage() {
                                         ...prev,
                                         payment: {
                                             ...prev.payment,
-                                            domestic: { ...prev.payment.domestic, provider: val as any }
+                                            domestic: { ...prev.payment.domestic, provider: val as 'TOSS' | 'NICE' | 'KCP' | 'KICC' }
                                         }
                                     }))}
                                 >
@@ -324,7 +324,7 @@ export default function InfraPage() {
                                         value={settings.payment.global.provider}
                                         onValueChange={(val) => setSettings(prev => ({
                                             ...prev,
-                                            payment: { ...prev.payment, global: { ...prev.payment.global, provider: val as any } }
+                                            payment: { ...prev.payment, global: { ...prev.payment.global, provider: val as 'EXIMBAY' | 'STRIPE' | 'PAYPAL' } }
                                         }))}
                                     >
                                         <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-slate-200 font-medium">

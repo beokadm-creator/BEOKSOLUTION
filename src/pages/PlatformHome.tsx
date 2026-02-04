@@ -12,6 +12,8 @@ interface ConfSummary {
     societyId: string;
     dates: string;
     location: string;
+    status?: string;
+    startDate?: number;
 }
 
 const PlatformHome: React.FC = () => {
@@ -61,8 +63,8 @@ const PlatformHome: React.FC = () => {
                 })
                 // Filter ACTIVE or PUBLIC (or just show all for now to verify KADD)
                 // The user said: "filter by status in JS"
-                .filter((c: any) => c.status !== 'HIDDEN' && c.status !== 'ARCHIVED')
-                .sort((a: any, b: any) => b.startDate - a.startDate); // Newest first
+                .filter((c: ConfSummary) => c.status !== 'HIDDEN' && c.status !== 'ARCHIVED')
+                .sort((a: ConfSummary, b: ConfSummary) => (b.startDate || 0) - (a.startDate || 0)); // Newest first
 
                 setActiveConferences(list);
             } catch (e) {

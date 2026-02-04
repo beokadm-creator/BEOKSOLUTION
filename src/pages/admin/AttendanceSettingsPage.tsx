@@ -5,7 +5,7 @@ import { db } from '../../firebase';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+import { Card, CardContent } from '../../components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
 import { Plus, Trash2, Save, Clock, MapPin, AlertCircle, CalendarDays, Coffee, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -33,6 +33,10 @@ interface DailyRule {
     date: string;
     globalGoalMinutes: number;
     zones: ZoneRule[];
+    // 계산 방식: DAILY_SEPARATE = 날짜별 독립 완료, CUMULATIVE = 전체 기간 누적 합산
+    completionMode?: 'DAILY_SEPARATE' | 'CUMULATIVE';
+    // 전체 기간 누적 목표 (CUMULATIVE 모드일 때 사용)
+    cumulativeGoalMinutes?: number;
 }
 
 const AttendanceSettingsPage: React.FC = () => {
@@ -92,11 +96,13 @@ const AttendanceSettingsPage: React.FC = () => {
 
     // Helper: Get current rule or default
     const getCurrentRule = (): DailyRule => {
-        if (!selectedDate) return { date: '', globalGoalMinutes: 0, zones: [] };
+        if (!selectedDate) return { date: '', globalGoalMinutes: 0, zones: [], completionMode: 'DAILY_SEPARATE' };
         return rules[selectedDate] || {
             date: selectedDate,
             globalGoalMinutes: 240, // Default 4 hours
-            zones: []
+            zones: [],
+            completionMode: 'DAILY_SEPARATE', // 기본: 날짜별 독립 완료
+            cumulativeGoalMinutes: 0 // 기본: 누적 목표 없음
         };
     };
 
@@ -293,6 +299,88 @@ const AttendanceSettingsPage: React.FC = () => {
                                             <p className="text-xs text-slate-400 leading-snug">
                                                 이 설정은 '참석 증명서' 발급 조건을 계산할 때 사용되는 기준 시간입니다. 실제 출결 기록은 각 장소별로 누적됩니다.
                                             </p>
+                                        </div>
+                                    </div>
+                                </Card>
+                            </div>
+                        </section>
+
+                        {/* 3.1. Completion Mode Selection */}
+                        <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-6">
+                            <div className="lg:col-span-4 space-y-2">
+                                <div className="flex items-center gap-2 text-slate-800 font-bold text-lg">
+                                    <Clock className="w-5 h-5 text-purple-600" />
+                                    이수 계산 방식
+                                </div>
+                                <p className="text-sm text-slate-500 leading-relaxed">
+                                    수강 완료 기준 계산 방식을 선택합니다.
+                                </p>
+                            </div>
+                            <div className="lg:col-span-8">
+                                <Card className="border shadow-none ring-1 ring-slate-100 bg-white">
+                                    <div className="p-6">
+                                        <div className="space-y-4">
+                                            <div>
+                                                <Label className="text-slate-600 mb-2 block">계산 방식</Label>
+                                                <div className="flex gap-4">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => updateRule({ ...currentRule, completionMode: 'DAILY_SEPARATE' })}
+                                                        className={cn(
+                                                            "flex-1 px-4 py-3 rounded-lg border-2 font-medium text-sm transition-all",
+                                                            currentRule.completionMode === 'DAILY_SEPARATE'
+                                                                ? "bg-blue-50 border-blue-500 text-blue-700"
+                                                                : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <CalendarDays className="w-4 h-4" />
+                                                            <span className="font-bold">날짜별 독립 완료</span>
+                                                        </div>
+                                                        <p className="text-xs text-slate-500">
+                                                            매일 목표 시간을 개별로 충족해야 완료
+                                                        </p>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => updateRule({ ...currentRule, completionMode: 'CUMULATIVE' })}
+                                                        className={cn(
+                                                            "flex-1 px-4 py-3 rounded-lg border-2 font-medium text-sm transition-all",
+                                                            currentRule.completionMode === 'CUMULATIVE'
+                                                                ? "bg-purple-50 border-purple-500 text-purple-700"
+                                                                : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <Clock className="w-4 h-4" />
+                                                            <span className="font-bold">전체 기간 누적 합산</span>
+                                                        </div>
+                                                        <p className="text-xs text-slate-500">
+                                                            전체 회기 기간 동안의 총합으로 완료 여부 판정
+                                                        </p>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* CUMULATIVE 모드일 때만 전체 목표 표시 */}
+                                            {currentRule.completionMode === 'CUMULATIVE' && (
+                                                <div className="pt-4 border-t border-slate-200">
+                                                    <Label className="text-slate-600 mb-1.5 block">전체 기간 누적 목표 (분)</Label>
+                                                    <div className="relative">
+                                                        <Input
+                                                            type="number"
+                                                            value={currentRule.cumulativeGoalMinutes || 0}
+                                                            onChange={(e) => updateRule({ ...currentRule, cumulativeGoalMinutes: Number(e.target.value) })}
+                                                            className="pl-4 pr-16 h-12 text-lg font-medium border-slate-200 focus:border-purple-500 focus:ring-purple-500"
+                                                            placeholder="예: 720 (3일 × 240분)"
+                                                        />
+                                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">Minutes</span>
+                                                    </div>
+                                                    <p className="text-xs text-purple-600 mt-2 font-medium">
+                                                        💡 전체 회기 기간 동안 충족해야 할 총 시간입니다.
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </Card>

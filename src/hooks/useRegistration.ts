@@ -3,7 +3,6 @@ import { doc, runTransaction, Timestamp, collection, getDoc, setDoc, query, wher
 import { db, auth as firebaseAuth } from '../firebase';
 import { Registration, RegistrationPeriod, ConferenceUser, RegistrationSettings } from '../types/schema';
 import { generateReceiptNumber, generateConfirmationQr } from '../utils/transaction';
-import { signInAnonymously } from 'firebase/auth';
 import toast from 'react-hot-toast';
 
 interface RegistrationState {
@@ -26,7 +25,7 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
         success: false,
         regId: null
     });
-    
+
     const [availablePeriods, setAvailablePeriods] = useState<RegistrationPeriod[]>([]);
 
     useEffect(() => {
@@ -51,45 +50,10 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
         fetchPeriods();
     }, [conferenceId]);
 
-    // [Fix-Step 368] Guest Hijacking Prevention
-    const initializeGuest = async (mode: string | null) => {
-        // 1. If Login Mode, skip guest creation
-        if (mode === 'login') return null;
-
-        const currentUser = firebaseAuth.currentUser;
-
-        // 2. If already logged in as regular user, skip
-        if (currentUser && !currentUser.isAnonymous) return null;
-
-        // 3. If already anonymous, reuse
-        if (currentUser && currentUser.isAnonymous) return currentUser;
-
-        // 4. Create Guest
-        try {
-            const { user: guestUser } = await signInAnonymously(firebaseAuth);
-            
-            // Create User Doc (Anti-Zombie)
-            await setDoc(doc(db, 'users', guestUser.uid), {
-                uid: guestUser.uid,
-                id: guestUser.uid,
-                name: 'Guest',
-                tier: 'NON_MEMBER',
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-                isAnonymous: true
-            }, { merge: true });
-
-            return guestUser;
-        } catch (error) {
-            console.error("Guest Init Error:", error);
-            throw error;
-        }
-    };
-
     // [Fix-Step 368] Resume Registration
-    const resumeRegistration = async (userId: string): Promise<any> => {
+    const resumeRegistration = async (userId: string): Promise<Record<string, unknown> | null> => {
         if (!conferenceId || !userId) return null;
-        
+
         try {
             const q = query(
                 collection(db, `conferences/${conferenceId}/registrations`),
@@ -97,12 +61,16 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
                 where('status', '==', 'PENDING')
             );
             const snap = await getDocs(q);
-            
+
             if (!snap.empty) {
                 // Get most recent
                 const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                docs.sort((a: any, b: any) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
-                
+                docs.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
+                    const aTime = (a.updatedAt as { seconds: number })?.seconds || 0;
+                    const bTime = (b.updatedAt as { seconds: number })?.seconds || 0;
+                    return bTime - aTime;
+                });
+
                 const pending = docs[0];
                 toast("작성 중인 신청서를 불러왔습니다.");
                 return pending;
@@ -113,8 +81,7 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
         return null;
     };
 
-    // Helper function to remove undefined values recursively
-    const removeUndefined = (obj: any): any => {
+    const removeUndefined = (obj: Record<string, unknown>): Record<string, unknown> | null => {
         if (obj === null || obj === undefined) {
             return null;
         }
@@ -122,12 +89,12 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
             return obj;
         }
         if (Array.isArray(obj)) {
-            return obj.map(removeUndefined);
+            return obj.map(removeUndefined) as unknown as Record<string, unknown>;
         }
-        const result: any = {};
+        const result: Record<string, unknown> = {};
         for (const key in obj) {
-            if (obj.hasOwnProperty(key)) {
-                const value = removeUndefined(obj[key]);
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                const value = removeUndefined(obj[key] as Record<string, unknown>);
                 if (value !== undefined) {
                     result[key] = value;
                 }
@@ -136,10 +103,7 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
         return result;
     };
 
-    // [Fix-Step 368] Auto-Save
-    // [Fix-Step 369] Support guest/anonymous users in auto-save
-    // CRITICAL FIX: Update users/{uid} with actual form data for final registration
-    const autoSave = async (step: number, formData: any, regId?: string | null) => {
+    const autoSave = async (step: number, formData: Record<string, unknown>, regId?: string | null) => {
         const currentUser = firebaseAuth.currentUser;
         if (!user || !conferenceId || !currentUser) return null;
 
@@ -158,12 +122,11 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
             const cleanedFormData = removeUndefined(formData);
 
             const dataToSave = {
-                userId: currentUser.uid, // Use currentUser.uid (supports both authenticated and anonymous users)
+                userId: currentUser.uid, // All users are authenticated (email/password)
                 conferenceId,
                 status: 'PENDING',
                 currentStep: step,
                 formData: cleanedFormData,
-                isAnonymous: currentUser.isAnonymous, // Track if this is a guest registration
                 lastUpdated: serverTimestamp(),
                 // Basic info if creating
                 ...(regId ? {} : { createdAt: serverTimestamp() })
@@ -171,20 +134,15 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
 
             await setDoc(ref, dataToSave, { merge: true });
 
-            // CRITICAL FIX: Also update users/{uid} with actual form data
-            // This ensures form data (name, email, phone, affiliation, licenseNumber) is available
-            // when register() is called for final payment processing
-            // [FIX-20250124] Update for both anonymous and non-anonymous users
             if (cleanedFormData.name) {
                 await setDoc(doc(db, 'users', currentUser.uid), {
-                    name: cleanedFormData.name, // Actual name from form
-                    email: cleanedFormData.email, // Actual email from form
-                    userName: cleanedFormData.name, // For compatibility
-                    phoneNumber: cleanedFormData.phone, // Actual phone from form
-                    affiliation: cleanedFormData.affiliation, // Actual affiliation from form
-                    licenseNumber: cleanedFormData.licenseNumber, // Actual license number
-                    simplePassword: cleanedFormData.simplePassword, // Password for non-member login
-                    isAnonymous: currentUser.isAnonymous, // Preserve anonymity status
+                    name: cleanedFormData.name,
+                    email: cleanedFormData.email,
+                    userName: cleanedFormData.name,
+                    phoneNumber: cleanedFormData.phone,
+                    affiliation: cleanedFormData.affiliation,
+                    licenseNumber: cleanedFormData.licenseNumber,
+                    simplePassword: cleanedFormData.simplePassword,
                     lastUpdated: serverTimestamp()
                 }, { merge: true });
             }
@@ -246,16 +204,15 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
                     refundAmount: 0,
                     receiptNumber,
                     userTier: user.tier,
-                    
+
                     // Snapshot User Info
                     userName: user.name,
                     userEmail: user.email,
                     userPhone: user.phone,
                     affiliation: user.affiliation,
                     licenseNumber: user.licenseNumber,
-                    isAnonymous: true,
                     lastUpdated: serverTimestamp(),
-                    
+
                     confirmationQr,
                     badgeQr: null, // Phase 2: Null until check-in
                     isCheckedIn: false,
@@ -265,7 +222,7 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
                 };
 
                 transaction.set(regRef, newRegistration);
-                
+
                 return regId;
             });
 
@@ -275,21 +232,21 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
             setStatus({ loading: false, error: null, success: true, regId: newRegId });
             return true;
 
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
-            setStatus({ loading: false, error: err.message, success: false, regId: null });
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            setStatus({ loading: false, error: message, success: false, regId: null });
             return false;
         }
     };
 
-    return { 
-        register, 
-        loading: status.loading, 
-        error: status.error, 
+    return {
+        register,
+        loading: status.loading,
+        error: status.error,
         success: status.success,
         availablePeriods,
         calculatePrice,
-        initializeGuest,
         resumeRegistration,
         autoSave
     };

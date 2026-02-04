@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { db } from '../firebase';
@@ -12,10 +12,18 @@ const ConferenceBadgePage: React.FC = () => {
   const [uiData, setUiData] = useState<{status: string, name: string, aff: string, id: string, issued: boolean} | null>(null);
   const [msg, setMsg] = useState("초기화 중...");
 
-  useEffect(() => {
-    if (!slug || !auth.user) { setMsg("로그인이 필요합니다."); return; }
+  useLayoutEffect(() => {
+    if (!slug || !auth.user) {
+      requestAnimationFrame(() => {
+        setMsg("로그인이 필요합니다.");
+      });
+      return;
+    }
 
-    setMsg("데이터 조회 중...");
+    const initializeMsg = "데이터 조회 중...";
+    requestAnimationFrame(() => {
+      setMsg(initializeMsg);
+    });
 
     // CRITICAL FIX: Verify auth.user is for current conference
     // auth.user.id must match registrations in this conference to avoid cross-conference data leakage
@@ -39,7 +47,11 @@ const ConferenceBadgePage: React.FC = () => {
         hasData: !snap.empty
       });
 
-      if (snap.empty) { setUiData(null); setMsg("등록 정보가 없습니다."); return; }
+      if (snap.empty) {
+        setUiData(null);
+        setMsg("등록 정보가 없습니다.");
+        return;
+      }
 
       const docData = snap.docs[0].data();
       const paymentStatus = docData?.paymentStatus || 'UNKNOWN';
@@ -70,7 +82,7 @@ const ConferenceBadgePage: React.FC = () => {
     });
 
     return () => unsub();
-  }, [slug, auth.user, msg]);
+  }, [slug, auth.user]);
 
   // Render - outside useEffect
   if (msg) return <div className="p-10 text-center font-bold text-gray-500 flex items-center justify-center min-h-screen">{msg}</div>;

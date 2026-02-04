@@ -5,8 +5,7 @@ import toast from 'react-hot-toast';
 export const useExcel = () => {
     const [processing, setProcessing] = useState(false);
 
-    // 1. Export
-    const exportToExcel = (data: any[], fileName: string, sheetName: string = 'Sheet1') => {
+    const exportToExcel = (data: Record<string, unknown>[], fileName: string, sheetName: string = 'Sheet1') => {
         setProcessing(true);
         try {
             const wb = XLSX.utils.book_new();
@@ -21,8 +20,7 @@ export const useExcel = () => {
         }
     };
 
-    // 2. Import (Parse File)
-    const importFromExcel = (file: File): Promise<any[]> => {
+    const importFromExcel = (file: File): Promise<Record<string, unknown>[]> => {
         setProcessing(true);
         return new Promise((resolve, reject) => {
             const reader = new FileReader();

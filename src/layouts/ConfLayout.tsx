@@ -6,16 +6,15 @@ import { useSubdomain } from '../hooks/useSubdomain';
 import { doc, getDoc, collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { LayoutDashboard, Globe, FileText, Users, Settings, QrCode, Monitor, CreditCard, LogOut, ArrowLeft, Printer, BarChart } from 'lucide-react';
+import { LayoutDashboard, Globe, FileText, Users, Settings, QrCode, Monitor, CreditCard, LogOut, ArrowLeft, Printer, BarChart, UserPlus, Building2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/ui/button';
-import { APP_VERSION } from '../constants/defaults';
 
 export default function ConfLayout() {
     const { cid } = useParams<{ cid: string }>();
     const { subdomain } = useSubdomain();
 
-    const [conference, setConference] = useState<any>(null);
+    const [conference, setConference] = useState<Record<string, unknown> | null>(null);
     const [loading, setLoading] = useState(true);
     const location = useLocation();
     const [searchParams] = useSearchParams();
@@ -73,9 +72,11 @@ export default function ConfLayout() {
         { href: `/admin/conf/${cid}`, label: '대시보드', icon: LayoutDashboard },
         { href: `/admin/conf/${cid}/settings`, label: '행사 정보', icon: Globe },
         { href: `/admin/conf/${cid}/settings/registration`, label: '등록 설정', icon: CreditCard },
+        { href: `/admin/conf/${cid}/sponsors`, label: '스폰서 관리', icon: Building2 },
         { href: `/admin/conf/${cid}/agenda`, label: '프로그램', icon: FileText },
         { href: `/admin/conf/${cid}/abstracts`, label: '초록 관리', icon: FileText },
         { href: `/admin/conf/${cid}/registrations`, label: '등록자 관리', icon: Users },
+        { href: `/admin/conf/${cid}/external-attendees`, label: '외부 참석자', icon: UserPlus },
         { href: `/admin/conf/${cid}/infodesk`, label: '인포데스크', icon: Printer },
         { href: `/admin/conf/${cid}/gate`, label: '출입 게이트', icon: QrCode },
         { href: `/admin/conf/${cid}/attendance-settings`, label: '수강 설정', icon: Settings },

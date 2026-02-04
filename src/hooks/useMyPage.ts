@@ -62,9 +62,10 @@ export const useMyPage = (conferenceId: string, userId: string) => {
                 const history: string[] = [];
 
                 setData({ user, registration, history, stayTimeMinutes: minutes, canPrintCertificate: canPrint });
-            } catch (e: any) {
+            } catch (e: unknown) {
                 logger.error('useMyPage', 'Fetch error', e);
-                setError(e.message);
+                const message = e instanceof Error ? e.message : 'Unknown error';
+                setError(message);
             } finally {
                 setLoading(false);
             }

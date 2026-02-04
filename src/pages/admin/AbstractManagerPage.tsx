@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { getFirestore, collection, getDocs, getDoc, doc } from 'firebase/firestore';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { collection, getDocs, getDoc, doc } from 'firebase/firestore';
+import { db } from '../../firebase';
 import { useAdminStore } from '../../store/adminStore';
 import { useAbstracts } from '../../hooks/useAbstracts';
 import { fixBrokenSubmissions } from '../../utils/dataFixer';
@@ -15,12 +16,15 @@ import { utils, writeFile } from 'xlsx';
 
 export default function AbstractManagerPage() {
     const { selectedConferenceId, availableConferences } = useAdminStore();
+    console.log('[AbstractManager] RENDER - selectedConferenceId:', selectedConferenceId);
+
     const { fetchAllSubmissions, judgeSubmission, deleteAbstractAsAdmin } = useAbstracts(selectedConferenceId || undefined);
     const [submissions, setSubmissions] = useState<Submission[]>([]);
     const [loading, setLoading] = useState(false);
-    const [societies, setSocieties] = useState<any[]>([]);
+    const [societies, setSocieties] = useState<Array<{ id: string; name?: { ko?: string; en?: string }; [key: string]: unknown }>>([]);
     const [users, setUsers] = useState<ConferenceUser[]>([]);
     const [registrations, setRegistrations] = useState<Registration[]>([]);
+    const prevConferenceIdRef = useRef<string | null>(null);
 
     // Optimize lookups with Maps
     const userMap = useMemo(() => new Map(users.map(u => [u.id, u])), [users]);
@@ -33,36 +37,9 @@ export default function AbstractManagerPage() {
     const [comment, setComment] = useState('');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-    useEffect(() => {
-        // [Step 405] Debug conference selection
-        console.log("[AbstractManager] Conference ID:", selectedConferenceId);
-        if (selectedConferenceId) {
-            loadSubmissions();
-            fetchContextData();
-        } else {
-            // [Debug] Auto-select first available for testing
-            console.log("[AbstractManager] No conference selected, using default '2026spring'");
-            loadSubmissionsForConference('2026spring');
-        }
-
-        // Fetch Societies for Excel Export
-        const fetchSocieties = async () => {
-            try {
-                const db = getFirestore();
-                const snap = await getDocs(collection(db, 'societies'));
-                setSocieties(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-            } catch (e) {
-                console.error("Failed to fetch societies:", e);
-            }
-        };
-        fetchSocieties();
-    }, [selectedConferenceId]);
-
-    const fetchContextData = async () => {
+    const fetchContextData = useCallback(async () => {
         if (!selectedConferenceId) return;
         try {
-            const db = getFirestore();
-
             // Registrations
             const regsSnap = await getDocs(collection(db, `conferences/${selectedConferenceId}/registrations`));
             setRegistrations(regsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Registration)));
@@ -109,34 +86,55 @@ export default function AbstractManagerPage() {
 
             // Merge: global users override conference-local users
             const mergedUsers = new Map([...confUsers]);
-            globalUsers.forEach((user, uid) => mergedUsers.set(uid, user));
+            globalUsers.forEach((user, uid) => {
+                mergedUsers.set(uid, user);
+            });
 
             setUsers(Array.from(mergedUsers.values()));
         } catch (e) {
             console.error("Failed to fetch context data:", e);
         }
-    };
+    }, [selectedConferenceId]);
 
-    const loadSubmissionsForConference = async (confId: string) => {
-        setLoading(true);
-        try {
-            const { fetchAllSubmissions } = useAbstracts(confId);
-            const data = await fetchAllSubmissions();
-            setSubmissions(data);
-        } catch (e) {
-            console.error("[AbstractManager] Load error:", e);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const loadSubmissions = async () => {
+    const loadSubmissions = useCallback(async () => {
         setLoading(true);
         const data = await fetchAllSubmissions();
         console.log("[AbstractManager] Fetched submissions:", data.length);
         setSubmissions(data);
         setLoading(false);
-    };
+    }, [fetchAllSubmissions]);
+
+    /* eslint-disable react-hooks/exhaustive-deps */
+    useEffect(() => {
+        // Prevent multiple executions for the same conference
+        if (selectedConferenceId === prevConferenceIdRef.current) {
+            console.log('[AbstractManager] Skipping - same conference ID');
+            return;
+        }
+
+        // [Step 405] Debug conference selection
+        console.log("[AbstractManager] Conference ID:", selectedConferenceId);
+        if (selectedConferenceId) {
+            prevConferenceIdRef.current = selectedConferenceId;
+            void loadSubmissions();
+            fetchContextData();
+        } else {
+            // [Debug] Auto-select first available for testing
+            console.log("[AbstractManager] No conference selected, waiting for conference selection");
+        }
+
+        // Fetch Societies for Excel Export
+        const fetchSocieties = async () => {
+            try {
+                const snap = await getDocs(collection(db, 'societies'));
+                setSocieties(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            } catch (e) {
+                console.error("Failed to fetch societies:", e);
+            }
+        };
+        fetchSocieties();
+    }, [selectedConferenceId]); // Intentionally omit loadSubmissions and fetchContextData to prevent infinite loop
+    /* eslint-enable react-hooks/exhaustive-deps */
 
     const handleJudgeClick = (sub: Submission, action: 'accepted_oral' | 'accepted_poster' | 'rejected') => {
         setSelectedSub(sub);
@@ -273,10 +271,10 @@ export default function AbstractManagerPage() {
                 '저자': sub.authors?.map(a => `${a.name}${a.isPresenter ? '(발표자)' : ''}`).join(', ') || '',
                 '발표자 이메일': sub.authors?.find(a => a.isPresenter)?.email || '',
                 '소속': sub.authors?.find(a => a.isPresenter)?.affiliation || '',
-                '획득 점수': (sub as any).score || (sub as any).reviewerScore || '',
+                '획득 점수': (sub as Submission & { score?: number; reviewerScore?: number }).score || (sub as Submission & { score?: number; reviewerScore?: number }).reviewerScore || '',
                 '상태': sub.reviewStatus || 'submitted',
                 '심사의견': sub.reviewerComment || '',
-                '제출일': sub.submittedAt ? new Date((sub.submittedAt as any).seconds * 1000).toLocaleString() : '',
+                '제출일': sub.submittedAt ? new Date(sub.submittedAt.seconds * 1000).toLocaleString() : '',
                 '파일링크': sub.fileUrl || ''
             };
         });
@@ -453,8 +451,9 @@ export default function AbstractManagerPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">심사 의견 (선택사항)</label>
+                            <label htmlFor="reviewer-comment" className="text-sm font-medium">심사 의견 (선택사항)</label>
                             <Textarea
+                                id="reviewer-comment"
                                 value={comment}
                                 onChange={(e) => setComment(e.target.value)}
                                 placeholder="심사 의견을 입력하세요..."

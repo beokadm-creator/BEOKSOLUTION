@@ -2,28 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { useConference } from '../hooks/useConference';
 import { useAbstracts } from '../hooks/useAbstracts';
 import { useAuth } from '../hooks/useAuth';
-import { useNonMemberAuth } from '../hooks/useNonMemberAuth';
 import toast from 'react-hot-toast';
-import { Loader2, FileText, UploadCloud, Plus, Trash2, CheckCircle2, ChevronRight, AlertCircle, Lock, ChevronLeft, Calendar, UserPlus, MessageSquare, X, ArrowRight } from 'lucide-react';
+import { Loader2, FileText, UploadCloud, Plus, Trash2, CheckCircle2, AlertCircle, Lock, ChevronLeft, Calendar, UserPlus, MessageSquare, X, ArrowRight } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import EmptyState from '../components/common/EmptyState';
-import { Button } from '../components/ui/button';
-import { EregiButton, EregiInput, EregiCard } from '../components/eregi/EregiForm';
+import { EregiButton, EregiInput } from '../components/eregi/EregiForm';
 import { Badge } from '../components/ui/badge';
 import { cn } from '../lib/utils';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const AbstractSubmissionPage: React.FC = () => {
     const { id: confId, slug, info: conferenceInfo } = useConference();
     const { auth } = useAuth(confId || '');
-    const { nonMember, loading: nonMemberLoading } = useNonMemberAuth(confId);
 
-    // [FIX] Priority: Use non-member registration ID over anonymous user ID
-    // Anonymous users don't have name/email/phone/org data, which causes display issues
-    // Non-member registrations should use registrationId as the submitter ID
-    const submitterId = nonMember?.registrationId || auth.user?.id;
+    // All users are members - Firebase Auth account required for registration
+    const submitterId = auth.user?.id;
 
     // Deadline checks
     const now = new Date();
@@ -32,11 +26,9 @@ const AbstractSubmissionPage: React.FC = () => {
     const isSubmissionOpen = submissionDeadline ? now <= submissionDeadline : true;
     const isEditOpen = editDeadline ? now <= editDeadline : true;
 
-    // [Fix] Pass both IDs to support OR query in hook
     const { submitAbstract, uploading, error, mySubmissions, deleteSubmission } = useAbstracts(
         confId || undefined,
-        auth.user?.id,
-        nonMember?.registrationId
+        auth.user?.id
     );
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -53,45 +45,33 @@ const AbstractSubmissionPage: React.FC = () => {
                 id: auth.user.id,
                 uid: auth.user.uid,
                 name: auth.user.name,
-                email: auth.user.email,
-                displayName: (auth.user as any).displayName
+                email: auth.user.email
             });
         }
-        if (nonMember) {
-            console.log('[AbstractSubmissionPage] Non-member info:', {
-                registrationId: nonMember.registrationId,
-                email: nonMember.email,
-                name: nonMember.name
-            });
-        }
-    }, [auth.user, nonMember]);
+    }, [auth.user]);
 
-    // 결제 완료 여부 확인
+    // 결제 완료 여부 확인 - users/{uid}/participations 확인
     useEffect(() => {
         const checkPaymentStatus = async () => {
-            if (!confId) {
+            if (!confId || !auth.user?.id) {
                 setCheckingRegistration(false);
                 return;
             }
 
             try {
-                let isPaid = false;
+                const participationsRef = collection(db, 'users', auth.user.id, 'participations');
+                const q = query(participationsRef, where('conferenceId', '==', confId));
+                const snap = await getDocs(q);
 
-                if (auth.user) {
-                    // 회원: userId로 등록 내역 확인
-                    const regRef = collection(db, `conferences/${confId}/registrations`);
-                    const q = query(regRef, where('userId', '==', auth.user.id), where('status', '==', 'PAID'));
-                    const snap = await getDocs(q);
-                    isPaid = !snap.empty;
-                } else if (nonMember?.registrationId) {
-                    // 비회원: registrationId로 등록 내역 확인
-                    const regDoc = await getDoc(doc(db, `conferences/${confId}/registrations`, nonMember.registrationId));
-                    if (regDoc.exists()) {
-                        const data = regDoc.data();
-                        isPaid = data.status === 'PAID';
-                    }
+                let isPaid = false;
+                if (!snap.empty) {
+                    const docData = snap.docs[0].data();
+                    const paymentStatus = docData?.paymentStatus || docData?.status || 'PENDING';
+                    isPaid = paymentStatus === 'PAID';
+                    console.log('[AbstractSubmissionPage] Registration check:', { confId, paymentStatus, isPaid });
                 }
 
+                console.log('[AbstractSubmissionPage] Final registration status:', { isPaid });
                 setIsRegistered(isPaid);
             } catch (err) {
                 console.error('[AbstractSubmissionPage] 등록 상태 확인 오류:', err);
@@ -102,7 +82,7 @@ const AbstractSubmissionPage: React.FC = () => {
         };
 
         checkPaymentStatus();
-    }, [confId, auth.user, nonMember?.registrationId]);
+    }, [confId, auth.user?.id]);
 
     const [step, setStep] = useState(0); // 0 = History View, 1-3 = Edit Form Steps
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -124,13 +104,13 @@ const AbstractSubmissionPage: React.FC = () => {
         setAuthors([...authors, { name: '', email: '', affiliation: '', isPresenter: false, isFirstAuthor: false }]);
     };
 
-    const handleAuthorChange = (idx: number, field: string, value: any) => {
+    const handleAuthorChange = (idx: number, field: string, value: string | boolean) => {
         const newAuthors = [...authors];
-        (newAuthors[idx] as any)[field] = value;
+        (newAuthors[idx] as Record<string, string | boolean>)[field] = value;
         setAuthors(newAuthors);
     };
 
-    const handleEdit = (sub: any) => {
+    const handleEdit = (sub: { id: string; title?: { ko?: string; en?: string }; field?: string; type?: string; authors?: typeof authors }) => {
         setEditingId(sub.id);
         setTitleKo(sub.title?.ko || '');
         setTitleEn(sub.title?.en || '');
@@ -176,9 +156,9 @@ const AbstractSubmissionPage: React.FC = () => {
         }
     };
 
-    if (auth.loading || nonMemberLoading || checkingRegistration) return <LoadingSpinner />;
+    if (auth.loading || checkingRegistration) return <LoadingSpinner />;
 
-    // Auth Check
+    // Auth Check - All users must be logged in (member only)
     if (!submitterId) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -198,14 +178,7 @@ const AbstractSubmissionPage: React.FC = () => {
                             className="w-full justify-center"
                             onClick={() => navigate(`/${slug}/auth?mode=login&returnUrl=/${slug}/abstracts&lang=${lang}`)}
                         >
-                            {lang === 'ko' ? '로그인 (회원)' : 'Login (Member)'}
-                        </EregiButton>
-                        <EregiButton
-                            variant="secondary"
-                            className="w-full justify-center"
-                            onClick={() => navigate(`/${slug}/check-status?returnUrl=/${slug}/abstracts&lang=${lang}`)}
-                        >
-                            {lang === 'ko' ? '비회원 인증' : 'Non-Member Auth'}
+                            {lang === 'ko' ? '로그인' : 'Login'}
                         </EregiButton>
                     </div>
                 </div>
@@ -278,15 +251,7 @@ const AbstractSubmissionPage: React.FC = () => {
                                     {lang === 'ko' ? '회원' : 'Member'}
                                 </Badge>
                                 <span className="font-bold text-gray-900">{auth.user.name}</span>
-                                <span className="text-gray-50">({auth.user.organization || (lang === 'ko' ? '소속 없음' : 'No affiliation')})</span>
-                            </>
-                        ) : nonMember ? (
-                            <>
-                                <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200 px-2.5 py-0.5 rounded-full">
-                                    {lang === 'ko' ? '비회원' : 'Non-Member'}
-                                </Badge>
-                                <span className="font-bold text-gray-900">{nonMember.name}</span>
-                                <span className="text-gray-500">({nonMember.email})</span>
+                                <span className="text-gray-500">({auth.user.organization || (lang === 'ko' ? '소속 없음' : 'No affiliation')})</span>
                             </>
                         ) : null}
                     </div>
@@ -321,7 +286,7 @@ const AbstractSubmissionPage: React.FC = () => {
                             </EregiButton>
 
                             <EregiButton
-                                onClick={() => window.location.href = nonMember ? `/${slug}/non-member/hub` : '/mypage'}
+                                onClick={() => window.location.href = '/mypage'}
                                 variant="outline"
                                 className="h-14 border-2 border-gray-100 hover:border-gray-300 text-gray-600 font-bold rounded-xl justify-center"
                             >

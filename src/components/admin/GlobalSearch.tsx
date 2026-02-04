@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Search, Building, ShieldCheck, Mail, Phone } from 'lucide-react';
-import { getFirestore, collection, query, where, getDocs, limit, startAt, endAt, orderBy } from 'firebase/firestore';
+import { Search, Building, Phone } from 'lucide-react';
+import { getFirestore, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
@@ -147,7 +147,7 @@ export default function GlobalSearch() {
 
                                         {/* Society Badges */}
                                         <div className="flex flex-wrap gap-2 justify-end max-w-[200px]">
-                                            {user.affiliations && Object.entries(user.affiliations).map(([socId, aff]: [string, any]) => {
+                                            {user.affiliations && Object.entries(user.affiliations).map(([socId, aff]: [string, { verified: boolean; grade?: string; role?: string }]) => {
                                                 if (!aff || !aff.verified) return null;
                                                 return (
                                                     <div key={socId} className="flex flex-col items-center">

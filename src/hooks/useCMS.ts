@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { doc, updateDoc, collection, addDoc, getDocs, deleteDoc, Timestamp, setDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, addDoc, deleteDoc, Timestamp, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { ConferenceInfo, Page, Agenda, Speaker, RegistrationSettings } from '../types/schema';
 
@@ -81,8 +81,9 @@ export const useCMS = (conferenceId: string) => {
             }
             setLoading(false);
             return true;
-        } catch (e: any) {
-            setError(e.message);
+        } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : 'Unknown error';
+            setError(message);
             setLoading(false);
             return false;
         }
@@ -98,8 +99,9 @@ export const useCMS = (conferenceId: string) => {
             }
             setLoading(false);
             return true;
-        } catch (e: any) {
-            setError(e.message);
+        } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : 'Unknown error';
+            setError(message);
             setLoading(false);
             return false;
         }
@@ -111,8 +113,9 @@ export const useCMS = (conferenceId: string) => {
             await deleteDoc(doc(db, `conferences/${conferenceId}/agendas/${id}`));
             setLoading(false);
             return true;
-        } catch (e: any) {
-            setError(e.message);
+        } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : 'Unknown error';
+            setError(message);
             setLoading(false);
             return false;
         }
@@ -124,8 +127,9 @@ export const useCMS = (conferenceId: string) => {
             await deleteDoc(doc(db, `conferences/${conferenceId}/speakers/${id}`));
             setLoading(false);
             return true;
-        } catch (e: any) {
-            setError(e.message);
+        } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : 'Unknown error';
+            setError(message);
             setLoading(false);
             return false;
         }

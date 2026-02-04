@@ -1,6 +1,7 @@
 
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, ReactNode } from 'react';
-import { useVendor, VisitLog } from '../hooks/useVendor';
+import { useVendor } from '../hooks/useVendor';
 
 // Define the shape of the context
 // This should match what useVendor returns + any extra state

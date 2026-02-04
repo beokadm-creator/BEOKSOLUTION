@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCMS } from '../../hooks/useCMS';
 import { Agenda, Speaker } from '../../types/schema';
 import { Timestamp, collection, getDocs, query, where } from 'firebase/firestore';
@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+import { Card, CardContent } from '../../components/ui/card';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ImageUpload from '../../components/ui/ImageUpload';
 import BilingualInput from '../../components/ui/bilingual-input';
@@ -29,43 +29,47 @@ const AgendaManager: React.FC = () => {
     const [speakerForm, setSpeakerForm] = useState<Partial<Speaker>>({});
     const [sessionType, setSessionType] = useState<string>('');
 
-    const fetchAgendas = useCallback(async () => {
+    useEffect(() => {
         if (!confId) return;
-        const agRef = collection(db, `conferences/${confId}/agendas`);
-        const agSnap = await getDocs(agRef);
-        const list = agSnap.docs.map(d => ({ id: d.id, ...d.data() } as Agenda));
-        list.sort((a, b) => a.startTime.seconds - b.startTime.seconds);
-        setAgendas(list);
-    }, [confId]);
-
-    const fetchSpeakers = useCallback(async (agendaId: string) => {
-        if (!confId) return;
-        const spRef = collection(db, `conferences/${confId}/speakers`);
-        const q = query(spRef, where('agendaId', '==', agendaId));
-        const spSnap = await getDocs(q);
-        setSpeakers(spSnap.docs.map(d => ({ id: d.id, ...d.data() } as Speaker)));
+        const fetchAgendas = async () => {
+            const agRef = collection(db, `conferences/${confId}/agendas`);
+            const agSnap = await getDocs(agRef);
+            const list = agSnap.docs.map(d => ({ id: d.id, ...d.data() } as Agenda));
+            list.sort((a, b) => a.startTime.seconds - b.startTime.seconds);
+            setAgendas(list);
+        };
+        fetchAgendas();
     }, [confId]);
 
     useEffect(() => {
-        if (!confId) return;
-        fetchAgendas();
-    }, [confId, fetchAgendas]);
+        const fetchSpeakers = async () => {
+            if (!confId) return;
+            if (selectedAgendaId) {
+                const spRef = collection(db, `conferences/${confId}/speakers`);
+                const q = query(spRef, where('agendaId', '==', selectedAgendaId));
+                const spSnap = await getDocs(q);
+                setSpeakers(spSnap.docs.map(d => ({ id: d.id, ...d.data() } as Speaker)));
+            } else {
+                setSpeakers([]);
+            }
+        };
+        fetchSpeakers();
+    }, [confId, selectedAgendaId]);
 
     useEffect(() => {
         if (selectedAgendaId && confId) {
-            fetchSpeakers(selectedAgendaId);
-            // Pre-fill agenda form
             const selected = agendas.find(a => a.id === selectedAgendaId);
             if (selected) {
+                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setAgendaForm({ ...selected });
+                 
                 setSessionType(selected.sessionType || '');
             }
         } else {
-            setSpeakers([]);
             setAgendaForm({});
             setSessionType('');
         }
-    }, [selectedAgendaId, agendas, confId, fetchSpeakers]);
+    }, [selectedAgendaId, agendas, confId]);
 
     const handleCreateNew = () => {
         setSelectedAgendaId(null);
@@ -81,8 +85,8 @@ const AgendaManager: React.FC = () => {
 
         await saveAgenda({
             ...agendaForm,
-            sessionType // Ensure sessionType is synced
-        } as any, agendaForm.id); // Pass ID to update instead of create
+            sessionType
+        } as Partial<Agenda>, agendaForm.id);
 
         toast.success(agendaForm.id ? "세션 정보가 수정되었습니다." : "새 세션이 생성되었습니다.");
         if (!agendaForm.id) {

@@ -9,8 +9,22 @@ import { db } from '../firebase';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { QrCode, LogOut, Camera, X, CheckCircle, AlertTriangle, RefreshCw, ShieldCheck } from 'lucide-react';
-import { Html5QrcodeScanner, Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
 import { APP_VERSION } from '../constants/defaults';
+
+interface UserAffiliation {
+    verified?: boolean;
+    expiry?: string;
+    expiryDate?: string;
+    licenseNumber?: string;
+}
+
+interface ScanResultUser {
+    name: string;
+    affiliation?: string;
+    org?: string;
+    affiliations?: Record<string, UserAffiliation> | UserAffiliation[];
+}
 
 export default function VendorLayout() {
   const { vid } = useParams<{ vid: string }>();
@@ -19,7 +33,6 @@ export default function VendorLayout() {
   
   // 0. Resolve Vendor ID (Handle Slug vs ID)
   const [resolvedVid, setResolvedVid] = useState<string | null>(null);
-  const [isResolving, setIsResolving] = useState(true);
 
   useEffect(() => {
     if (!vid) return;
@@ -112,11 +125,11 @@ export default function VendorLayout() {
                           setIsScanning(false);
                       }).catch(err => console.error(err));
                   },
-                  (errorMessage) => {
+                  () => {
                       // Ignore errors for now (scanning in progress)
                   }
-              ).catch(err => {
-                  console.error("Error starting scanner", err);
+              ).catch(() => {
+                  console.error("Error starting scanner");
                   setErrorState("Camera Access Failed");
                   setIsScanning(false);
               });
@@ -279,9 +292,25 @@ export default function VendorLayout() {
                      </DialogTitle>
                      <DialogDescription className="text-zinc-400 pt-2">
                          <div className="bg-zinc-950 p-4 rounded-lg border border-zinc-800 mb-4">
-                            <p className="font-semibold text-white text-lg mb-1">{scanResult?.user.name}</p>
-                            <p className="text-sm">{(scanResult?.user as any).affiliations?.[0] || (scanResult?.user as any).affiliation || (scanResult?.user as any).org}</p>
-                        </div>
+                           <p className="font-semibold text-white text-lg mb-1">{scanResult?.user.name}</p>
+                           <p className="text-sm">{(scanResult?.user as ScanResultUser | undefined)?.affiliations ? (() => {
+                               const user = scanResult?.user as ScanResultUser | undefined;
+                               if (!user) return '-';
+                               if (Array.isArray(user.affiliations) && user.affiliations.length > 0) {
+                                   return Object.values(user.affiliations[0])[0] as string;
+                               }
+                               if (typeof user.affiliations === 'object' && user.affiliations !== null) {
+                                   const firstKey = Object.keys(user.affiliations)[0];
+                                   if (firstKey) {
+                                       const affiliation = user.affiliations[firstKey];
+                                       if (affiliation && typeof affiliation === 'object') {
+                                           return Object.values(affiliation)[0] as string;
+                                       }
+                                   }
+                               }
+                               return user.affiliation || user.org || '-';
+                           })() : (scanResult?.user as ScanResultUser | undefined)?.affiliation || (scanResult?.user as ScanResultUser | undefined)?.org || '-'}</p>
+                       </div>
                          본 부스({vendor?.name})에 귀하의 명함 정보(성함, 소속, 연락처)를 제공하시겠습니까?
                      </DialogDescription>
                  </DialogHeader>

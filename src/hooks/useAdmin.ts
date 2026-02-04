@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { doc, updateDoc, collection, getDocs, query, where, Timestamp, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { BadgeElement, Registration } from '../types/schema';
 
@@ -57,8 +57,9 @@ export const useAdmin = (conferenceId: string) => {
             });
 
             setLoading(false);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            setError(message);
             setLoading(false);
         }
     };

@@ -75,7 +75,7 @@ export default function ImageUpload({ path, onUploadComplete, previewUrl, label 
                         setUploading(false);
                         setPreview(downloadURL); // Switch to remote URL
                         // toast.success("Image uploaded successfully! ✅"); // Optional: Success Alert
-                    } catch (urlError: any) {
+                    } catch (urlError: unknown) {
                          console.error("Get URL failed", urlError);
                          setUploading(false);
                          toast.error(`❌ Failed to get Download URL:\n${urlError.message}`);
@@ -83,10 +83,11 @@ export default function ImageUpload({ path, onUploadComplete, previewUrl, label 
                 }
             );
 
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error("Upload setup failed", e);
             setUploading(false);
-            toast.error(`❌ Upload Setup Error:\n${e.message}`);
+            const message = e instanceof Error ? e.message : 'Unknown error';
+            toast.error(`❌ Upload Setup Error:\n${message}`);
         }
     };
 

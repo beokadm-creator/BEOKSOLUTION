@@ -2,6 +2,11 @@
 @import "./styles/eregi-components.css";
 @import "./styles/print.css";
 
+/* Smooth scrolling for anchor links */
+html {
+  scroll-behavior: smooth;
+}
+
 @theme {
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));

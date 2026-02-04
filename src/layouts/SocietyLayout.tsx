@@ -2,49 +2,66 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, useParams, Link, useLocation } from 'react-router-dom';
 import { SocietyProvider } from '../contexts/SocietyContext';
-import { useAuth } from '../hooks/useAuth';
 import { useSubdomain } from '../hooks/useSubdomain';
 import { getSocietyAdminPath } from '../utils/pathHelper';
 import { DEFAULT_SOCIETY_FEATURES, APP_VERSION } from '../constants/defaults';
 import { doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { Button } from '../components/ui/button';
-import { LayoutDashboard, Settings, Users, Mail, ShieldCheck, LogOut, Building2, Cog } from 'lucide-react';
+import { LayoutDashboard, Settings, Users, Mail, ShieldCheck, LogOut, Building2, CreditCard, Globe } from 'lucide-react';
 import { cn } from '../lib/utils';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
 export default function SocietyLayout() {
-  const { sid: paramSid } = useParams<{ sid: string }>();
+  const { sid: paramSid, societyId: paramSocietyId } = useParams<{ sid: string; societyId: string }>();
   const { subdomain } = useSubdomain();
-  const sid = subdomain || paramSid;
+  
+  // Priority: subdomain > URL param (kadd.eregi.co.kr)
+  const sid = subdomain || paramSocietyId || paramSid;
+  
+  // Stabilize sid: only update when it changes (not on every render)
+  const [stableSid, setStableSid] = useState<string>(subdomain || paramSocietyId || paramSid || '');
+  
+  useEffect(() => {
+    if (sid && sid !== stableSid) {
+      setStableSid(sid);
+    }
+  }, [sid, stableSid]);
 
-  const [society, setSociety] = useState<any>(null);
+  const [society, setSociety] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const location = useLocation();
   
   // Fetch Society Data
   useEffect(() => {
-    if (!sid) {
+    if (!stableSid) {
+        console.error('[SocietyLayout] No sid provided');
         setLoading(false);
         return;
     }
+
+    console.log('[SocietyLayout] Fetching society with sid:', stableSid);
+
     const fetchSociety = async () => {
         try {
-            const docRef = doc(db, 'societies', sid);
+            const docRef = doc(db, 'societies', stableSid);
             const docSnap = await getDoc(docRef);
+            console.log('[SocietyLayout] Doc exists:', docSnap.exists());
             if (docSnap.exists()) {
-                setSociety({ id: docSnap.id, ...docSnap.data() });
+                const data = docSnap.data();
+                console.log('[SocietyLayout] Society data:', data);
+                setSociety({ id: docSnap.id, ...data });
             } else {
-                console.error('Society not found');
+                console.error('[SocietyLayout] Society not found for sid:', stableSid);
             }
         } catch (e) {
-            console.error(e);
+            console.error('[SocietyLayout] Error fetching society:', e);
         } finally {
             setLoading(false);
         }
     };
     fetchSociety();
-  }, [sid]);
+  }, [stableSid]);
 
   // Merge Features (Deep Merge Simulation)
   const features = { ...DEFAULT_SOCIETY_FEATURES, ...(society?.features || {}) };
@@ -57,13 +74,16 @@ export default function SocietyLayout() {
   }, []);
 
   if (loading) return <LoadingSpinner />;
+  if (!sid) return <div>잠시만 기다려주세요...</div>;
   if (!society) return <div>Society Not Found</div>;
 
   const navItems = [
     { href: getSocietyAdminPath(sid!, '', subdomain), label: '대시보드', icon: LayoutDashboard, key: 'dashboard' },
+    { href: getSocietyAdminPath(sid!, 'content', subdomain), label: '콘텐츠 관리', icon: Globe, key: 'content' },
     { href: getSocietyAdminPath(sid!, 'infra', subdomain), label: '인프라 설정', icon: Settings, key: 'infra' },
     { href: getSocietyAdminPath(sid!, 'identity', subdomain), label: '아이덴티티', icon: Building2, key: 'identity' },
     { href: getSocietyAdminPath(sid!, 'members', subdomain), label: '회원 명단', icon: ShieldCheck, key: 'members' },
+    { href: getSocietyAdminPath(sid!, 'membership-fees', subdomain), label: '회비 설정', icon: CreditCard, key: 'membership-fees' },
     { href: getSocietyAdminPath(sid!, 'templates', subdomain), label: '알림톡 템플릿', icon: Mail, key: 'templates' },
     { href: getSocietyAdminPath(sid!, 'users', subdomain), label: '관리자 계정', icon: Users, key: 'users' },
   ];

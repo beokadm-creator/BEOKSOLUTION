@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, LogOut, User as UserIcon } from 'lucide-react';
+import { LogOut, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getAuth } from 'firebase/auth';
 
@@ -35,11 +35,11 @@ const EregiNavigation: React.FC<EregiNavigationProps> = ({
     const { auth: { user: authUser } } = useAuth('');
 
     // Determine effective user
-    const displayUser = customUser || (authUser ? {
+    const displayUser = useMemo(() => customUser || (authUser ? {
         name: authUser.name || authUser.email?.split('@')[0] || 'User',
         email: authUser.email || '',
         label: 'Verified User'
-    } : null);
+    } : null), [customUser, authUser]);
 
     const handleLogout = () => {
         if (onLogout) {
@@ -55,6 +55,7 @@ const EregiNavigation: React.FC<EregiNavigationProps> = ({
         console.log('[EregiNavigation] authUser:', {
             name: authUser?.name,
             email: authUser?.email,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             displayName: (authUser as any)?.displayName
         });
     }, [displayUser, authUser]);

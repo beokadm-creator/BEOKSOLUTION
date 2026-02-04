@@ -1,10 +1,12 @@
 
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, ReactNode } from 'react';
 import { DEFAULT_SOCIETY_FEATURES } from '../constants/defaults';
+import type { Society } from '../types/schema';
 
 interface SocietyContextType {
   societyId: string;
-  society: any; // Replace with proper Society type
+  society: Society | null;
   features: typeof DEFAULT_SOCIETY_FEATURES;
 }
 

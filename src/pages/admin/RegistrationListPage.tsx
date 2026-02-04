@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useExcel } from '../../hooks/useExcel';
+import { useRegistrationsPagination } from '../../hooks/useRegistrationsPagination';
 import toast from 'react-hot-toast';
-import { collection, query, where, getDocs, doc, updateDoc, Timestamp, limit, addDoc } from 'firebase/firestore';
+import { query, collection, getDocs, limit, doc, updateDoc, Timestamp, addDoc, where } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { Loader2, Printer } from 'lucide-react';
+import { Loader2, Printer, ChevronLeft, ChevronRight } from 'lucide-react';
 import { EregiButton } from '../../components/eregi/EregiForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import PrintHandler from '../../components/print/PrintHandler';
@@ -12,10 +13,12 @@ import BadgeTemplate from '../../components/print/BadgeTemplate';
 import { kadd_2026 } from '../../data/conferences/kadd_2026.backup';
 import { useRef } from 'react';
 import { handleDeleteRegistrationWithCleanup } from '../../utils/registrationDeleteHandler'; // Keep cascade delete handler
+import { Button } from '../../components/ui/button';
 
 // Define the root-level registration type based on PaymentSuccessHandler
 interface RootRegistration {
     id: string; // orderId
+    orderId?: string; // Add optional orderId
     originalRegId: string;
     slug: string;
     societyId: string;
@@ -64,10 +67,6 @@ const RegistrationListPage: React.FC = () => {
 
     const { exportToExcel, processing: exporting } = useExcel();
 
-    const [registrations, setRegistrations] = useState<RootRegistration[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
     // Filters
     // [FIX-20250124-01] Default filter to SUCCESSFUL (PAID) to avoid showing incomplete registrations
     const [filterStatus, setFilterStatus] = useState('SUCCESSFUL');
@@ -82,6 +81,22 @@ const RegistrationListPage: React.FC = () => {
     const [selectedReg, setSelectedReg] = useState<RootRegistration | null>(null);
     const [showPrintModal, setShowPrintModal] = useState(false);
     const badgeRef = useRef<HTMLDivElement>(null);
+
+    // Use pagination hook (follows project convention: use hooks, not direct Firestore)
+    const {
+        registrations,
+        loading,
+        error,
+        currentPage,
+        itemsPerPage,
+        setCurrentPage,
+        setItemsPerPage,
+        hasMore,
+        refresh: refreshPagination
+    } = useRegistrationsPagination({
+        conferenceId,
+        itemsPerPage: 50
+    });
 
     // Auto-Resolve Slug if missing
     useEffect(() => {
@@ -116,69 +131,17 @@ const RegistrationListPage: React.FC = () => {
                     setConferenceId(foundId);
                     setStatus(`Auto-Resolved: ${found}`);
                 } else {
-                    setError("No active conferences found in system.");
+                    console.error("No active conferences found in system.");
                     setStatus("Resolution Failed: No conferences found.");
                 }
             } catch (e: unknown) {
-                setError("Failed to auto-resolve conference.");
+                console.error("Failed to auto-resolve conference:", e);
                 setStatus(`Resolution Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
             }
         };
 
         resolveSlug();
     }, [slug]);
-
-    // Fetch Data from Root 'registrations' collection
-    useEffect(() => {
-        const loadData = async () => {
-            if (!activeSlug || !conferenceId) {
-                // Wait for resolution
-                return;
-            }
-
-            setLoading(true);
-            setError(null);
-
-            try {
-                // Corrected Path: conferences/{conferenceId}/registrations
-                const regRef = collection(db, 'conferences', conferenceId, 'registrations');
-                // No need to filter by slug if we are in the subcollection, but safety check doesn't hurt.
-                // Actually, subcollection 'registrations' might not have 'slug' field on every doc if it's implicit.
-                // Let's just fetch all from the subcollection.
-
-                const snap = await getDocs(regRef);
-                const data = snap.docs.map(d => {
-                    const docData = d.data();
-                    const flattened = {
-                        id: d.id,
-                        ...docData
-                    } as RootRegistration;
-
-                    // Flatten userInfo fields to top level for display
-                    if (docData.userInfo) {
-                        flattened.userName = docData.userInfo.name || docData.userName;
-                        flattened.userEmail = docData.userInfo.email || docData.userEmail;
-                        flattened.userPhone = docData.userInfo.phone || docData.userPhone;
-                        flattened.affiliation = docData.userInfo.affiliation || docData.affiliation;
-                        flattened.licenseNumber = docData.userInfo.licenseNumber || docData.licenseNumber;
-                    }
-
-                    return flattened;
-                });
-
-                // Sort by date desc (client side)
-                data.sort((a, b) => b.createdAt.seconds - a.createdAt.seconds);
-
-                setRegistrations(data);
-            } catch (err: unknown) {
-                setError((err instanceof Error ? err.message : 'Unknown error') + " (Check Console for Link)");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadData();
-    }, [activeSlug, conferenceId]);
 
     // Action: Issue Badge Manual
     const handleIssueBadge = async (e: React.MouseEvent, reg: RootRegistration) => {
@@ -200,8 +163,8 @@ const RegistrationListPage: React.FC = () => {
                 type: 'BADGE_ISSUED', timestamp: Timestamp.now(), method: 'MANUAL_ADMIN_LIST'
             });
             toast.success("명찰 발급 처리 완료");
-            // Refresh local state ideally, or rely on next fetch
-            setRegistrations(prev => prev.map(r => r.id === reg.id ? { ...r, badgeIssued: true } : r));
+            // Refresh pagination to show updated badge status
+            refreshPagination();
         } catch (e: unknown) {
             console.error("Badge issue failed:", e);
             toast.error("처리 실패");
@@ -232,7 +195,8 @@ const RegistrationListPage: React.FC = () => {
                 return;
             }
 
-            await handleDeleteRegistrationWithCleanup(reg, conferenceId, setRegistrations);
+            await handleDeleteRegistrationWithCleanup(reg, conferenceId, refreshPagination);
+
 
         } catch (e: unknown) {
             toast.error("삭제 중 오류가 발생했습니다: " + (e instanceof Error ? e.message : 'Unknown error'));
@@ -240,15 +204,46 @@ const RegistrationListPage: React.FC = () => {
     };
 
 const filteredData = useMemo(() => {
-        return registrations.filter(r => {
+        // First, group registrations by userId to handle duplicates
+        const userRegistrations = new Map<string, RootRegistration[]>();
+        registrations.forEach(r => {
+            if (r.userId) {
+                if (!userRegistrations.has(r.userId)) {
+                    userRegistrations.set(r.userId, []);
+                }
+                userRegistrations.get(r.userId)!.push(r);
+            }
+        });
+
+        // For each user, select the best registration (priority: PAID > others)
+        const deduplicatedRegs: RootRegistration[] = [];
+        userRegistrations.forEach((regs) => {
+            // Sort by status priority: PAID first, then by createdAt desc
+            const sorted = regs.sort((a, b) => {
+                if (a.status === 'PAID' && b.status !== 'PAID') return -1;
+                if (a.status !== 'PAID' && b.status === 'PAID') return 1;
+                // If same status, newer first
+                const aTime = a.createdAt?.toMillis() || 0;
+                const bTime = b.createdAt?.toMillis() || 0;
+                return bTime - aTime;
+            });
+            // Only include if status is one of the allowed statuses
+            const best = sorted[0];
+            if (['PAID', 'REFUNDED', 'CANCELED', 'REFUND_REQUESTED'].includes(best.status)) {
+                deduplicatedRegs.push(best);
+            }
+        });
+
+        // Then filter by status and name
+        return deduplicatedRegs.filter(r => {
             try {
                 let matchesStatus = false;
                 if (filterStatus === 'ALL') {
                     matchesStatus = true;
                 } else if (filterStatus === 'SUCCESSFUL') {
                     matchesStatus = r.status === 'PAID';
-                } else if (filterStatus === 'FAILED') {
-                    matchesStatus = ['PENDING', 'CANCELED', 'REFUND_REQUESTED'].includes(r.status || '');
+                } else if (filterStatus === 'CANCELED') {
+                    matchesStatus = r.status === 'CANCELED' || r.status === 'REFUNDED' || r.status === 'REFUND_REQUESTED';
                 } else {
                     matchesStatus = r.status === filterStatus;
                 }
@@ -317,11 +312,7 @@ const filteredData = useMemo(() => {
                     <option value="ALL">전체 상태 (All Status)</option>
                     <option value="SUCCESSFUL">성공 접수 (Successful)</option>
                     <option value="PAID">결제완료 (PAID)</option>
-                    <option value="FAILED">실패 접수 (Failed)</option>
-                    <option value="PENDING">대기 (PENDING)</option>
-                    <option value="REFUNDED">환불완료 (REFUNDED)</option>
-                    <option value="CANCELED">취소됨 (CANCELED)</option>
-                    <option value="REFUND_REQUESTED">환불요청 (REFUND_REQUESTED)</option>
+                    <option value="CANCELED">취소/환불 (Canceled)</option>
                 </select>
                 <div className="ml-auto flex gap-2">
                     <EregiButton
@@ -363,7 +354,7 @@ const filteredData = useMemo(() => {
                                 className="hover:bg-slate-50 cursor-pointer transition-colors"
                                 onClick={() => navigate(`/admin/conf/${conferenceId}/registrations/${r.id}`)}
                             >
-                                <td className="p-4 font-mono text-xs text-gray-400">{r.id}</td>
+                                <td className="p-4 font-mono text-xs text-gray-400">{r.orderId || r.id}</td>
                                 <td className="p-4 font-medium text-gray-900">{r.userName}</td>
                                 <td className="p-4 text-sm text-gray-500">{r.userEmail || '-'}</td>
                                 <td className="p-4 text-sm text-gray-500">{r.userPhone || '-'}</td>
@@ -427,6 +418,80 @@ const filteredData = useMemo(() => {
                 </table>
             </div>
 
+            {/* Pagination Controls */}
+            {!loading && registrations.length > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-3 bg-white border-t">
+                    <div className="text-sm text-gray-600">
+                        Showing {(currentPage - 1) * itemsPerPage + 1} to {(currentPage - 1) * itemsPerPage + registrations.length} entries (Page {currentPage}{!hasMore ? ' - Last Page' : ''})
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                        {/* Page Size Selector */}
+                        <select
+                            value={itemsPerPage}
+                            onChange={(e) => {
+                                setItemsPerPage(Number(e.target.value));
+                            }}
+                            className="px-3 py-1 border border-gray-300 rounded text-sm"
+                        >
+                            <option value={25}>25 per page</option>
+                            <option value={50}>50 per page</option>
+                            <option value={100}>100 per page</option>
+                        </select>
+
+                        {/* Previous Button */}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                setCurrentPage(1);
+                            }}
+                            disabled={currentPage === 1}
+                            className="px-3 py-1"
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                            First
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                if (currentPage > 1) {
+                                    setCurrentPage(currentPage - 1);
+                                }
+                            }}
+                            disabled={currentPage === 1}
+                            className="px-3 py-1"
+                        >
+                            <ChevronLeft className="w-4 h-4 mr-1" />
+                            Previous
+                        </Button>
+
+                        {/* Page Info */}
+                        <span className="text-sm font-medium px-3">
+                            Page {currentPage}
+                        </span>
+
+                        {/* Next Button */}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                if (hasMore) {
+                                    setCurrentPage(currentPage + 1);
+                                }
+                            }}
+                            disabled={!hasMore}
+                            className="px-3 py-1"
+                        >
+                            Next
+                            <ChevronRight className="w-4 h-4 ml-1" />
+                        </Button>
+                    </div>
+                </div>
+            )}
+ 
             {/* Print Preview Modal */}
             <Dialog open={showPrintModal} onOpenChange={setShowPrintModal}>
                 <DialogContent className="max-w-3xl">

@@ -1,56 +1,35 @@
-import * as XLSX from 'xlsx';
-import { useState, useEffect } from 'react';
-import { collection, addDoc, Timestamp, doc, updateDoc, arrayUnion, query, where, getDocs, orderBy, or } from 'firebase/firestore';
+import { useState, useEffect, useCallback } from 'react';
+import { collection, addDoc, Timestamp, doc, updateDoc, arrayUnion, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { Submission } from '../types/schema';
 import toast from 'react-hot-toast';
 
-export const useAbstracts = (conferenceId?: string, userId?: string, registrationId?: string) => {
+export const useAbstracts = (conferenceId?: string, userId?: string) => {
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [mySubmissions, setMySubmissions] = useState<Submission[]>([]);
     const [loadingSubs, setLoadingSubs] = useState(false);
 
-    const fetchMySubmissions = async () => {
-        if (!userId && !registrationId) return;
-        if (!conferenceId) return; // Early return if conferenceId is missing
+    const fetchMySubmissions = useCallback(async () => {
+        if (!userId) return;
+        if (!conferenceId) return;
         setLoadingSubs(true);
         try {
             const ref = collection(db, `conferences/${conferenceId}/submissions`);
-            
-            // Query with fallback logic: try userId first, then registrationId
-            let snap;
-            if (userId && registrationId) {
-                // If both exist, query both and merge results
-                const q1 = query(ref, where('userId', '==', userId));
-                const q2 = query(ref, where('registrationId', '==', registrationId));
-                const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
-                
-                // Merge results and remove duplicates
-                const allDocs = new Map();
-                snap1.docs.forEach(d => allDocs.set(d.id, d));
-                snap2.docs.forEach(d => allDocs.set(d.id, d));
-                snap = { docs: Array.from(allDocs.values()) };
-            } else if (userId) {
-                const q = query(ref, where('userId', '==', userId));
-                snap = await getDocs(q);
-            } else {
-                const q = query(ref, where('registrationId', '==', registrationId));
-                snap = await getDocs(q);
-            }
-            
+            const q = query(ref, where('userId', '==', userId));
+            const snap = await getDocs(q);
             setMySubmissions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Submission)));
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error(e);
         } finally {
             setLoadingSubs(false);
         }
-    };
+    }, [conferenceId, userId]);
 
     useEffect(() => {
-        if (userId || registrationId) fetchMySubmissions();
-    }, [conferenceId, userId, registrationId]);
+        if (userId) fetchMySubmissions();
+    }, [fetchMySubmissions, userId]);
 
     const submitAbstract = async (
         data: {
@@ -62,23 +41,14 @@ export const useAbstracts = (conferenceId?: string, userId?: string, registratio
         file: File | null,
         submissionId?: string
     ) => {
-        if (!userId && !registrationId) {
+        if (!userId) {
             setError('User not logged in');
             return false;
         }
-        
+
         if (!conferenceId) {
             setError('Conference ID is missing');
             return false;
-        }
-        
-        // [Task 2] Priority Logic & Mandatory submitterId
-        const submitterId = userId || registrationId;
-        const isMemberUser = !!userId;
-
-        if (!submitterId) {
-             setError('Submitter ID is missing');
-             return false;
         }
 
         setUploading(true);
@@ -89,8 +59,8 @@ export const useAbstracts = (conferenceId?: string, userId?: string, registratio
 
             // 1. Upload File (If provided)
             if (file) {
-                // [Fix] Path: conferences/{confId}/abstracts/{submitterId}/{fileName}
-                const storageRef = ref(storage, `conferences/${conferenceId}/abstracts/${submitterId}/${file.name}`);
+                // Path: conferences/{confId}/abstracts/{userId}/{fileName}
+                const storageRef = ref(storage, `conferences/${conferenceId}/abstracts/${userId}/${file.name}`);
                 const snapshot = await uploadBytes(storageRef, file);
                 fileUrl = await getDownloadURL(snapshot.ref);
             }
@@ -98,37 +68,50 @@ export const useAbstracts = (conferenceId?: string, userId?: string, registratio
             if (submissionId) {
                 // Update existing
                 const subRef = doc(db, `conferences/${conferenceId}/submissions/${submissionId}`);
-                
-                const updateData: any = {
+
+                const historyEntry = {
+                    status: 'UPDATED' as const,
+                    timestamp: timestamp,
+                    comment: 'User updated submission' as const
+                };
+
+                const updateData: {
+                    title: { ko: string; en: string };
+                    field: string;
+                    type: string;
+                    authors: { name: string; email: string; affiliation: string; isPresenter: boolean; isFirstAuthor: boolean }[];
+                    updatedAt: Timestamp;
+                    status: string;
+                    history: typeof historyEntry[];
+                    fileUrl?: string;
+                } = {
                     ...data,
                     updatedAt: timestamp,
-                    status: 'submitted', // Reset status on update? Or keep? Prompt says 'submitted'.
-                    history: arrayUnion({
-                        status: 'UPDATED',
-                        timestamp: timestamp,
-                        comment: 'User updated submission'
-                    })
+                    status: 'submitted',
+                    history: [historyEntry]
                 };
-                
+
                 if (fileUrl) {
                     updateData.fileUrl = fileUrl;
                 }
 
-                await updateDoc(subRef, updateData);
+                await updateDoc(subRef, {
+                    ...updateData,
+                    history: arrayUnion(historyEntry)
+                });
             } else {
                 if (!fileUrl) throw new Error("File is required for new submission");
 
                 // Create new
                 const subRef = collection(db, `conferences/${conferenceId}/submissions`);
                 await addDoc(subRef, {
-                    userId: userId || null,
-                    registrationId: registrationId || null,
-                    submitterId, // Shadow UID for unified querying
-                    isMemberUser, // [Task 3] Query Efficiency
+                    userId,
+                    submitterId: userId,
+                    isMemberUser: true,
                     ...data,
                     fileUrl,
                     status: 'submitted',
-                    submittedAt: timestamp, // [New]
+                    submittedAt: timestamp,
                     history: [{
                         status: 'submitted',
                         timestamp: timestamp,
@@ -142,9 +125,10 @@ export const useAbstracts = (conferenceId?: string, userId?: string, registratio
             setUploading(false);
             fetchMySubmissions(); // Refresh list
             return true;
-        } catch (err: any) {
-            console.error(err);
-            setError(err.message);
+        } catch (err: unknown) {
+            const error = err instanceof Error ? err : new Error(String(err));
+            console.error(error);
+            setError(error.message);
             setUploading(false);
             return false;
         }
@@ -157,7 +141,7 @@ export const useAbstracts = (conferenceId?: string, userId?: string, registratio
             const q = query(ref, orderBy('submittedAt', 'desc'));
             const snap = await getDocs(q);
             return snap.docs.map(d => ({ id: d.id, ...d.data() } as Submission));
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error(e);
             return [];
         }
@@ -183,16 +167,16 @@ export const useAbstracts = (conferenceId?: string, userId?: string, registratio
                 })
             });
             return true;
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error(e);
-            setError(e.message);
+            setError(e instanceof Error ? e.message : 'Unknown error');
             return false;
         }
     };
 
     const deleteSubmission = async (submissionId: string) => {
-        if (!userId && !registrationId) return false;
-        if (!conferenceId) return false; // Early return if conferenceId is missing
+        if (!userId) return false;
+        if (!conferenceId) return false;
         if (!confirm('Are you sure you want to cancel this submission?')) return false;
 
         try {
@@ -218,9 +202,9 @@ export const useAbstracts = (conferenceId?: string, userId?: string, registratio
             
             setMySubmissions(prev => prev.filter(s => s.id !== submissionId));
             return true;
-        } catch (e: any) {
+        } catch (e) {
             console.error(e);
-            setError(e.message);
+            setError(e instanceof Error ? e.message : 'Unknown error');
             return false;
         }
     };
@@ -236,7 +220,7 @@ export const useAbstracts = (conferenceId?: string, userId?: string, registratio
                 try {
                     const fileRef = ref(storage, submission.fileUrl);
                     await deleteObject(fileRef);
-                } catch (error: any) {
+                } catch (error: unknown) {
                     console.warn("File delete failed (might be already missing):", error);
                     // Fallback: Proceed to delete document even if file delete fails
                     // This ensures "Clean Delete" attempt but doesn't block doc removal on ghost files
@@ -248,9 +232,9 @@ export const useAbstracts = (conferenceId?: string, userId?: string, registratio
             await deleteDoc(doc(db, `conferences/${conferenceId}/submissions/${submission.id}`));
             
             return true;
-        } catch (e: any) {
+        } catch (e) {
             console.error("Admin delete failed:", e);
-            setError(e.message);
+            setError(e instanceof Error ? e.message : 'Unknown error');
             return false;
         }
     };

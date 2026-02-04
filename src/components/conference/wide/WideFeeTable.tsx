@@ -27,7 +27,6 @@ interface WideFeeTableProps {
 
 export const WideFeeTable: React.FC<WideFeeTableProps> = ({
   pricing,
-  currency,
   lang,
   labels = {
     category: 'Category',

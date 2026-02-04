@@ -1,24 +1,25 @@
 import React, { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth, db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { useSociety } from '../hooks/useSociety';
+import { toast } from 'react-hot-toast';
+import { Lock } from 'lucide-react';
+import LoadingSpinner from '../components/common/LoadingSpinner';
+import { SUPER_ADMINS } from '../constants/defaults';
+import { auth, db } from '../firebase';
+
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../components/ui/card';
-import { Lock } from 'lucide-react';
-import { doc, getDoc } from 'firebase/firestore';
-import { useSociety } from '../hooks/useSociety';
-import LoadingSpinner from '../components/common/LoadingSpinner';
-import { SUPER_ADMINS } from '../constants/defaults';
 
 const SocietyLoginPage: React.FC = () => {
     const { society, loading: socLoading } = useSociety();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    const navigate = useNavigate();
+    const navigate = useNavigate();  // ✅ navigate 추가
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -28,8 +29,7 @@ const SocietyLoginPage: React.FC = () => {
         setLoading(true);
 
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
+            await signInWithEmailAndPassword(auth, email, password);
 
             const isSuperAdmin = SUPER_ADMINS.includes(email);
 
@@ -39,6 +39,12 @@ const SocietyLoginPage: React.FC = () => {
                 if (isSuperAdmin) {
                     console.log(`🔐 [SocietyLogin] SUPER_ADMIN bypassing society check`);
                     toast.success(`Welcome Super Admin to ${society.name.en}`);
+                    
+                    // ✅ sessionStorage에 Super Admin 정보 저장
+                    sessionStorage.setItem('societyAdmin', 'true');
+                    sessionStorage.setItem('societyId', society.id);
+                    sessionStorage.setItem('isSuperAdmin', 'true');
+                    
                     navigate('/admin/society');
                     return;
                 }
@@ -61,6 +67,11 @@ const SocietyLoginPage: React.FC = () => {
                 }
 
                 toast.success(`Welcome back to ${society.name.en}`);
+                
+                // ✅ sessionStorage에 admin 정보 저장 (AdminGuard에서 확인용)
+                sessionStorage.setItem('societyAdmin', 'true');
+                sessionStorage.setItem('societyId', society.id);
+                
                 navigate('/admin/society');
             } else {
                 toast.success("Logged in");
@@ -120,30 +131,29 @@ const SocietyLoginPage: React.FC = () => {
                                 <Input
                                     id="password"
                                     type="password"
-                                    placeholder="••••••••"
+                                    placeholder="•••••••••"
                                     className="h-14 rounded-2xl border-slate-200 focus:ring-4 focus:ring-blue-500/10 transition-all font-medium"
                                     value={password}
                                     onChange={e => setPassword(e.target.value)}
                                     required
                                 />
                             </div>
-                            <Button type="submit" className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-lg shadow-lg shadow-blue-600/20 transform active:scale-[0.98] transition-all" disabled={loading}>
-                                {loading ? 'Authorizing...' : 'Enter Console'}
+
+                            <Button 
+                                type="submit" 
+                                className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-blue-600/20"
+                                disabled={loading}
+                            >
+                                {loading ? '로그인 중...' : 'Society Admin Login'}
                             </Button>
                         </form>
                     </CardContent>
-                    <CardFooter className="justify-center border-t border-slate-50 p-6 bg-slate-50/30">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">
-                            Powered by eRegi SaaS Platform
+                    <CardFooter className="bg-slate-50/50 p-6">
+                        <p className="text-xs text-slate-500 text-center w-full">
+                            🔒 Authorized personnel only. All access attempts are logged.
                         </p>
                     </CardFooter>
                 </Card>
-
-                <div className="text-center">
-                    <button onClick={() => navigate('/')} className="text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors underline underline-offset-4">
-                        Return to Hub
-                    </button>
-                </div>
             </div>
         </div>
     );

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
-import { useNavigate } from 'react-router-dom'; 
 import { db } from '../firebase';
 import '../styles/PlatformLanding.css';
 import toast from 'react-hot-toast';

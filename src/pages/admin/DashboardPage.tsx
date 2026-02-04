@@ -20,34 +20,55 @@ export default function DashboardPage() {
         const fetchStats = async () => {
             if (!selectedConferenceId) return;
 
-            // This is a placeholder for real stats fetching logic
-            // In a real app, you might want to use aggregation queries or maintain counters
             try {
                 const q = query(
-                    collection(db, 'conferences', selectedConferenceId, 'registrations'),
-                    // where('conferenceId', '==', selectedConferenceId) // Redundant in subcollection
+                    collection(db, 'conferences', selectedConferenceId, 'registrations')
                 );
                 const snapshot = await getDocs(q);
 
-                let total = 0;
-                let pending = 0;
-                let completed = 0;
-                let revenue = 0;
-
+                // Group by userId to handle duplicates (users who tried multiple times)
+                const userRegistrations = new Map<string, RegistrationData[]>();
                 snapshot.forEach(doc => {
                     const data = doc.data();
-                    total++;
-                    if (data.paymentStatus === 'COMPLETED') {
+                    const userId = data.userId;
+                    if (userId) {
+                        if (!userRegistrations.has(userId)) {
+                            userRegistrations.set(userId, []);
+                        }
+                        userRegistrations.get(userId)!.push({ id: doc.id, ...data } as RegistrationData);
+                    }
+                });
+
+                let completed = 0;
+                let canceled = 0;
+                let revenue = 0;
+
+                // Count each user once, using their best registration
+                userRegistrations.forEach((regs) => {
+                    // Sort by status priority: PAID > REFUNDED > CANCELED > others
+                    const sorted = regs.sort((a, b) => {
+                        if (a.status === 'PAID' && b.status !== 'PAID') return -1;
+                        if (a.status !== 'PAID' && b.status === 'PAID') return 1;
+                        if (a.status === 'REFUNDED' && b.status !== 'REFUNDED') return -1;
+                        if (a.status !== 'REFUNDED' && b.status === 'REFUNDED') return 1;
+                        // If same status, newer first
+                        const aTime = a.createdAt?.toMillis?.() || 0;
+                        const bTime = b.createdAt?.toMillis?.() || 0;
+                        return bTime - aTime;
+                    });
+
+                    const best = sorted[0];
+                    if (best.status === 'PAID') {
                         completed++;
-                        revenue += (data.paymentAmount || 0);
-                    } else {
-                        pending++;
+                        revenue += (best.amount || 0);
+                    } else if (['CANCELED', 'REFUNDED', 'REFUND_REQUESTED'].includes(best.status)) {
+                        canceled++;
                     }
                 });
 
                 setStats({
-                    totalRegistrations: total,
-                    pendingPayments: pending,
+                    totalRegistrations: completed + canceled,
+                    pendingPayments: canceled,
                     completedPayments: completed,
                     totalRevenue: revenue
                 });
@@ -92,10 +113,11 @@ export default function DashboardPage() {
                     variant="success"
                 />
                 <DataWidget
-                    title="Pending Payments"
+                    title="Canceled/Refunded"
                     value={stats.pendingPayments}
-                    subValue="Awaiting payment"
+                    subValue="Not active"
                     icon={AlertCircle}
+                    variant="warning"
                 />
                 <DataWidget
                     title="Total Revenue"

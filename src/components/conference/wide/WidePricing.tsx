@@ -1,9 +1,5 @@
-import React, { useState } from 'react';
-import { getGradeName } from '../../../utils/gradeTranslator';
+import React from 'react';
 import { useSocietyGrades } from '../../../hooks/useSocietyGrades';
-import { useAuth } from '../../../hooks/useAuth';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../../../firebase';
 
 type LocalizedString = { [lang: string]: string } | string;
 
@@ -12,14 +8,13 @@ export interface PricingPeriod {
     type?: string;
     name: LocalizedString | string;
     period?: { start: Date; end: Date };
-    startDate?: any;
-    endDate?: any;
+    startDate?: Date | { toDate: () => Date };
+    endDate?: Date | { toDate: () => Date };
     prices: Record<string, number> | Array<{ name: LocalizedString | string; amount: number; }>;
     isBestValue?: boolean;
 }
 
 interface WidePricingProps {
-    slug?: string;
     pricing: PricingPeriod[];
     currency?: string;
     lang: string;
@@ -31,13 +26,11 @@ interface WidePricingProps {
         refundPolicyTitle?: string;
     };
     refundPolicy?: string;
-    societyId?: string; // Added societyId
+    societyId?: string;
 }
 
 export const WidePricing: React.FC<WidePricingProps> = ({
-    slug,
     pricing,
-    currency = 'KRW',
     lang,
     labels = {
         category: 'Category',
@@ -49,59 +42,9 @@ export const WidePricing: React.FC<WidePricingProps> = ({
     refundPolicy,
     societyId
 }) => {
-    const { auth } = useAuth('');
-    const [isRegistered, setIsRegistered] = useState(false);
-    const [showQRModal, setShowQRModal] = useState(false);
-    const [registrationData, setRegistrationData] = useState<any>(null);
-
-    // Check if user is already registered for this conference
-    React.useEffect(() => {
-        const checkRegistration = async () => {
-            if (!auth.user || !slug) return;
-
-            try {
-                const confId = `${societyId}_${slug}`;
-                const q = query(
-                    collection(db, 'conferences', confId, 'registrations'),
-                    where('userId', '==', auth.user.uid)
-                );
-                const snap = await getDocs(q);
-
-                if (!snap.empty) {
-                    setIsRegistered(true);
-                    setRegistrationData(snap.docs[0].data());
-                } else {
-                    setIsRegistered(false);
-                }
-            } catch (e) {
-                console.error('Error checking registration:', e);
-            }
-        };
-
-        checkRegistration();
-    }, [auth.user, slug, societyId]);
-
-    const handleButtonClick = () => {
-        if (isRegistered && registrationData) {
-            // [Fix] Navigate to badge page directly for registered users (use pure slug)
-            window.location.href = slug ? `/${slug}/badge` : `/badge`;
-        } else {
-            // Navigate to registration page
-            window.location.href = slug ? `/${slug}/register?lang=${lang}` : `/register?lang=${lang}`;
-        }
-    };
-
-    const handleBadgeClick = () => {
-        window.location.href = slug ? `/${slug}/badge` : `/badge`;
-    };
-
-    // Task 1: Grade Localization
-    const { getGradeLabel, gradeMasterMap } = useSocietyGrades(societyId);
+    const { gradeMasterMap } = useSocietyGrades(societyId);
 
     const manualMap: Record<string, string> = {
-        'Dental hygienist': '치과위생사',
-        'Resident': '전공의/수련의',
-        'MO PHD': '군의관_공보의',
         'Member': '회원',
         'Non-Member': '비회원',
         'Nurse': '간호사',
@@ -123,20 +66,17 @@ export const WidePricing: React.FC<WidePricingProps> = ({
 
         // 1. Manual Map
         if (manualMap[name]) return manualMap[name];
-        
+
         // 2. Normalized Manual Map
         const normalized = name.replace(/_/g, ' ').trim();
         if (manualMap[normalized]) return manualMap[normalized];
 
-        // 3. Grade Master Map (getGradeLabel)
-        // getGradeLabel returns code if not found, or the label.
-        // We assume 'name' passed here is the code or name.
-        // Try exact match as code
+        // 3. Grade Master Map
         if (gradeMasterMap.has(name)) {
             return gradeMasterMap.get(name)?.ko || name;
         }
         // Try normalized as code
-        const codeNorm = name.toLowerCase().replace(/\s/g, '_'); // e.g. "Non Member" -> "non_member"
+        const codeNorm = name.toLowerCase().replace(/\s/g, '_');
         if (gradeMasterMap.has(codeNorm)) {
              return gradeMasterMap.get(codeNorm)?.ko || name;
         }
@@ -144,9 +84,9 @@ export const WidePricing: React.FC<WidePricingProps> = ({
         return name.replace(/_/g, ' ');
     };
 
-    const formatDate = (dateVal: any) => {
+    const formatDate = (dateVal: Date | { toDate: () => Date } | string | undefined) => {
         if (!dateVal) return '';
-        const d = dateVal instanceof Date ? dateVal : (dateVal.toDate ? dateVal.toDate() : new Date(dateVal));
+        const d = dateVal instanceof Date ? dateVal : (typeof dateVal === 'object' && 'toDate' in dateVal ? dateVal.toDate() : new Date(dateVal));
         if (isNaN(d.getTime())) return '';
         const y = d.getFullYear();
         const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -163,25 +103,24 @@ export const WidePricing: React.FC<WidePricingProps> = ({
     const isCurrentPeriod = (item: PricingPeriod) => {
         const { start, end } = getPeriodDates(item);
         if (!start || !end) return false;
-        
+
         const now = new Date();
         const s = start instanceof Date ? start : (start.toDate ? start.toDate() : new Date(start));
         const e = end instanceof Date ? end : (end.toDate ? end.toDate() : new Date(end));
-        
+
         // End of day adjustment
         e.setHours(23, 59, 59, 999);
-        
+
         return now >= s && now <= e;
     };
 
-    const normalizePrices = (prices: any) => {
+    const normalizePrices = (prices: Record<string, number> | Array<{ name: LocalizedString | string; amount: number }>) => {
         if (!prices) return [];
         let arr: { name: string; amount: number }[] = [];
-        
+
         if (Array.isArray(prices)) {
             arr = prices.map(p => {
                 const rawName = t(p.name);
-                // Apply translation only if rawName is English-like (optional, but safer to just apply)
                 return {
                     name: translateGrade(rawName),
                     amount: Number(p.amount || p.price || 0)
@@ -193,166 +132,144 @@ export const WidePricing: React.FC<WidePricingProps> = ({
                 amount: Number(val)
             }));
         }
-        
+
         return arr.sort((a, b) => a.amount - b.amount);
     };
 
-    const currencySymbol = '₩'; // Forced
-    
+    const currencySymbol = '₩';
+
     const getCurrencyDisplay = (amount: number) => {
          return `${currencySymbol}${amount.toLocaleString()}`;
     };
 
     if (!pricing || pricing.length === 0) return null;
 
+    // Get all unique grades across all periods
+    const allGrades = Array.from(
+        new Set(
+            pricing.flatMap(p => normalizePrices(p.prices).map(price => price.name))
+        )
+    );
+
     return (
-        <section className="w-full flex justify-center">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl w-full">
-                {pricing.map((item) => {
-                    const isActive = isCurrentPeriod(item);
-                    const { start, end } = getPeriodDates(item);
-                    const dateStr = start && end ? `${formatDate(start)} ~ ${formatDate(end)}` : '';
-                    
-                    const priceList = normalizePrices(item.prices);
-                    
-                    // Determine highlight price (try to find General/Standard/Non-Member, else max)
-                    let highlightPrice = 0;
-                    const generalPrice = priceList.find(p => 
-                        p.name.toLowerCase().includes('general') || 
-                        p.name.includes('일반') || 
-                        p.name.toLowerCase().includes('non-member')
-                    );
-                    
-                    if (generalPrice) {
-                        highlightPrice = generalPrice.amount;
-                    } else if (priceList.length > 0) {
-                        highlightPrice = priceList[priceList.length - 1].amount;
-                    }
-
-                    return (
-                        <div key={item.id} className={`bg-white rounded-2xl p-8 shadow-sm transition-all relative overflow-hidden flex flex-col items-center text-center max-w-sm mx-auto w-full ${isActive ? 'ring-4 ring-blue-500 shadow-xl scale-105 z-10' : 'border border-slate-200 hover:shadow-lg'}`}>
-                             {isActive && (
-                                <div className="absolute top-0 inset-x-0 bg-blue-500 text-white text-xs font-bold py-1.5 uppercase tracking-widest">
-                                    {labels.bestValue || 'Open Now'}
-                                </div>
-                            )}
-
-                            <div className="mt-4 mb-2">
-                                <span className={`inline-block px-3 py-1 rounded-full text-xs font-extrabold tracking-wide ${isActive ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
-                                    {t(item.name)}
-                                </span>
-                            </div>
-
-                            {/* Date Range */}
-                            {dateStr && (
-                                <p className={`text-sm font-medium mb-4 ${isActive ? 'text-blue-600' : 'text-slate-400'}`}>
-                                    {dateStr}
-                                </p>
-                            )}
-
-                            <div className="text-4xl font-black text-slate-900 mb-2">
-                                <span className="text-lg font-medium text-slate-400 mr-1">{currencySymbol}</span>
-                                {highlightPrice.toLocaleString()}
-                            </div>
-                            <p className="text-sm text-slate-500 mb-8">
-                                {generalPrice ? generalPrice.name : (priceList.length > 0 ? 'Registration Fee' : '')}
-                            </p>
-
-                            <div className="w-full h-px bg-slate-100 mb-6"></div>
-
-                            {/* Detailed Prices List */}
-                            <ul className="text-sm text-slate-500 space-y-4 w-full text-left">
-                                {priceList.map((p, idx) => (
-                                    <li key={idx} className="flex justify-between items-center group">
-                                        <span className="font-medium text-slate-600 group-hover:text-slate-900 transition-colors">{p.name}</span>
-                                        <span className={`font-mono font-bold ${isActive ? 'text-blue-600' : 'text-slate-700'}`}>
-                                            {getCurrencyDisplay(p.amount)}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
-
-                            {isRegistered ? (
-                                <>
-                                    <button onClick={handleButtonClick} className={`mt-8 w-full py-3 rounded-xl font-bold transition-all ${isActive ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-                                        {lang === 'ko' ? '등록확인' : 'Registration Status'}
-                                    </button>
-                                </>
-                            ) : (
-                                    <button onClick={handleButtonClick} className={`mt-8 w-full py-3 rounded-xl font-bold transition-all ${isActive ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-                                        {lang === 'ko' ? '등록하기' : 'Register Now'}
-                                    </button>
-                            )}
-
-                            {/* QR Modal */}
-                            {showQRModal && registrationData && (
-                                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowQRModal(false)}>
-                                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 m-4" onClick={(e) => e.stopPropagation()}>
-                                        <h3 className="text-xl font-bold text-slate-900 mb-6 text-center">
-                                            {lang === 'ko' ? '등록확인' : 'Registration Confirmation'}
-                                        </h3>
-                                        <div className="space-y-4">
-                                            <div className="flex justify-between items-center py-3 border-b border-slate-100">
-                                                <span className="text-sm text-slate-600">
-                                                    {lang === 'ko' ? '이름' : 'Name'}
-                                                </span>
-                                                <span className="font-bold text-slate-900">
-                                                    {registrationData.userName || auth.user?.name || '-'}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between items-center py-3 border-b border-slate-100">
-                                                <span className="text-sm text-slate-600">
-                                                    {lang === 'ko' ? '참가 유형' : 'Registration Type'}
-                                                </span>
-                                                <span className="font-bold text-slate-900">
-                                                    {registrationData.userTier || '-'}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between items-center py-3 border-b border-slate-100">
-                                                <span className="text-sm text-slate-600">
-                                                    {lang === 'ko' ? '등록일' : 'Registration Date'}
-                                                </span>
-                                                <span className="font-bold text-slate-900">
-                                                    {registrationData.createdAt ? new Date(registrationData.createdAt.seconds * 1000).toLocaleDateString() : '-'}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between items-center py-3 border-b border-slate-100">
-                                                <span className="text-sm text-slate-600">
-                                                    {lang === 'ko' ? '결제 상태' : 'Payment Status'}
-                                                </span>
-                                                <span className={`font-bold ${registrationData.paymentStatus === 'PAID' ? 'text-green-600' : 'text-red-600'}`}>
-                                                    {registrationData.paymentStatus === 'PAID' ? (lang === 'ko' ? '완료' : 'Paid') : (lang === 'ko' ? '미결' : 'Pending')}
-                                                </span>
-                                            </div>
-                                            <div className="flex gap-3 mt-6">
-                                                <button
-                                                    onClick={handleBadgeClick}
-                                                    className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors"
-                                                >
-                                                    {lang === 'ko' ? '디지털 명찰 발급' : 'Get Digital Badge'}
-                                                </button>
-                                                <button
-                                                    onClick={() => setShowQRModal(false)}
-                                                    className="flex-1 py-3 bg-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-300 transition-colors"
-                                                >
-                                                    {lang === 'ko' ? '닫기' : 'Close'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
-
-                {refundPolicy && (
-                    <div className="col-span-full mt-8 p-6 bg-slate-50 rounded-2xl border border-slate-200/60 text-sm text-slate-500 text-center max-w-4xl mx-auto">
-                        <strong className="block text-slate-700 mb-2 text-base">{labels.refundPolicyTitle}</strong>
-                        <p className="leading-relaxed">{refundPolicy}</p>
+        <>
+            <section className="w-full flex justify-center py-12">
+                <div className="max-w-6xl w-full px-4">
+                    {/* Title */}
+                    <div className="text-center mb-12">
+                        <h2 className="text-3xl font-bold text-slate-900 mb-3">
+                            {lang === 'ko' ? '등록비 안내' : 'Registration Fees'}
+                        </h2>
+                        <p className="text-slate-500 text-lg">
+                            {lang === 'ko' ? '기간과 등급에 따른 등록비용을 확인하세요' : 'Check registration fees by period and grade'}
+                        </p>
                     </div>
-                )}
-            </div>
-        </section>
+
+                    {/* Pricing Table */}
+                    <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-slate-200">
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr>
+                                        {/* Grade Column Header */}
+                                        <th className="p-6 text-left bg-slate-50 border-b-2 border-slate-200 min-w-[180px]">
+                                            <span className="text-sm font-bold text-slate-600 uppercase tracking-wide">
+                                                {lang === 'ko' ? '등급' : 'Grade'}
+                                            </span>
+                                        </th>
+                                        {/* Period Columns */}
+                                        {pricing.map((item) => {
+                                            const isActive = isCurrentPeriod(item);
+                                            const { start, end } = getPeriodDates(item);
+                                            const dateStr = start && end ? `${formatDate(start)} ~ ${formatDate(end)}` : '';
+
+                                            return (
+                                                <th
+                                                    key={item.id}
+                                                    className={`p-6 text-center min-w-[200px] border-b-2 ${
+                                                        isActive
+                                                            ? 'bg-blue-600 border-blue-700'
+                                                            : 'bg-slate-50 border-slate-200'
+                                                    }`}
+                                                >
+                                                    <div className={`text-sm font-bold uppercase tracking-wide ${isActive ? 'text-white' : 'text-slate-600'}`}>
+                                                        {t(item.name)}
+                                                    </div>
+                                                    {dateStr && (
+                                                        <div className={`text-xs mt-1 font-medium ${isActive ? 'text-blue-100' : 'text-slate-500'}`}>
+                                                            {dateStr}
+                                                        </div>
+                                                    )}
+                                                    {isActive && (
+                                                        <div className="mt-2 inline-flex items-center bg-white/20 text-white text-[10px] font-bold px-3 py-1 rounded-full">
+                                                            {labels.bestValue || 'CURRENT'}
+                                                        </div>
+                                                    )}
+                                                </th>
+                                            );
+                                        })}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {allGrades.map((grade) => (
+                                        <tr key={grade} className="border-b border-slate-100 last:border-0">
+                                            {/* Grade Name */}
+                                            <td className="p-5 bg-white font-semibold text-slate-800 sticky left-0 z-10">
+                                                {grade}
+                                            </td>
+                                            {/* Prices for each period */}
+                                            {pricing.map((item) => {
+                                                const isActive = isCurrentPeriod(item);
+                                                const priceList = normalizePrices(item.prices);
+                                                const priceData = priceList.find(p => p.name === grade);
+
+                                                return (
+                                                    <td
+                                                        key={`${item.id}-${grade}`}
+                                                        className={`p-5 text-center font-mono font-bold text-lg ${
+                                                            isActive ? 'bg-blue-50/50 text-blue-600' : 'bg-white text-slate-700'
+                                                        }`}
+                                                    >
+                                                        {priceData ? getCurrencyDisplay(priceData.amount) : '-'}
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Refund Policy */}
+                    {refundPolicy && (
+                        <div className="mt-12 p-6 bg-amber-50 rounded-xl border border-amber-200/60">
+                            <div className="flex items-start gap-3">
+                                <svg
+                                    className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <title>{labels.refundPolicyTitle}</title>
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                    />
+                                </svg>
+                                <div>
+                                    <h3 className="text-base font-bold text-slate-800 mb-2">
+                                        {labels.refundPolicyTitle}
+                                    </h3>
+                                    <p className="text-sm text-slate-600 leading-relaxed">{refundPolicy}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </section>
+        </>
     );
 };

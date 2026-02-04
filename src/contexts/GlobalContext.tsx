@@ -1,9 +1,11 @@
 
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, ReactNode } from 'react';
+import type { ConferenceUser } from '../types/schema';
 
 interface GlobalContextType {
   isSuperAdmin: boolean;
-  user: any; // Replace with proper User type
+  user: ConferenceUser | null;
 }
 
 const GlobalContext = createContext<GlobalContextType | undefined>(undefined);

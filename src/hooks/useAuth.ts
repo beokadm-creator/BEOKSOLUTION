@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged, signOut, signInWithCustomToken } from 'firebase/auth';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { onSnapshot, doc, DocumentData } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { useRef } from 'react';
 import { auth as firebaseAuth, db, functions } from '../firebase';
 import { ConferenceUser } from '../types/schema';
-import { setRootCookie, getRootCookie, removeRootCookie, clearAllSessions } from '../utils/cookie';
-import { getSessionToken, validateTokenExpiry } from '../utils/sessionManager';
+import { getRootCookie, removeRootCookie, clearAllSessions } from '../utils/cookie';
+import { getSessionToken } from '../utils/sessionManager';
 
 // [Step 412-D] 물리적 쿨다운 강제
 const GLOBAL_SYNC_LOCK = false;
@@ -20,7 +19,7 @@ export interface AuthState {
   syncError?: boolean; // [Silent Patch] CORS/Network failure flag
 }
 
-export const useAuth = (conferenceId?: string) => {
+export const useAuth = () => {
   const [auth, setAuth] = useState<AuthState>({
     user: null,
     loading: true,
@@ -82,9 +81,9 @@ export const useAuth = (conferenceId?: string) => {
         const userDocRef = doc(db, 'users', currentUser.uid);
         
         // Subscribe to user doc
-        docUnsub = onSnapshot(userDocRef, (docSnap: any) => {
+        docUnsub = onSnapshot(userDocRef, (docSnap) => {
                    if (docSnap.exists()) {
-                   const userData = docSnap.data() as any;
+                   const userData = docSnap.data() as DocumentData;
 
                    console.log('[useAuth] Raw Firestore userData:', userData);
                    console.log('[useAuth] userData.phoneNumber:', userData.phoneNumber);
@@ -146,10 +145,10 @@ export const useAuth = (conferenceId?: string) => {
                             phone: '',
                             country: 'KR',
                             isForeigner: false,
-                            tier: 'NON_MEMBER' as any,
+                            tier: 'NON_MEMBER' as 'MEMBER' | 'NON_MEMBER',
                             authStatus: { emailVerified: currentUser.emailVerified, phoneVerified: false },
-                            createdAt: null as any,
-                            updatedAt: null as any
+                            createdAt: null as Timestamp | null,
+                            updatedAt: null as Timestamp | null
                         },
                         loading: false,
                         step: 'LOGGED_IN',
@@ -157,11 +156,11 @@ export const useAuth = (conferenceId?: string) => {
                     };
                  });
               }
-        }, (err: any) => {
+        }, (err: { code?: string; message?: string }) => {
             setAuth(prev => {
                 // 에러 메시지가 이전과 동일하다면 상태 업데이트를 스킵하여 리렌더링 차단
                 if (prev.error === err.message) return prev;
-                return { ...prev, loading: false, error: err.message };
+                return { ...prev, loading: false, error: err.message || 'Unknown error' };
             });
         });
 
@@ -183,15 +182,16 @@ export const useAuth = (conferenceId?: string) => {
 
                 try {
                     const { data } = await mintFn({ idToken: sessionToken });
-                    const resultData = data as any;
+                    const resultData = data as { token: string };
 
                     if (!resultData.token) {
                         throw new Error("Custom token not received from server");
                     }
 
                     customTokenToUse = resultData.token;
-                } catch (mintErr: any) {
-                    throw new Error(`Failed to exchange token: ${mintErr.message}`);
+                } catch (mintErr: unknown) {
+                    const error = mintErr instanceof Error ? mintErr : new Error(String(mintErr));
+                    throw new Error(`Failed to exchange token: ${error.message}`);
                 }
 
                 if (customTokenToUse) {
@@ -207,13 +207,14 @@ export const useAuth = (conferenceId?: string) => {
                     window.history.replaceState({}, document.title, newUrl.toString());
                 }
                 return;
-            } catch (loginErr: any) {
+            } catch (loginErr: unknown) {
                 clearAllSessions();
+                const message = loginErr instanceof Error ? loginErr.message : 'Failed to restore session';
                 setAuth(prev => ({
                     ...prev,
                     loading: false,
                     step: 'IDLE',
-                    error: loginErr.message || 'Failed to restore session'
+                    error: message
                 }));
             }
         }

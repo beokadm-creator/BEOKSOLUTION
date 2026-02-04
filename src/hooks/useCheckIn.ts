@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { collection, query, where, getDocs, updateDoc, Timestamp, doc, getDoc } from 'firebase/firestore';
+import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Registration, ConferenceUser, ConferenceInfo } from '../types/schema';
+import { Registration, ConferenceUser } from '../types/schema';
 import { generateBadgeQr } from '../utils/transaction';
 import { printBadge } from '../utils/printer';
 
@@ -26,9 +26,7 @@ export const useCheckIn = (conferenceId: string) => {
             let parsed;
             try {
                 parsed = JSON.parse(qrData);
-            } catch (e) {
-                // If not JSON, maybe it's raw regId or invalid
-                // Assume it might be raw string if dev, but strict protocol says JSON
+            } catch {
                 throw new Error("Invalid QR Format. Not a Confirmation QR.");
             }
 
@@ -45,7 +43,6 @@ export const useCheckIn = (conferenceId: string) => {
 
             const regData = regSnap.data() as Registration;
 
-            // Fetch User for details
             const userRef = doc(db, `conferences/${conferenceId}/users/${regData.userId}`);
             const userSnap = await getDoc(userRef);
             const userData = userSnap.data() as ConferenceUser;
@@ -54,8 +51,9 @@ export const useCheckIn = (conferenceId: string) => {
             setScannedUser(userData);
             setStatus({ loading: false, error: null, message: "Registration Found. Ready to Issue Badge." });
 
-        } catch (err: any) {
-            setStatus({ loading: false, error: err.message, message: null });
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            setStatus({ loading: false, error: message, message: null });
         }
     };
 
@@ -110,11 +108,11 @@ export const useCheckIn = (conferenceId: string) => {
 
             setStatus({ loading: false, error: null, message: `Badge ${isNewIssue ? 'Issued' : 'Reprinted'} Successfully!` });
             
-            // Update local state
             setScannedReg({ ...scannedReg, badgeQr, isCheckedIn: true });
 
-        } catch (err: any) {
-            setStatus({ loading: false, error: err.message, message: null });
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            setStatus({ loading: false, error: message, message: null });
         }
     };
 

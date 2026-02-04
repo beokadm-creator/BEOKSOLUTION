@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { collection, getDocs, doc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Registration, ConferenceUser } from '../types/schema';
@@ -16,7 +16,7 @@ export const useRegistrations = (conferenceId: string) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchRegistrations = async () => {
+    const fetchRegistrations = useCallback(async () => {
         setLoading(true);
         try {
             // 1. Fetch all registrations
@@ -26,8 +26,6 @@ export const useRegistrations = (conferenceId: string) => {
             // 2. Fetch users to join data (Inefficient for large data, but okay for demo/MVP)
             // In prod, duplicate user info into registration doc or use efficient indexing/functions
             const regs = regSnap.docs.map(d => d.data() as Registration);
-            
-            const joinedData: RegistrationWithUser[] = [];
 
             // Parallel fetch optimization
             const userPromises = regs.map(async (reg) => {
@@ -45,7 +43,7 @@ export const useRegistrations = (conferenceId: string) => {
                             // userOrg: userData.organization // Not in schema yet, add if needed
                         } as RegistrationWithUser;
                     }
-                } catch (e) {
+                } catch {
                     console.warn(`User not found for reg ${reg.id}`);
                 }
                 return {
@@ -67,13 +65,15 @@ export const useRegistrations = (conferenceId: string) => {
             setError(errorMessage);
             setLoading(false);
         }
-    };
+    }, [conferenceId]);
 
     useEffect(() => {
         if (conferenceId) {
-            fetchRegistrations();
+            requestAnimationFrame(() => {
+                fetchRegistrations();
+            });
         }
-    }, [conferenceId]);
+    }, [conferenceId, fetchRegistrations]);
 
     // Refund Logic (Reused/Extended)
     const processRefund = async (regId: string, amount: number) => {

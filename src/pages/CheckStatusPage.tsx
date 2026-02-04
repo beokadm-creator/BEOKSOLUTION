@@ -21,9 +21,9 @@ const CheckStatusPage: React.FC = () => {
     const lang = searchParams.get('lang') === 'en' ? 'en' : 'ko';
 
     const t = {
-        title: lang === 'ko' ? '비회원(준회원) 인증' : 'Non-Member Authentication',
-        description: lang === 'ko' 
-            ? '등록 시 입력한 이메일과 비밀번호를 입력해주세요.' 
+        title: lang === 'ko' ? '등록조회' : 'Registration Lookup',
+        description: lang === 'ko'
+            ? '등록 시 입력한 이메일과 비밀번호를 입력해주세요.'
             : 'Please enter the email and password you used for registration.',
         emailLabel: lang === 'ko' ? '이메일' : 'Email',
         passwordLabel: lang === 'ko' ? '비밀번호' : 'Password',
@@ -44,7 +44,7 @@ const CheckStatusPage: React.FC = () => {
             if (returnUrl) {
                 navigate(returnUrl);
             } else {
-                navigate(`/${slug}/non-member/hub`);
+                navigate(`/${slug}/abstracts`);
             }
         }
     }, [nonMember, cid, slug, navigate, returnUrl, authLoading]);
@@ -81,12 +81,13 @@ const CheckStatusPage: React.FC = () => {
                 if (returnUrl) {
                     navigate(returnUrl);
                 } else {
-                    navigate(`/${slug}/non-member/hub`);
+                    navigate(`/${slug}/abstracts`);
                 }
             }, 500);  // 500ms delay
-        } catch (err: any) {
+        } catch (err) {
             console.error('[CheckStatusPage] Login error:', err);
-            toast.error(err.message || t.fail);
+            const errorMessage = err instanceof Error ? err.message : t.fail;
+            toast.error(errorMessage);
         }
     };
 

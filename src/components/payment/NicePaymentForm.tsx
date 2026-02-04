@@ -1,7 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../firebase';
-import { Loader2 } from 'lucide-react';
 
 interface NicePaymentFormProps {
     amount: number;
@@ -11,7 +10,7 @@ interface NicePaymentFormProps {
     goodsName: string;
     mid: string;
     merchantKey: string;
-    onSuccess: (result: any) => void;
+    onSuccess: (result: Record<string, unknown>) => void;
     onFail: (error: string) => void;
 }
 
@@ -35,6 +34,7 @@ export default function NicePaymentForm({
     onFail
 }: NicePaymentFormProps) {
     const formRef = useRef<HTMLFormElement>(null);
+    const [moid] = useState(() => `ORDER_${Date.now()}`);
 
     useEffect(() => {
         // 1. Load Script
@@ -112,7 +112,7 @@ export default function NicePaymentForm({
             document.body.removeChild(script);
             // delete window.nicepaySubmit; // Maybe keep it
         };
-    }, []);
+    }, [amount, merchantKey, mid, onFail, onSuccess]);
 
     return (
         <div className="hidden">
@@ -121,7 +121,7 @@ export default function NicePaymentForm({
                 <input type="hidden" name="GoodsName" value={goodsName} />
                 <input type="hidden" name="Amt" value={amount} />
                 <input type="hidden" name="MID" value={mid} />
-                <input type="hidden" name="Moid" value={`ORDER_${Date.now()}`} />
+                <input type="hidden" name="Moid" value={moid} />
                 <input type="hidden" name="BuyerName" value={buyerName} />
                 <input type="hidden" name="BuyerEmail" value={buyerEmail} />
                 <input type="hidden" name="BuyerTel" value={buyerTel} />

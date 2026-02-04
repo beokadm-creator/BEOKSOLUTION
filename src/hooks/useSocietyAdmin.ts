@@ -75,7 +75,7 @@ export const useSocietyAdmin = (societyId: string | undefined, userEmail: string
         };
 
         checkAdmin();
-    }, [societyId, userEmail]);
+    }, [societyId, userEmail, isSuperPath, vid]);
 
     const isAdmin = isSocietyAdmin;
     const permissions = null;
