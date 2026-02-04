@@ -549,6 +549,7 @@ const UserHubPage: React.FC = () => {
                         // [Fix] Advanced Deduplication & Filtering Strategy (Fallback)
                         const grouped = new Map<string, UserReg[]>();
                         validRegs.forEach(r => {
+                            console.log(`[UserHub] Fallback Reg: ${r.slug} | p=${r.paymentStatus} | s=${r.status} | date=${r.paymentDate} | id=${r.id}`);
                             if (!grouped.has(r.slug)) grouped.set(r.slug, []);
                             grouped.get(r.slug)!.push(r);
                         });
@@ -710,6 +711,7 @@ const UserHubPage: React.FC = () => {
                     // [Fix] Advanced Deduplication & Filtering Strategy (Realtime)
                     const grouped = new Map<string, UserReg[]>();
                     validRegs.forEach(r => {
+                        console.log(`[UserHub] Realtime Reg: ${r.slug} | p=${r.paymentStatus} | s=${r.status} | date=${r.paymentDate} | id=${r.id}`);
                         if (!grouped.has(r.slug)) grouped.set(r.slug, []);
                         grouped.get(r.slug)!.push(r);
                     });
@@ -1050,7 +1052,7 @@ const UserHubPage: React.FC = () => {
                                 </div>
                                 <div className="mt-auto border-t border-slate-100 pt-4 flex items-center justify-between">
                                     <span className={r.earnedPoints ? "bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold" : "bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-xs"}>
-                                        {r.earnedPoints ? `+${r.earnedPoints} pts` : '진행중'}
+                                        {r.earnedPoints ? `+${r.earnedPoints} pts` : `[DBG] p:${r.paymentStatus} s:${r.status}`}
                                     </span>
                                     <div className="flex gap-2">
                                         <Button
