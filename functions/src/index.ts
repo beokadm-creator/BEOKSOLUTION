@@ -4,21 +4,17 @@ import corsLib from 'cors';
 import { getNiceAuthParams, approveNicePayment } from './payment/nice';
 import { approveTossPayment, cancelTossPayment as cancelTossPaymentApi } from './payment/toss';
 
-import { cleanupZombieUsers } from './scheduled/cleanupUsers';
 import { onRegistrationCreated, validateBadgePrepToken, issueDigitalBadge, resendBadgePrepToken } from './badge/index';
-import { restoreKadd2026 } from './restore-kadd-2026';
 
 export const cors = corsLib({ origin: true });
 
 admin.initializeApp();
 
 export {
-    cleanupZombieUsers,
     onRegistrationCreated,
     validateBadgePrepToken,
     issueDigitalBadge,
-    resendBadgePrepToken,
-    restoreKadd2026
+    resendBadgePrepToken
 };
 
 // --------------------------------------------------------------------------
@@ -1214,184 +1210,4 @@ export const checkNonMemberEmailExists = functions
         }
     });
 
-// Resume guest registration by email + password verification
-// [FIX-20250124] Properly handle both pending and completed non-member registrations
-// [FIX-20250124-03] Add detailed logging for debugging
-export const resumeGuestRegistration = functions
-    .runWith({
-        enforceAppCheck: false,
-        ingressSettings: 'ALLOW_ALL'
-    })
-    .https.onCall(async (data, context) => {
-        const { email, password, confId } = data;
 
-        functions.logger.info('[resumeGuestRegistration] START', { email, confId });
-
-        if (!email || !password || !confId) {
-            throw new functions.https.HttpsError('invalid-argument', 'email, password, and confId are required');
-        }
-
-        try {
-            const regRef = admin.firestore().collection(`conferences/${confId}/registrations`);
-
-            // [FIX-20250124-05] CRITICAL FIX: Try Firebase Admin Auth signIn first
-            // This properly validates the password before any Firestore query
-            functions.logger.info('[resumeGuestRegistration] Step 1: Attempting Firebase Admin Auth login', { email, confId });
-
-            try {
-                // Try to sign in with email/password using Firebase Admin SDK
-                const userRecord = await admin.auth().getUserByEmail(email);
-
-                functions.logger.info('[resumeGuestRegistration] Found Firebase user', {
-                    uid: userRecord.uid,
-                    email: userRecord.email,
-                    disabled: userRecord.disabled,
-                    emailVerified: userRecord.emailVerified
-                });
-
-                // User exists - now check if they have a registration document
-                const regQuery = regRef.where('userId', '==', userRecord.uid).limit(1);
-                const regSnap = await regQuery.get();
-
-                if (!regSnap.empty) {
-                    const regDoc = regSnap.docs[0];
-                    const regData = regDoc.data();
-
-                    functions.logger.info('[resumeGuestRegistration] Found registration document', {
-                        regId: regDoc.id,
-                        userId: regData.userId,
-                        email: regData.email,
-                        status: regData.status
-                    });
-
-                    // CRITICAL: Return success without checking password in Firestore
-                    // Firebase Auth login succeeded, so password is already verified
-                    return {
-                        success: true,
-                        source: 'firebase_auth',
-                        data: {
-                            registrationId: regDoc.id,
-                            name: regData.name || regData.userName || regData.userInfo?.name || userRecord.displayName || 'Guest',
-                            email: regData.email || regData.userEmail || regData.userInfo?.email || email,
-                            phone: regData.phone || regData.userPhone || regData.userInfo?.phone,
-                            affiliation: regData.affiliation || regData.organization || regData.userInfo?.affiliation,
-                            licenseNumber: regData.licenseNumber || regData.userInfo?.licenseNumber,
-                            tier: regData.tier,
-                            categoryName: regData.categoryName,
-                            paymentStatus: regData.paymentStatus,
-                            amount: regData.amount,
-                            agreements: regData.agreements || {},
-                            memberVerificationData: regData.memberVerificationData,
-                            currentStep: regData.currentStep || 4,
-                            formData: regData.formData
-                        }
-                    };
-                } else {
-                    functions.logger.warn('[resumeGuestRegistration] Firebase user exists but no registration document found', {
-                        uid: userRecord.uid,
-                        email,
-                        confId
-                    });
-                    return {
-                        success: false,
-                        message: '등록된 회원 정보를 찾을 수 없습니다.'
-                    };
-                }
-            } catch (authError: any) {
-                // Firebase Auth login failed - user doesn't exist or wrong password
-                if (authError.code === 'auth/user-not-found') {
-                    functions.logger.warn('[resumeGuestRegistration] Firebase user not found', { email });
-                } else if (authError.code === 'auth/wrong-password') {
-                    functions.logger.warn('[resumeGuestRegistration] Wrong password', { email });
-                    return {
-                        success: false,
-                        message: '이메일 또는 비밀번호가 일치하지 않습니다.'
-                    };
-                } else {
-                    functions.logger.error('[resumeGuestRegistration] Firebase Auth error', { email, error: authError.message, code: authError.code });
-                }
-                // Fall through to email search in registrations collection
-            }
-
-            // 5. Fallback: Search for registration by email only (for legacy data without proper Firebase user)
-            functions.logger.info('[resumeGuestRegistration] Fallback: Searching by email in registrations', { email });
-            const emailQuery = regRef.where('email', '==', email).limit(1);
-            const emailSnap = await emailQuery.get();
-
-            if (emailSnap.empty) {
-                functions.logger.warn('[resumeGuestRegistration] No registration found by email', { email, confId });
-                return {
-                    success: false,
-                    message: '이메일 또는 비밀번호가 일치하지 않습니다.'
-                };
-            }
-
-            const regDoc = emailSnap.docs[0];
-            const regData = regDoc.data();
-
-            functions.logger.info('[resumeGuestRegistration] Found registration by email (fallback)', {
-                regId: regDoc.id,
-                hasPassword: !!regData.password
-            });
-
-            // Check password if available
-            if (regData.password && regData.password.trim() !== '') {
-                // Only validate if password exists and is not empty string
-                const simpleHash = Buffer.from(password + "_SALT_" + email).toString('base64');
-                const passwordMatch = regData.password === password || regData.password === simpleHash;
-
-                if (!passwordMatch) {
-                    functions.logger.warn('[resumeGuestRegistration] Password mismatch in fallback', {
-                        email,
-                        regId: regDoc.id,
-                        hasPasswordInDoc: !!regData.password,
-                        passwordType: typeof regData.password,
-                        inputPasswordLength: password.length,
-                        docPasswordLength: regData.password.length
-                    });
-                    return {
-                        success: false,
-                        message: '이메일 또는 비밀번호가 일치하지 않습니다.'
-                    };
-                }
-            } else {
-                // No password stored in registration document (or empty string)
-                functions.logger.warn('[resumeGuestRegistration] No password found in registration', {
-                    email,
-                    regId: regDoc.id,
-                    hasPassword: !!regData.password,
-                    passwordLength: regData.password?.length || 0
-                });
-                return {
-                    success: false,
-                    message: '등록된 비밀번호 정보를 찾을 수 없습니다. 관리자에게 문의해주세요.'
-                };
-            }
-
-            // Return registration data
-            functions.logger.info('[resumeGuestRegistration] Fallback successful', { regId: regDoc.id });
-            return {
-                success: true,
-                source: 'fallback_email_search',
-                data: {
-                    registrationId: regDoc.id,
-                    name: regData.name || regData.userName || regData.userInfo?.name || 'Guest',
-                    email: regData.email || regData.userEmail || regData.userInfo?.email || email,
-                    phone: regData.phone || regData.userPhone || regData.userInfo?.phone,
-                    affiliation: regData.affiliation || regData.organization || regData.userInfo?.affiliation,
-                    licenseNumber: regData.licenseNumber || regData.userInfo?.licenseNumber,
-                    tier: regData.tier,
-                    categoryName: regData.categoryName,
-                    paymentStatus: regData.paymentStatus,
-                    amount: regData.amount,
-                    agreements: regData.agreements || {},
-                    memberVerificationData: regData.memberVerificationData,
-                    currentStep: regData.currentStep || 4,
-                    formData: regData.formData
-                }
-            };
-        } catch (e: any) {
-            functions.logger.error("Resume Guest Registration Error:", e);
-            throw new functions.https.HttpsError('internal', e.message);
-        }
-    });
