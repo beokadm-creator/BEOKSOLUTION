@@ -136,20 +136,33 @@ const InfodeskPage: React.FC = () => {
             const targetConferenceId = cid || selectedConferenceId;
             if (!targetConferenceId) throw new Error("Conference ID Missing");
 
-            const regRef = doc(db, 'conferences', targetConferenceId, 'registrations', code);
-            const regSnap = await getDoc(regRef);
+            // Extract registration ID from QR code (remove BADGE- prefix if exists)
+            let regId = code;
+            if (code.startsWith('BADGE-')) {
+                regId = code.replace('BADGE-', '');
+            }
 
-            // Check if external attendee
-            const extRef = doc(db, 'conferences', targetConferenceId, 'external_attendees', code);
-            const extSnap = await getDoc(extRef);
+            // Check if external attendee (EXT- prefix)
+            const isExternalAttendee = regId.startsWith('EXT-');
+
+            let regSnap, extSnap;
+            if (isExternalAttendee) {
+                const extRef = doc(db, `conferences/${targetConferenceId}/external_attendees`, regId);
+                extSnap = await getDoc(extRef);
+                regSnap = { exists: () => false };
+            } else {
+                const regRef = doc(db, `conferences/${targetConferenceId}/registrations`, regId);
+                regSnap = await getDoc(regRef);
+                extSnap = { exists: () => false };
+            }
 
             let regData: { userName?: string; affiliation?: string; userEmail?: string; name?: string; organization?: string; status?: string; } | null = null;
             let isExternal = false;
 
-            if (regSnap.exists()) {
+            if (regSnap.exists && regSnap.exists()) {
                 regData = regSnap.data();
                 isExternal = false;
-            } else if (extSnap.exists()) {
+            } else if (extSnap.exists && extSnap.exists()) {
                 regData = extSnap.data();
                 isExternal = true;
             } else {
@@ -168,7 +181,7 @@ const InfodeskPage: React.FC = () => {
             const issueDigitalBadgeFn = httpsCallable(functions, 'issueDigitalBadge');
             const result = await issueDigitalBadgeFn({
                 confId: targetConferenceId,
-                regId: code,
+                regId: regId, // Use regId with prefix stripped
                 issueOption: issueOption,
                 isExternalAttendee: isExternal
             }) as { data: { success: boolean; badgeQr: string } };

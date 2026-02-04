@@ -12,8 +12,6 @@ import BadgePrepPage from './pages/BadgePrepPage';
 import ConferenceLoader from './components/conference/ConferenceLoader';
 import ConferencePreviewLoader from './components/conference/ConferencePreviewLoader';
 import RegistrationPage from './pages/RegistrationPage';
-import CheckStatusPage from './pages/CheckStatusPage';
-import NonMemberHubPage from './pages/NonMemberHubPage';
 import RegistrationSuccessPage from './pages/RegistrationSuccessPage';
 import RegistrationFailPage from './pages/RegistrationFailPage';
 import AbstractSubmissionPage from './pages/AbstractSubmissionPage';
@@ -51,6 +49,7 @@ import BadgeManagementPage from './pages/admin/BadgeManagementPage';
 import AdminRefundPage from './pages/admin/AdminRefundPage';
 import AbstractManagerPage from './pages/admin/AbstractManagerPage';
 import ExternalAttendeePage from './pages/admin/ExternalAttendeePage';
+import { NoticesManager } from './pages/admin/notices/NoticesManager';
 import SocietyLoginPage from './pages/SocietyLoginPage';
 import MembershipPaymentPage from './pages/MembershipPaymentPage';
 import MembershipPaymentLayout from './layouts/MembershipPaymentLayout';
@@ -134,6 +133,7 @@ const App: React.FC = () => {
                   <Route path="registrations" element={<RegistrationListPage />} />
                   <Route path="registrations/:regId" element={<RegistrationDetailPage />} />
                   <Route path="abstracts" element={<AbstractManagerPage />} />
+                  <Route path="notices" element={<NoticesManager />} />
                   <Route path="agenda" element={<AgendaManager />} />
                   <Route path="sponsors" element={<SponsorManager />} />
                   <Route path="page-editor" element={<PageEditor />} />
@@ -178,10 +178,8 @@ const App: React.FC = () => {
               <Route path="/:slug/mypage/*" element={<ConferenceMyPageRedirect />} />
               <Route path="/:slug/auth" element={<NewAuthPortal />} />
               <Route path="/:slug/register" element={<RegistrationPage />} />
-              <Route path="/:slug/check-status" element={<CheckStatusPage />} />
-              <Route path="/:slug/non-member/hub" element={<NonMemberHubPage />} />
-            <Route path="/:slug/register/success" element={<RegistrationSuccessPage />} />
-            <Route path="/:slug/register/fail" element={<RegistrationFailPage />} />
+              <Route path="/:slug/register/success" element={<RegistrationSuccessPage />} />
+              <Route path="/:slug/register/fail" element={<RegistrationFailPage />} />
               <Route path="/:slug/register/fail" element={<RegistrationFailPage />} />
               <Route path="/:slug/abstracts" element={<AbstractSubmissionPage />} />
               <Route path="/:slug/program" element={<ProgramPage />} />
@@ -304,10 +302,6 @@ const App: React.FC = () => {
 
             {/* --- PRIORITY 5: REGISTER --- */}
             <Route path="/:slug/register" element={<RegistrationPage />} />
-            {/* [Fix-Step 314] Added Check Status Route */}
-            <Route path="/:slug/check-status" element={<CheckStatusPage />} />
-            {/* [v361] Non-Member Hub */}
-            <Route path="/:slug/non-member/hub" element={<NonMemberHubPage />} />
             <Route path="/:slug/register/success" element={<RegistrationSuccessPage />} />
 
             {/* --- FALLBACK CONFERENCE ROUTES (Abstracts, Program) --- */}

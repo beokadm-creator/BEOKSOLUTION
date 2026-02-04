@@ -95,7 +95,8 @@ const RegistrationListPage: React.FC = () => {
         refresh: refreshPagination
     } = useRegistrationsPagination({
         conferenceId,
-        itemsPerPage: 50
+        itemsPerPage: 50,
+        searchQuery: searchName
     });
 
     // Auto-Resolve Slug if missing
@@ -179,14 +180,14 @@ const RegistrationListPage: React.FC = () => {
 
     const handleDeleteRegistration = async (e: React.MouseEvent, reg: RootRegistration) => {
         e.stopPropagation();
-        
+
         const confirmMessage = `다음 등록 정보를 삭제하시겠습니까?\n\n` +
             `이름: ${reg.userName || '미상'}\n` +
             `이메일: ${reg.userEmail || '미상'}\n` +
             `주문번호: ${reg.id}\n\n` +
             `⚠️ 관련된 모든 출결 데이터가 함께 삭제됩니다.\n` +
             `⚠️ 이 작업은 되돌릴 수 없습니다.`;
-            
+
         if (!confirm(confirmMessage)) return;
 
         try {
@@ -203,7 +204,7 @@ const RegistrationListPage: React.FC = () => {
         }
     };
 
-const filteredData = useMemo(() => {
+    const filteredData = useMemo(() => {
         // First, group registrations by userId to handle duplicates
         const userRegistrations = new Map<string, RootRegistration[]>();
         registrations.forEach(r => {
@@ -247,7 +248,7 @@ const filteredData = useMemo(() => {
                 } else {
                     matchesStatus = r.status === filterStatus;
                 }
-                
+
                 // Fix: Null-safe access
                 const matchesName = (r.userName ?? '').toLowerCase().includes(searchName.toLowerCase());
                 return matchesStatus && matchesName;
@@ -299,7 +300,7 @@ const filteredData = useMemo(() => {
             {/* Filters & Actions */}
             <div className="flex gap-4 mb-6 items-center flex-wrap">
                 <input
-                    placeholder="이름 검색 (Search Name)"
+                    placeholder="이름, 이메일, 전화번호 검색 (Search by Name, Email, Phone)"
                     value={searchName}
                     onChange={e => setSearchName(e.target.value)}
                     className="p-2 border rounded w-64 focus:outline-none focus:ring-2 focus:ring-[#2d80c6] rounded-xl"
@@ -424,7 +425,7 @@ const filteredData = useMemo(() => {
                     <div className="text-sm text-gray-600">
                         Showing {(currentPage - 1) * itemsPerPage + 1} to {(currentPage - 1) * itemsPerPage + registrations.length} entries (Page {currentPage}{!hasMore ? ' - Last Page' : ''})
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
                         {/* Page Size Selector */}
                         <select
@@ -491,7 +492,7 @@ const filteredData = useMemo(() => {
                     </div>
                 </div>
             )}
- 
+
             {/* Print Preview Modal */}
             <Dialog open={showPrintModal} onOpenChange={setShowPrintModal}>
                 <DialogContent className="max-w-3xl">

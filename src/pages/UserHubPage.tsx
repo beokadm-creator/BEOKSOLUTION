@@ -434,11 +434,15 @@ const UserHubPage: React.FC = () => {
                             return;
                         }
 
-                        const regPromises = snapshot.docs.map(async (docSnap) => {
+                        const regPromises = snapshot.docs.map(async (docSnap): Promise<UserReg | null> => {
                             const data = docSnap.data();
 
-                            // [CRITICAL FIX] Safely extract slug with fallback
-                            const confSlug = forceString(data.slug || data.conferenceId || data.conferenceSlug || 'kadd_2026spring');
+                            // [CRITICAL FIX] Safely extract slug without hardcoded fallback
+                            const confSlug = forceString(data.slug || data.conferenceId || data.conferenceSlug);
+                            if (!confSlug) {
+                                console.warn('[UserHub] Skipping registration with missing slug:', data);
+                                return null;
+                            }
                             let realTitle = forceString(data.conferenceName || confSlug);
                             let socName = forceString(data.societyName);
                             let loc = "장소 정보 없음";
@@ -463,75 +467,35 @@ const UserHubPage: React.FC = () => {
                                     // 🔧 [FIX] Handle multilingual title
                                     realTitle = forceString(cData.title?.ko || cData.title?.en || cData.title || cData.slug);
 
-                                    // Get venue and dates from info/general subdocument
-                                    try {
-                                        console.log('[UserHub] Fetching info/general from:', `conferences/${confId}/info/general`);
-                                        const infoDocRef = doc(db, `conferences/${confId}/info/general`);
-                                        const infoSnap = await getDoc(infoDocRef);
-                                        console.log('[UserHub] Info doc exists:', infoSnap.exists());
-                                        if (infoSnap.exists()) {
-                                            const iData = infoSnap.data();
-                                            console.log('[UserHub] Info doc data:', iData);
+                                    // Check for deprecated info/general but PREFER main doc
+                                    // Previously fetched info/general here, but it contained outdated info. 
+                                    // Now using main conference doc as single source of truth.
 
-                                            // venue can be in multiple formats:
-                                            // 1. venue.name (object: {ko: "...", en: "..."})
-                                            // 2. venueName (string)
-                                            // 3. venue (object with name/address)
-                                            const venueNameObj = iData.venue?.name || iData.venueName;
-                                            const venueName = venueNameObj
-                                                ? (typeof venueNameObj === 'string' ? venueNameObj : venueNameObj.ko || venueNameObj.en || '')
-                                                : '';
-                                            const venueAddress = iData.venue?.address || iData.venueAddress || '';
+                                    console.log('[UserHub] Using conference main doc for dates/venue');
+                                    console.log('[UserHub] Conference dates data:', cData.dates);
 
-                                            // Dates from dates field
-                                            const startDate = iData.dates?.start || iData.startDate;
-                                            const endDate = iData.dates?.end || iData.endDate;
-                                            console.log('[UserHub] Dates:', { startDate, endDate });
+                                    // Dates: Conference main doc has dates object
+                                    const dateStart = cData.dates?.start || cData.startDate || cData.dates?.startDate;
+                                    const dateEnd = cData.dates?.end || cData.endDate;
 
-                                            loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : '장소 정보 없음');
+                                    console.log('[UserHub] Parsed dates:', { dateStart, dateEnd });
 
-                                            const s = startDate ? (startDate.toDate ? startDate.toDate().toLocaleDateString('ko-KR') : forceString(startDate)) : '';
-                                            const e = endDate ? (endDate.toDate ? endDate.toDate().toLocaleDateString('ko-KR') : forceString(endDate)) : '';
-                                            dates = s === e ? s : `${s} ~ ${e}`;
-                                            receiptConfig = iData.receiptConfig;
+                                    const s = dateStart ? (dateStart.toDate ? dateStart.toDate().toLocaleDateString('ko-KR') : forceString(dateStart)) : '';
+                                    const e = dateEnd ? (dateEnd.toDate ? dateEnd.toDate().toLocaleDateString('ko-KR') : forceString(dateEnd)) : '';
+                                    dates = s === e ? s : `${s} ~ ${e}`;
 
-                                            console.log('[UserHub] Venue resolved:', { venueName, venueAddress, loc, dates });
-                                        } else {
-                                            // Fallback to main conference document
-                                            console.log('[UserHub] Info doc not found, using conference main doc');
-                                            console.log('[UserHub] Conference dates data:', cData.dates);
+                                    console.log('[UserHub] Formatted dates:', dates);
 
-                                            // Dates: Conference main doc has dates object
-                                            const dateStart = cData.dates?.start || cData.startDate || cData.dates?.startDate;
-                                            const dateEnd = cData.dates?.end || cData.endDate;
+                                    // Venue: Try multiple fields
+                                    // Prioritize venue object structure
+                                    const venueName = cData.venue?.name || cData.venueName;
+                                    const venueAddress = cData.venue?.address || cData.venueAddress;
 
-                                            console.log('[UserHub] Parsed dates:', { dateStart, dateEnd });
+                                    // Use forceString to handle {ko, en} objects
+                                    loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : '장소 정보 없음');
 
-                                            const s = dateStart ? (dateStart.toDate ? dateStart.toDate().toLocaleDateString('ko-KR') : forceString(dateStart)) : '';
-                                            const e = dateEnd ? (dateEnd.toDate ? dateEnd.toDate().toLocaleDateString('ko-KR') : forceString(dateEnd)) : '';
-                                            dates = s === e ? s : `${s} ~ ${e}`;
-
-                                            console.log('[UserHub] Formatted dates:', dates);
-
-                                            // Venue: Try multiple fields
-                                            const venueName = cData.venue?.name || cData.venueName || cData.venue?.name?.ko || cData.venue?.name?.en;
-                                            const venueAddress = cData.venue?.address || cData.venueAddress;
-
-                                            loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : '장소 정보 없음');
-
-                                            receiptConfig = cData.receipt;
-                                            console.log('[UserHub] Fallback venue resolved:', { venueName, venueAddress, loc });
-                                        }
-                                    } catch (infoErr) {
-                                        console.error('[UserHub] Info lookup failed:', infoErr);
-                                        logger.warn('UserHub', `Info lookup failed for ${confId}, using conference data`, infoErr);
-                                        // Fallback to main conference document
-                                        loc = forceString(cData.location || cData.venue?.name || cData.venue?.address || '장소 정보 없음');
-                                        const s = forceString(cData.dates?.start || cData.startDate);
-                                        const e = forceString(cData.dates?.end || cData.endDate);
-                                        dates = s === e ? s : `${s} ~ ${e}`;
-                                        receiptConfig = cData.receipt;
-                                    }
+                                    receiptConfig = cData.receipt;
+                                    console.log('[UserHub] Venue resolved:', { venueName, venueAddress, loc });
                                 }
                             } catch (err) {
                                 logger.error('UserHub', `Conference lookup failed for slug: ${confSlug}`, err);
@@ -577,9 +541,31 @@ const UserHubPage: React.FC = () => {
                         });
 
                         const loadedRegs = await Promise.all(regPromises);
-                        console.log('[UserHub] Loaded registrations:', loadedRegs);
-                        setRegs(loadedRegs);
-                        setTotalPoints(loadedRegs.reduce((acc, r) => acc + (r.earnedPoints ?? 0), 0));
+                        const validRegs = loadedRegs.filter((r) => r !== null) as UserReg[];
+                        console.log('[UserHub] Loaded registrations:', validRegs);
+
+                        // [Fix] Filter out REFUNDED (canceled) registrations
+                        // [Fix] DEDUPLICATE: Keep only one entry per conference slug (prefer PAID > PENDING)
+                        // This handles cases where bad data caused duplicates or multiple entries exist
+                        const uniqueRegsMap = new Map<string, UserReg>();
+
+                        validRegs.forEach(r => {
+                            if (r.paymentStatus === 'REFUNDED') return;
+
+                            const existing = uniqueRegsMap.get(r.slug);
+                            if (!existing) {
+                                uniqueRegsMap.set(r.slug, r);
+                            } else {
+                                // If duplicate exists, favor PAID over others, or newer over older
+                                if (r.paymentStatus === 'PAID' && existing.paymentStatus !== 'PAID') {
+                                    uniqueRegsMap.set(r.slug, r);
+                                }
+                            }
+                        });
+
+                        const activeRegs = Array.from(uniqueRegsMap.values());
+                        setRegs(activeRegs);
+                        setTotalPoints(activeRegs.reduce((acc, r) => acc + (r.earnedPoints ?? 0), 0));
                         setSyncStatus('connected');
                         setLoading(false);
                     } catch (err) {
@@ -603,27 +589,40 @@ const UserHubPage: React.FC = () => {
 
             unsubscribe = onSnapshot(qReg, async (snapshot) => {
                 try {
-                    const regPromises = snapshot.docs.map(async (docSnap) => {
+                    const regPromises = snapshot.docs.map(async (docSnap): Promise<UserReg | null> => {
                         const data = docSnap.data();
 
-                        // [CRITICAL FIX] Safely extract slug with fallback
-                        const confSlug = forceString(data.slug || data.conferenceId || data.conferenceSlug || 'kadd_2026spring');
+                        // [CRITICAL FIX] Safely extract slug without hardcoded fallback
+                        const confSlug = forceString(data.slug || data.conferenceId || data.conferenceSlug);
+                        if (!confSlug) {
+                            console.warn('[UserHub] Skipping realtime registration with missing slug:', data);
+                            return null; // Will filter out later
+                        }
                         let realTitle = forceString(data.conferenceName || confSlug);
                         let socName = forceString(data.societyName);
                         let loc = "장소 정보 없음";
                         let dates = "";
                         let receiptConfig: ReceiptConfig | undefined = undefined;
+                        let cData: { societyId?: string;[key: string]: unknown } | undefined = undefined;
 
                         // JOIN 1: Conference Details
                         try {
                             const confQ = query(collection(db, 'conferences'), where('slug', '==', confSlug));
                             const confSnap = await getDocs(confQ);
                             if (!confSnap.empty) {
-                                const cData = confSnap.docs[0].data();
-                                realTitle = forceString(cData.title);
-                                loc = forceString(cData.location || cData.venue);
-                                const s = forceString(cData.dates?.start || cData.startDate);
-                                const e = forceString(cData.dates?.end || cData.endDate);
+                                cData = confSnap.docs[0].data();
+                                realTitle = forceString(cData.title?.ko || cData.title?.en || cData.title);
+
+                                // Logic aligned with fallback (non-realtime) block
+                                const venueName = cData.venue?.name || cData.venueName;
+                                const venueAddress = cData.venue?.address || cData.venueAddress;
+                                loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : forceString(cData.location || '장소 정보 없음'));
+
+                                const dateStart = cData.dates?.start || cData.startDate || cData.dates?.startDate;
+                                const dateEnd = cData.dates?.end || cData.endDate;
+
+                                const s = dateStart ? (dateStart.toDate ? dateStart.toDate().toLocaleDateString('ko-KR') : forceString(dateStart)) : '';
+                                const e = dateEnd ? (dateEnd.toDate ? dateEnd.toDate().toLocaleDateString('ko-KR') : forceString(dateEnd)) : '';
                                 dates = s === e ? s : `${s} ~ ${e}`;
                                 receiptConfig = cData.receipt;
                             }
@@ -672,8 +671,27 @@ const UserHubPage: React.FC = () => {
                     });
 
                     const loadedRegs = await Promise.all(regPromises);
-                    setRegs(loadedRegs);
-                    setTotalPoints(loadedRegs.reduce((acc, r) => acc + (r.earnedPoints ?? 0), 0));
+                    const validRegs = loadedRegs.filter((r) => r !== null) as UserReg[];
+
+                    // [Fix] Filter out REFUNDED (canceled) registrations & Deduplicate
+                    const uniqueRegsMap = new Map<string, UserReg>();
+
+                    validRegs.forEach(r => {
+                        if (r.paymentStatus === 'REFUNDED') return;
+
+                        const existing = uniqueRegsMap.get(r.slug);
+                        if (!existing) {
+                            uniqueRegsMap.set(r.slug, r);
+                        } else {
+                            if (r.paymentStatus === 'PAID' && existing.paymentStatus !== 'PAID') {
+                                uniqueRegsMap.set(r.slug, r);
+                            }
+                        }
+                    });
+
+                    const activeRegs = Array.from(uniqueRegsMap.values());
+                    setRegs(activeRegs);
+                    setTotalPoints(activeRegs.reduce((acc, r) => acc + (r.earnedPoints ?? 0), 0));
 
                     setSyncStatus('connected');
                 } catch (processError) {

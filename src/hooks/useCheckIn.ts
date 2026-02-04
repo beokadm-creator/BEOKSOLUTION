@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { updateDoc, doc } from 'firebase/firestore';
+import { updateDoc, doc, getDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Registration, ConferenceUser } from '../types/schema';
+import { Registration, ConferenceUser, ConferenceInfo } from '../types/schema';
 import { generateBadgeQr } from '../utils/transaction';
 import { printBadge } from '../utils/printer';
 
@@ -22,26 +22,48 @@ export const useCheckIn = (conferenceId: string) => {
         setScannedUser(null);
 
         try {
-            // Parse JSON: { type: 'CONFIRM', regId, userId, t }
-            let parsed;
-            try {
-                parsed = JSON.parse(qrData);
-            } catch {
-                throw new Error("Invalid QR Format. Not a Confirmation QR.");
+            // [Modified] Support CONF- prefix
+            let targetRegId = qrData;
+
+            if (qrData.startsWith('CONF-')) {
+                targetRegId = qrData.replace('CONF-', '');
+            } else {
+                try {
+                    const parsed = JSON.parse(qrData);
+                    if (parsed.type === 'CONFIRM' && parsed.regId) targetRegId = parsed.regId;
+                } catch { }
             }
 
-            if (parsed.type !== 'CONFIRM') {
-                 throw new Error("Wrong QR Type. This is not a Confirmation QR.");
-            }
+            if (!targetRegId) throw new Error("유효하지 않은 QR 코드입니다.");
 
-            const regRef = doc(db, `conferences/${conferenceId}/registrations/${parsed.regId}`);
-            const regSnap = await getDoc(regRef);
+            console.log('[useCheckIn] Scanning QR:', { qrData, targetRegId });
 
+            // CRITICAL FIX: Try to find registration by document ID first
+            let regRef = doc(db, `conferences/${conferenceId}/registrations/${targetRegId}`);
+            let regSnap = await getDoc(regRef);
+
+            // If not found by document ID, try to find by confirmationQr field
             if (!regSnap.exists()) {
-                throw new Error("Registration not found.");
+                console.log('[useCheckIn] Not found by doc ID, searching by confirmationQr field');
+                const { query, where, collection, getDocs } = await import('firebase/firestore');
+                const q = query(
+                    collection(db, `conferences/${conferenceId}/registrations`),
+                    where('confirmationQr', '==', targetRegId)
+                );
+                const querySnap = await getDocs(q);
+
+                if (querySnap.empty) {
+                    throw new Error("등록 정보를 찾을 수 없습니다.");
+                }
+
+                // Use the first matching registration
+                regSnap = querySnap.docs[0];
+                console.log('[useCheckIn] Found by confirmationQr:', regSnap.id);
+            } else {
+                console.log('[useCheckIn] Found by doc ID:', regSnap.id);
             }
 
-            const regData = regSnap.data() as Registration;
+            const regData = { ...regSnap.data(), id: regSnap.id } as Registration;
 
             const userRef = doc(db, `conferences/${conferenceId}/users/${regData.userId}`);
             const userSnap = await getDoc(userRef);
@@ -66,7 +88,7 @@ export const useCheckIn = (conferenceId: string) => {
             // Check if already checked in?
             // If already checked in, we might be re-issuing (Reprint)
             // But if badgeQr is null, it's first time.
-            
+
             let badgeQr = scannedReg.badgeQr;
             let isNewIssue = false;
 
@@ -107,7 +129,7 @@ export const useCheckIn = (conferenceId: string) => {
             }
 
             setStatus({ loading: false, error: null, message: `Badge ${isNewIssue ? 'Issued' : 'Reprinted'} Successfully!` });
-            
+
             setScannedReg({ ...scannedReg, badgeQr, isCheckedIn: true });
 
         } catch (err: unknown) {

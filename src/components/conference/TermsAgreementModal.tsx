@@ -81,7 +81,7 @@ export default function TermsAgreementModal({
   // Check if term exists (has content)
   const termExists = (key: string): boolean => {
     const content = getTermContent(key);
-    const exists = content && content.trim().length > 0;
+    const exists = content && typeof content === 'string' && content.trim().length > 0;
     console.log(`[TermsAgreementModal] Term '${key}' exists=${exists}`);
     return exists;
   };

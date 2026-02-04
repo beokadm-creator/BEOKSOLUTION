@@ -6,7 +6,7 @@ import { useSubdomain } from '../hooks/useSubdomain';
 import { doc, getDoc, collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { LayoutDashboard, Globe, FileText, Users, Settings, QrCode, Monitor, CreditCard, LogOut, ArrowLeft, Printer, BarChart, UserPlus, Building2 } from 'lucide-react';
+import { LayoutDashboard, Globe, FileText, Users, Settings, QrCode, Monitor, CreditCard, LogOut, ArrowLeft, Printer, BarChart, UserPlus, Building2, Bell } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/ui/button';
 
@@ -75,6 +75,7 @@ export default function ConfLayout() {
         { href: `/admin/conf/${cid}/sponsors`, label: '스폰서 관리', icon: Building2 },
         { href: `/admin/conf/${cid}/agenda`, label: '프로그램', icon: FileText },
         { href: `/admin/conf/${cid}/abstracts`, label: '초록 관리', icon: FileText },
+        { href: `/admin/conf/${cid}/notices`, label: '공지사항 관리', icon: Bell },
         { href: `/admin/conf/${cid}/registrations`, label: '등록자 관리', icon: Users },
         { href: `/admin/conf/${cid}/external-attendees`, label: '외부 참석자', icon: UserPlus },
         { href: `/admin/conf/${cid}/infodesk`, label: '인포데스크', icon: Printer },

@@ -75,6 +75,7 @@ export const onRegistrationCreated = functions.firestore
       // Update registration with token reference
       await db.collection(`conferences/${confId}/registrations`).doc(regId).update({
         badgePrepToken: token,
+        confirmationQr: regId, // Use regId directly without CONF- prefix for InfoDesk scanning
         updatedAt: now
       });
 

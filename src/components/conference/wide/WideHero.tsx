@@ -38,6 +38,7 @@ export const WideHero: React.FC<WideHeroProps> = ({
   subtitle,
   period,
   venueName,
+  category,
   societyName,
   bgImage,
   lang,
@@ -46,6 +47,7 @@ export const WideHero: React.FC<WideHeroProps> = ({
   const { auth } = useAuth();
   const { conferenceId: urlConfId } = useParams<{ conferenceId?: string }>();
   const [showModal, setShowModal] = useState(false);
+  const [modalInitialMode, setModalInitialMode] = useState<'member-auth' | 'non-member' | 'registration-check'>('member-auth');
   const [isRegistered, setIsRegistered] = useState<boolean>(false);
 
   // Extract societyId from confId (format: kadd_2026spring)
@@ -149,7 +151,7 @@ export const WideHero: React.FC<WideHeroProps> = ({
             alt="Conference Hero"
             loading="eager"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/80 via-slate-900/60 to-slate-900/90" />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/70" />
         </div>
       )}
 
@@ -190,10 +192,13 @@ export const WideHero: React.FC<WideHeroProps> = ({
                 // 아직 등록하지 않은 회원: 등록하기 버튼 -> 모달 표시
                 <button
                   type="button"
-                  onClick={() => setShowModal(true)}
+                  onClick={() => {
+                    setModalInitialMode('member-auth');
+                    setShowModal(true);
+                  }}
                   className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-blue-900/30 hover:shadow-blue-900/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98]"
                 >
-                  {lang === 'ko' ? '등록하기' : 'Register Now'}
+                  {lang === 'ko' ? '등록(조회)하기' : 'Register / Check'}
                 </button>
               )}
             </>
@@ -201,17 +206,23 @@ export const WideHero: React.FC<WideHeroProps> = ({
             // 비로그인: 등록하기 버튼 (클릭 시 모달 표시)
             <button
               type="button"
-              onClick={() => setShowModal(true)}
+              onClick={() => {
+                setModalInitialMode('member-auth');
+                setShowModal(true);
+              }}
               className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-blue-900/30 hover:shadow-blue-900/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98]"
             >
-              {lang === 'ko' ? '등록하기' : 'Register Now'}
+              {lang === 'ko' ? '등록(조회)하기' : 'Register / Check'}
             </button>
           )}
 
           {!auth.user && (
             <button
               type="button"
-              onClick={() => setShowModal(true)}
+              onClick={() => {
+                setModalInitialMode('registration-check');
+                setShowModal(true);
+              }}
               className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/40 text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98]"
             >
               {lang === 'ko' ? '등록조회' : 'Registration Lookup'}
@@ -244,11 +255,15 @@ export const WideHero: React.FC<WideHeroProps> = ({
       {/* MODAL - New Registration Modal */}
       <RegistrationModal
         isOpen={showModal}
-        onClose={() => setShowModal(false)}
+        onClose={() => {
+          setShowModal(false);
+          setTimeout(() => setModalInitialMode('member-auth'), 300);
+        }}
         societyId={societyId}
         societyName={typeof societyName === 'string' ? societyName : (lang === 'ko' ? societyName?.ko : societyName?.en) || societyId}
         confId={confIdToUse || ''}
         lang={lang as 'ko' | 'en'}
+        initialMode={modalInitialMode}
       />
     </section>
   );

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
-import { useNonMemberAuth } from '../../../hooks/useNonMemberAuth';
+
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../../firebase';
 
@@ -49,7 +49,7 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
   const { auth } = useAuth();
   const { conferenceId: urlConfId } = useParams<{ conferenceId?: string }>();
   const [showModal, setShowModal] = useState(false);
-  const [modalInitialMode, setModalInitialMode] = useState<'member-auth' | 'non-member' | 'registration-lookup'>('member-auth');
+  const [modalInitialMode, setModalInitialMode] = useState<'member-auth' | 'non-member' | 'registration-check'>('member-auth');
   const [modalRedirectUrl, setModalRedirectUrl] = useState<string | undefined>(undefined);
   const [isRegistered, setIsRegistered] = useState<boolean>(false);
 
@@ -77,27 +77,7 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
 
   const targetSlug = slug || urlSlug;
 
-  // Determine effective ConfId for non-member auth
-  let effectiveConfId = propConfId;
-  if (!effectiveConfId) {
-    if (urlConfId) {
-      effectiveConfId = urlConfId;
-    } else if (slug && slug.includes('_')) {
-      effectiveConfId = slug;
-    } else if (typeof window !== 'undefined') {
-      const hostname = window.location.hostname;
-      const parts = hostname.split('.');
-      let societyIdToUse = 'kadd';
 
-      if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') {
-        societyIdToUse = parts[0].toLowerCase();
-      }
-
-      effectiveConfId = `${societyIdToUse}_${targetSlug}`;
-    }
-  }
-
-  const { nonMember } = useNonMemberAuth(effectiveConfId);
 
   // 2. 등록 여부 확인 (로그인한 회원만)
   useEffect(() => {
@@ -176,7 +156,7 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
             alt="Conference Hero"
             loading="eager"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/80 via-slate-900/60 to-slate-900/90" />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/70" />
         </div>
       )}
 
@@ -215,7 +195,7 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
                   onClick={() => setShowModal(true)}
                   className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-blue-900/30 hover:shadow-blue-900/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98]"
                 >
-                  {lang === 'ko' ? '등록(조회)하기' : 'Register'}
+                  {lang === 'ko' ? '등록(조회)하기' : 'Register / Check'}
                 </button>
               )}
             </>
@@ -226,17 +206,17 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
               onClick={() => setShowModal(true)}
               className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-blue-900/30 hover:shadow-blue-900/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98]"
             >
-              {lang === 'ko' ? '등록(조회)하기' : 'Register'}
+              {lang === 'ko' ? '등록(조회)하기' : 'Register / Check'}
             </button>
           )}
 
           <button
             type="button"
             onClick={() => {
-              if (auth.user || nonMember) {
+              if (auth.user) {
                 navigate(`/${targetSlug}/abstracts?lang=${lang}`);
               } else {
-                setModalInitialMode('registration-lookup');
+                setModalInitialMode('registration-check');
                 setModalRedirectUrl(`/${targetSlug}/abstracts?lang=${lang}`);
                 setShowModal(true);
               }
@@ -259,8 +239,6 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
           </span>
         </div>
       </div>
-
-      {/* 3. Floating Info Bar (Removed as per request to use Chip style below title) */}
 
       {/* MODAL - New Registration Modal */}
       <RegistrationModal

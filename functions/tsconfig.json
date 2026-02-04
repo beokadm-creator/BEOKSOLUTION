@@ -6,8 +6,11 @@
     "outDir": "lib",
     "sourceMap": true,
     "strict": true,
+    "noImplicitAny": false,
     "target": "es2018",
-    "lib": ["es2018"],
+    "lib": [
+      "es2018"
+    ],
     "skipLibCheck": true,
     "moduleResolution": "node",
     "esModuleInterop": true,

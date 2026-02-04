@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAdminStore } from '../../store/adminStore';
 import { Sponsor, SponsorDoc, SponsorTier } from '../../types/schema';
-import { Timestamp, collection, getDocs, doc, setDoc, updateDoc, deleteDoc, writeBatch, query, orderBy, deleteField } from 'firebase/firestore';
+import { Timestamp, collection, getDocs, doc, setDoc, updateDoc, deleteDoc, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -11,7 +11,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ImageUpload from '../../components/ui/ImageUpload';
 import toast from 'react-hot-toast';
-import { Plus, Save, Trash2, ArrowUp, ArrowDown, Building2, ExternalLink, Eye, EyeOff } from 'lucide-react';
+import { Plus, Save, Trash2, ArrowUp, ArrowDown, Building2, EyeOff } from 'lucide-react';
 
 const SponsorManager: React.FC = () => {
   const { selectedConferenceId: confId } = useAdminStore();

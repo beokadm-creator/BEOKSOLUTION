@@ -33,7 +33,9 @@ export interface RootRegistration {
 interface UseRegistrationsPaginationParams {
     conferenceId: string | null;
     itemsPerPage?: number;
+    searchQuery?: string; // 검색어 (이름, 이메일, 전화번호)
 }
+
 
 interface UseRegistrationsPaginationReturn {
     registrations: RootRegistration[];
@@ -58,7 +60,8 @@ interface UseRegistrationsPaginationReturn {
  */
 export function useRegistrationsPagination({
     conferenceId,
-    itemsPerPage: initialItemsPerPage = 50
+    itemsPerPage: initialItemsPerPage = 50,
+    searchQuery = ''
 }: UseRegistrationsPaginationParams): UseRegistrationsPaginationReturn {
     const [registrations, setRegistrations] = useState<RootRegistration[]>([]);
     const [loading, setLoading] = useState(true);
@@ -122,6 +125,29 @@ export function useRegistrationsPagination({
                         flattened.userPhone = docData.userInfo.phone || docData.userPhone;
                         flattened.affiliation = docData.userInfo.affiliation || docData.affiliation;
                         flattened.licenseNumber = docData.userInfo.licenseNumber || docData.licenseNumber;
+
+                        // [Fix] Map grade/tier from userInfo if available
+                        if (!flattened.tier && docData.userInfo.grade) {
+                            flattened.tier = docData.userInfo.grade;
+                        }
+                    }
+
+                    // [Fix] Map schema-defined userTier to tier if tier is missing
+                    if (!flattened.tier && docData.userTier) {
+                        flattened.tier = docData.userTier;
+                    }
+
+                    // [Fix] Fallback to categoryName if tier is still missing (for display)
+                    if (!flattened.tier && docData.categoryName) {
+                        flattened.tier = docData.categoryName;
+                    }
+
+                    // [Fix] Fallback for licenseNumber if still missing
+                    if (!flattened.licenseNumber) {
+                        if (docData.license) flattened.licenseNumber = docData.license;
+                        else if (docData.userInfo?.licensenumber) flattened.licenseNumber = docData.userInfo.licensenumber;
+                        // Check formData as last resort (some legacy data might be here)
+                        else if (docData.formData?.licenseNumber) flattened.licenseNumber = docData.formData.licenseNumber;
                     }
 
                     return flattened;
@@ -135,7 +161,19 @@ export function useRegistrationsPagination({
                 // Check if more pages available
                 setHasMore(snap.docs.length === itemsPerPage);
 
-                setRegistrations(data);
+                // Client-side filtering by search query
+                let filteredData = data;
+                if (searchQuery && searchQuery.trim()) {
+                    const query = searchQuery.toLowerCase().trim();
+                    filteredData = data.filter(reg => {
+                        const name = (reg.userName || '').toLowerCase();
+                        const email = (reg.userEmail || '').toLowerCase();
+                        const phone = (reg.userPhone || '').toLowerCase();
+                        return name.includes(query) || email.includes(query) || phone.includes(query);
+                    });
+                }
+
+                setRegistrations(filteredData);
             } catch (err: unknown) {
                 setError((err instanceof Error ? err.message : 'Unknown error') + " (Check Console for Link)");
             } finally {
@@ -144,7 +182,7 @@ export function useRegistrationsPagination({
         };
 
         loadData();
-    }, [conferenceId, currentPage, itemsPerPage]);
+    }, [conferenceId, currentPage, itemsPerPage, searchQuery]);
 
     /**
      * Refresh data (reset to page 1)

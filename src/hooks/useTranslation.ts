@@ -122,12 +122,27 @@ export const useTranslation = (slug: string) => {
         let docData: ConferenceData | null = null;
         let confId = slug;
 
+        // 🚨 [Fix] Determine societyId from hostname for domain-based filtering
+        const hostname = window.location.hostname;
+        const parts = hostname.split('.');
+        let domainSocietyId: string | null = null;
+        if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') {
+          domainSocietyId = parts[0]; // e.g., 'kadd' from kadd.eregi.co.kr
+        }
+
         // 1. 메인 문서 Fetch (slug 필드 우선 - 더 유연한 매칭)
+        // 🚨 [Fix] Query by slug, then filter by societyId in memory (no index needed)
         const q = query(collection(db, 'conferences'), where('slug', '==', slug));
         const querySnap = await getDocs(q);
 
-        if (!querySnap.empty) {
-          docData = { id: querySnap.docs[0].id, ...querySnap.docs[0].data() } as ConferenceData & { id: string };
+        // Filter by societyId if on subdomain
+        const matchingDocs = querySnap.docs.filter(doc => {
+          if (!domainSocietyId) return true; // No filter on main domain
+          return doc.data().societyId === domainSocietyId;
+        });
+
+        if (matchingDocs.length > 0) {
+          docData = { id: matchingDocs[0].id, ...matchingDocs[0].data() } as ConferenceData & { id: string };
           confId = docData.id as string;
         } else {
           // Fallback: ID 직접 검색

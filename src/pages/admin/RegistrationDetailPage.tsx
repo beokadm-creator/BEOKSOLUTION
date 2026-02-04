@@ -7,6 +7,25 @@ import { ArrowLeft, Printer, XCircle, CheckCircle, CreditCard } from 'lucide-rea
 import toast from 'react-hot-toast';
 import { Registration } from '../../types/schema';
 
+// Extended type for flattened data in UI
+interface ExtendedRegistration extends Registration {
+    tier?: string;
+    grade?: string;
+    categoryName?: string;
+    userOrg?: string;
+    paymentKey?: string;
+    paidAt?: any; // Handles Date, Timestamp, string
+    orderId?: string;
+    paymentType?: string;
+    method?: string;
+    userInfo?: {
+        licenseNumber?: string;
+        grade?: string;
+        [key: string]: any;
+    };
+    license?: string; // For explicit fallback
+}
+
 const getConferenceIdByDomain = () => {
     const hostname = window.location.hostname;
     if (hostname.includes('kap.eregi')) {
@@ -34,7 +53,7 @@ const RegistrationDetailPage: React.FC = () => {
     const { cid, regId } = useParams<{ cid: string; regId: string }>();
     const id = regId;
     const navigate = useNavigate();
-    const [data, setData] = useState<Registration | null>(null);
+    const [data, setData] = useState<ExtendedRegistration | null>(null);
     const [loading, setLoading] = useState(true);
     const [canceling, setCanceling] = useState(false);
     const [effectiveCid, setEffectiveCid] = useState<string | null>(null);
@@ -56,7 +75,7 @@ const RegistrationDetailPage: React.FC = () => {
                 const snap = await getDoc(ref);
                 if (snap.exists()) {
                     const docData = snap.data();
-                    const flattened = { id: snap.id, ...docData } as Registration & { id: string };
+                    const flattened = { id: snap.id, ...docData } as ExtendedRegistration;
 
                     // Flatten userInfo fields to top level for display
                     if (docData.userInfo) {
@@ -65,6 +84,22 @@ const RegistrationDetailPage: React.FC = () => {
                         flattened.userPhone = docData.userInfo.phone || docData.userPhone;
                         flattened.affiliation = docData.userInfo.affiliation || docData.affiliation;
                         flattened.licenseNumber = docData.userInfo.licenseNumber || docData.licenseNumber;
+
+                        // [Fix] Map grade/tier from userInfo if available
+                        if (!flattened.tier && docData.userInfo.grade) {
+                            flattened.tier = docData.userInfo.grade;
+                        }
+                    }
+
+                    // [Fix] Map schema-defined userTier to tier if tier is missing
+                    if (!flattened.tier && docData.userTier) {
+                        // @ts-ignore - Dynamic key injection
+                        flattened.tier = docData.userTier;
+                    }
+
+                    // [Fix] Fallback for licenseNumber
+                    if (!flattened.licenseNumber && docData.license) {
+                        flattened.licenseNumber = docData.license;
                     }
 
                     // [Fix] Extract payment details from nested object if available
@@ -99,24 +134,25 @@ const RegistrationDetailPage: React.FC = () => {
 
     const handlePaymentCancel = async () => {
         if (!effectiveCid || !id || !data) return;
-        if (!confirm('정말로 결제를 취소하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
+        if (!confirm('정말로 결제를 취소하시겠습니까? PG 승인 취소가 진행되며, 이 작업은 되돌릴 수 없습니다.')) return;
 
         setCanceling(true);
         try {
-            const regRef = doc(db, 'conferences', effectiveCid, 'registrations', id);
-            await updateDoc(regRef, {
-                status: 'CANCELED',
-                canceledAt: Timestamp.now()
+            // [Modified] Call Cloud Function to Cancel Payment via PG API
+            const { httpsCallable } = await import('firebase/functions');
+            const { functions } = await import('../../firebase'); // Dynamic import to ensure init
+
+            const cancelFn = httpsCallable(functions, 'cancelTossPayment');
+
+            await cancelFn({
+                paymentKey: data.paymentKey,
+                cancelReason: 'Admin Manual Cancel',
+                confId: effectiveCid,
+                regId: id
             });
 
-            await addDoc(collection(db, `conferences/${effectiveCid}/registrations/${id}/logs`), {
-                type: 'PAYMENT_CANCELED',
-                timestamp: Timestamp.now(),
-                method: 'ADMIN_MANUAL',
-                amount: data.amount,
-                paymentKey: data.paymentKey
-            });
-
+            // DB Updates are handled by Cloud Function now (or we can double check/refresh here)
+            // But for UI feedback:
             toast.success('결제가 취소되었습니다.');
             setData((prev) => prev ? { ...prev, status: 'CANCELED' as const } : null);
         } catch (error) {
@@ -204,17 +240,16 @@ const RegistrationDetailPage: React.FC = () => {
                 </div>
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">등록상태 (Status)</h3>
-                    <span className={`px-2 py-1 rounded font-bold ${
-                        data.status === 'PAID' ? 'bg-green-100 text-green-800' :
+                    <span className={`px-2 py-1 rounded font-bold ${data.status === 'PAID' ? 'bg-green-100 text-green-800' :
                         data.status === 'REFUND_REQUESTED' ? 'bg-yellow-100 text-yellow-800' :
-                        data.status === 'REFUNDED' ? 'bg-blue-100 text-blue-800' :
-                        data.status === 'CANCELED' ? 'bg-red-100 text-red-800' :
-                        'bg-gray-100 text-gray-800'
-                    }`}>
+                            data.status === 'REFUNDED' ? 'bg-blue-100 text-blue-800' :
+                                data.status === 'CANCELED' ? 'bg-red-100 text-red-800' :
+                                    'bg-gray-100 text-gray-800'
+                        }`}>
                         {data.status === 'PAID' ? '결제완료' :
-                         data.status === 'REFUND_REQUESTED' ? '환불요청' :
-                         data.status === 'REFUNDED' ? '환불완료' :
-                         data.status === 'CANCELED' ? '취소됨' : data.status}
+                            data.status === 'REFUND_REQUESTED' ? '환불요청' :
+                                data.status === 'REFUNDED' ? '환불완료' :
+                                    data.status === 'CANCELED' ? '취소됨' : data.status}
                     </span>
                 </div>
 
@@ -240,11 +275,11 @@ const RegistrationDetailPage: React.FC = () => {
 
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">면허번호 (License)</h3>
-                    <p className="text-lg">{data.licenseNumber || data.userInfo?.licenseNumber || '-'}</p>
+                    <p className="text-lg">{data.licenseNumber || data.userInfo?.licenseNumber || data.userInfo?.licensenumber || (data as any).license || (data as any).formData?.licenseNumber || '-'}</p>
                 </div>
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">등록등급 (Grade)</h3>
-                    <p className="text-lg">{data.tier || data.categoryName || data.grade || '-'}</p>
+                    <p className="text-lg">{data.tier || data.userTier || data.categoryName || data.grade || '-'}</p>
                 </div>
 
                 <div className="col-span-2 border-t my-2"></div>
@@ -261,11 +296,11 @@ const RegistrationDetailPage: React.FC = () => {
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">결제일시 (Paid At)</h3>
                     <p className="text-lg">
-                        {data.paidAt 
-                            ? (data.paidAt instanceof Date 
-                                ? data.paidAt.toLocaleString() 
-                                : (typeof data.paidAt === 'object' && 'toDate' in data.paidAt 
-                                    ? (data.paidAt as { toDate: () => Date }).toDate().toLocaleString() 
+                        {data.paidAt
+                            ? (data.paidAt instanceof Date
+                                ? data.paidAt.toLocaleString()
+                                : (typeof data.paidAt === 'object' && 'toDate' in data.paidAt
+                                    ? (data.paidAt as { toDate: () => Date }).toDate().toLocaleString()
                                     : String(data.paidAt)))
                             : '-'}
                     </p>

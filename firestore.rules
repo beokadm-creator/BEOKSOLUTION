@@ -59,6 +59,12 @@ service cloud.firestore {
          allow read: if request.auth != null && (resource.data.vendorId == request.auth.uid || resource.data.vendorId == request.auth.token.vendorId);
          allow create: if request.auth != null && request.resource.data.vendorId == request.auth.uid;
       }
+
+      // Notices: Public read, admin write (override from above)
+      match /notices/{noticeId} {
+         allow read: if true;  // Public read access
+         allow write: if request.auth != null && request.auth.token.email == 'aaron@beoksolution.com';  // Admin only write
+      }
     }
 
     // [FIX] Allow collection group queries for registrations (My Page issue)

@@ -9,7 +9,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../..
 import { LogOut, Plus, Building2, Calendar, Edit, Save, Users, Settings, Trash2, Key, ShieldCheck, Search, Filter } from 'lucide-react';
 import { auth, functions } from '../../firebase';
 import { httpsCallable } from 'firebase/functions';
-import { doc, updateDoc, getDocs, collection, getDoc, setDoc, deleteDoc, addDoc, query, where } from 'firebase/firestore';
+import { doc, updateDoc, getDocs, collection, getDoc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 import { Badge } from '../../components/ui/badge';
@@ -65,50 +65,20 @@ const SuperAdminPage: React.FC = () => {
         console.log('[SuperAdminPage] fetchMembers called, currentSocietyId:', currentSocietyId);
         setLoadingMembers(true);
         try {
-            const q = query(collection(db, 'conferences'), where('societyId', '==', currentSocietyId));
-            const confSnap = await getDocs(q);
-            console.log('[SuperAdminPage] Conferences for society:', confSnap.docs.length, confSnap.docs.map(d => d.id));
+            // Directly fetch all users from /users collection
+            const usersRef = collection(db, 'users');
+            const userSnap = await getDocs(usersRef);
 
-            if (confSnap.docs.length === 0) {
-                setMembers([]);
-                setLoadingMembers(false);
-                return;
-            }
-
-            const conferenceIds = confSnap.docs.map(d => d.id);
-            const regPromises = conferenceIds.map(confId =>
-                getDocs(collection(db, 'conferences', confId, 'registrations'))
-            );
-            const regSnaps = await Promise.all(regPromises);
-
-            const userIds = new Set<string>();
-            regSnaps.forEach(regSnap => {
-                regSnap.docs.forEach(regDoc => {
-                    const regData = regDoc.data() as { id: string; userId: string; conferenceId: string; [key: string]: unknown };
-                    if (regData.userId) {
-                        userIds.add(regData.userId);
-                    }
-                });
-            });
-
-            console.log('[SuperAdminPage] Unique user IDs from registrations:', userIds.size, Array.from(userIds));
-
-            if (userIds.size === 0) {
-                setMembers([]);
-                setLoadingMembers(false);
-                return;
-            }
-
-            const userPromises = Array.from(userIds).map(uid =>
-                getDoc(doc(db, 'users', uid))
-            );
-            const userSnaps = await Promise.all(userPromises);
+            console.log('[SuperAdminPage] Total users in /users collection:', userSnap.docs.length);
 
             const membersList: Array<{ id: string; name?: string; email?: string; phone?: string; organization?: string; affiliation?: string; marketingAgreed?: boolean; infoAgreed?: boolean; createdAt?: { seconds: number } }> = [];
-            userSnaps.forEach(userSnap => {
-                if (userSnap.exists()) {
-                    membersList.push({ id: userSnap.id, ...userSnap.data() as { name?: string; email?: string; phone?: string; organization?: string; affiliation?: string; marketingAgreed?: boolean; infoAgreed?: boolean; createdAt?: { seconds: number } } });
-                }
+
+            userSnap.docs.forEach(userDoc => {
+                const userData = userDoc.data() as { name?: string; email?: string; phone?: string; organization?: string; affiliation?: string; marketingAgreed?: boolean; infoAgreed?: boolean; createdAt?: { seconds: number } };
+                membersList.push({
+                    id: userDoc.id,
+                    ...userData
+                });
             });
 
             console.log('[SuperAdminPage] Final members count:', membersList.length);
@@ -126,7 +96,7 @@ const SuperAdminPage: React.FC = () => {
         if (!currentSocietyId && societies.length > 0) {
             setCurrentSocietyId(societies[0].id);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [societies]);
 
     useEffect(() => {

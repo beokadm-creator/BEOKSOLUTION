@@ -44,6 +44,13 @@ export const WideContentPreview: React.FC<WideContentPreviewProps> = ({
   const renderContent = () => {
     switch (activeSection) {
       case 'welcome':
+        // Debug: Log the welcome message data
+        console.log('[WideContentPreview] Welcome Message Data:', {
+          raw: config.welcomeMessage,
+          translated: t(config.welcomeMessage),
+          lang: lang
+        });
+
         return (
           <section id="section-welcome" className="animate-fade-in space-y-16">
             <WideAboutPreview

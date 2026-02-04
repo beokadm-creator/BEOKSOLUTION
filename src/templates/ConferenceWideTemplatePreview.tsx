@@ -85,7 +85,7 @@ export const ConferenceWideTemplatePreview = ({ slug }: Props) => {
   const tabItems = [
     { id: 'welcome', icon: Home, label: { ko: '홈', en: 'Home' } },
     { id: 'program', icon: Calendar, label: { ko: '프로그램', en: 'Program' } },
-    { id: 'speakers', icon: Users, label: { ko: '연사진', en: 'Speakers' } },
+    { id: 'speakers', icon: Users, label: { ko: '연자진', en: 'Speakers' } },
     { id: 'pricing', icon: CreditCard, label: { ko: '등록비', en: 'Pricing' } },
     { id: 'location', icon: MapPin, label: { ko: '위치', en: 'Location' } },
   ];

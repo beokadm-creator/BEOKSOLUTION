@@ -9,7 +9,15 @@ const ConferenceBadgePage: React.FC = () => {
   const { slug } = useParams();
   const { auth } = useAuth('');
   // Use a single simple state for UI to avoid sync issues
-  const [uiData, setUiData] = useState<{status: string, name: string, aff: string, id: string, issued: boolean} | null>(null);
+  const [uiData, setUiData] = useState<{
+    status: string;
+    name: string;
+    aff: string;
+    id: string;
+    issued: boolean;
+    qrValue: string;
+    receiptNumber: string;
+  } | null>(null);
   const [msg, setMsg] = useState("초기화 중...");
 
   useLayoutEffect(() => {
@@ -33,10 +41,10 @@ const ConferenceBadgePage: React.FC = () => {
     // Fix: Query registrations with payment status filter
     // Query: userId + conference + PAID status
     const q = query(
-        collection(db, `conferences/${slug}/registrations`),
-        where('userId', '==', userId),
-        where('paymentStatus', '==', 'PAID'),  // CRITICAL: Only show PAID registrations
-        orderBy('createdAt', 'desc') // Get most recent PAID registration
+      collection(db, `conferences/${slug}/registrations`),
+      where('userId', '==', userId),
+      where('paymentStatus', '==', 'PAID'),  // CRITICAL: Only show PAID registrations
+      orderBy('createdAt', 'desc') // Get most recent PAID registration
     );
 
     const unsub = onSnapshot(q, (snap) => {
@@ -71,12 +79,32 @@ const ConferenceBadgePage: React.FC = () => {
       }
 
       // EXTREME SANITIZATION
+      // Voucher QR: Use regId directly (no CONF- prefix) for InfoDesk scanning
+      const regId = snap.docs[0].id;
+      const voucherQr = String(docData.confirmationQr || regId);
+
+      // Badge QR: Use BADGE-{regId} format
+      const badgeQr = String(docData.badgeQr || `BADGE-${regId}`);
+
+      const finalQrValue = docData.badgeIssued ? badgeQr : voucherQr;
+
+      console.log('[ConferenceBadgePage] QR Code Debug:', {
+        regId,
+        confirmationQr: docData.confirmationQr,
+        badgeQr: docData.badgeQr,
+        badgeIssued: docData.badgeIssued,
+        voucherQr,
+        finalQrValue
+      });
+
       setUiData({
         status: String(docData.attendanceStatus || 'OUTSIDE'),
-        name: String(docData.userName || '이름 없음'),
-        aff: String(docData.affiliation || docData.userAffiliation || '소속 없음'),
-        id: String(snap.docs[0]?.id || 'ERR'),
-        issued: !!docData.badgeIssued
+        name: String(docData.userName || docData.name || '이름 없음'),
+        aff: String(docData.affiliation || docData.organization || docData.userAffiliation || docData.userInfo?.affiliation || '소속 없음'),
+        id: String(regId || 'ERR'),
+        issued: !!docData.badgeIssued,
+        qrValue: finalQrValue,
+        receiptNumber: String(docData.receiptNumber || docData.orderId || '-')
       });
       setMsg(""); // Clear msg
     });
@@ -97,7 +125,11 @@ const ConferenceBadgePage: React.FC = () => {
 
         <div className="bg-white p-4 inline-block rounded-2xl shadow-inner border border-gray-100 mb-6">
           {/* QRCode MUST have a fallback string */}
-          <QRCode value={uiData.id || "ERROR"} size={180} />
+          <QRCode
+            key={uiData.qrValue}
+            value={uiData.qrValue || "ERROR"}
+            size={180}
+          />
         </div>
 
         <h2 className="text-3xl font-black text-gray-900 mb-2 tracking-tight">{uiData.name}</h2>
@@ -115,7 +147,10 @@ const ConferenceBadgePage: React.FC = () => {
           </div>
         )}
       </div>
-      <p className="mt-6 text-[10px] text-gray-300 font-mono tracking-widest">{uiData.id}</p>
+      <div className="mt-6 text-center">
+        <p className="text-sm font-bold text-gray-500 tracking-wider">REF: {uiData.receiptNumber}</p>
+        <p className="text-[10px] text-gray-300 font-mono tracking-widest mt-1">ID: {uiData.id}</p>
+      </div>
     </div>
   );
 };

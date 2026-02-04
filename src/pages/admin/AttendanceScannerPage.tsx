@@ -119,11 +119,9 @@ const AttendanceScannerPage: React.FC = () => {
             const regSnap = await getDocs(regQuery);
 
             let regDoc: QueryDocumentSnapshot | null = null;
-            let isExternal = false;
 
             if (!regSnap.empty) {
                 regDoc = regSnap.docs[0];
-                isExternal = false;
             } else {
                 // 2. external_attendees 컬렉션에서 badgeQr 검색
                 const extQuery = query(
@@ -135,7 +133,6 @@ const AttendanceScannerPage: React.FC = () => {
 
                 if (!extSnap.empty) {
                     regDoc = extSnap.docs[0];
-                    isExternal = true;
                 }
             }
 

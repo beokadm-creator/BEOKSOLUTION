@@ -20,7 +20,7 @@ export const WideLocationPreview: React.FC<WideLocationPreviewProps> = ({
         if (googleMapEmbedUrl) return googleMapEmbedUrl;
 
         // 주소 또는 장소명을 URL 인코딩
-        const query = encodeURIComponent(address || venueName);
+        const query = encodeURIComponent(`${venueName} ${address}`.trim());
         return `https://www.google.com/maps?q=${query}&output=embed`;
     };
 
@@ -68,7 +68,7 @@ export const WideLocationPreview: React.FC<WideLocationPreviewProps> = ({
                     >
                         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <title>Google Maps</title>
-                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
                         </svg>
                         <span>{lang === 'ko' ? '구글 지도에서 열기' : 'Open in Google Maps'}</span>
                     </a>

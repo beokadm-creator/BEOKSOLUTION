@@ -21,7 +21,7 @@ import { functions } from '../firebase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { WideFooterPreview } from '../components/conference/wide-preview/WideFooterPreview';
-import { normalizeUserData, toFirestoreUserData } from '../utils/userDataMapper';
+import { toFirestoreUserData } from '../utils/userDataMapper';
 
 // Dynamic Types based on DB
 interface RegistrationPeriod {
@@ -91,13 +91,51 @@ export default function RegistrationPage() {
         memberExpiry?: string;
         memberVerification?: MemberVerificationData;
         memberVerificationData?: MemberVerificationData & { memberDocId?: string };
+        calculatedPrice?: number; // Pre-calculated price from modal
     } || {};
 
-    // Params from Modal (State > SearchParams fallback)
+    // Params from Modal (State > SearchParams > sessionStorage fallback)
     const memberVerified = state.memberVerified || searchParams.get('memberVerified') === 'true';
     const paramMemberName = state.memberName || searchParams.get('memberName') || '';
     const paramMemberGrade = state.memberGrade || searchParams.get('memberGrade') || '';
     const paramMemberCode = state.memberCode || searchParams.get('memberCode') || '';
+
+    // Try to get calculated price - sessionStorage FIRST for reliability
+    let paramCalculatedPrice: number | undefined = undefined;
+
+    try {
+        // Priority 1: Check sessionStorage for member verification
+        const storageKey = `member_verification_${confId}`;
+        const sessionData = sessionStorage.getItem(storageKey);
+        if (sessionData) {
+            const parsed = JSON.parse(sessionData);
+            if (typeof parsed.calculatedPrice === 'number') {
+                paramCalculatedPrice = parsed.calculatedPrice;
+                console.log('[RegistrationPage] Using calculated price from member verification sessionStorage:', paramCalculatedPrice);
+            }
+        }
+
+        // Priority 2: Check sessionStorage for non-member selection
+        if (paramCalculatedPrice === undefined) {
+            const nonMemberKey = `non_member_selection_${confId}`;
+            const nonMemberData = sessionStorage.getItem(nonMemberKey);
+            if (nonMemberData) {
+                const parsed = JSON.parse(nonMemberData);
+                if (typeof parsed.calculatedPrice === 'number') {
+                    paramCalculatedPrice = parsed.calculatedPrice;
+                    console.log('[RegistrationPage] Using calculated price from non-member sessionStorage:', paramCalculatedPrice);
+                }
+            }
+        }
+
+        // Priority 3: Check location.state (may be lost during navigation)
+        if (paramCalculatedPrice === undefined && location.state && typeof (location.state as any).calculatedPrice === 'number') {
+            paramCalculatedPrice = (location.state as any).calculatedPrice;
+            console.log('[RegistrationPage] Using calculated price from location.state:', paramCalculatedPrice);
+        }
+    } catch (e) {
+        console.warn('[RegistrationPage] Failed to read calculated price:', e);
+    }
 
     useRegistration(confId || '', auth.user);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -113,6 +151,7 @@ export default function RegistrationPage() {
     const [nicePaySecret, setNicePaySecret] = useState('');
     const [paymentWidget, setPaymentWidget] = useState<PaymentWidgetInstance | null>(null);
     const paymentMethodsWidgetRef = useRef<HTMLDivElement>(null);
+    const paymentMethodsInstanceRef = useRef<any>(null);
 
     // State - Form
     const [formData, setFormData] = useState({
@@ -129,6 +168,8 @@ export default function RegistrationPage() {
     const [currentRegId, setCurrentRegId] = useState<string | null>(null);
     const [price, setPrice] = useState(0);
     const [finalCategory, setFinalCategory] = useState('');
+    // [Fix-Step 156] selectedTier state to ensure grade/tier is saved
+    const [selectedTier, setSelectedTier] = useState<string>('');
 
     // NicePay State
     const [nicePayActive, setNicePayActive] = useState(false);
@@ -204,23 +245,19 @@ export default function RegistrationPage() {
                 const defaultClientKey = "test_gck_4yKeq5bgrpXJA4nz4qxArGX0lzW6";
                 if (infraSnap.exists()) {
                     const data = infraSnap.data() as InfraSettings;
-                    const useGlobalPayment = language === 'en' && data.payment?.global?.enabled;
+                    const domesticPayment = data.payment?.domestic;
+                    // const useGlobalPayment = language === 'en' && data.payment?.global?.enabled;
 
-                    if (useGlobalPayment) {
-                        const key = data.payment?.domestic?.apiKey && data.payment?.domestic?.apiKey.startsWith('test_')
-                            ? data.payment?.domestic?.apiKey
-                            : defaultClientKey;
-                        setTossClientKey(key);
-                        setPaymentProvider(data.payment?.domestic?.provider || 'TOSS');
-                        if (data.payment?.domestic?.secretKey) setNicePaySecret(data.payment.domestic.secretKey);
-                    } else {
-                        const key = data.payment?.domestic?.apiKey && data.payment?.domestic?.apiKey.startsWith('test_')
-                            ? data.payment?.domestic?.apiKey
-                            : defaultClientKey;
-                        setTossClientKey(key);
-                        setPaymentProvider(data.payment?.domestic?.provider || 'TOSS');
-                        if (data.payment?.domestic?.secretKey) setNicePaySecret(data.payment.domestic.secretKey);
-                    }
+                    // Use DB key if configured, otherwise fallback to default test key
+                    const apiKey = domesticPayment?.apiKey || defaultClientKey;
+                    const secretKey = domesticPayment?.secretKey || '';
+
+                    setTossClientKey(apiKey);
+                    setNicePaySecret(secretKey);
+                    setPaymentProvider(domesticPayment?.provider || 'TOSS');
+
+                    // Log current mode for debugging
+                    console.log('[Payment] Provider:', domesticPayment?.provider, 'Test Mode:', domesticPayment?.isTestMode);
                 } else {
                     setTossClientKey(defaultClientKey);
                     setPaymentProvider('TOSS');
@@ -251,8 +288,87 @@ export default function RegistrationPage() {
 
     // Calculate Price based on Grade
     useEffect(() => {
+        // PRIORITY 1: Use pre-calculated price from modal if available
+        if (paramCalculatedPrice !== undefined && paramCalculatedPrice >= 0) {
+            console.log('[RegistrationPage] Using pre-calculated price from modal:', paramCalculatedPrice);
+            setPrice(paramCalculatedPrice);
+
+            // Determine category name
+            let categoryPrefix = 'Registration';
+            if (activePeriod) {
+                categoryPrefix = activePeriod.name.ko;
+            } else {
+                categoryPrefix = language === 'ko' ? '학술대회 등록' : 'Conference Registration';
+            }
+
+            // Still need to determine the category name
+            let targetGradeId = '';
+            if (paramMemberGrade) {
+                if (grades.length > 0) {
+                    const normalizedServer = String(paramMemberGrade).toLowerCase().replace(/\s/g, '');
+                    const matched = grades.find(g => {
+                        const gId = (g.id || '').toLowerCase().replace(/\s/g, '');
+                        const gCode = (g.code || '').toLowerCase().replace(/\s/g, '');
+                        let gName = '';
+                        const nameObj = g.name;
+                        if (nameObj && typeof nameObj === 'object') {
+                            const koName = (nameObj as { ko?: string }).ko || '';
+                            const enName = (nameObj as { en?: string }).en || '';
+                            gName = (koName + enName).toLowerCase().replace(/\s/g, '');
+                        } else {
+                            gName = String(nameObj || '').toLowerCase().replace(/\s/g, '');
+                        }
+                        return gId === normalizedServer || gCode === normalizedServer || gName === normalizedServer || gName.includes(normalizedServer);
+                    });
+                    if (matched) {
+                        targetGradeId = matched.code || matched.id;
+                    }
+                }
+                if (!targetGradeId && activePeriod?.prices && activePeriod.prices[paramMemberGrade] !== undefined) {
+                    targetGradeId = paramMemberGrade;
+                }
+            }
+
+            // [Fix-Step 156] Update selectedTier state
+            setSelectedTier(targetGradeId);
+
+            if (targetGradeId) {
+                const gradeNameObj = grades.find(g => g.id === targetGradeId || g.code === targetGradeId)?.name || null;
+                let gradeName = '';
+                if (gradeNameObj && typeof gradeNameObj === 'object' && gradeNameObj !== null) {
+                    const ko = (gradeNameObj as { ko?: string }).ko || '';
+                    const en = (gradeNameObj as { en?: string }).en || '';
+                    gradeName = language === 'en' ? (en || ko) : (ko || en);
+                } else if (gradeNameObj) {
+                    gradeName = String(gradeNameObj);
+                }
+
+                if (!gradeName) {
+                    const dbGrade = grades.find(g => g.id === targetGradeId || g.code === targetGradeId);
+                    if (dbGrade) {
+                        const dbGradeName = dbGrade.name;
+                        if (dbGradeName && typeof dbGradeName === 'object' && dbGradeName !== null) {
+                            const ko = (dbGradeName as { ko?: string }).ko || '';
+                            const en = (dbGradeName as { en?: string }).en || '';
+                            gradeName = language === 'en' ? (en || ko) : (ko || en);
+                        } else if (dbGradeName) {
+                            gradeName = String(dbGradeName || '');
+                        }
+                    } else {
+                        gradeName = targetGradeId;
+                    }
+                }
+
+                setFinalCategory(`${categoryPrefix} - ${gradeName}`);
+            } else {
+                setFinalCategory(categoryPrefix);
+            }
+            return;
+        }
+
         if (!activePeriod) return;
 
+        // PRIORITY 2: Fall back to original calculation logic if no pre-calculated price
         let targetGradeId = '';
 
         // 1. Try to use passed grade (from URL or State)
@@ -341,10 +457,14 @@ export default function RegistrationPage() {
 
             const p = activePeriod.prices[targetGradeId] ?? 0;
             setPrice(p);
+            setPrice(p);
             setFinalCategory(`${activePeriod.name.ko} - ${gradeName}`);
         }
 
-    }, [activePeriod, grades, paramMemberGrade, language]);
+        // [Fix-Step 156] Update selectedTier state
+        setSelectedTier(targetGradeId);
+
+    }, [activePeriod, grades, paramMemberGrade, language, paramCalculatedPrice]);
 
 
     // Payment Widget Init
@@ -364,13 +484,28 @@ export default function RegistrationPage() {
 
     useEffect(() => {
         if (paymentWidget && paymentMethodsWidgetRef.current && price >= 0) {
-            paymentWidget.renderPaymentMethods(
-                '#payment-widget',
-                { value: price },
-                { variantKey: 'DEFAULT' }
-            );
+            const amount = { value: price };
+
+            if (paymentMethodsInstanceRef.current) {
+                // Update existing widget amount
+                console.log('[PaymentWidget] Updating amount:', price);
+                paymentMethodsInstanceRef.current.updateAmount(amount);
+            } else {
+                // Initial Render
+                console.log('[PaymentWidget] Rendering methods with:', price);
+                paymentMethodsInstanceRef.current = paymentWidget.renderPaymentMethods(
+                    '#payment-widget',
+                    amount,
+                    { variantKey: 'DEFAULT' }
+                );
+            }
         }
     }, [paymentWidget, price]);
+
+    // Reset instance ref if widget changes
+    useEffect(() => {
+        paymentMethodsInstanceRef.current = null;
+    }, [paymentWidget]);
 
 
     // Handlers
@@ -499,14 +634,17 @@ export default function RegistrationPage() {
                     name: formData.name,
                     email: formData.email,
                     phone: formData.phone,
-                    affiliation: formData.affiliation
+                    affiliation: formData.affiliation,
+                    licenseNumber: formData.licenseNumber // [Fix-Step 156] Include licenseNumber in userInfo
                 },
                 conferenceId: confId,
                 status: 'PENDING',
                 paymentStatus: 'PENDING',
                 amount: price,
+                tier: selectedTier, // [Fix-Step 156] Include tier
                 categoryName: finalCategory,
                 orderId: orderId,
+                licenseNumber: formData.licenseNumber, // [Fix-Step 156] Include licenseNumber at root
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now()
             };
@@ -543,7 +681,9 @@ export default function RegistrationPage() {
                 regData.memberVerificationData = mvFromURL;
             }
 
-            await setDoc(regRef, regData);
+            // [Modified] Do NOT save to Firestore yet (Prevent Garbage)
+            // Save to sessionStorage to retrieve after success
+            sessionStorage.setItem(`pending_reg_${orderId}`, JSON.stringify(regData));
             setCurrentRegId(regRef.id);
 
             // 2. Process Payment

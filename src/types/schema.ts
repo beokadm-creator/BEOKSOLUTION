@@ -791,3 +791,43 @@ export const EVENT_TYPE_PRESETS: Record<NotificationEventType, EventTypeConfig> 
     ]
   }
 };
+
+// ==========================================
+// G. Conference Notices
+// ==========================================
+
+/**
+ * Priority levels for notices
+ */
+export type NoticePriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+
+/**
+ * Notice status
+ */
+export type NoticeStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+
+/**
+ * Collection: `notices`
+ * Path: `conferences/{confId}/notices/{noticeId}`
+ */
+export interface Notice {
+  id: string; // noticeId
+  conferenceId: string; // For easy querying
+  title: LocalizedText;
+  content: {
+    html: string; // HTML content
+    images?: string[]; // Image URLs from Firebase Storage
+    videos?: string[]; // Video URLs (YouTube, Vimeo, or Firebase Storage)
+  };
+  priority: NoticePriority;
+  status: NoticeStatus;
+  isPinned?: boolean; // Pinned notices appear at the top
+  targetAudience?: 'ALL' | 'MEMBERS' | 'NON_MEMBERS' | 'SPEAKERS' | 'VENDORS';
+  publishAt?: Timestamp; // Scheduled publish time
+  expiresAt?: Timestamp; // Expiration time (auto-archive)
+  readCount?: number; // Analytics: how many users read this notice
+  authorId: string; // Creator user ID
+  authorName?: string; // Snapshot of creator name
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}

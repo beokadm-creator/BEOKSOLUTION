@@ -47,37 +47,53 @@ const PaymentSuccessHandler: React.FC = () => {
             try {
                 console.log("Processing Payment Success...", { orderId, amount, confId });
 
-                // Fetch registration data to get user information
-                const regDoc = await getDoc(doc(db, 'conferences', confId, 'registrations', regId));
-                if (!regDoc.exists()) {
-                    console.error("Registration not found:", regId);
-                    toast.error("등록 정보를 찾을 수 없습니다.");
+                // [Modified] Fetch registration data from sessionStorage (Garbage-Free Flow)
+                // Since we didn't save PENDING doc in Firestore, we must use session data.
+                const pendingDataStr = sessionStorage.getItem(`pending_reg_${orderId}`);
+
+                let regData: any = null;
+                if (pendingDataStr) {
+                    try {
+                        regData = JSON.parse(pendingDataStr);
+                        console.log("Restored pending registration data from session");
+                    } catch (e) {
+                        console.error("Failed to parse pending data", e);
+                    }
+                }
+
+                // Fallback: If not in session (e.g. cross-device?), try Firestore just in case (legacy support)
+                if (!regData && regId) {
+                    const regDoc = await getDoc(doc(db, 'conferences', confId, 'registrations', regId));
+                    if (regDoc.exists()) {
+                        regData = regDoc.data();
+                        // Idempotency check: If already PAID in DB, redirect
+                        if (regData.paymentStatus === 'PAID') {
+                            console.log("Registration already paid (DB), redirecting");
+                            const pureSlug = confId.includes('_') ? confId.split('_').slice(1).join('_') : confId;
+                            const userName = regData.userInfo?.name || regData.name || '';
+                            sessionStorage.removeItem(`payment_processing_${paymentKey}`);
+                            window.location.href = `/${pureSlug}/register/success?orderId=${orderId}&name=${encodeURIComponent(userName)}`;
+                            return;
+                        }
+                    }
+                }
+
+                if (!regData) {
+                    console.error("Registration data not found (Session or DB)");
+                    toast.error("등록 정보를 찾을 수 없습니다. (세션 만료 등)");
                     setIsProcessing(false);
                     return;
                 }
 
-                const regData = regDoc.data();
-
-                // Idempotency check: If already PAID, redirect to success page
-                if (regData.paymentStatus === 'PAID') {
-                    console.log("Registration already paid, redirecting to success page");
-                    const pureSlug = confId.includes('_') ? confId.split('_').slice(1).join('_') : confId;
-                    const userName = regData.userInfo?.name || regData.name || '';
-                    sessionStorage.removeItem(`payment_processing_${paymentKey}`); // Cleanup
-                    window.location.href = `/${pureSlug}/register/success?orderId=${orderId}&name=${encodeURIComponent(userName)}`;
-                    return;
-                }
-
                 const userData = {
-                    name: regData.userInfo.name,
-                    email: regData.userInfo.email,
-                    phone: regData.userInfo.phone,
-                    affiliation: regData.userInfo.affiliation,
+                    name: regData.userInfo?.name || regData.name,
+                    email: regData.userInfo?.email || regData.email,
+                    phone: regData.userInfo?.phone || regData.phone,
+                    affiliation: regData.userInfo?.affiliation || regData.affiliation,
                     userId: regData.userId || 'GUEST',
                     tier: regData.tier,
                     categoryName: regData.categoryName,
-                    licenseNumber: regData.userInfo.licenseNumber || '',
-                    // 회원 인증 정보가 있으면 포함하여 Cloud Function으로 전달
+                    licenseNumber: regData.userInfo?.licenseNumber || '',
                     memberVerificationData: regData.memberVerificationData || null
                 };
 
@@ -169,8 +185,8 @@ const PaymentSuccessHandler: React.FC = () => {
 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-red-50">
-             <h2 className="text-xl font-bold text-red-600">결제 처리 실패</h2>
-             <p>관리자에게 문의해주세요.</p>
+            <h2 className="text-xl font-bold text-red-600">결제 처리 실패</h2>
+            <p>관리자에게 문의해주세요.</p>
         </div>
     );
 };

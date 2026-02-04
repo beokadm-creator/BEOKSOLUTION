@@ -22,3 +22,11 @@ export const useConfContext = () => {
   }
   return context;
 };
+
+/**
+ * Safely get ConfContext without throwing an error
+ * Returns undefined if context is not available (e.g., in public pages)
+ */
+export const useConfContextSafe = () => {
+  return useContext(ConfContext);
+};

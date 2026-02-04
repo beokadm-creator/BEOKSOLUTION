@@ -23,6 +23,7 @@ interface ConferenceData {
         name: { ko: string; en: string };
         address: { ko: string; en: string };
         mapUrl: string;
+        googleMapEmbedUrl?: string;
     };
     visualAssets: {
         banner: { ko: string; en: string };
@@ -44,7 +45,8 @@ const defaultData: ConferenceData = {
     venue: {
         name: { ko: '', en: '' },
         address: { ko: '', en: '' },
-        mapUrl: ''
+        mapUrl: '',
+        googleMapEmbedUrl: ''
     },
     visualAssets: {
         banner: { ko: '', en: '' },
@@ -98,7 +100,8 @@ export default function ConferenceSettingsPage() {
                                 ko: snapData.venue?.address?.ko || snapData.venue?.address || '',
                                 en: snapData.venue?.address?.en || ''
                             },
-                            mapUrl: snapData.venue?.mapUrl || ''
+                            mapUrl: snapData.venue?.mapUrl || '',
+                            googleMapEmbedUrl: snapData.venue?.googleMapEmbedUrl || ''
                         },
                         abstractDeadlines: {
                             submissionDeadline: toDateStr(snapData.abstractSubmissionDeadline),
@@ -329,12 +332,12 @@ export default function ConferenceSettingsPage() {
                                             onChange={(e) => setData(prev => ({ ...prev, dates: { ...prev.dates, end: e.target.value } }))}
                                             className="h-11 border-slate-200 rounded-lg"
                                         />
-                                          </div>
-                                      </div>
-                              </CardContent>
-                         </Card>
-                     </div>
-                 </section>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </section>
 
                 <hr className="border-slate-100" />
 
@@ -454,6 +457,22 @@ export default function ConferenceSettingsPage() {
                                     </div>
                                     <p className="text-xs text-slate-500 ml-1">
                                         * 참석자들이 쉽게 찾아올 수 있도록 정확한 지도 URL을 입력해주세요.
+                                    </p>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <Label className="text-base font-medium text-slate-700">구글 지도 임베드 URL (Google Map Embed URL)</Label>
+                                    <div className="relative">
+                                        <Globe className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
+                                        <Input
+                                            value={data.venue.googleMapEmbedUrl || ''}
+                                            onChange={(e) => setData(prev => ({ ...prev, venue: { ...prev.venue, googleMapEmbedUrl: e.target.value } }))}
+                                            placeholder="https://www.google.com/maps/embed?..."
+                                            className="pl-10 h-11 border-slate-200 rounded-lg"
+                                        />
+                                    </div>
+                                    <p className="text-xs text-slate-500 ml-1">
+                                        * 지도 공유 -&gt; 지도 퍼가기에서 복사한 HTML의 src 속성값만 입력하세요. (선택사항)
                                     </p>
                                 </div>
                             </CardContent>

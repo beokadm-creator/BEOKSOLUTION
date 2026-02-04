@@ -12,7 +12,7 @@ interface WideHeaderProps {
 
 export const WideHeader: React.FC<WideHeaderProps> = ({ lang, setLang, societyName }) => {
     const navigate = useNavigate();
-    const { auth, logout } = useAuth('');
+    const { auth, logout } = useAuth();
     const [isScrolled, setIsScrolled] = useState(false);
 
     useEffect(() => {
@@ -64,6 +64,9 @@ export const WideHeader: React.FC<WideHeaderProps> = ({ lang, setLang, societyNa
                                 size="sm"
                                 onClick={() => navigate('/mypage')}
                                 className={`rounded-full transition-colors ${buttonGhostClass}`}
+                                style={{
+                                    color: isScrolled ? '#334155' : '#ffffff',
+                                }}
                             >
                                 <User className="w-4 h-4 mr-1.5" />
                                 <span className="font-medium">My Page</span>
@@ -73,29 +76,27 @@ export const WideHeader: React.FC<WideHeaderProps> = ({ lang, setLang, societyNa
                                 size="sm"
                                 onClick={logout}
                                 className={`rounded-full transition-colors ${buttonGhostClass}`}
+                                style={{
+                                    color: isScrolled ? '#64748b' : '#cbd5e1',
+                                }}
                             >
                                 <span className="font-medium">Logout</span>
                             </Button>
                         </>
                     ) : (
-                        <>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => navigate(`/auth?returnUrl=${encodeURIComponent(window.location.pathname)}`)}
-                                className={`rounded-full hidden md:flex ${buttonGhostClass}`}
-                            >
-                                Log In
-                            </Button>
-                            <Button
-                                variant="default"
-                                size="sm"
-                                onClick={() => navigate('/auth?tab=signup')}
-                                className={`rounded-full px-5 font-bold shadow-lg transition-transform hover:scale-105 active:scale-95 ${isScrolled ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-white text-blue-900 hover:bg-blue-50'}`}
-                            >
-                                Sign Up
-                            </Button>
-                        </>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => navigate('/auth')}
+                            className="rounded-full px-5 font-bold shadow-lg transition-transform hover:scale-105 active:scale-95"
+                            style={{
+                                backgroundColor: isScrolled ? '#2563eb' : '#ffffff',
+                                color: isScrolled ? '#ffffff' : '#1e3a8a',
+                                border: 'none'
+                            }}
+                        >
+                            {lang === 'ko' ? '등록(조회)하기' : 'Register / Check'}
+                        </Button>
                     )}
                 </div>
             </div>

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../ui/button';
-import { Globe } from 'lucide-react';
+import { Globe, Bell } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
-import { useNonMemberAuth } from '../../../hooks/useNonMemberAuth';
+import { useNoticeCount } from '../../../hooks/useNotices';
+import { NoticeModal } from '../NoticeModal';
+
 
 interface WideHeaderPreviewProps {
   lang: string;
@@ -24,30 +26,13 @@ export const WideHeaderPreview: React.FC<WideHeaderPreviewProps> = ({
 }) => {
   const navigate = useNavigate();
   const [isScrolled, setIsScrolled] = useState(false);
+  const [noticeModalOpen, setNoticeModalOpen] = useState(false);
 
-  
   // Auth hooks
   const { auth } = useAuth();
-  
-  // Determine effective ConfId for non-member auth if not provided
-  let effectiveConfId = confId;
-  if (!effectiveConfId) {
-    if (slug && slug.includes('_')) {
-      effectiveConfId = slug;
-    } else if (typeof window !== 'undefined') {
-      const hostname = window.location.hostname;
-      const parts = hostname.split('.');
-      let societyIdToUse = 'kadd';
+  const { count } = useNoticeCount();
 
-      if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') {
-        societyIdToUse = parts[0].toLowerCase();
-      }
 
-      effectiveConfId = `${societyIdToUse}_${slug}`;
-    }
-  }
-
-  const { nonMember } = useNonMemberAuth(effectiveConfId);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -73,10 +58,8 @@ export const WideHeaderPreview: React.FC<WideHeaderPreviewProps> = ({
   const handleRegisterClick = () => {
     if (auth.user) {
       handleNavigation(`/${slug}/mypage`);
-    } else if (nonMember) {
-      handleNavigation(`/${slug}/non-member/hub`);
     } else {
-      handleNavigation(`/auth?tab=signup&returnTo=${slug}`);
+      handleNavigation(`/${slug}/auth`);
     }
   };
 
@@ -101,6 +84,24 @@ export const WideHeaderPreview: React.FC<WideHeaderPreviewProps> = ({
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-3">
+            {/* Notice Bell */}
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setNoticeModalOpen(true)}
+                className={`rounded-full px-3 font-medium transition-colors ${buttonGhostClass}`}
+                aria-label="Notices"
+              >
+                <Bell className="w-4 h-4" />
+              </Button>
+              {count > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shadow-sm">
+                  {count > 9 ? '9+' : count}
+                </span>
+              )}
+            </div>
+
             <Button
               variant="ghost"
               size="sm"
@@ -111,21 +112,54 @@ export const WideHeaderPreview: React.FC<WideHeaderPreviewProps> = ({
               {lang === 'ko' ? 'English' : '한국어'}
             </Button>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleRegisterClick}
-              className={`rounded-full px-5 font-bold shadow-lg transition-transform hover:scale-105 active:scale-95 ${isScrolled ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-white text-blue-900 hover:bg-blue-50'}`}
-            >
-              {auth.user || nonMember 
-                ? (lang === 'ko' ? '마이페이지' : 'My Page') 
-                : (lang === 'ko' ? '등록(조회)하기' : 'Register')}
-            </Button>
+            {auth.user ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleNavigation(`/${slug}/mypage`)}
+                className={`rounded-full transition-colors ${buttonGhostClass}`}
+                style={{ color: isScrolled ? '#334155' : '#ffffff' }}
+              >
+                {lang === 'ko' ? '마이페이지' : 'My Page'}
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handleNavigation(`/auth`)}
+                className="rounded-full px-5 font-bold shadow-lg transition-transform hover:scale-105 active:scale-95"
+                style={{
+                  backgroundColor: isScrolled ? '#2563eb' : '#ffffff',
+                  color: isScrolled ? '#ffffff' : '#1e3a8a',
+                  border: 'none'
+                }}
+              >
+                {lang === 'ko' ? '등록(조회)하기' : 'Register / Check'}
+              </Button>
+            )}
           </div>
 
           {/* Mobile Header Actions */}
           <div className="flex md:hidden items-center gap-2">
-            {/* Language Toggle (Always Visible) */}
+            {/* Notice Bell */}
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setNoticeModalOpen(true)}
+                className={`rounded-full transition-colors ${buttonGhostClass} px-3`}
+                aria-label="Notices"
+              >
+                <Bell className="w-4 h-4" />
+              </Button>
+              {count > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shadow-sm">
+                  {count > 9 ? '9+' : count}
+                </span>
+              )}
+            </div>
+
+            {/* Language Toggle */}
             <Button
               variant="ghost"
               size="sm"
@@ -140,6 +174,12 @@ export const WideHeaderPreview: React.FC<WideHeaderPreviewProps> = ({
 
         {/* Mobile Menu Removed as per request */}
       </div>
+
+      {/* Notice Modal */}
+      <NoticeModal
+        isOpen={noticeModalOpen}
+        onClose={() => setNoticeModalOpen(false)}
+      />
     </header>
   );
 };

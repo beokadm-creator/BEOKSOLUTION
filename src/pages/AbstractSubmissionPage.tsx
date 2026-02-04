@@ -14,7 +14,7 @@ import { db } from '../firebase';
 
 const AbstractSubmissionPage: React.FC = () => {
     const { id: confId, slug, info: conferenceInfo } = useConference();
-    const { auth } = useAuth(confId || '');
+    const { auth } = useAuth();
 
     // All users are members - Firebase Auth account required for registration
     const submitterId = auth.user?.id;
@@ -67,7 +67,7 @@ const AbstractSubmissionPage: React.FC = () => {
                 if (!snap.empty) {
                     const docData = snap.docs[0].data();
                     const paymentStatus = docData?.paymentStatus || docData?.status || 'PENDING';
-                    isPaid = paymentStatus === 'PAID';
+                    isPaid = paymentStatus === 'PAID' || paymentStatus === 'COMPLETED';
                     console.log('[AbstractSubmissionPage] Registration check:', { confId, paymentStatus, isPaid });
                 }
 
@@ -110,13 +110,19 @@ const AbstractSubmissionPage: React.FC = () => {
         setAuthors(newAuthors);
     };
 
-    const handleEdit = (sub: { id: string; title?: { ko?: string; en?: string }; field?: string; type?: string; authors?: typeof authors }) => {
+    const handleEdit = (sub: any) => {
         setEditingId(sub.id);
         setTitleKo(sub.title?.ko || '');
         setTitleEn(sub.title?.en || '');
         setField(sub.field || 'General');
         setType(sub.type || 'Oral');
-        setAuthors(sub.authors || []);
+        setAuthors((sub.authors || []).map(a => ({
+            name: a.name || '',
+            email: a.email || '',
+            affiliation: a.affiliation || '',
+            isPresenter: a.isPresenter || false,
+            isFirstAuthor: (a as any).isFirstAuthor || false
+        })));
         setStep(1); // Go to step 1
         window.scrollTo(0, 0);
         toast("Editing mode activated");
