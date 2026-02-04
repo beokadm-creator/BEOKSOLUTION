@@ -61,6 +61,7 @@ interface UserReg {
     paymentDate?: Timestamp | Date | string;
     receiptConfig?: ReceiptConfig;
     userName?: string;
+    status?: string; // Generic status field from Firestore (PAID, CANCELED, etc.)
 }
 
 interface Affiliation {
@@ -536,7 +537,8 @@ const UserHubPage: React.FC = () => {
                                 receiptNumber: data.id,
                                 paymentDate: data.createdAt,
                                 receiptConfig: receiptConfig,
-                                userName: data.userName || user.name || (user as { displayName?: string }).displayName
+                                userName: data.userName || user.name || (user as { displayName?: string }).displayName,
+                                status: data.status
                             };
                         });
 
@@ -550,10 +552,14 @@ const UserHubPage: React.FC = () => {
                         const uniqueRegsMap = new Map<string, UserReg>();
 
                         validRegs.forEach(r => {
-                            const status = (r.paymentStatus || '').toUpperCase();
+                            const pStatus = (r.paymentStatus || '').toUpperCase();
+                            const gStatus = (r.status || '').toUpperCase();
+
                             // Skip refunded, canceled, or refund requested registrations
-                            if (['CANCELED', 'REFUNDED', 'REFUND_REQUESTED'].includes(status)) {
-                                console.log(`[UserHub] Filtering out registration: ${r.slug} (${status})`);
+                            // Check BOTH paymentStatus and status fields for robustness
+                            if (['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(pStatus) ||
+                                ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(gStatus)) {
+                                console.log(`[UserHub] Filtering out registration: ${r.slug} (paymentStatus=${pStatus}, status=${gStatus})`);
                                 return;
                             }
 
@@ -562,7 +568,7 @@ const UserHubPage: React.FC = () => {
                                 uniqueRegsMap.set(r.slug, r);
                             } else {
                                 // If duplicate exists, favor PAID over others
-                                if (status === 'PAID' && (existing.paymentStatus || '').toUpperCase() !== 'PAID') {
+                                if (pStatus === 'PAID' && (existing.paymentStatus || '').toUpperCase() !== 'PAID') {
                                     uniqueRegsMap.set(r.slug, r);
                                 }
                             }
@@ -671,7 +677,8 @@ const UserHubPage: React.FC = () => {
                             receiptNumber: data.id, // Using orderId as receipt number
                             paymentDate: data.createdAt,
                             receiptConfig: receiptConfig,
-                            userName: data.userName || user.name || (user as { displayName?: string }).displayName
+                            userName: data.userName || user.name || (user as { displayName?: string }).displayName,
+                            status: data.status
                         };
                     });
 
@@ -682,10 +689,14 @@ const UserHubPage: React.FC = () => {
                     const uniqueRegsMap = new Map<string, UserReg>();
 
                     validRegs.forEach(r => {
-                        const status = (r.paymentStatus || '').toUpperCase();
+                        const pStatus = (r.paymentStatus || '').toUpperCase();
+                        const gStatus = (r.status || '').toUpperCase();
+
                         // Skip refunded, canceled, or refund requested registrations
-                        if (['CANCELED', 'REFUNDED', 'REFUND_REQUESTED'].includes(status)) {
-                            console.log(`[UserHub] Filtering out registration (Realtime): ${r.slug} (${status})`);
+                        // Check BOTH paymentStatus and status fields for robustness
+                        if (['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(pStatus) ||
+                            ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(gStatus)) {
+                            console.log(`[UserHub] Filtering out registration (Realtime): ${r.slug} (paymentStatus=${pStatus}, status=${gStatus})`);
                             return;
                         }
 
@@ -693,7 +704,7 @@ const UserHubPage: React.FC = () => {
                         if (!existing) {
                             uniqueRegsMap.set(r.slug, r);
                         } else {
-                            if (status === 'PAID' && (existing.paymentStatus || '').toUpperCase() !== 'PAID') {
+                            if (pStatus === 'PAID' && (existing.paymentStatus || '').toUpperCase() !== 'PAID') {
                                 uniqueRegsMap.set(r.slug, r);
                             }
                         }
