@@ -13,9 +13,9 @@
 | :--- | :--- | :--- | :--- |
 | 1 | Input Details | ✅ Ready | `ExternalAttendeePage.tsx` has the form and state. |
 | 2 | Click "Register" | ✅ Ready | `handleIndividualRegister` saves data to Firestore. |
-| 3 | **Force Signup & UID** | ❌ **Broken** | **Issues Found**: <br> 1. Signup is NOT triggered on "Register". It is currently deferred to "Issue Badge" (`handleIssueBadge`). <br> 2. The Cloud Function `generateFirebaseAuthUserForExternalAttendee` is called by the frontend but **MISSING** in the backend (`functions/src`). <br> 3. `generateAttendeeData` generates a random UUID client-side, which is not a real Firebase Auth UID. |
-| 4 | Issue Voucher | ⚠️ Partial | UI exists, but relies on the potentially incomplete data. |
-| 5 | System Access | ❌ **Blocked** | Without a real Firebase Auth User (Step 3), the user cannot log in. The `password` is saved in Firestore but no Auth account uses it. |
+| 3 | **Force Signup & UID** | 🟢 **Deployed** | Cloud Function `generateFirebaseAuthUserForExternalAttendee` deployed. Ready for testing. |
+| 4 | Issue Voucher | ⚠️ Partial | UI exists. Ready for verification. |
+| 5 | System Access | 🟡 **Pending Verification** | Depends on successful signup (Step 3). Should work now. |
 
 ## Required Fixes
 1.  **Backend**: Create `generateFirebaseAuthUserForExternalAttendee` Cloud Function.
