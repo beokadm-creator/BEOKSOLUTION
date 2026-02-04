@@ -7,6 +7,15 @@ import { collection, query, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { safeText } from '../../utils/safeText';
 
+interface RegistrationData {
+    id: string;
+    userId?: string;
+    status: string;
+    amount?: number;
+    createdAt?: any;
+    [key: string]: any;
+}
+
 export default function DashboardPage() {
     const { selectedConferenceId, selectedConferenceSlug, selectedConferenceTitle } = useAdminStore();
     const [stats, setStats] = useState({
@@ -67,7 +76,7 @@ export default function DashboardPage() {
                 });
 
                 setStats({
-                    totalRegistrations: completed + canceled,
+                    totalRegistrations: completed, // Fix: Exclude canceled from total count as per user feedback
                     pendingPayments: canceled,
                     completedPayments: completed,
                     totalRevenue: revenue
