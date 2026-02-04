@@ -550,15 +550,19 @@ const UserHubPage: React.FC = () => {
                         const uniqueRegsMap = new Map<string, UserReg>();
 
                         validRegs.forEach(r => {
-                            // Skip refunded or canceled registrations
-                            if (r.paymentStatus === 'REFUNDED' || r.paymentStatus === 'CANCELED') return;
+                            const status = (r.paymentStatus || '').toUpperCase();
+                            // Skip refunded, canceled, or refund requested registrations
+                            if (['CANCELED', 'REFUNDED', 'REFUND_REQUESTED'].includes(status)) {
+                                console.log(`[UserHub] Filtering out registration: ${r.slug} (${status})`);
+                                return;
+                            }
 
                             const existing = uniqueRegsMap.get(r.slug);
                             if (!existing) {
                                 uniqueRegsMap.set(r.slug, r);
                             } else {
-                                // If duplicate exists, favor PAID over others, or newer over older
-                                if (r.paymentStatus === 'PAID' && existing.paymentStatus !== 'PAID') {
+                                // If duplicate exists, favor PAID over others
+                                if (status === 'PAID' && (existing.paymentStatus || '').toUpperCase() !== 'PAID') {
                                     uniqueRegsMap.set(r.slug, r);
                                 }
                             }
@@ -678,14 +682,18 @@ const UserHubPage: React.FC = () => {
                     const uniqueRegsMap = new Map<string, UserReg>();
 
                     validRegs.forEach(r => {
-                        // Skip refunded or canceled registrations
-                        if (r.paymentStatus === 'REFUNDED' || r.paymentStatus === 'CANCELED') return;
+                        const status = (r.paymentStatus || '').toUpperCase();
+                        // Skip refunded, canceled, or refund requested registrations
+                        if (['CANCELED', 'REFUNDED', 'REFUND_REQUESTED'].includes(status)) {
+                            console.log(`[UserHub] Filtering out registration (Realtime): ${r.slug} (${status})`);
+                            return;
+                        }
 
                         const existing = uniqueRegsMap.get(r.slug);
                         if (!existing) {
                             uniqueRegsMap.set(r.slug, r);
                         } else {
-                            if (r.paymentStatus === 'PAID' && existing.paymentStatus !== 'PAID') {
+                            if (status === 'PAID' && (existing.paymentStatus || '').toUpperCase() !== 'PAID') {
                                 uniqueRegsMap.set(r.slug, r);
                             }
                         }
