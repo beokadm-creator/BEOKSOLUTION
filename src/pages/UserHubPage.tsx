@@ -546,35 +546,53 @@ const UserHubPage: React.FC = () => {
                         const validRegs = loadedRegs.filter((r) => r !== null) as UserReg[];
                         console.log('[UserHub] Loaded registrations:', validRegs);
 
-                        // [Fix] Filter out REFUNDED and CANCELED (canceled) registrations
-                        // [Fix] DEDUPLICATE: Keep only one entry per conference slug (prefer PAID > PENDING)
-                        // This handles cases where bad data caused duplicates or multiple entries exist
-                        const uniqueRegsMap = new Map<string, UserReg>();
-
+                        // [Fix] Advanced Deduplication & Filtering Strategy (Fallback)
+                        const grouped = new Map<string, UserReg[]>();
                         validRegs.forEach(r => {
-                            const pStatus = (r.paymentStatus || '').toUpperCase();
-                            const gStatus = (r.status || '').toUpperCase();
+                            if (!grouped.has(r.slug)) grouped.set(r.slug, []);
+                            grouped.get(r.slug)!.push(r);
+                        });
 
-                            // Skip refunded, canceled, or refund requested registrations
-                            // Check BOTH paymentStatus and status fields for robustness
+                        const activeRegs: UserReg[] = [];
+
+                        grouped.forEach((regs, slug) => {
+                            // Sort: Latest created first
+                            regs.sort((a, b) => {
+                                const getTime = (d: any) => {
+                                    if (!d) return 0;
+                                    if (d.toMillis) return d.toMillis();
+                                    if (d.toDate) return d.toDate().getTime();
+                                    if (d instanceof Date) return d.getTime();
+                                    if (typeof d === 'string') return new Date(d).getTime();
+                                    return 0;
+                                };
+                                return getTime(b.paymentDate) - getTime(a.paymentDate);
+                            });
+
+                            const latest = regs[0];
+                            const pStatus = (latest.paymentStatus || '').toUpperCase();
+                            const gStatus = (latest.status || '').toUpperCase();
+
+                            // 1. If latest action was CANCEL/REFUND, User intends to withdraw -> Hide
                             if (['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(pStatus) ||
                                 ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(gStatus)) {
-                                console.log(`[UserHub] Filtering out registration: ${r.slug} (paymentStatus=${pStatus}, status=${gStatus})`);
+                                console.log(`[UserHub] Hiding conference ${slug} because latest registration is canceled`);
                                 return;
                             }
 
-                            const existing = uniqueRegsMap.get(r.slug);
-                            if (!existing) {
-                                uniqueRegsMap.set(r.slug, r);
+                            // 2. Otherwise, prefer PAID registration if exists in history
+                            const paidReg = regs.find(r =>
+                                (r.paymentStatus || '').toUpperCase() === 'PAID' ||
+                                (r.status || '').toUpperCase() === 'PAID'
+                            );
+
+                            if (paidReg) {
+                                activeRegs.push(paidReg);
                             } else {
-                                // If duplicate exists, favor PAID over others
-                                if (pStatus === 'PAID' && (existing.paymentStatus || '').toUpperCase() !== 'PAID') {
-                                    uniqueRegsMap.set(r.slug, r);
-                                }
+                                activeRegs.push(latest);
                             }
                         });
 
-                        const activeRegs = Array.from(uniqueRegsMap.values());
                         setRegs(activeRegs);
                         setTotalPoints(activeRegs.reduce((acc, r) => acc + (r.earnedPoints ?? 0), 0));
                         setSyncStatus('connected');
@@ -685,32 +703,52 @@ const UserHubPage: React.FC = () => {
                     const loadedRegs = await Promise.all(regPromises);
                     const validRegs = loadedRegs.filter((r) => r !== null) as UserReg[];
 
-                    // [Fix] Filter out REFUNDED and CANCELED (canceled) registrations & Deduplicate
-                    const uniqueRegsMap = new Map<string, UserReg>();
-
+                    // [Fix] Advanced Deduplication & Filtering Strategy (Realtime)
+                    const grouped = new Map<string, UserReg[]>();
                     validRegs.forEach(r => {
-                        const pStatus = (r.paymentStatus || '').toUpperCase();
-                        const gStatus = (r.status || '').toUpperCase();
+                        if (!grouped.has(r.slug)) grouped.set(r.slug, []);
+                        grouped.get(r.slug)!.push(r);
+                    });
 
-                        // Skip refunded, canceled, or refund requested registrations
-                        // Check BOTH paymentStatus and status fields for robustness
+                    const activeRegs: UserReg[] = [];
+
+                    grouped.forEach((regs, slug) => {
+                        // Sort: Latest created first
+                        regs.sort((a, b) => {
+                            const getTime = (d: any) => {
+                                if (!d) return 0;
+                                if (d.toMillis) return d.toMillis();
+                                if (d.toDate) return d.toDate().getTime();
+                                if (d instanceof Date) return d.getTime();
+                                if (typeof d === 'string') return new Date(d).getTime();
+                                return 0;
+                            };
+                            return getTime(b.paymentDate) - getTime(a.paymentDate);
+                        });
+
+                        const latest = regs[0];
+                        const pStatus = (latest.paymentStatus || '').toUpperCase();
+                        const gStatus = (latest.status || '').toUpperCase();
+
+                        // 1. If latest action was CANCEL/REFUND, User intends to withdraw -> Hide
                         if (['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(pStatus) ||
                             ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(gStatus)) {
-                            console.log(`[UserHub] Filtering out registration (Realtime): ${r.slug} (paymentStatus=${pStatus}, status=${gStatus})`);
+                            console.log(`[UserHub] Hiding conference ${slug} because latest registration (Realtime) is canceled`);
                             return;
                         }
 
-                        const existing = uniqueRegsMap.get(r.slug);
-                        if (!existing) {
-                            uniqueRegsMap.set(r.slug, r);
+                        // 2. Otherwise, prefer PAID registration if exists in history
+                        const paidReg = regs.find(r =>
+                            (r.paymentStatus || '').toUpperCase() === 'PAID' ||
+                            (r.status || '').toUpperCase() === 'PAID'
+                        );
+
+                        if (paidReg) {
+                            activeRegs.push(paidReg);
                         } else {
-                            if (pStatus === 'PAID' && (existing.paymentStatus || '').toUpperCase() !== 'PAID') {
-                                uniqueRegsMap.set(r.slug, r);
-                            }
+                            activeRegs.push(latest);
                         }
                     });
-
-                    const activeRegs = Array.from(uniqueRegsMap.values());
                     setRegs(activeRegs);
                     setTotalPoints(activeRegs.reduce((acc, r) => acc + (r.earnedPoints ?? 0), 0));
 
