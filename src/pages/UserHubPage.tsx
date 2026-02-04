@@ -544,13 +544,14 @@ const UserHubPage: React.FC = () => {
                         const validRegs = loadedRegs.filter((r) => r !== null) as UserReg[];
                         console.log('[UserHub] Loaded registrations:', validRegs);
 
-                        // [Fix] Filter out REFUNDED (canceled) registrations
+                        // [Fix] Filter out REFUNDED and CANCELED (canceled) registrations
                         // [Fix] DEDUPLICATE: Keep only one entry per conference slug (prefer PAID > PENDING)
                         // This handles cases where bad data caused duplicates or multiple entries exist
                         const uniqueRegsMap = new Map<string, UserReg>();
 
                         validRegs.forEach(r => {
-                            if (r.paymentStatus === 'REFUNDED') return;
+                            // Skip refunded or canceled registrations
+                            if (r.paymentStatus === 'REFUNDED' || r.paymentStatus === 'CANCELED') return;
 
                             const existing = uniqueRegsMap.get(r.slug);
                             if (!existing) {
@@ -673,11 +674,12 @@ const UserHubPage: React.FC = () => {
                     const loadedRegs = await Promise.all(regPromises);
                     const validRegs = loadedRegs.filter((r) => r !== null) as UserReg[];
 
-                    // [Fix] Filter out REFUNDED (canceled) registrations & Deduplicate
+                    // [Fix] Filter out REFUNDED and CANCELED (canceled) registrations & Deduplicate
                     const uniqueRegsMap = new Map<string, UserReg>();
 
                     validRegs.forEach(r => {
-                        if (r.paymentStatus === 'REFUNDED') return;
+                        // Skip refunded or canceled registrations
+                        if (r.paymentStatus === 'REFUNDED' || r.paymentStatus === 'CANCELED') return;
 
                         const existing = uniqueRegsMap.get(r.slug);
                         if (!existing) {
