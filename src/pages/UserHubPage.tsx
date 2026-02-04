@@ -556,7 +556,30 @@ const UserHubPage: React.FC = () => {
                         const activeRegs: UserReg[] = [];
 
                         grouped.forEach((regs, slug) => {
-                            // Sort: Latest created first
+                            // 1. Check for ANY PAID registration -> Show PAID (User re-registered successfully)
+                            const paidReg = regs.find(r =>
+                                (r.paymentStatus || '').toUpperCase() === 'PAID' ||
+                                (r.status || '').toUpperCase() === 'PAID'
+                            );
+                            if (paidReg) {
+                                activeRegs.push(paidReg);
+                                return;
+                            }
+
+                            // 2. Check for ANY CANCELED/REFUNDED -> Hide (User canceled)
+                            const hasCancel = regs.some(r => {
+                                const p = (r.paymentStatus || '').toUpperCase();
+                                const s = (r.status || '').toUpperCase();
+                                return ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(p) ||
+                                    ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(s);
+                            });
+
+                            if (hasCancel) {
+                                console.log(`[UserHub] Hiding conference ${slug} due to cancellation history`);
+                                return;
+                            }
+
+                            // 3. Otherwise show latest (PENDING etc)
                             regs.sort((a, b) => {
                                 const getTime = (d: any) => {
                                     if (!d) return 0;
@@ -569,27 +592,8 @@ const UserHubPage: React.FC = () => {
                                 return getTime(b.paymentDate) - getTime(a.paymentDate);
                             });
 
-                            const latest = regs[0];
-                            const pStatus = (latest.paymentStatus || '').toUpperCase();
-                            const gStatus = (latest.status || '').toUpperCase();
-
-                            // 1. If latest action was CANCEL/REFUND, User intends to withdraw -> Hide
-                            if (['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(pStatus) ||
-                                ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(gStatus)) {
-                                console.log(`[UserHub] Hiding conference ${slug} because latest registration is canceled`);
-                                return;
-                            }
-
-                            // 2. Otherwise, prefer PAID registration if exists in history
-                            const paidReg = regs.find(r =>
-                                (r.paymentStatus || '').toUpperCase() === 'PAID' ||
-                                (r.status || '').toUpperCase() === 'PAID'
-                            );
-
-                            if (paidReg) {
-                                activeRegs.push(paidReg);
-                            } else {
-                                activeRegs.push(latest);
+                            if (regs.length > 0) {
+                                activeRegs.push(regs[0]);
                             }
                         });
 
@@ -713,7 +717,30 @@ const UserHubPage: React.FC = () => {
                     const activeRegs: UserReg[] = [];
 
                     grouped.forEach((regs, slug) => {
-                        // Sort: Latest created first
+                        // 1. Check for ANY PAID registration -> Show PAID (User re-registered successfully)
+                        const paidReg = regs.find(r =>
+                            (r.paymentStatus || '').toUpperCase() === 'PAID' ||
+                            (r.status || '').toUpperCase() === 'PAID'
+                        );
+                        if (paidReg) {
+                            activeRegs.push(paidReg);
+                            return;
+                        }
+
+                        // 2. Check for ANY CANCELED/REFUNDED -> Hide (User canceled)
+                        const hasCancel = regs.some(r => {
+                            const p = (r.paymentStatus || '').toUpperCase();
+                            const s = (r.status || '').toUpperCase();
+                            return ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(p) ||
+                                ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(s);
+                        });
+
+                        if (hasCancel) {
+                            console.log(`[UserHub] Hiding conference ${slug} due to cancellation history (Realtime)`);
+                            return;
+                        }
+
+                        // 3. Otherwise show latest (PENDING etc)
                         regs.sort((a, b) => {
                             const getTime = (d: any) => {
                                 if (!d) return 0;
@@ -726,27 +753,8 @@ const UserHubPage: React.FC = () => {
                             return getTime(b.paymentDate) - getTime(a.paymentDate);
                         });
 
-                        const latest = regs[0];
-                        const pStatus = (latest.paymentStatus || '').toUpperCase();
-                        const gStatus = (latest.status || '').toUpperCase();
-
-                        // 1. If latest action was CANCEL/REFUND, User intends to withdraw -> Hide
-                        if (['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(pStatus) ||
-                            ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(gStatus)) {
-                            console.log(`[UserHub] Hiding conference ${slug} because latest registration (Realtime) is canceled`);
-                            return;
-                        }
-
-                        // 2. Otherwise, prefer PAID registration if exists in history
-                        const paidReg = regs.find(r =>
-                            (r.paymentStatus || '').toUpperCase() === 'PAID' ||
-                            (r.status || '').toUpperCase() === 'PAID'
-                        );
-
-                        if (paidReg) {
-                            activeRegs.push(paidReg);
-                        } else {
-                            activeRegs.push(latest);
+                        if (regs.length > 0) {
+                            activeRegs.push(regs[0]);
                         }
                     });
                     setRegs(activeRegs);
