@@ -3,7 +3,7 @@
 ## Essential Commands
 
 ```bash
-# Development & Build
+# Development & Build (uses rolldown-vite for faster builds)
 npm run dev              # Vite dev server (HMR, port 5173)
 npm run build           # TypeScript + Vite build (dist/)
 npm run lint            # ESLint check on all TS/TSX files
@@ -13,7 +13,7 @@ npm test                # Run all Jest tests
 npx jest --testPathPattern=MyComponent.test.ts  # Single file
 npx jest --testNamePattern="should render"    # Single test
 
-# Firebase Functions
+# Firebase Functions (functions/src/{payment,scheduled,utils})
 cd functions && npm run build                      # Compile to lib/
 firebase emulators:start --only functions          # Local emulator
 firebase deploy --only functions                   # Deploy functions
@@ -103,8 +103,10 @@ if (error.code === 'auth/user-not-found') toast.error('사용자를 찾을 수 �
 - `GlobalContext` → Super admin access
 - `ConfContext` → Conference-specific data (confId, conference info)
 - `SocietyContext` → Society admin operations
+- `VendorContext` → Payment/vendor integration
 - Wrap pages with appropriate layout to activate context
 - **20+ custom hooks in src/hooks**: Use `useConference`, `useAuth`, `useConferenceAdmin` for domain logic
+- Each hook returns `{ loading, error, data }` states; always check `loading` before render
 
 ### Data Access Patterns
 ```typescript
@@ -166,3 +168,4 @@ src/
 6. **Optional Fields**: Use optional chaining (`data.venue?.name`) for Firestore fields
 7. **Payment Functions**: Use `confirmNicePayment` or `confirmTossPayment` CloudFunctions only
 8. **Type Safety**: Never use `any` for Firestore models - import from schema.ts
+9. **Optional Queries During Index Build**: Some queries require indexes that take 5-15 minutes to build. For optional features, consider disabling the query temporarily rather than blocking the page

@@ -14,8 +14,11 @@ export {
     onRegistrationCreated,
     validateBadgePrepToken,
     issueDigitalBadge,
-    resendBadgePrepToken
+    resendBadgePrepToken,
+    generateFirebaseAuthUserForExternalAttendee
 };
+
+import { generateFirebaseAuthUserForExternalAttendee } from './auth/external';
 
 // --------------------------------------------------------------------------
 // PAYMENT: NICEPAY UTILITIES

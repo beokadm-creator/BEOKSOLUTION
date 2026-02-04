@@ -177,6 +177,33 @@ const ExternalAttendeePage: React.FC = () => {
                 operator: auth.user?.email
             });
 
+            // [SCENARIO FIX] Force Signup & Generate UID immediately
+            if (formData.password) {
+                try {
+                    const functions = getFunctions();
+                    const generateAuthUserFn = httpsCallable(functions, 'generateFirebaseAuthUserForExternalAttendee');
+                    const authResult = await generateAuthUserFn({
+                        confId,
+                        externalId: attendeeData.id,
+                        password: formData.password,
+                        email: formData.email,
+                        name: formData.name,
+                        phone: formData.phone,
+                        organization: formData.organization,
+                        licenseNumber: formData.licenseNumber
+                    }) as { data: { success: boolean; uid: string; message: string } };
+
+                    if (authResult.data.success) {
+                        toast.success('회원 계정이 자동으로 생성되었습니다.');
+                        // Update local state with new userId
+                        attendeeData.userId = authResult.data.uid;
+                    }
+                } catch (authError) {
+                    console.error('Failed to auto-create auth user:', authError);
+                    toast.error('회원 계정 생성 실패 (나중에 명찰 발급 시 재시도됩니다)');
+                }
+            }
+
             setExternalAttendees(prev => [attendeeData, ...prev]);
             setFormData({ name: '', email: '', phone: '', organization: '', licenseNumber: '', amount: 0, password: '' });
             toast.success('외부 참석자가 등록되었습니다.');
@@ -249,7 +276,7 @@ const ExternalAttendeePage: React.FC = () => {
 
             for (const attendee of batch) {
                 await setDoc(doc(db, `conferences/${confId}/external_attendees`, attendee.id), attendee);
-                
+
                 await addDoc(collection(db, `conferences/${confId}/external_attendees/${attendee.id}/logs`), {
                     type: 'REGISTERED',
                     timestamp: Timestamp.now(),
@@ -448,7 +475,7 @@ const ExternalAttendeePage: React.FC = () => {
                                         <Label>이름 <span className="text-red-500">*</span></Label>
                                         <Input
                                             value={formData.name}
-                                            onChange={e => setFormData({...formData, name: e.target.value})}
+                                            onChange={e => setFormData({ ...formData, name: e.target.value })}
                                             placeholder="홍길동"
                                         />
                                     </div>
@@ -457,7 +484,7 @@ const ExternalAttendeePage: React.FC = () => {
                                         <Input
                                             type="email"
                                             value={formData.email}
-                                            onChange={e => setFormData({...formData, email: e.target.value})}
+                                            onChange={e => setFormData({ ...formData, email: e.target.value })}
                                             placeholder="example@email.com"
                                         />
                                     </div>
@@ -465,7 +492,7 @@ const ExternalAttendeePage: React.FC = () => {
                                         <Label>전화번호 <span className="text-red-500">*</span></Label>
                                         <Input
                                             value={formData.phone}
-                                            onChange={e => setFormData({...formData, phone: e.target.value})}
+                                            onChange={e => setFormData({ ...formData, phone: e.target.value })}
                                             placeholder="010-1234-5678"
                                         />
                                     </div>
@@ -473,7 +500,7 @@ const ExternalAttendeePage: React.FC = () => {
                                         <Label>소속 <span className="text-red-500">*</span></Label>
                                         <Input
                                             value={formData.organization}
-                                            onChange={e => setFormData({...formData, organization: e.target.value})}
+                                            onChange={e => setFormData({ ...formData, organization: e.target.value })}
                                             placeholder="병원/학교명"
                                         />
                                     </div>
@@ -481,16 +508,16 @@ const ExternalAttendeePage: React.FC = () => {
                                         <Label>면허번호 (선택)</Label>
                                         <Input
                                             value={formData.licenseNumber}
-                                            onChange={e => setFormData({...formData, licenseNumber: e.target.value})}
+                                            onChange={e => setFormData({ ...formData, licenseNumber: e.target.value })}
                                             placeholder="면허번호"
                                         />
                                     </div>
-                                     <div className="space-y-2">
+                                    <div className="space-y-2">
                                         <Label>등록비 (선택)</Label>
                                         <Input
                                             type="number"
                                             value={formData.amount}
-                                            onChange={e => setFormData({...formData, amount: parseInt(e.target.value) || 0})}
+                                            onChange={e => setFormData({ ...formData, amount: parseInt(e.target.value) || 0 })}
                                             placeholder="0"
                                         />
                                     </div>
@@ -500,7 +527,7 @@ const ExternalAttendeePage: React.FC = () => {
                                             <Input
                                                 type={showPassword ? 'text' : 'password'}
                                                 value={formData.password}
-                                                onChange={e => setFormData({...formData, password: e.target.value})}
+                                                onChange={e => setFormData({ ...formData, password: e.target.value })}
                                                 placeholder="비밀번호 입력 (최소 6자)"
                                             />
                                             <button
@@ -589,8 +616,8 @@ const ExternalAttendeePage: React.FC = () => {
                                 )}
                             </CardContent>
                             <CardFooter>
-                                <Button 
-                                    onClick={handleBulkRegister} 
+                                <Button
+                                    onClick={handleBulkRegister}
                                     disabled={isProcessing || bulkPreview.length === 0}
                                     className="w-full"
                                 >
