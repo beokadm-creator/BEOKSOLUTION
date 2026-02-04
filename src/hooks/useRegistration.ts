@@ -4,6 +4,7 @@ import { db, auth as firebaseAuth } from '../firebase';
 import { Registration, RegistrationPeriod, ConferenceUser, RegistrationSettings } from '../types/schema';
 import { generateReceiptNumber, generateConfirmationQr } from '../utils/transaction';
 import toast from 'react-hot-toast';
+import { toFirestoreUserData } from '../utils/userDataMapper';
 
 interface RegistrationState {
     loading: boolean;
@@ -135,13 +136,18 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
             await setDoc(ref, dataToSave, { merge: true });
 
             if (cleanedFormData.name) {
+                const userDataToSave = toFirestoreUserData({
+                    name: cleanedFormData.name as string,
+                    email: cleanedFormData.email as string,
+                    phone: cleanedFormData.phone as string,
+                    organization: cleanedFormData.affiliation as string,
+                    licenseNumber: cleanedFormData.licenseNumber as string
+                });
+
                 await setDoc(doc(db, 'users', currentUser.uid), {
-                    name: cleanedFormData.name,
-                    email: cleanedFormData.email,
-                    userName: cleanedFormData.name,
-                    phoneNumber: cleanedFormData.phone,
-                    affiliation: cleanedFormData.affiliation,
-                    licenseNumber: cleanedFormData.licenseNumber,
+                    ...userDataToSave,
+                    name: userDataToSave.name, // Ensure specific fields (compatibility)
+                    userName: userDataToSave.name, // Legacy
                     simplePassword: cleanedFormData.simplePassword,
                     lastUpdated: serverTimestamp()
                 }, { merge: true });
@@ -189,7 +195,8 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
                 const regId = regRef.id;
 
                 // Generate Receipt Number (Atomic Increment)
-                const receiptNumber = await generateReceiptNumber(conferenceId, transaction);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const receiptNumber = await generateReceiptNumber(conferenceId, transaction as any);
 
                 // Generate Confirmation QR (Phase 1)
                 const confirmationQr = generateConfirmationQr(regId, user.id);
@@ -209,7 +216,7 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
                     userName: user.name,
                     userEmail: user.email,
                     userPhone: user.phone,
-                    affiliation: user.affiliation,
+                    affiliation: user.organization, // Map new field to legacy schema
                     licenseNumber: user.licenseNumber,
                     lastUpdated: serverTimestamp(),
 

@@ -325,18 +325,21 @@ export interface Registration {
   id: string; // regId
   userId: string;
   conferenceId: string; // For easy querying if needed, though redundant with path
-  
+
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
   amount: number;
   refundAmount: number;
   receiptNumber: string; // e.g., "2026-SP-001"
   userTier?: string; // Added snapshot of tier at registration time
-  
+
   // Snapshot User Info (Added for Data Integrity)
   userName?: string;
   userEmail?: string;
   userPhone?: string;
+  affiliation?: string; // Legacy support (DB field)
+  organization?: string; // New standard
+  licenseNumber?: string; // Snapshot of license number
 
   status?: string; // Added for status checking
 
@@ -345,10 +348,10 @@ export interface Registration {
   badgeQr: string | null;
   /** @deprecated Use badge_tokens/{token} collection as SSOT. Kept for backward compatibility only. */
   badgePrepToken?: string;       // Reference to badge_tokens collection (DEPRECATED - use badge_tokens SSOT)
-  
+
   isCheckedIn: boolean; // Default: false
   checkInTime: Timestamp | null;
-  
+
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -654,40 +657,40 @@ export interface NotificationTemplate {
  * Path: `conferences/{confId}/external_attendees/{externalId}`
  */
 export interface ExternalAttendee {
-   id: string; // External attendee ID (same as generated UID)
-   uid: string; // Generated UID (UUID v4) - used for badge, voucher, attendance tracking
-   userId?: string; // Firebase Auth user ID (generated for external attendees)
-   conferenceId: string;
-   name: string;
-   email: string;
-   phone: string;
-   organization: string;
-   licenseNumber?: string; // Optional
-   password?: string; // Optional - password for Firebase Auth (only stored temporarily until user creation)
+  id: string; // External attendee ID (same as generated UID)
+  uid: string; // Generated UID (UUID v4) - used for badge, voucher, attendance tracking
+  userId?: string; // Firebase Auth user ID (generated for external attendees)
+  conferenceId: string;
+  name: string;
+  email: string;
+  phone: string;
+  organization: string;
+  licenseNumber?: string; // Optional
+  password?: string; // Optional - password for Firebase Auth (only stored temporarily until user creation)
 
-   // Registration snapshot for compatibility
-   paymentStatus: PaymentStatus;
-   paymentMethod: PaymentMethod;
-   amount: number;
-   receiptNumber: string;
+  // Registration snapshot for compatibility
+  paymentStatus: PaymentStatus;
+  paymentMethod: PaymentMethod;
+  amount: number;
+  receiptNumber: string;
 
-   // Badge & Check-in fields
-   confirmationQr: string;
-   badgeQr: string | null;
-   badgePrepToken?: string;
-   isCheckedIn: boolean;
-   checkInTime: Timestamp | null;
-   badgeIssued?: boolean;
-   badgeIssuedAt?: Timestamp;
+  // Badge & Check-in fields
+  confirmationQr: string;
+  badgeQr: string | null;
+  badgePrepToken?: string;
+  isCheckedIn: boolean;
+  checkInTime: Timestamp | null;
+  badgeIssued?: boolean;
+  badgeIssuedAt?: Timestamp;
 
-   // Deletion status
-   deleted?: boolean;
+  // Deletion status
+  deleted?: boolean;
 
-   // Metadata
-   registrationType: 'MANUAL_INDIVIDUAL' | 'MANUAL_BULK';
-   registeredBy: string; // Admin user ID who registered
-   createdAt: Timestamp;
-   updatedAt: Timestamp;
+  // Metadata
+  registrationType: 'MANUAL_INDIVIDUAL' | 'MANUAL_BULK';
+  registeredBy: string; // Admin user ID who registered
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 }
 
 /**

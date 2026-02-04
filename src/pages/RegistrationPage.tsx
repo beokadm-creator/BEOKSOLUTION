@@ -21,6 +21,7 @@ import { functions } from '../firebase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { WideFooterPreview } from '../components/conference/wide-preview/WideFooterPreview';
+import { normalizeUserData, toFirestoreUserData } from '../utils/userDataMapper';
 
 // Dynamic Types based on DB
 interface RegistrationPeriod {
@@ -34,6 +35,7 @@ interface RegistrationPeriod {
 
 interface RegistrationSettings {
     periods: RegistrationPeriod[];
+    refundPolicy?: string;
 }
 
 interface InfraSettings {
@@ -60,18 +62,36 @@ interface Grade {
     code: string;
 }
 
+interface MemberVerificationData {
+    id?: string;
+    societyId?: string;
+    grade?: string;
+    name?: string;
+    code?: string;
+    expiry?: string;
+}
+
 export default function RegistrationPage() {
     const { slug } = useParams<{ slug: string }>();
     const navigate = useNavigate();
 
     // Hooks
     const { id: confId, info, loading: confLoading } = useConference();
-    const { auth } = useAuth(confId || '');
+    const { auth } = useAuth();
 
     const { language, setLanguage } = useUserStore();
     const [searchParams] = useSearchParams();
     const location = useLocation();
-    const state = location.state as { memberVerified?: boolean; memberName?: string; memberGrade?: string; memberCode?: string } || {};
+    const state = location.state as {
+        memberVerified?: boolean;
+        memberName?: string;
+        memberGrade?: string;
+        memberCode?: string;
+        memberVerificationId?: string;
+        memberExpiry?: string;
+        memberVerification?: MemberVerificationData;
+        memberVerificationData?: MemberVerificationData & { memberDocId?: string };
+    } || {};
 
     // Params from Modal (State > SearchParams fallback)
     const memberVerified = state.memberVerified || searchParams.get('memberVerified') === 'true';
@@ -211,16 +231,13 @@ export default function RegistrationPage() {
                     const uData = auth.user;
                     setFormData(prev => ({
                         ...prev,
-                        name: prev.name || uData.name || uData.userName || '',
+                        name: prev.name || uData.name || '',
                         email: uData.email || '',
-                        phone: uData.phone || uData.phoneNumber || '',
-                        affiliation: uData.affiliation || uData.organization || '',
+                        phone: uData.phone || '', // ✅ ConferenceUser has phone
+                        affiliation: uData.organization || '', // ✅ ConferenceUser.organization -> UI.affiliation
                         licenseNumber: prev.licenseNumber || uData.licenseNumber || ''
                     }));
-                    // If user is logged in, consider basic info "saved" implicitly? 
-                    // No, let them review and click "Save" to be sure about the current registration context.
                 }
-
             } catch (error) {
                 console.error("Init failed:", error);
                 toast.error("초기화 실패");
@@ -429,12 +446,16 @@ export default function RegistrationPage() {
 
             // 2. Save User Info to users/{uid}
             if (uid) {
-                await setDoc(doc(db, 'users', uid), {
+                const userDataToSave = toFirestoreUserData({
                     name: formData.name,
                     email: formData.email,
                     phone: formData.phone,
-                    affiliation: formData.affiliation,
-                    licenseNumber: formData.licenseNumber,
+                    organization: formData.affiliation, // UI는 affiliation, DB는 organization으로 저장
+                    licenseNumber: formData.licenseNumber
+                });
+
+                await setDoc(doc(db, 'users', uid), {
+                    ...userDataToSave,
                     simplePassword: formData.simplePassword ? btoa(formData.simplePassword) : null, // Legacy support
                     updatedAt: Timestamp.now()
                 }, { merge: true });
@@ -492,32 +513,11 @@ export default function RegistrationPage() {
 
             // Determine and attach member verification data if available
             // Priority: location.state > sessionStorage > URL params
-            interface MemberVerificationData {
-                id?: string;
-                societyId?: string;
-                grade?: string;
-                name?: string;
-                code?: string;
-                expiry?: string;
-            }
-
-            interface LocationState {
-                memberVerificationId?: string;
-                memberVerification?: MemberVerificationData;
-                memberVerificationData?: MemberVerificationData & { memberDocId?: string };
-                memberGrade?: string;
-                memberName?: string;
-                memberCode?: string;
-                memberExpiry?: string;
-            }
-
             const mvFromURL: MemberVerificationData | null = (() => {
-                const locState: LocationState = (location?.state as LocationState) || {};
-
                 // Try sessionStorage first (persists across refresh)
                 const storageKey = `member_verification_${confId}`;
                 const sessionData = sessionStorage.getItem(storageKey);
-                let fromStorage = null;
+                let fromStorage: MemberVerificationData | null = null;
                 if (sessionData) {
                     try {
                         fromStorage = JSON.parse(sessionData);
@@ -527,12 +527,12 @@ export default function RegistrationPage() {
                 }
 
                 const candidate = {
-                    id: locState.memberVerificationId || locState.memberVerification?.id || locState?.memberVerificationData?.id || locState?.memberVerificationData?.memberDocId || fromStorage?.id || '',
+                    id: state.memberVerificationId || state.memberVerification?.id || state.memberVerificationData?.id || state.memberVerificationData?.memberDocId || fromStorage?.id || '',
                     societyId: info?.societyId || fromStorage?.societyId || '',
-                    grade: (paramMemberGrade || locState.memberGrade || memberVerification?.grade || memberVerificationData?.grade || fromStorage?.grade || ''),
-                    name: (paramMemberName || locState.memberName || memberVerification?.name || memberVerificationData?.name || fromStorage?.name || ''),
-                    code: (paramMemberCode || locState.memberCode || memberVerification?.code || memberVerificationData?.code || fromStorage?.code || ''),
-                    expiry: locState.memberExpiry || memberVerification?.expiry || memberVerificationData?.expiry || fromStorage?.expiry || ''
+                    grade: (paramMemberGrade || state.memberGrade || state.memberVerification?.grade || state.memberVerificationData?.grade || fromStorage?.grade || ''),
+                    name: (paramMemberName || state.memberName || state.memberVerification?.name || state.memberVerificationData?.name || fromStorage?.name || ''),
+                    code: (paramMemberCode || state.memberCode || state.memberVerification?.code || state.memberVerificationData?.code || fromStorage?.code || ''),
+                    expiry: state.memberExpiry || state.memberVerification?.expiry || state.memberVerificationData?.expiry || fromStorage?.expiry || ''
                 };
                 const hasData = !!(candidate.name || candidate.code || candidate.id);
                 return hasData ? candidate : null;
@@ -868,7 +868,7 @@ export default function RegistrationPage() {
                         <DialogTitle>{language === 'ko' ? '환불규정' : 'Refund Policy'}</DialogTitle>
                     </DialogHeader>
                     <div className="mt-4 whitespace-pre-wrap text-sm text-slate-600 leading-relaxed">
-                        {regSettings?.refundPolicy || info?.refundPolicy ||
+                        {regSettings?.refundPolicy || (info as any)?.refundPolicy ||
                             "2026년 3월 5일 17시까지 전액 환불 이후 환불은 불가 합니다. 카드결제 : 승인취소 퀵계좌이체 등 : 시스템에서 계좌 환불 * 카드사 승인 사정에 따라 환불이 영업일 기준 5일 이상 발생할 수 있습니다. 자세한 사항은 사무국으로 문의주시기 바랍니다."}
                     </div>
                     <div className="mt-6 flex justify-end">

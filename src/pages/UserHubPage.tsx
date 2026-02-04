@@ -21,7 +21,8 @@ import PrintHandler from '../components/print/PrintHandler';
 import { ReceiptConfig } from '../types/print';
 import { logger } from '../utils/logger';
 import { CreditCard } from 'lucide-react';
-import { Timestamp, Submission } from '../types/schema';
+import { Timestamp, Submission, ConferenceUser } from '../types/schema';
+import { normalizeUserData } from '../utils/userDataMapper';
 
 interface Stringable {
     ko?: string;
@@ -143,38 +144,42 @@ const UserHubPage: React.FC = () => {
     const { verifyMember, loading: verifyLoading } = useMemberVerification();
     const verifyFormInitializedRef = useRef(false);
 
-    const fetchUserData = useCallback(async (u: { uid: string; userName?: string; name?: string; displayName?: string; phoneNumber?: string; phone?: string; affiliation?: string; org?: string; organization?: string; licenseNumber?: string; licenseId?: string; email?: string }) => {
+    const fetchUserData = useCallback(async (u: ConferenceUser) => {
         const db = getFirestore();
         setLoading(true);
 
+        // Initial profile from auth user
         let profileData = {
-            displayName: forceString(u.userName || u.name || u.displayName),
-            phoneNumber: forceString(u.phoneNumber || u.phone),
-            affiliation: forceString(u.affiliation || u.org || u.organization),
-            licenseNumber: forceString(u.licenseNumber || u.licenseId),
-            email: forceString(u.email)
+            displayName: u.name,
+            phoneNumber: u.phone,
+            affiliation: u.organization,
+            licenseNumber: u.licenseNumber || '',
+            email: u.email
         };
 
-        logger.debug('UserHub', 'Starting profile load', { uid: u.uid });
+        logger.debug('UserHub', 'Starting profile load', { uid: u.id });
 
         try {
-            const userDocSnap = await getDoc(doc(db, 'users', u.uid));
+            const userDocSnap = await getDoc(doc(db, 'users', u.id));
             const hasUserDoc = userDocSnap.exists();
 
             if (hasUserDoc) {
-                const userData = userDocSnap.data();
-                logger.debug('UserHub', 'users/{uid} document found', { uid: u.uid });
+                const rawData = userDocSnap.data();
+                logger.debug('UserHub', 'users/{uid} document found', { uid: u.id });
+
+                const normalized = normalizeUserData({ ...rawData, id: u.id });
+
                 profileData = {
-                    displayName: forceString(userData.userName || userData.name || profileData.displayName),
-                    phoneNumber: forceString(userData.phoneNumber || userData.phone || profileData.phoneNumber),
-                    affiliation: forceString(userData.affiliation || userData.org || userData.organization || profileData.affiliation),
-                    licenseNumber: forceString(userData.licenseNumber || userData.licenseId || profileData.licenseNumber),
-                    email: forceString(userData.email || profileData.email)
+                    displayName: normalized.name || profileData.displayName,
+                    phoneNumber: normalized.phone || profileData.phoneNumber,
+                    affiliation: normalized.organization || profileData.affiliation,
+                    licenseNumber: normalized.licenseNumber || profileData.licenseNumber,
+                    email: normalized.email || profileData.email
                 };
             } else {
                 logger.debug('UserHub', 'users/{uid} document does not exist, checking participations');
                 try {
-                    const participationsRef = collection(db, `users/${u.uid}/participations`);
+                    const participationsRef = collection(db, `users/${u.id}/participations`);
                     const participationsSnap = await getDocs(participationsRef);
 
                     logger.debug('UserHub', 'Participations query returned', { count: participationsSnap.size });
@@ -183,15 +188,16 @@ const UserHubPage: React.FC = () => {
                         const confSlug = nonMemberParticipation.slug || nonMemberParticipation.conferenceId || nonMemberParticipation.conferenceSlug || 'kadd_2026spring';
 
                         // [Non-member detection] users/{uid} doesn't exist but participations do
-                        logger.debug('UserHub', 'Non-member detected', { uid: u.uid, hasParticipations: participationsSnap.size, confSlug });
-                        const firstParticipation = participationsSnap.docs[0].data();
+                        logger.debug('UserHub', 'Non-member detected', { uid: u.id, hasParticipations: participationsSnap.size, confSlug });
+
+                        const normalizedPart = normalizeUserData(nonMemberParticipation);
 
                         profileData = {
-                            displayName: forceString(firstParticipation.userName || firstParticipation.name || profileData.displayName),
-                            phoneNumber: forceString(firstParticipation.userPhone || firstParticipation.phone || profileData.phoneNumber),
-                            affiliation: forceString(firstParticipation.userOrg || firstParticipation.organization || firstParticipation.affiliation || profileData.affiliation),
-                            licenseNumber: forceString(firstParticipation.licenseNumber || profileData.licenseNumber),
-                            email: forceString(firstParticipation.userEmail || firstParticipation.email || profileData.email)
+                            displayName: normalizedPart.name || profileData.displayName,
+                            phoneNumber: normalizedPart.phone || profileData.phoneNumber,
+                            affiliation: normalizedPart.organization || profileData.affiliation,
+                            licenseNumber: normalizedPart.licenseNumber || profileData.licenseNumber,
+                            email: normalizedPart.email || profileData.email
                         };
                     }
                 } catch (partErr) {
@@ -219,7 +225,7 @@ const UserHubPage: React.FC = () => {
             // Query submissions across ALL conferences where user is submitter
             // Use collectionGroup to search conferences/{confId}/submissions
             // [Safety] Use parameter u instead of outer scope user to avoid null reference
-            if (!u.uid) {
+            if (!u.id) {
                 logger.warn('UserHub', 'User UID is null, skipping abstracts fetch');
                 setAbstracts([]);
                 setLoading(false);
