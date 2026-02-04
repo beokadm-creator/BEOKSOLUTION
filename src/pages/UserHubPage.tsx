@@ -535,7 +535,8 @@ const UserHubPage: React.FC = () => {
                                 paymentStatus: data.paymentStatus,
                                 amount: data.amount,
                                 receiptNumber: data.id,
-                                paymentDate: data.createdAt,
+                                names: data.names, // Ensure names is mapped if needed
+                                paymentDate: data.createdAt || data.updatedAt || data.registeredAt,
                                 receiptConfig: receiptConfig,
                                 userName: data.userName || user.name || (user as { displayName?: string }).displayName,
                                 status: data.status
@@ -580,7 +581,7 @@ const UserHubPage: React.FC = () => {
                                 return;
                             }
 
-                            // 3. Otherwise show latest (PENDING etc)
+                            // 3. Otherwise check latest registration
                             regs.sort((a, b) => {
                                 const getTime = (d: any) => {
                                     if (!d) return 0;
@@ -593,8 +594,17 @@ const UserHubPage: React.FC = () => {
                                 return getTime(b.paymentDate) - getTime(a.paymentDate);
                             });
 
-                            if (regs.length > 0) {
-                                activeRegs.push(regs[0]);
+                            const latest = regs[0];
+                            const pStatus = (latest.paymentStatus || '').toUpperCase();
+                            const status = (latest.status || '').toUpperCase();
+
+                            // WHITE-LIST STRATEGY: Only allow known valid unfinished statuses
+                            // If it is 'COMPLETED' but not caught by step 1 (PAID), it is invalid (zombie).
+                            if (['PENDING', 'READY', 'SUBMITTED'].includes(pStatus) ||
+                                ['PENDING', 'READY', 'SUBMITTED'].includes(status)) {
+                                activeRegs.push(latest);
+                            } else {
+                                console.log(`[UserHub] Hiding conference ${slug} due to invalid status: p=${pStatus}, s=${status}`);
                             }
                         });
 
@@ -698,7 +708,8 @@ const UserHubPage: React.FC = () => {
                             paymentStatus: data.paymentStatus,
                             amount: data.amount,
                             receiptNumber: data.id, // Using orderId as receipt number
-                            paymentDate: data.createdAt,
+                            receiptNumber: data.id, // Using orderId as receipt number
+                            paymentDate: data.createdAt || data.updatedAt || data.registeredAt,
                             receiptConfig: receiptConfig,
                             userName: data.userName || user.name || (user as { displayName?: string }).displayName,
                             status: data.status
@@ -742,7 +753,7 @@ const UserHubPage: React.FC = () => {
                             return;
                         }
 
-                        // 3. Otherwise show latest (PENDING etc)
+                        // 3. Otherwise check latest registration
                         regs.sort((a, b) => {
                             const getTime = (d: any) => {
                                 if (!d) return 0;
@@ -755,8 +766,16 @@ const UserHubPage: React.FC = () => {
                             return getTime(b.paymentDate) - getTime(a.paymentDate);
                         });
 
-                        if (regs.length > 0) {
-                            activeRegs.push(regs[0]);
+                        const latest = regs[0];
+                        const pStatus = (latest.paymentStatus || '').toUpperCase();
+                        const status = (latest.status || '').toUpperCase();
+
+                        // WHITE-LIST STRATEGY: Only allow known valid unfinished statuses
+                        if (['PENDING', 'READY', 'SUBMITTED'].includes(pStatus) ||
+                            ['PENDING', 'READY', 'SUBMITTED'].includes(status)) {
+                            activeRegs.push(latest);
+                        } else {
+                            console.log(`[UserHub] Hiding conference ${slug} due to invalid status: p=${pStatus}, s=${status} (Realtime)`);
                         }
                     });
                     setRegs(activeRegs);
