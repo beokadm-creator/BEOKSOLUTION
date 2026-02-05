@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Pre-commit checks running..."
+
+# 1. lint-staged 실행
+npx lint-staged
+
+# 2. 추가 체크가 필요하면 여기에 추가
+# npm test -- --passWithNoTests --bail --watchAll=false
