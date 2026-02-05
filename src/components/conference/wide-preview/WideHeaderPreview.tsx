@@ -169,6 +169,32 @@ export const WideHeaderPreview: React.FC<WideHeaderPreviewProps> = ({
               <Globe className="w-4 h-4" />
               <span className="font-medium text-xs ml-1">{lang === 'ko' ? 'EN' : 'KR'}</span>
             </Button>
+
+            {/* User / Login Button (Mobile) */}
+            {auth.user ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleNavigation(`/${slug}/mypage`)}
+                className={`rounded-full transition-colors ${buttonGhostClass} px-3`}
+              >
+                <span className="font-bold text-xs">{lang === 'ko' ? 'MY' : 'MY'}</span>
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handleNavigation(`/auth`)}
+                className="rounded-full px-4 font-bold shadow-sm transition-transform active:scale-95 text-xs h-8"
+                style={{
+                  backgroundColor: isScrolled ? '#2563eb' : '#ffffff',
+                  color: isScrolled ? '#ffffff' : '#1e3a8a',
+                  border: 'none'
+                }}
+              >
+                {lang === 'ko' ? '로그인' : 'Login'}
+              </Button>
+            )}
           </div>
         </div>
 

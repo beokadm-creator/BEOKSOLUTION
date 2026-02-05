@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useConference } from '../../hooks/useConference';
 import { useAuth } from '../../hooks/useAuth';
-import { collection, getDoc, getDocs, doc, setDoc, updateDoc, Timestamp, addDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, getDoc, getDocs, doc, setDoc, updateDoc, Timestamp, addDoc, query, where, onSnapshot, runTransaction } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { httpsCallable, getFunctions } from 'firebase/functions';
 import { v4 as uuidv4 } from 'uuid';
@@ -25,6 +25,7 @@ const ExternalAttendeePage: React.FC = () => {
     const [externalAttendees, setExternalAttendees] = useState<ExternalAttendee[]>([]);
     const [loading, setLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [progress, setProgress] = useState(0);
 
     // Fetch external attendees with real-time updates
     useEffect(() => {
@@ -159,18 +160,31 @@ const ExternalAttendeePage: React.FC = () => {
                 }
             }
 
-            const attendeeData = generateAttendeeData(formData, 'MANUAL_INDIVIDUAL');
+            // Transaction for receipt number and document creation
+            const configRef = doc(db, `conferences/${confId}/settings/receipt_config`);
+            let attendeeData = generateAttendeeData(formData, 'MANUAL_INDIVIDUAL');
+            let assignedReceiptNumber = '';
 
-            await setDoc(doc(db, `conferences/${confId}/external_attendees`, attendeeData.id), attendeeData);
+            await runTransaction(db, async (transaction) => {
+                const configDoc = await transaction.get(configRef);
 
-            // Update receipt serial number
-            if (receiptConfig) {
-                await updateDoc(doc(db, `conferences/${confId}/settings/receipt_config`), {
-                    nextSerialNo: receiptConfig.nextSerialNo + 1
-                });
-            }
+                let nextSerialNo = 1;
+                if (configDoc.exists()) {
+                    nextSerialNo = (configDoc.data().nextSerialNo || 0);
+                }
 
-            // Add log
+                // Assign receipt number carefully
+                assignedReceiptNumber = nextSerialNo.toString().padStart(3, '0');
+                attendeeData.receiptNumber = assignedReceiptNumber;
+
+                // Update config
+                transaction.set(configRef, { nextSerialNo: nextSerialNo + 1 }, { merge: true });
+
+                // Set attendee doc
+                transaction.set(doc(db, `conferences/${confId}/external_attendees`, attendeeData.id), attendeeData);
+            });
+
+            // Add log (outside transaction as it's less critical)
             await addDoc(collection(db, `conferences/${confId}/external_attendees/${attendeeData.id}/logs`), {
                 type: 'REGISTERED',
                 timestamp: Timestamp.now(),
@@ -276,14 +290,35 @@ const ExternalAttendeePage: React.FC = () => {
                 }
             }
 
-            const batch = bulkPreview.map(data => generateAttendeeData(data, 'MANUAL_BULK'));
+            // Transaction for receipt numbers and batch creation
+            const configRef = doc(db, `conferences/${confId}/settings/receipt_config`);
+            const batchData = bulkPreview.map(data => generateAttendeeData(data, 'MANUAL_BULK'));
 
-            // Process one by one to avoid overwhelming Cloud Functions
-            for (const attendee of batch) {
+            await runTransaction(db, async (transaction) => {
+                const configDoc = await transaction.get(configRef);
+                let currentSerialNo = 0;
+
+                if (configDoc.exists()) {
+                    currentSerialNo = configDoc.data().nextSerialNo || 0;
+                }
+
+                // Assign receipt numbers and write to transaction
+                batchData.forEach((attendee, index) => {
+                    attendee.receiptNumber = (currentSerialNo + index).toString().padStart(3, '0');
+                    transaction.set(doc(db, `conferences/${confId}/external_attendees`, attendee.id), attendee);
+                });
+
+                // Update serial number
+                transaction.set(configRef, { nextSerialNo: currentSerialNo + batchData.length }, { merge: true });
+            });
+
+            // Process Auth User creation one by one (less critical than DB consistency)
+            const total = batchData.length;
+            for (let i = 0; i < batchData.length; i++) {
+                const attendee = batchData[i];
+                setProgress(Math.round(((i + 1) / total) * 100));
                 try {
-                    // 1. Create Firestore Document
-                    await setDoc(doc(db, `conferences/${confId}/external_attendees`, attendee.id), attendee);
-
+                    // Log creation
                     await addDoc(collection(db, `conferences/${confId}/external_attendees/${attendee.id}/logs`), {
                         type: 'REGISTERED',
                         timestamp: Timestamp.now(),
@@ -291,8 +326,7 @@ const ExternalAttendeePage: React.FC = () => {
                         operator: auth.user?.email
                     });
 
-                    // 2. Auto-create Auth User
-                    // Use provided password or fallback to phone last 4 digits or default
+                    // Auto-create Auth User
                     const passwordToUse = attendee.password || (attendee.phone ? attendee.phone.slice(-4) : '123456');
 
                     const functions = getFunctions();
@@ -327,23 +361,16 @@ const ExternalAttendeePage: React.FC = () => {
 
                     successCount++;
                 } catch (err) {
-                    console.error(`Failed to register ${attendee.name}:`, err);
+                    console.error(`Failed to register auth for ${attendee.name}:`, err);
                     failCount++;
                 }
             }
 
-            // Update receipt serial number
-            if (receiptConfig) {
-                await updateDoc(doc(db, `conferences/${confId}/settings/receipt_config`), {
-                    nextSerialNo: receiptConfig.nextSerialNo + batch.length
-                });
-            }
-
-            setExternalAttendees(prev => [...batch, ...prev]); // Optimistic update, but snapshot will correct it
+            setExternalAttendees(prev => [...batchData, ...prev]);
             setBulkPreview([]);
 
             if (failCount > 0) {
-                toast(`완료되었으나 ${failCount}명의 처리에 실패했습니다.`, { icon: '⚠️' });
+                toast(`DB저장은 완료되었으나 ${failCount}명의 계정 생성에 실패했습니다.`, { icon: '⚠️' });
             } else {
                 toast.success(`${successCount}명의 외부 참석자가 등록되었습니다.`);
             }
@@ -353,6 +380,7 @@ const ExternalAttendeePage: React.FC = () => {
             toast.error('대량 등록 중 오류가 발생했습니다.');
         } finally {
             setIsProcessing(false);
+            setProgress(0);
         }
     };
 
@@ -514,6 +542,78 @@ const ExternalAttendeePage: React.FC = () => {
             toast.error('명찰 발급에 실패했습니다.');
         } finally {
             setIsProcessing(false);
+        }
+    };
+
+    // Handle batch account creation for all
+    const handleBatchCreateAccount = async () => {
+        const targetAttendees = externalAttendees.filter(a => {
+            const hasAccount = a.authCreated || (a.userId && !a.userId.startsWith('EXT-'));
+            return !hasAccount;
+        });
+
+        if (targetAttendees.length === 0) {
+            toast('계정을 생성할 대상이 없습니다.', { icon: 'ℹ️' });
+            return;
+        }
+
+        if (!confirm(`총 ${targetAttendees.length}명의 미가입 참석자에 대해 계정을 생성하시겠습니까?\n(다소 시간이 걸릴 수 있습니다)`)) return;
+
+        setIsProcessing(true);
+        let successCount = 0;
+        let failCount = 0;
+
+        try {
+            // Process in chunks of 5 to batch concurrency
+            const chunkSize = 5;
+            for (let i = 0; i < targetAttendees.length; i += chunkSize) {
+                const chunk = targetAttendees.slice(i, i + chunkSize);
+
+                // Update progress
+                setProgress(Math.round(((i + chunk.length) / targetAttendees.length) * 100));
+
+                await Promise.all(chunk.map(async (attendee) => {
+                    try {
+                        const passwordToUse = attendee.password || (attendee.phone ? attendee.phone.slice(-4) : '123456');
+                        const functions = getFunctions();
+                        const generateAuthUserFn = httpsCallable(functions, 'generateFirebaseAuthUserForExternalAttendee');
+
+                        const authResult = await generateAuthUserFn({
+                            confId,
+                            externalId: attendee.id,
+                            password: passwordToUse,
+                            email: attendee.email,
+                            name: attendee.name,
+                            phone: attendee.phone,
+                            organization: attendee.organization,
+                            licenseNumber: attendee.licenseNumber
+                        }) as { data: { success: boolean; uid: string; message: string } };
+
+                        if (authResult.data.success) {
+                            successCount++;
+                            // No need to manual updateDoc if the cloud function does it, but we can update local state or rely on onSnapshot
+                        } else {
+                            failCount++;
+                        }
+                    } catch (err) {
+                        console.error(`Failed batch create for ${attendee.name}:`, err);
+                        failCount++;
+                    }
+                }));
+            }
+
+            if (failCount > 0) {
+                toast.error(`${successCount}명 성공, ${failCount}명 실패.`);
+            } else {
+                toast.success(`${successCount}명의 계정이 모두 생성되었습니다.`);
+            }
+
+        } catch (error) {
+            console.error('Batch create failed:', error);
+            toast.error('일괄 계정 생성 중 오류가 발생했습니다.');
+        } finally {
+            setIsProcessing(false);
+            setProgress(0);
         }
     };
 
@@ -761,18 +861,27 @@ const ExternalAttendeePage: React.FC = () => {
                                 <Button
                                     onClick={handleBulkRegister}
                                     disabled={isProcessing || bulkPreview.length === 0}
-                                    className="w-full"
+                                    className="w-full relative overflow-hidden"
                                 >
-                                    {isProcessing ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                            일괄 등록 및 계정 생성 중...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Upload className="w-4 h-4 mr-2" />
-                                            {bulkPreview.length}명 일괄 등록
-                                        </>
+                                    <span className="relative z-10 flex items-center justify-center">
+                                        {isProcessing ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                {progress > 0 ? `처리 중... ${progress}%` : '일괄 등록 및 계정 생성 중...'}
+                                                <span className="ml-2 text-xs opacity-90">(창을 닫지 마세요)</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Upload className="w-4 h-4 mr-2" />
+                                                {bulkPreview.length}명 일괄 등록
+                                            </>
+                                        )}
+                                    </span>
+                                    {isProcessing && progress > 0 && (
+                                        <div
+                                            className="absolute bottom-0 left-0 top-0 bg-white/20 transition-all duration-300"
+                                            style={{ width: `${progress}%`, zIndex: 0 }}
+                                        />
                                     )}
                                 </Button>
                             </CardFooter>
@@ -788,6 +897,33 @@ const ExternalAttendeePage: React.FC = () => {
                                         <UserPlus className="w-5 h-5" />
                                         등록된 외부 참석자 ({externalAttendees.length})
                                     </CardTitle>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleBatchCreateAccount}
+                                        disabled={isProcessing}
+                                        className="mr-2 text-blue-600 border-blue-200 hover:bg-blue-50 relative overflow-hidden"
+                                    >
+                                        <span className="relative z-10 flex items-center">
+                                            {isProcessing && progress > 0 ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                    처리중 {progress}%
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <UserPlus className="w-4 h-4 mr-2" />
+                                                    계정 일괄 생성
+                                                </>
+                                            )}
+                                        </span>
+                                        {isProcessing && progress > 0 && (
+                                            <div
+                                                className="absolute bottom-0 left-0 top-0 bg-blue-100 transition-all duration-300"
+                                                style={{ width: `${progress}%`, zIndex: 0 }}
+                                            />
+                                        )}
+                                    </Button>
                                     <Button
                                         variant="outline"
                                         size="sm"

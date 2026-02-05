@@ -66,8 +66,8 @@ export const WideContentPreview: React.FC<WideContentPreviewProps> = ({
           <div id="section-program" className="animate-fade-in pt-8 pb-4">
             <div className="max-w-7xl mx-auto px-6">
               <WideProgramPreview
-                agendas={config.agendas}
-                speakers={config.speakers}
+                agendas={config.agendas as any}
+                speakers={config.speakers as any}
                 lang={lang}
               />
             </div>
@@ -79,7 +79,7 @@ export const WideContentPreview: React.FC<WideContentPreviewProps> = ({
           <div id="section-speakers" className="animate-fade-in pt-8 pb-4">
             <div className="max-w-7xl mx-auto px-6">
               <WideSpeakersPreview
-                speakers={config.speakers}
+                speakers={config.speakers as any}
                 lang={lang}
               />
             </div>
@@ -140,7 +140,7 @@ export const WideContentPreview: React.FC<WideContentPreviewProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 min-h-[600px]">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 min-h-[50vh] md:min-h-[600px]">
       {renderContent()}
     </div>
   );

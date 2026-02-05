@@ -3,21 +3,24 @@ import { ArrowRight } from 'lucide-react';
 import { Globe } from 'lucide-react';
 import type { Language } from '../../../hooks/useLanguage';
 
+import { Society } from '../../../types/schema';
+
 interface SocietyHomeSectionProps {
-  society: Record<string, unknown>;
+  society: Society;
   language?: Language;
-  onRegisterClick?: (conference: Record<string, unknown>) => void;
+  onRegisterClick?: (conference: any) => void;
 }
 
 const SocietyHomeSection: React.FC<SocietyHomeSectionProps> = ({ society, language = 'ko' }) => {
-  const getLocalizedText = (text: string | { [lang: string]: string } | undefined) => {
+  const getLocalizedText = (text: string | { [lang: string]: string } | undefined | { ko: string; en?: string }) => {
     if (!text) return '';
     if (typeof text === 'string') return text;
-    return text[language] || text.ko || '';
+    // Handle both index signature and known keys
+    return (text as any)[language] || (text as any).ko || '';
   };
 
   return (
-    <section className="relative h-[440px] bg-slate-900 flex items-center overflow-hidden rounded-3xl">
+    <section className="relative min-h-[440px] h-auto py-12 bg-slate-900 flex items-center overflow-hidden rounded-3xl">
       <div className="absolute inset-0 opacity-30 bg-[url('https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&q=80&w=2000')] bg-cover bg-center"></div>
       <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/60 to-transparent"></div>
 

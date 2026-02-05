@@ -62,6 +62,17 @@ const SocietyLandingPage: React.FC = () => {
     const [activeMenu, setActiveMenu] = useState<string>('home');
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
+    // Scroll state for navbar
+    const [isScrolled, setIsScrolled] = useState(false);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            setIsScrolled(window.scrollY > 20);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
     useEffect(() => {
         if (!societyId) {
             setLoading(false);
@@ -134,10 +145,29 @@ const SocietyLandingPage: React.FC = () => {
 
     const hasUser = !!authHook.auth.user;
 
+
+    // Determine header style based on menu and scroll
+    // Only use transparent header on Home tab when not scrolled
+    const useTransparentHeader = activeMenu === 'home' && !isScrolled;
+
+    const headerClass = useTransparentHeader
+        ? 'bg-gradient-to-b from-black/50 to-transparent border-b border-white/10'
+        : 'bg-white/95 backdrop-blur-md shadow-lg border-b border-slate-100';
+
+    const textClass = useTransparentHeader ? 'text-white shadow-sm' : 'text-slate-800';
+    const buttonGhostClass = useTransparentHeader
+        ? 'text-white hover:bg-white/20'
+        : 'text-slate-800 hover:bg-slate-100';
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const logoContainerClass = useTransparentHeader
+        ? 'brightness-0 invert drop-shadow-sm'
+        : '';
+
     return (
         <div className="min-h-screen bg-gray-50 font-sans text-slate-900">
             {/* Mobile Navbar */}
-            <nav className="lg:hidden fixed top-0 left-0 right-0 z-[100] bg-white border-b border-slate-200 h-16 shadow-sm">
+            <nav className={`lg:hidden fixed top-0 left-0 right-0 z-[100] h-16 transition-all duration-300 ease-in-out ${headerClass}`}>
                 <div className="px-4 h-full flex justify-between items-center gap-3">
                     {/* Left: Hamburger Menu */}
                     <button
@@ -146,7 +176,7 @@ const SocietyLandingPage: React.FC = () => {
                             console.log('Hamburger clicked!');
                             setSidebarOpen(true);
                         }}
-                        className="p-3 rounded-xl hover:bg-slate-100 active:bg-slate-200 transition-colors relative z-50"
+                        className={`p-3 rounded-xl transition-colors relative z-50 ${buttonGhostClass}`}
                         aria-label="메뉴 열기"
                         style={{ minWidth: '48px', minHeight: '48px' }}
                     >
@@ -156,7 +186,7 @@ const SocietyLandingPage: React.FC = () => {
                     {/* Center: Logo Only - Larger and Prominent */}
                     <div className="flex items-center justify-center flex-1 -mx-16">
                         {society.logoUrl ? (
-                            <img src={society.logoUrl} alt="Logo" className="h-9 object-contain max-w-full" />
+                            <img src={society.logoUrl} alt="Logo" className={`h-9 object-contain max-w-full transition-all duration-300 ${logoContainerClass}`} />
                         ) : (
                             <div className="h-9 w-9 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black uppercase text-sm font-black shadow-lg shadow-blue-600/20">
                                 {society.id.substring(0, 2)}
@@ -182,7 +212,7 @@ const SocietyLandingPage: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={toggleLanguage}
-                                    className="p-3 rounded-xl text-slate-600 hover:bg-slate-100 active:bg-slate-200 transition-colors"
+                                    className={`p-3 rounded-xl transition-colors ${buttonGhostClass}`}
                                     aria-label={language === 'ko' ? 'English' : '한국어'}
                                 >
                                     <Globe size={20} strokeWidth={2.5} />
@@ -190,7 +220,7 @@ const SocietyLandingPage: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => navigate('/auth')}
-                                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-900 text-white hover:bg-black transition-all shadow-lg active:scale-95 font-bold text-sm"
+                                    className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg active:scale-95 ${!useTransparentHeader ? 'bg-slate-900 text-white hover:bg-black' : 'bg-white text-slate-900 hover:bg-slate-100'}`}
                                 >
                                     <LogIn size={18} strokeWidth={2.5} />
                                 </button>
@@ -251,7 +281,7 @@ const SocietyLandingPage: React.FC = () => {
 
             {/* Main Content */}
             <div className="lg:ml-64 pt-16 lg:pt-20">
-                <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+                <main className={['intro', 'greeting'].includes(activeMenu) ? 'w-full' : 'max-w-7xl mx-auto px-4 sm:px-6 py-8'}>
                     {/* Content Sections */}
                     {activeMenu === 'home' && (
                         <div className="space-y-8">

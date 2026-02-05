@@ -146,7 +146,7 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
   }, [auth.user, slug, urlConfId, propConfId, targetSlug]);
 
   return (
-    <section className="relative w-full min-h-[85vh] md:min-h-[75vh] flex items-center justify-center overflow-hidden bg-slate-900 pt-20">
+    <section className="relative w-full min-h-[calc(100dvh-60px)] md:min-h-[75vh] flex items-center justify-center overflow-hidden bg-slate-900 pt-20">
       {/* 1. Full Background Image with Enhanced Gradient */}
       {bgImage && (
         <div className="absolute inset-0 z-0">

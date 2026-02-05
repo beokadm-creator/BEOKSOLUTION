@@ -394,10 +394,10 @@ export default function SocietyDashboardPage() {
                                                     onChange={(e) => handleStatusChange(conf.id, e.target.value)}
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
-                                                    <option value="SETUP">Setup Mode</option>
-                                                    <option value="PLANNING">Planning</option>
-                                                    <option value="OPEN">Open (Live)</option>
-                                                    <option value="CLOSED">Closed (Archived)</option>
+                                                    <option value="SETUP">Setup Mode (Hidden)</option>
+                                                    <option value="PLANNING">Planning (Coming Soon)</option>
+                                                    <option value="OPEN">Open (Registration Active)</option>
+                                                    <option value="CLOSED">Closed (Ended)</option>
                                                 </select>
                                                 <ChevronDown className="absolute right-3 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
                                             </div>

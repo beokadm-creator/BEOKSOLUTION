@@ -115,6 +115,11 @@ export interface Conference {
     end: Timestamp;
   };
   location: string;
+  venue?: {
+    name: LocalizedText;
+    address?: LocalizedText;
+    mapUrl?: string;
+  };
   status: 'PLANNING' | 'OPEN' | 'CLOSED' | 'ARCHIVED';
   createdAt: Timestamp;
   // Abstract submission deadlines

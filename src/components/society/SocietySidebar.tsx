@@ -38,30 +38,29 @@ const SocietySidebar: React.FC<SocietySidebarProps> = ({
     <>
       {/* Mobile overlay */}
       <div
-        className={`fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity ${
-          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
+        className={`fixed inset-0 bg-black/50 z-[110] lg:hidden transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
         onClick={onClose}
       />
 
       {/* Sidebar */}
       <aside
         className={`
-          fixed left-0 top-0 h-full w-64 bg-[#001f3f] text-white z-50 flex flex-col border-r border-[#003366]
+          fixed left-0 top-0 h-full w-64 bg-[#001f3f] text-white z-[120] flex flex-col border-r border-[#003366]
           transition-transform duration-300 ease-in-out
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
           lg:translate-x-0
         `}
       >
         {/* Header */}
-        <div className="h-20 flex items-center justify-between px-6 border-b border-[#003366]">
-          <div>
-            <h1 className="text-lg font-black leading-none">{societyName || 'SOCIETY'}</h1>
+        <div className="h-20 flex items-center justify-between px-6 border-b border-[#003366] gap-3">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-lg font-black leading-none truncate">{societyName || 'SOCIETY'}</h1>
             <p className="text-[10px] font-bold text-blue-300 uppercase tracking-widest mt-1">Portal</p>
           </div>
           <button
             onClick={onClose}
-            className="lg:hidden p-2 rounded-lg hover:bg-[#003366] transition-colors"
+            className="lg:hidden p-2 rounded-lg hover:bg-[#003366] transition-colors flex-shrink-0"
             aria-label="Close menu"
           >
             <X size={20} />
