@@ -1,3 +1,41 @@
+# ⚠️ VERSION CONTROL PROTECTION ACTIVE ⚠️
+
+**This repository has rollback prevention enabled.**
+
+## Current Production Version
+- **v1.0.0** (see `.DEPLOYED_VERSION` file)
+- **Baseline Tag**: `v1.0.0` (commit `35aaeed`)
+- **Release Notes**: [`RELEASE_NOTES_v1.0.0.md`](./RELEASE_NOTES_v1.0.0.md)
+
+## Critical Rules (ENFORCED)
+
+### ✅ Required for ALL Changes
+- Create feature branch: `git checkout -b feature/description`
+- Run tests: `npm test` (167 tests must pass)
+- Fix linting: `npm run lint` (0 errors, 0 warnings)
+- Create Pull Request on GitHub
+- Wait for CI/CD to pass (ESLint + TypeScript + Tests + Build)
+- Get review approval
+
+### ❌ PROHIBITED
+- Direct commits to `main` branch (GitHub will block)
+- Skipping tests (pre-commit hooks will block)
+- Rolling back to previous versions (tag protection)
+- Force pushing to `main` (branch protection)
+
+## Mandatory Reading
+**Before making ANY changes**, read:
+1. [`MANDATORY_WORKFLOW.md`](./MANDATORY_WORKFLOW.md) - Step-by-step workflow
+2. [`VERSION_CONTROL_POLICY.md`](./VERSION_CONTROL_POLICY.md) - Version control rules
+3. [`BRANCH_PROTECTION_SETUP.md`](./BRANCH_PROTECTION_SETUP.md) - GitHub setup guide
+
+## Multi-Layer Protection
+1. **Pre-commit hooks** (local): ESLint + Tests
+2. **GitHub Branch Protection** (server): PR required, CI/CD validation
+3. **Git Tag v1.0.0** (anchor): Immutable production baseline
+
+---
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

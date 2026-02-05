@@ -1,3 +1,65 @@
+# 🚨 CRITICAL: VERSION CONTROL PROTECTION 🚨
+
+**ALL AGENTS MUST READ THIS BEFORE STARTING ANY WORK**
+
+## Current Production Baseline
+- **Version**: v1.0.0 (Immutable)
+- **Tracking**: `.DEPLOYED_VERSION` file
+- **Release Notes**: `RELEASE_NOTES_v1.0.0.md`
+
+## 🛡️ Rollback Prevention System (ENFORCED)
+
+This codebase has **multi-layer protection** against accidental rollbacks:
+
+### Layer 1: Git Tag Anchor
+- **v1.0.0** is the production baseline (commit `35aaeed`)
+- **NEVER** delete, move, or modify this tag
+- All forward progress must be from this point
+
+### Layer 2: Pre-commit Hooks (LOCAL ENFORCEMENT)
+- **ESLint** must pass (no errors, no warnings)
+- **Jest Tests** must pass (167 tests, 100% pass rate required)
+- **Auto-fix** runs on staged files
+- Hook location: `.husky/pre-commit`
+
+### Layer 3: GitHub Branch Protection (SERVER ENFORCEMENT)
+- **Direct push to `main`**: BLOCKED
+- **PR required**: ALL changes must go through pull requests
+- **CI/CD validation required**: ESLint + TypeScript + Tests + Build
+- **Force push protection**: ENABLED
+
+### Layer 4: CI/CD Pipeline (AUTOMATED VALIDATION)
+- File: `.github/workflows/ci.yml`
+- Runs on every PR to `main` or `develop`
+- Checks: ESLint → TypeScript → Jest → Vite Build
+- **ALL must pass** before merge button activates
+
+## 📋 MANDATORY PRE-WORK CHECKLIST
+
+**Before starting ANY work**, agents MUST:
+
+1. **Read** `MANDATORY_WORKFLOW.md` (this file's continuation)
+2. **Check** `.DEPLOYED_VERSION` to know current production version
+3. **Create** feature branch: `git checkout -b feature/description`
+4. **NEVER** work directly on `main` branch
+
+## ⚠️ Consequences of Violation
+
+- **Pre-commit hook failure**: Commit blocked
+- **Direct push to main**: GitHub rejects with error
+- **CI/CD failure**: PR cannot be merged
+- **Rollback attempt**: Tag protection prevents deletion
+
+## 🛠️ Emergency Recovery
+
+If you accidentally cause issues:
+1. **DO NOT** try to rollback
+2. **DO** create a new feature branch with fix
+3. **DO** follow normal PR workflow
+4. **READ** `VERSION_CONTROL_POLICY.md` for detailed procedures
+
+---
+
 # AGENTS.md - eRegi AI Agent Guidelines
 
 ## Essential Commands
