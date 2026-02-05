@@ -281,7 +281,6 @@ const LandingPage: React.FC = () => {
                     <div className="flex flex-wrap justify-center gap-8 text-xs font-bold text-slate-400 uppercase tracking-widest">
                         <button onClick={() => navigate('/terms')} className="hover:text-slate-900 transition-colors">이용약관</button>
                         <button onClick={() => navigate('/privacy')} className="hover:text-slate-900 transition-colors">개인정보처리방침</button>
-                        <button onClick={() => navigate('/admin')} className="hover:text-slate-900 transition-colors">Admin Console</button>
                     </div>
 
                     <div className="flex flex-col items-center md:items-end gap-2 text-right">
