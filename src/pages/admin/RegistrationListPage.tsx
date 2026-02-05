@@ -4,8 +4,9 @@ import { useExcel } from '../../hooks/useExcel';
 import { useRegistrationsPagination } from '../../hooks/useRegistrationsPagination';
 import toast from 'react-hot-toast';
 import { query, collection, getDocs, limit, doc, updateDoc, Timestamp, addDoc, where } from 'firebase/firestore';
-import { db } from '../../firebase';
-import { Loader2, Printer, ChevronLeft, ChevronRight } from 'lucide-react';
+import { db, functions } from '../../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { Loader2, Printer, ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
 import { EregiButton } from '../../components/eregi/EregiForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import PrintHandler from '../../components/print/PrintHandler';
@@ -41,6 +42,16 @@ interface RootRegistration {
     createdAt: Timestamp;
     badgeIssued?: boolean;
     badgeIssuedAt?: Timestamp;
+}
+
+interface SendNotificationResult {
+    success: boolean;
+    results: {
+        total: number;
+        success: number;
+        failed: number;
+        details: Array<{ regId: string; success: boolean; error?: string }>;
+    };
 }
 
 const statusToKorean = (status: string) => {
@@ -81,6 +92,12 @@ const RegistrationListPage: React.FC = () => {
     const [selectedReg, setSelectedReg] = useState<RootRegistration | null>(null);
     const [showPrintModal, setShowPrintModal] = useState(false);
     const badgeRef = useRef<HTMLDivElement>(null);
+
+    // Notification Send State
+    const [selectedRegs, setSelectedRegs] = useState<string[]>([]);
+    const [showNotificationModal, setShowNotificationModal] = useState(false);
+    const [sendingNotifications, setSendingNotifications] = useState(false);
+    const [notificationEventType, setNotificationEventType] = useState<string>('CONFERENCE_REGISTER');
 
     // Use pagination hook (follows project convention: use hooks, not direct Firestore)
     const {
@@ -204,6 +221,87 @@ const RegistrationListPage: React.FC = () => {
         }
     };
 
+    const handleSendSingleNotification = async (e: React.MouseEvent, reg: RootRegistration) => {
+        e.stopPropagation();
+
+        if (!confirm(`${reg.userName} 님에게 알림톡을 발송하시겠습니까?`)) return;
+        if (!conferenceId) {
+            toast.error("Conference ID가 없습니다.");
+            return;
+        }
+
+        setSendingNotifications(true);
+        try {
+            const sendNotificationFn = httpsCallable(functions, 'sendNotificationToRegistrations');
+            const result = await sendNotificationFn({
+                confId: conferenceId,
+                regIds: [reg.id],
+                eventType: notificationEventType
+            });
+
+            const data = result.data as SendNotificationResult;
+            if (data.success && data.results.success > 0) {
+                toast.success("알림톡이 발송되었습니다.");
+            } else {
+                toast.error(`발송 실패: ${data.results.details[0]?.error || 'Unknown error'}`);
+            }
+        } catch (error: unknown) {
+            console.error('Notification send failed:', error);
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            toast.error(`발송 실패: ${message}`);
+        } finally {
+            setSendingNotifications(false);
+        }
+    };
+
+    const handleSendBulkNotifications = async () => {
+        if (selectedRegs.length === 0) {
+            toast.error("발송할 등록자를 선택해주세요.");
+            return;
+        }
+
+        const confirmMessage = `선택한 ${selectedRegs.length}명에게 알림톡을 발송하시겠습니까?\n\n이벤트: ${notificationEventType}`;
+        if (!confirm(confirmMessage)) return;
+        if (!conferenceId) {
+            toast.error("Conference ID가 없습니다.");
+            return;
+        }
+
+        setSendingNotifications(true);
+        try {
+            const sendNotificationFn = httpsCallable(functions, 'sendNotificationToRegistrations');
+            const result = await sendNotificationFn({
+                confId: conferenceId,
+                regIds: selectedRegs,
+                eventType: notificationEventType
+            });
+
+            const data = result.data as SendNotificationResult;
+            if (data.success) {
+                const { total, success, failed } = data.results;
+                toast.success(`발송 완료: ${success}/${total}명 성공 (실패: ${failed}명)`);
+                setSelectedRegs([]);
+                setShowNotificationModal(false);
+            } else {
+                toast.error("일괄 발송에 실패했습니다.");
+            }
+        } catch (error: unknown) {
+            console.error('Bulk notification send failed:', error);
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            toast.error(`발송 실패: ${message}`);
+        } finally {
+            setSendingNotifications(false);
+        }
+    };
+
+    const handleToggleRegSelection = (regId: string) => {
+        setSelectedRegs(prev =>
+            prev.includes(regId)
+                ? prev.filter(id => id !== regId)
+                : [...prev, regId]
+        );
+    };
+
     const filteredData = useMemo(() => {
         // First, group registrations by userId to handle duplicates
         const userRegistrations = new Map<string, RootRegistration[]>();
@@ -316,6 +414,17 @@ const RegistrationListPage: React.FC = () => {
                     <option value="CANCELED">취소/환불 (Canceled)</option>
                 </select>
                 <div className="ml-auto flex gap-2">
+                    {selectedRegs.length > 0 && (
+                        <EregiButton
+                            onClick={() => setShowNotificationModal(true)}
+                            disabled={sendingNotifications}
+                            variant="primary"
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white border-none py-2 px-4 h-auto text-sm"
+                        >
+                            <MessageCircle size={14} className="mr-1" />
+                            선택 {selectedRegs.length}명 알림톡 발송
+                        </EregiButton>
+                    )}
                     <EregiButton
                         onClick={handleExport}
                         disabled={exporting}
@@ -333,6 +442,20 @@ const RegistrationListPage: React.FC = () => {
                 <table className="w-full text-left min-w-[1000px]">
                     <thead className="bg-[#f0f5fa] border-b border-[#e1ecf6]">
                         <tr>
+                            <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider w-10">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedRegs.length === filteredData.length && filteredData.length > 0}
+                                    onChange={(e) => {
+                                        if (e.target.checked) {
+                                            setSelectedRegs(filteredData.map(r => r.id));
+                                        } else {
+                                            setSelectedRegs([]);
+                                        }
+                                    }}
+                                    className="w-4 h-4 rounded border-gray-300"
+                                />
+                            </th>
                             <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">주문번호</th>
                             <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">이름</th>
                             <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">이메일</th>
@@ -355,6 +478,14 @@ const RegistrationListPage: React.FC = () => {
                                 className="hover:bg-slate-50 cursor-pointer transition-colors"
                                 onClick={() => navigate(`/admin/conf/${conferenceId}/registrations/${r.id}`)}
                             >
+                                <td className="p-4" onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedRegs.includes(r.id)}
+                                        onChange={() => handleToggleRegSelection(r.id)}
+                                        className="w-4 h-4 rounded border-gray-300"
+                                    />
+                                </td>
                                 <td className="p-4 font-mono text-xs text-gray-400">{r.orderId || r.id}</td>
                                 <td className="p-4 font-medium text-gray-900">{r.userName}</td>
                                 <td className="p-4 text-sm text-gray-500">{r.userEmail || '-'}</td>
@@ -371,7 +502,7 @@ const RegistrationListPage: React.FC = () => {
                                     </span>
                                 </td>
                                 <td className="p-4">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1">
                                         {r.badgeIssued ? (
                                             <span className="text-green-600 font-bold text-xs flex items-center gap-1">
                                                 <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div> 발급완료
@@ -381,7 +512,7 @@ const RegistrationListPage: React.FC = () => {
                                                 <EregiButton
                                                     onClick={(e) => handleIssueBadge(e, r)}
                                                     variant="secondary"
-                                                    className="px-3 py-1 text-xs h-auto bg-white border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-100"
+                                                    className="px-2 py-1 text-xs h-auto bg-white border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-100"
                                                 >
                                                     명찰 발급
                                                 </EregiButton>
@@ -393,8 +524,19 @@ const RegistrationListPage: React.FC = () => {
                                             className="px-2 py-1 text-xs h-auto bg-white border-slate-200 hover:bg-slate-50 text-slate-600"
                                             title="인쇄"
                                         >
-                                            <Printer size={14} />
+                                            <Printer size={12} />
                                         </EregiButton>
+                                        {r.status === 'PAID' && (
+                                            <EregiButton
+                                                onClick={(e) => handleSendSingleNotification(e, r)}
+                                                disabled={sendingNotifications}
+                                                variant="secondary"
+                                                className="px-2 py-1 text-xs h-auto bg-indigo-50 border-indigo-200 hover:bg-indigo-100 text-indigo-600"
+                                                title="알림톡 발송"
+                                            >
+                                                <MessageCircle size={12} />
+                                            </EregiButton>
+                                        )}
                                     </div>
                                 </td>
                                 <td className="p-4">
@@ -404,7 +546,7 @@ const RegistrationListPage: React.FC = () => {
                                         className="px-2 py-1 text-xs h-auto bg-red-50 border-red-200 hover:bg-red-100 text-red-600"
                                         title="삭제"
                                     >
-                                        🗑️ 삭제
+                                        🗑️
                                     </EregiButton>
                                 </td>
                                 <td className="p-4 text-sm text-gray-500 whitespace-nowrap">
@@ -413,7 +555,7 @@ const RegistrationListPage: React.FC = () => {
                             </tr>
                         ))}
                         {filteredData.length === 0 && (
-                            <tr><td colSpan={12} className="p-8 text-center text-gray-500">등록된 내역이 없습니다. (No records found)</td></tr>
+                            <tr><td colSpan={13} className="p-8 text-center text-gray-500">등록된 내역이 없습니다. (No records found)</td></tr>
                         )}
                     </tbody>
                 </table>
@@ -492,6 +634,54 @@ const RegistrationListPage: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* Notification Send Modal */}
+            <Dialog open={showNotificationModal} onOpenChange={setShowNotificationModal}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>알림톡 일괄 발송</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
+                            <p className="font-medium">선택된 대상: <span className="font-bold">{selectedRegs.length}</span>명</p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700">이벤트 타입</label>
+                            <select
+                                value={notificationEventType}
+                                onChange={(e) => setNotificationEventType(e.target.value)}
+                                className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="CONFERENCE_REGISTER">학술대회 등록 완료</option>
+                                <option value="DIGITAL_BADGE_ISSUED">디지털 명찰 발급</option>
+                                <option value="CHECKIN_COMPLETE">체크인 완료</option>
+                            </select>
+                        </div>
+
+                        <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg">
+                            <p>• 선택한 참석자들에게 알림톡이 발송됩니다.</p>
+                            <p>• 토큰이 포함된 바우처 URL이 자동으로 생성됩니다.</p>
+                            <p>• 발송 결과는 토스트 메시지로 표시됩니다.</p>
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-3">
+                        <EregiButton onClick={() => setShowNotificationModal(false)} variant="secondary">
+                            취소
+                        </EregiButton>
+                        <EregiButton
+                            onClick={handleSendBulkNotifications}
+                            disabled={sendingNotifications}
+                            isLoading={sendingNotifications}
+                            variant="primary"
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                        >
+                            <MessageCircle className="w-4 h-4 mr-2" />
+                            {sendingNotifications ? '발송 중...' : '발송하기'}
+                        </EregiButton>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             {/* Print Preview Modal */}
             <Dialog open={showPrintModal} onOpenChange={setShowPrintModal}>
