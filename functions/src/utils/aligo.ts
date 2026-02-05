@@ -32,7 +32,7 @@ export async function sendAlimTalk(
     formData.append('sender', ALIGO_CONFIG.sender);
     formData.append('receiver_1', recipient);
     formData.append('subject_1', '');
-    formData.append('message_1', '');
+    formData.append('message_1', variables.message || '');
     formData.append('senddate', new Date().toISOString().replace(/[-T:]/g, '').substring(0, 14));
     formData.append('recvname', variables.name || '');
     formData.append('button', variables.button ? JSON.stringify(variables.button) : '');
@@ -136,9 +136,40 @@ export async function getAlimTalkHistory(
   }
 }
 
+/**
+ * Get AlimTalk templates
+ * @returns {Promise<Object>} - Template list
+ */
+export async function getAlimTalkTemplates(): Promise<any> {
+  try {
+    const formData = new URLSearchParams();
+    formData.append('apikey', ALIGO_CONFIG.apikey);
+    formData.append('userid', ALIGO_CONFIG.userid);
+    formData.append('senderkey', ALIGO_CONFIG.senderkey);
+
+    const response = await axios.post('https://apis.aligo.in/akv10/template/list', formData, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    });
+
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error: any) {
+    console.error('Get AlimTalk templates error:', error);
+    return {
+      success: false,
+      error: error.message || 'Unknown error occurred'
+    };
+  }
+}
+
 export default {
   sendAlimTalk,
   getAlimTalkRemain,
   getAlimTalkHistory,
+  getAlimTalkTemplates,
   config: ALIGO_CONFIG
 };

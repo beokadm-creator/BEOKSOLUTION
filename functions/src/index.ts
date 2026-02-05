@@ -4,7 +4,7 @@ import corsLib from 'cors';
 import { getNiceAuthParams, approveNicePayment } from './payment/nice';
 import { approveTossPayment, cancelTossPayment as cancelTossPaymentApi } from './payment/toss';
 
-import { onRegistrationCreated, validateBadgePrepToken, issueDigitalBadge, resendBadgePrepToken } from './badge/index';
+import { onRegistrationCreated, onExternalAttendeeCreated, validateBadgePrepToken, issueDigitalBadge, resendBadgePrepToken } from './badge/index';
 
 export const cors = corsLib({ origin: true });
 
@@ -12,6 +12,7 @@ admin.initializeApp();
 
 export {
     onRegistrationCreated,
+    onExternalAttendeeCreated,
     validateBadgePrepToken,
     issueDigitalBadge,
     resendBadgePrepToken,
@@ -669,6 +670,29 @@ export const cancelTossPayment = functions
 
         } catch (error: any) {
             functions.logger.error("Error in cancelTossPayment:", error);
+            throw new functions.https.HttpsError('internal', error.message);
+        }
+    });
+
+
+// 5. Get Aligo Templates
+import { getAlimTalkTemplates } from './utils/aligo';
+
+export const getAligoTemplates = functions
+    .runWith({
+        enforceAppCheck: false,
+        ingressSettings: 'ALLOW_ALL'
+    })
+    .https.onCall(async (data, context) => {
+        if (!context.auth) {
+            throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+        }
+
+        try {
+            const result = await getAlimTalkTemplates();
+            return result;
+        } catch (error: any) {
+            functions.logger.error("Error in getAligoTemplates:", error);
             throw new functions.https.HttpsError('internal', error.message);
         }
     });

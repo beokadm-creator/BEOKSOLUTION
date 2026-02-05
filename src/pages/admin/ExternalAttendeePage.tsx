@@ -12,7 +12,7 @@ import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { UserPlus, Upload, Download, FileText, Badge, CheckCircle2, Trash2, Loader2, Eye, EyeOff, Copy } from 'lucide-react';
+import { UserPlus, Upload, Download, FileText, Badge, CheckCircle2, Trash2, Loader2, Eye, EyeOff, Copy, MessageCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ExternalAttendee } from '../../types/schema';
 
@@ -406,6 +406,70 @@ const ExternalAttendeePage: React.FC = () => {
         } catch (error) {
             console.error('Delete failed:', error);
             toast.error('삭제에 실패했습니다.');
+        }
+    };
+
+    // Handle resend notification
+    const handleResendNotification = async (attendee: ExternalAttendee) => {
+        if (!confirm(`${attendee.name} 님에게 바우처 알림톡을 재발송하시겠습니까?`)) return;
+        if (!confId) return;
+
+        setIsProcessing(true);
+        try {
+            const functions = getFunctions();
+            const resendNotificationFn = httpsCallable(functions, 'resendBadgePrepToken');
+            const result = await resendNotificationFn({
+                confId,
+                regId: attendee.id
+            }) as { data: { success: boolean; newToken: string } };
+
+            if (result.data.success) {
+                toast.success('알림톡이 발송되었습니다.');
+            } else {
+                throw new Error('Failed to send notification');
+            }
+        } catch (error: any) {
+            console.error('Notification resend failed:', error);
+            toast.error(`발송 실패: ${error.message}`);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    // Handle bulk resend notifications
+    const handleBulkResendNotification = async () => {
+        if (!confirm(`등록된 모든 참석자(${externalAttendees.length}명)에게 알림톡을 재발송하시겠습니까?`)) return;
+        if (!confId) return;
+
+        setIsProcessing(true);
+        let successCount = 0;
+        let failCount = 0;
+
+        try {
+            const chunkSize = 5;
+            for (let i = 0; i < externalAttendees.length; i += chunkSize) {
+                const chunk = externalAttendees.slice(i, i + chunkSize);
+                setProgress(Math.round(((i + chunk.length) / externalAttendees.length) * 100));
+
+                await Promise.all(chunk.map(async (attendee) => {
+                    try {
+                        const functions = getFunctions();
+                        const resendNotificationFn = httpsCallable(functions, 'resendBadgePrepToken');
+                        await resendNotificationFn({ confId, regId: attendee.id });
+                        successCount++;
+                    } catch (err) {
+                        console.error(`Failed notification for ${attendee.name}:`, err);
+                        failCount++;
+                    }
+                }));
+            }
+            toast.success(`${successCount}명 발송 완료, ${failCount}명 실패.`);
+        } catch (error) {
+            console.error('Bulk notification failed:', error);
+            toast.error('일괄 발송 중 오류가 발생했습니다.');
+        } finally {
+            setIsProcessing(false);
+            setProgress(0);
         }
     };
 
@@ -927,6 +991,16 @@ const ExternalAttendeePage: React.FC = () => {
                                     <Button
                                         variant="outline"
                                         size="sm"
+                                        onClick={handleBulkResendNotification}
+                                        disabled={isProcessing}
+                                        className="mr-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                                    >
+                                        <MessageCircle className="w-4 h-4 mr-2" />
+                                        알림톡 일괄 발송
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
                                         onClick={handleRestoreData}
                                         disabled={isProcessing}
                                         className="text-amber-600 border-amber-200 hover:bg-amber-50"
@@ -1011,6 +1085,15 @@ const ExternalAttendeePage: React.FC = () => {
                                                                     }}
                                                                 >
                                                                     <FileText className="w-4 h-4" />
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    className="h-8 w-8 p-0 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50"
+                                                                    onClick={() => handleResendNotification(attendee)}
+                                                                    title="알림톡 발송"
+                                                                >
+                                                                    <MessageCircle className="w-4 h-4" />
                                                                 </Button>
                                                                 <Button
                                                                     size="sm"

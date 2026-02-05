@@ -73,15 +73,16 @@ export const onRegistrationCreated = functions.firestore
       });
 
       // Update registration with token reference
+      // [MIGRATION] Removed legacy badgePrepToken field update. Now using badge_tokens collection only.
       await db.collection(`conferences/${confId}/registrations`).doc(regId).update({
-        badgePrepToken: token,
+        // badgePrepToken: token, // DEPRECATED
         confirmationQr: regId, // Use regId directly without CONF- prefix for InfoDesk scanning
         updatedAt: now
       });
 
-      // TODO: Send notification with badgePrepUrl
-      // This requires notification template integration
-      // URL format: https://{domain}/{confId}/badge-prep/{token}
+      // Send notification
+      await sendBadgeNotification(db, conference, regId, regData, token);
+
       functions.logger.info(`[BadgeToken] Created token ${token} for ${regId}`);
 
       return null;
@@ -90,6 +91,114 @@ export const onRegistrationCreated = functions.firestore
       throw error;
     }
   });
+
+/**
+ * Helper: Send Badge Notification (AlimTalk)
+ */
+async function sendBadgeNotification(
+  db: admin.firestore.Firestore,
+  conference: any,
+  regId: string,
+  regData: any,
+  token: string
+) {
+  if (!conference.societyId) return;
+
+  try {
+    // Find active template for CONFERENCE_REGISTER
+    const templatesQuery = await db.collection(`societies/${conference.societyId}/notification-templates`)
+      .where('eventType', '==', 'CONFERENCE_REGISTER')
+      .where('isActive', '==', true)
+      .limit(1)
+      .get();
+
+    if (!templatesQuery.empty) {
+      const templateDoc = templatesQuery.docs[0];
+      const template = templateDoc.data();
+      const kakaoConfig = template.channels?.kakao;
+
+      if (kakaoConfig && kakaoConfig.status === 'APPROVED' && kakaoConfig.kakaoTemplateCode) {
+        // Prepare Data
+        const { format } = require('date-fns');
+        const { ko } = require('date-fns/locale');
+
+        // Society Info
+        const societySnap = await db.collection('societies').doc(conference.societyId).get();
+        const societyData = societySnap.data();
+        const societyName = societyData?.name?.ko || societyData?.name?.en || conference.societyId;
+
+        // Event Info
+        const eventName = conference.title?.ko || conference.title?.en || '';
+        const startDate = conference.dates?.start
+          ? format(conference.dates.start.toDate(), 'yyyy-MM-dd HH:mm', { locale: ko })
+          : '';
+
+        const venueName = typeof conference.venue?.name === 'object'
+          ? (conference.venue.name.ko || conference.venue.name.en || '')
+          : (conference.venue?.name || '');
+
+        // URL Construction
+        const domain = `https://${conference.societyId}.eregi.co.kr`;
+        const badgePrepUrl = `${domain}/${conference.id || conference.slug || conference.conferenceId}/badge-prep/${token}`;
+        const digitalBadgeQrUrl = `${domain}/my-badge/${regId}`;
+        const affiliation = regData.organization || regData.affiliation || regData.userInfo?.affiliation || '';
+
+        // Variables Map
+        const variables: { [key: string]: string } = {
+          userName: regData.name || regData.userInfo?.name || '',
+          society: societyName,
+          eventName: eventName,
+          badgePrepUrl: badgePrepUrl,
+          digitalBadgeQrUrl: digitalBadgeQrUrl,
+          organization: affiliation,
+          affiliation: affiliation,
+          registrationId: regId,
+          startDate: startDate,
+          venue: venueName,
+        };
+
+        // Replace Content
+        let content = kakaoConfig.content || '';
+        for (const [key, value] of Object.entries(variables)) {
+          content = content.replace(new RegExp(`#{${key}}`, 'g'), value);
+        }
+
+        // Process Buttons (Replace URL variables)
+        let buttons = kakaoConfig.buttons ? [...kakaoConfig.buttons] : [];
+        buttons = buttons.map((btn: any) => ({
+          ...btn,
+          linkMobile: btn.linkMobile?.replace('#{badgePrepUrl}', badgePrepUrl),
+          linkPc: btn.linkPc?.replace('#{badgePrepUrl}', badgePrepUrl)
+        }));
+
+        // Send
+        const recipientPhone = regData.phone || regData.userInfo?.phone;
+        if (recipientPhone) {
+          const cleanPhone = recipientPhone.replace(/-/g, '');
+
+          const { sendAlimTalk } = require('../utils/aligo');
+
+          await sendAlimTalk(
+            cleanPhone,
+            kakaoConfig.kakaoTemplateCode,
+            {
+              message: content,
+              name: variables.userName,
+              button: buttons
+            },
+            conference.societyId
+          );
+
+          functions.logger.info(`[BadgeNotification] AlimTalk sent to ${cleanPhone} for ${regId}`);
+        }
+      }
+    } else {
+      functions.logger.info(`[BadgeNotification] No active template for CONFERENCE_REGISTER in ${conference.societyId}`);
+    }
+  } catch (error) {
+    functions.logger.error(`[BadgeNotification] Error for ${regId}:`, error);
+  }
+}
 
 /**
  * Cloud Function: Validate Badge Prep Token (HTTP)
@@ -165,12 +274,13 @@ export const validateBadgePrepToken = functions
         });
 
         // Update registration with new token reference
-        await db.collection(`conferences/${confId}/registrations`).doc(tokenData.registrationId).update({
-          badgePrepToken: newToken,
+        const collectionName = tokenData.registrationId.startsWith('EXT-') ? 'external_attendees' : 'registrations';
+        await db.collection(`conferences/${confId}/${collectionName}`).doc(tokenData.registrationId).update({
+          // badgePrepToken: newToken, // DEPRECATED
           updatedAt: now
         });
 
-        functions.logger.info(`[BadgeToken] New token ${newToken} issued for ${tokenData.registrationId}`);
+        functions.logger.info(`[BadgeToken] New token ${newToken} reissued for ${tokenData.registrationId}`);
 
         // Return new token URL to client for redirect
         return {
@@ -196,8 +306,11 @@ export const validateBadgePrepToken = functions
         };
       }
 
-      // Get registration data
-      const regSnap = await db.collection(`conferences/${confId}/registrations`).doc(tokenData.registrationId).get();
+      // Get registration data (Check both registrations and external_attendees)
+      let regSnap = await db.collection(`conferences/${confId}/registrations`).doc(tokenData.registrationId).get();
+      if (!regSnap.exists) {
+        regSnap = await db.collection(`conferences/${confId}/external_attendees`).doc(tokenData.registrationId).get();
+      }
 
       if (!regSnap.exists) {
         return { valid: false, error: 'REGISTRATION_NOT_FOUND' };
@@ -213,10 +326,10 @@ export const validateBadgePrepToken = functions
         tokenStatus: tokenData.status,
         registration: {
           id: regSnap.id,
-          name: regData.name,
-          email: regData.email,
-          phone: regData.phone,
-          affiliation: regData.affiliation || regData.userAffiliation || '',
+          name: regData.name || regData.userInfo?.name,
+          email: regData.email || regData.userInfo?.email,
+          phone: regData.phone || regData.userInfo?.phone,
+          affiliation: regData.affiliation || regData.organization || regData.userInfo?.affiliation || '',
           licenseNumber: regData.licenseNumber || regData.userInfo?.licenseNumber || '',
           confirmationQr: regData.confirmationQr,
           badgeQr: regData.badgeQr,
@@ -256,8 +369,20 @@ export const issueDigitalBadge = functions
       // Generate badge QR
       const badgeQr = `BADGE-${regId}`;
 
-      // Update registration
-      await db.collection(`conferences/${confId}/registrations`).doc(regId).update({
+      // Update registration (Check both)
+      let regRef = db.collection(`conferences/${confId}/registrations`).doc(regId);
+      let regSnap = await regRef.get();
+
+      if (!regSnap.exists) {
+        regRef = db.collection(`conferences/${confId}/external_attendees`).doc(regId);
+        regSnap = await regRef.get();
+      }
+
+      if (!regSnap.exists) {
+        throw new Error('Registration not found');
+      }
+
+      await regRef.update({
         badgeIssued: true,
         badgeIssuedAt: now,
         badgeQr,
@@ -265,13 +390,16 @@ export const issueDigitalBadge = functions
         updatedAt: now
       });
 
-      // Update token status if exists
-      const regSnap = await db.collection(`conferences/${confId}/registrations`).doc(regId).get();
-
       if (regSnap.exists) {
-        const regData = regSnap.data();
-        if (regData && regData.badgePrepToken) {
-          await db.collection(`conferences/${confId}/badge_tokens`).doc(regData.badgePrepToken).update({
+        // Query badge_tokens for active token instead of relying on badgePrepToken field
+        const tokensSnap = await db.collection(`conferences/${confId}/badge_tokens`)
+          .where('registrationId', '==', regId)
+          .where('status', '==', 'ACTIVE')
+          .limit(1)
+          .get();
+
+        if (!tokensSnap.empty) {
+          await tokensSnap.docs[0].ref.update({
             status: 'ISSUED',
             issuedAt: now
           });
@@ -315,8 +443,12 @@ export const resendBadgePrepToken = functions
       const db = admin.firestore();
       const now = admin.firestore.Timestamp.now();
 
-      // Get existing registration
-      const regSnap = await db.collection(`conferences/${confId}/registrations`).doc(regId).get();
+      // Get existing registration (check both collections)
+      let regSnap = await db.collection(`conferences/${confId}/registrations`).doc(regId).get();
+
+      if (!regSnap.exists) {
+        regSnap = await db.collection(`conferences/${confId}/external_attendees`).doc(regId).get();
+      }
 
       if (!regSnap.exists) {
         throw new Error('Registration not found');
@@ -348,9 +480,14 @@ export const resendBadgePrepToken = functions
         );
       }
 
-      // Mark old token as EXPIRED if exists
-      if (regData.badgePrepToken) {
-        await db.collection(`conferences/${confId}/badge_tokens`).doc(regData.badgePrepToken).update({
+      // Mark old tokens as EXPIRED if exists
+      const oldTokensSnap = await db.collection(`conferences/${confId}/badge_tokens`)
+        .where('registrationId', '==', regId)
+        .where('status', '==', 'ACTIVE')
+        .get();
+
+      for (const tDoc of oldTokensSnap.docs) {
+        await tDoc.ref.update({
           status: 'EXPIRED',
           updatedAt: now
         });
@@ -370,13 +507,17 @@ export const resendBadgePrepToken = functions
         expiresAt
       });
 
-      // Update registration with new token reference
-      await db.collection(`conferences/${confId}/registrations`).doc(regId).update({
-        badgePrepToken: newToken,
+      // Update registration (handle both registrations and external_attendees)
+      const collectionName = regId.startsWith('EXT-') ? 'external_attendees' : 'registrations';
+      await db.collection(`conferences/${confId}/${collectionName}`).doc(regId).update({
+        // badgePrepToken: newToken, // DEPRECATED
         updatedAt: now
       });
 
-      functions.logger.info(`[BadgeToken] New token ${newToken} reissued for ${regId}`);
+      // Send AlimTalk
+      await sendBadgeNotification(db, conference, regId, regData, newToken);
+
+      functions.logger.info(`[BadgeToken] New token ${newToken} reissued and sent for ${regId}`);
 
       // Return new token (client will construct URL)
       return {
@@ -386,5 +527,73 @@ export const resendBadgePrepToken = functions
     } catch (error) {
       functions.logger.error('[BadgeToken] Resend token error:', error);
       throw new functions.https.HttpsError('internal', 'Failed to resend token');
+    }
+  });
+
+/**
+ * Trigger for External Attendees
+ */
+export const onExternalAttendeeCreated = functions.firestore
+  .document('conferences/{confId}/external_attendees/{regId}')
+  .onCreate(async (snap, context) => {
+    const regData = snap.data();
+    const { confId, regId } = context.params;
+
+    // Only generate token for PAID registrations
+    if (regData.paymentStatus !== 'PAID') {
+      functions.logger.info(`[BadgeToken-Ext] Skipping unpaid external registration ${regId}`);
+      return null;
+    }
+
+    try {
+      const db = admin.firestore();
+
+      // Get conference end date for token expiry
+      const confSnap = await db.collection('conferences').doc(confId).get();
+      const conference = confSnap.data();
+
+      // Set token expiry
+      let expiresAt: admin.firestore.Timestamp;
+      if (conference?.dates?.end) {
+        expiresAt = admin.firestore.Timestamp.fromMillis(
+          conference.dates.end.toMillis() + (24 * 60 * 60 * 1000)
+        );
+      } else {
+        expiresAt = admin.firestore.Timestamp.fromMillis(
+          admin.firestore.Timestamp.now().toMillis() + (7 * 24 * 60 * 60 * 1000)
+        );
+      }
+
+      // Generate unique token
+      const token = generateBadgePrepToken();
+      const now = admin.firestore.Timestamp.now();
+
+      // Create badge token document
+      await db.collection(`conferences/${confId}/badge_tokens`).doc(token).set({
+        token,
+        registrationId: regId,
+        conferenceId: confId,
+        userId: regData.userId || regData.uid || 'GUEST',
+        status: 'ACTIVE',
+        createdAt: now,
+        expiresAt
+      });
+
+      // Update external attendee doc (legacy compatibility if needed, but mainly updatedAt)
+      await db.collection(`conferences/${confId}/external_attendees`).doc(regId).update({
+        updatedAt: now
+      });
+
+      // Send notification
+      // Note: external_attendees has field 'organization' instead of 'userInfo.affiliation'
+      // sendBadgeNotification already updated to handle both
+      await sendBadgeNotification(db, { ...conference, id: confId }, regId, regData, token);
+
+      functions.logger.info(`[BadgeToken-Ext] Created token ${token} and notified for ${regId}`);
+
+      return null;
+    } catch (error) {
+      functions.logger.error(`[BadgeToken-Ext] Error for ${regId}:`, error);
+      return null;
     }
   });
