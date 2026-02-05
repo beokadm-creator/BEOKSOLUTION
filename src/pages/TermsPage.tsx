@@ -1,60 +1,63 @@
 import React from 'react';
 import { useConference } from '../hooks/useConference';
+import { LEGAL_CONTENT } from '../data/legal_content';
+import { ChevronLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const TermsPage: React.FC = () => {
     const { info, loading, isPlatform } = useConference();
+    const navigate = useNavigate();
 
-    if (loading) return <div>Loading...</div>;
+    // Although we have global terms, we might want to reference the conference title
+    // But currently LEGAL_CONTENT is static. 
+    // If specific conference terms are needed, we can extend LEGAL_CONTENT later.
+    const { title, sections, lastUpdated } = LEGAL_CONTENT.termsOfService;
+
+    if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
 
     const confTitle = info?.title?.ko || (isPlatform ? 'e-Regi Platform' : 'Conference');
 
     return (
-        <div style={{ padding: '40px', maxWidth: '800px', margin: '0 auto', fontFamily: 'sans-serif' }}>
-            <h1 style={{ marginBottom: '20px' }}>Terms of Service</h1>
-            <p style={{ color: '#666', marginBottom: '40px' }}>Last Updated: {new Date().toLocaleDateString()}</p>
+        <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="bg-slate-900 px-8 py-8 text-white">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-6 text-sm font-bold uppercase tracking-wider"
+                    >
+                        <ChevronLeft size={16} /> Back
+                    </button>
+                    <h1 className="text-3xl font-extrabold tracking-tight mb-2">{title}</h1>
+                    <p className="text-slate-400 text-sm font-medium">최종 수정일: {lastUpdated}</p>
+                </div>
 
-            <section style={{ marginBottom: '30px' }}>
-                <h2>1. Introduction</h2>
-                <p>
-                    Welcome to <strong>{confTitle}</strong>. By accessing or using our registration and conference services, 
-                    you agree to be bound by these Terms of Service.
-                </p>
-            </section>
+                <div className="p-8 lg:p-12 space-y-10">
+                    <div className="prose prose-slate max-w-none">
+                        <p className="text-slate-500 font-medium">
+                            본 약관은 <strong>{confTitle}</strong>(이하 "서비스") 이용에 적용됩니다.
+                        </p>
+                    </div>
 
-            <section style={{ marginBottom: '30px' }}>
-                <h2>2. Registration & Payments</h2>
-                <p>
-                    All registrations are subject to approval. Payments are processed securely via our payment partners (Toss Payments). 
-                    Refund policies are determined by the specific conference administration settings.
-                </p>
-            </section>
+                    <div className="space-y-8">
+                        {sections.map((section, idx) => (
+                            <section key={idx} className="scroll-mt-20">
+                                <h2 className="text-lg font-bold text-slate-900 mb-3">{section.heading}</h2>
+                                <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-line">
+                                    {section.content}
+                                </p>
+                            </section>
+                        ))}
+                    </div>
 
-            <section style={{ marginBottom: '30px' }}>
-                <h2>3. User Obligations</h2>
-                <p>
-                    You agree to provide accurate information during registration. 
-                    You are responsible for maintaining the confidentiality of your account credentials.
-                </p>
-            </section>
-
-            <section style={{ marginBottom: '30px' }}>
-                <h2>4. Intellectual Property</h2>
-                <p>
-                    All content presented at {confTitle}, including abstracts and presentation materials, 
-                    remains the property of the respective authors or the conference organization.
-                </p>
-            </section>
-
-            <section style={{ marginBottom: '30px' }}>
-                <h2>5. Limitation of Liability</h2>
-                <p>
-                    {confTitle} and e-Regi Inc. are not liable for any indirect, incidental, or consequential damages 
-                    arising from your use of the service.
-                </p>
-            </section>
-
-            <div style={{ marginTop: '50px', paddingTop: '20px', borderTop: '1px solid #eee' }}>
-                <a href="/" style={{ color: 'blue', textDecoration: 'underline' }}>Back to Home</a>
+                    <div className="pt-10 border-t border-slate-100 mt-10 flex justify-center">
+                        <button
+                            onClick={() => navigate('/')}
+                            className="text-eregi-600 font-bold hover:underline"
+                        >
+                            메인으로 돌아가기
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );
