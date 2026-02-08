@@ -59,8 +59,8 @@ export const generateFirebaseAuthUserForExternalAttendee = functions
                 const userRecord = await auth.getUserByEmail(attendeeData.email);
                 uid = userRecord.uid;
                 functions.logger.info(`[ExternalAuth] User already exists: ${uid}`);
-            } catch (e: any) {
-                if (e.code === 'auth/user-not-found') {
+            } catch (e: unknown) {
+                if (e instanceof Error && 'code' in e && e.code === 'auth/user-not-found') {
                     // Create new user
                     const userRecord = await auth.createUser({
                         email: attendeeData.email,
@@ -117,8 +117,9 @@ export const generateFirebaseAuthUserForExternalAttendee = functions
 
             return { success: true, uid, message: isNew ? 'Created new account' : 'Linked existing account' };
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             functions.logger.error("Error in generateFirebaseAuthUserForExternalAttendee:", error);
-            throw new functions.https.HttpsError('internal', error.message);
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            throw new functions.https.HttpsError('internal', message);
         }
     });
