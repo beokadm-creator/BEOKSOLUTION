@@ -52,8 +52,9 @@ export const approveNicePayment = async (tid: string, amt: number, mid: string, 
         });
 
         return response.data;
-    } catch (error: any) {
-        console.error('NicePay Approval Error:', error.response?.data || error.message);
+    } catch (error) {
+        const err = error as { response?: { data?: unknown }; message?: string };
+        console.error('NicePay Approval Error:', err.response?.data || err.message);
         throw new Error('Payment Approval Failed');
     }
 };

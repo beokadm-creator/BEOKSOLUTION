@@ -13,6 +13,8 @@ export default defineConfig([
     '*.patch.ts',
     '*.patch.tsx',
     'functions/lib',
+    'scripts',
+    '*.spec.ts',
   ]),
   {
     files: ['**/*.{ts,tsx}'],
