@@ -99,8 +99,9 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
     return label[currentLang as 'ko' | 'en'] || label.ko;
   };
 
-  // 로딩 상태
-  if (loading) {
+  // 로딩 상태 - loading이 true이거나 config가 아직 없으면 로딩 표시
+  // 이렇게 하면 데이터 로딩 중 타이밍 이슈로 인한 에러 화면 표시를 방지
+  if (loading || (!config && !error)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -108,7 +109,7 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
     );
   }
 
-  // 🚨 [진단 모드] 에러 발생 시 DebugScreen 출력
+  // 🚨 [진단 모드] 에러 발생 시 또는 로딩 완료 후에도 config가 없으면 DebugScreen 출력
   if (error || !config) {
     return <DebugScreen slug={slug} />;
   }
@@ -166,11 +167,10 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
                     key={item.id}
                     type="button"
                     onClick={() => handleTabClick(item.id)}
-                    className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 sm:px-6 py-2 rounded-xl font-medium transition-all duration-200 min-w-[60px] sm:min-w-[100px] ${
-                      isActive
+                    className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 sm:px-6 py-2 rounded-xl font-medium transition-all duration-200 min-w-[60px] sm:min-w-[100px] ${isActive
                         ? 'text-blue-600 bg-blue-50'
                         : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-                    }`}
+                      }`}
                   >
                     <Icon className={`w-6 h-6 sm:w-5 sm:h-5 md:w-6 md:h-6 ${isActive ? 'text-blue-600' : ''}`} />
                     <span className="text-[10px] sm:text-sm md:text-base font-medium">

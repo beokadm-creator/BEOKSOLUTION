@@ -109,7 +109,7 @@ export const useTranslation = (slug: string) => {
     const params = new URLSearchParams(window.location.search);
     const langParam = params.get('lang');
     if (langParam && (langParam.toLowerCase() === 'en' || langParam.toLowerCase() === 'ko')) {
-        setLanguage(langParam.toLowerCase());
+      setLanguage(langParam.toLowerCase());
     }
   }, []);
 
@@ -177,44 +177,36 @@ export const useTranslation = (slug: string) => {
             data: () => Record<string, unknown>;
           }
 
-          let agendaSnap: QuerySnapshot = { size: 0, docs: [], empty: true };
-          let speakerSnap: QuerySnapshot = { size: 0, docs: [], empty: true };
-          let sponsorSnap: QuerySnapshot = { size: 0, docs: [], empty: true };
-          let regSnap: DocSnapshot = { exists: () => false, data: () => ({}) };
-          let societySnap: DocSnapshot | null = null;
+          // 🚀 [개선] 병렬 쿼리 실행으로 로딩 속도 향상
+          const [agendaResult, speakerResult, sponsorResult, regResult, societyResult] = await Promise.allSettled([
+            getDocs(agendasRef),
+            getDocs(speakersRef),
+            getDocs(sponsorsRef),
+            getDoc(regSettingsRef),
+            docData.societyId ? getDoc(doc(db, 'societies', docData.societyId as string)) : Promise.resolve(null)
+          ]);
 
-          // 개별 쿼리별 try-catch로 식별
-          try {
-            agendaSnap = await getDocs(agendasRef) as QuerySnapshot;
-          } catch {
-            // Error silently ignored
-          }
+          // 결과 추출 (실패한 쿼리는 빈 값으로 처리)
+          const agendaSnap: QuerySnapshot = agendaResult.status === 'fulfilled'
+            ? agendaResult.value as QuerySnapshot
+            : { size: 0, docs: [], empty: true };
 
-          try {
-            speakerSnap = await getDocs(speakersRef) as QuerySnapshot;
-          } catch {
-            // Error silently ignored
-          }
+          const speakerSnap: QuerySnapshot = speakerResult.status === 'fulfilled'
+            ? speakerResult.value as QuerySnapshot
+            : { size: 0, docs: [], empty: true };
 
-          try {
-            sponsorSnap = await getDocs(sponsorsRef) as QuerySnapshot;
-          } catch {
-            // Error silently ignored
-          }
+          const sponsorSnap: QuerySnapshot = sponsorResult.status === 'fulfilled'
+            ? sponsorResult.value as QuerySnapshot
+            : { size: 0, docs: [], empty: true };
 
-          try {
-            regSnap = await getDoc(regSettingsRef) as DocSnapshot;
-          } catch {
-            // Error silently ignored
-          }
+          const regSnap: DocSnapshot = regResult.status === 'fulfilled'
+            ? regResult.value as DocSnapshot
+            : { exists: () => false, data: () => ({}) };
 
-          if (docData.societyId) {
-            try {
-              societySnap = await getDoc(doc(db, 'societies', docData.societyId as string)) as DocSnapshot;
-            } catch {
-              societySnap = null;
-            }
-          }
+          const societySnap: DocSnapshot | null = societyResult.status === 'fulfilled'
+            ? societyResult.value as DocSnapshot | null
+            : null;
+
 
           // 1. Agendas 병합
           (docData as ConferenceData & { agendas?: unknown[] }).agendas = agendaSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
