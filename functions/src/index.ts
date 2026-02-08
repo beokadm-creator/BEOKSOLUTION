@@ -5,6 +5,8 @@ import { getNiceAuthParams, approveNicePayment } from './payment/nice';
 import { approveTossPayment, cancelTossPayment as cancelTossPaymentApi } from './payment/toss';
 
 import { onRegistrationCreated, onExternalAttendeeCreated, validateBadgePrepToken, issueDigitalBadge, resendBadgePrepToken } from './badge/index';
+import { monitorRegistrationIntegrity, monitorMemberCodeIntegrity } from './monitoring/dataIntegrity';
+import { dailyErrorReport, weeklyPerformanceReport } from './monitoring/scheduledReports';
 
 export const cors = corsLib({ origin: true });
 
@@ -16,10 +18,15 @@ export {
     validateBadgePrepToken,
     issueDigitalBadge,
     resendBadgePrepToken,
-    generateFirebaseAuthUserForExternalAttendee
+    generateFirebaseAuthUserForExternalAttendee,
+    monitorRegistrationIntegrity,
+    monitorMemberCodeIntegrity,
+    dailyErrorReport,
+    weeklyPerformanceReport
 };
 
 import { generateFirebaseAuthUserForExternalAttendee } from './auth/external';
+import { sendErrorAlertEmail, sendDailyErrorReport } from './utils/email';
 
 // --------------------------------------------------------------------------
 // PAYMENT: NICEPAY UTILITIES
@@ -1236,5 +1243,143 @@ export const checkNonMemberEmailExists = functions
             throw new functions.https.HttpsError('internal', e.message);
         }
     });
+
+// --------------------------------------------------------------------------
+// MONITORING: Error Logging & Performance Tracking
+// --------------------------------------------------------------------------
+
+/**
+ * Log Error
+ *
+ * Logs errors to Firestore with deduplication
+ * - Same error (same errorId) on same day: increment occurrenceCount
+ * - New error: create new log entry
+ * - Critical errors: trigger email alert
+ */
+export const logError = functions
+    .runWith({
+        enforceAppCheck: false,
+        ingressSettings: 'ALLOW_ALL'
+    })
+    .https.onCall(async (data, _context) => {
+        const { errorId, errorData } = data;
+
+        if (!errorId || !errorData) {
+            throw new functions.https.HttpsError('invalid-argument', 'errorId and errorData are required');
+        }
+
+        try {
+            const db = admin.firestore();
+            const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+            const errorRef = db.doc(`logs/errors/${today}/${errorId}`);
+            const errorDoc = await errorRef.get();
+
+            const now = admin.firestore.Timestamp.now();
+            const isFirstOccurrence = !errorDoc.exists;
+
+            if (isFirstOccurrence) {
+                // New error - create log entry
+                await errorRef.set({
+                    id: errorId,
+                    timestamp: now,
+                    firstSeenAt: now,
+                    lastSeenAt: now,
+                    occurrenceCount: 1,
+                    resolved: false,
+                    alertSent: false,
+                    ...errorData
+                });
+
+                // Send alert for critical/high severity errors
+                if (errorData.severity === 'CRITICAL' || errorData.severity === 'HIGH') {
+                    // Send email alert
+                    await sendErrorAlertEmail({
+                        errorId,
+                        message: errorData.message,
+                        severity: errorData.severity,
+                        category: errorData.category,
+                        occurrenceCount: 1,
+                        url: errorData.url,
+                        userId: errorData.userId,
+                    });
+                    functions.logger.log(`Critical error detected: ${errorId} - ${errorData.message}`);
+                }
+            } else {
+                // Existing error - increment count
+                const currentData = errorDoc.data() as any;
+                await errorRef.update({
+                    lastSeenAt: now,
+                    occurrenceCount: currentData.occurrenceCount + 1,
+                    // Update alert if severity increased
+                    ...(errorData.severity === 'CRITICAL' && !currentData.alertSent && {
+                        alertNeeded: true
+                    })
+                });
+            }
+
+            return {
+                success: true,
+                errorId,
+                isFirstOccurrence
+            };
+        } catch (e: any) {
+            functions.logger.error("Error logging failed:", e);
+            throw new functions.https.HttpsError('internal', e.message);
+        }
+    });
+
+/**
+ * Log Performance
+ *
+ * Logs performance metrics to Firestore
+ * Used for Web Vitals, API response times, page load times
+ */
+export const logPerformance = functions
+    .runWith({
+        enforceAppCheck: false,
+        ingressSettings: 'ALLOW_ALL'
+    })
+    .https.onCall(async (data, _context) => {
+        const { metricName, value, threshold, context: metricContext } = data;
+
+        if (!metricName || value === undefined) {
+            throw new functions.https.HttpsError('invalid-argument', 'metricName and value are required');
+        }
+
+        try {
+            const db = admin.firestore();
+            const today = new Date().toISOString().split('T')[0];
+            const metricId = `perf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const metricRef = db.doc(`logs/performance/${today}/${metricId}`);
+
+            const isPoor = threshold && value > threshold;
+
+            await metricRef.set({
+                id: metricId,
+                timestamp: admin.firestore.Timestamp.now(),
+                metricType: data.metricType || 'CUSTOM',
+                metricName,
+                value,
+                unit: data.unit || 'ms',
+                threshold,
+                isPoor,
+                ...(metricContext || {})
+            });
+
+            // Alert if poor performance
+            if (isPoor) {
+                functions.logger.warn(`Poor performance detected: ${metricName} = ${value}${data.unit || 'ms'} (threshold: ${threshold})`);
+            }
+
+            return {
+                success: true,
+                metricId
+            };
+        } catch (e: any) {
+            functions.logger.error("Performance logging failed:", e);
+            throw new functions.https.HttpsError('internal', e.message);
+        }
+    });
+
 
 

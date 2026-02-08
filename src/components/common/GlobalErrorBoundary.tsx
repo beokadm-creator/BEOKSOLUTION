@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '../ui/button';
 import { AlertTriangle, RefreshCcw } from 'lucide-react';
+import { logError } from '@/utils/errorLogger';
 
 interface Props {
   children: ReactNode;
@@ -21,9 +22,15 @@ export class GlobalErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  public componentDidCatch(_error: Error, _errorInfo: ErrorInfo) {
-    // TODO: Log this to Sentry or Firebase Crashlytics
-    console.error('Uncaught error:', _error, _errorInfo);
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Log to Firestore via Cloud Function
+    logError(error, {
+      component: 'GlobalErrorBoundary',
+      errorBoundaryStack: errorInfo.componentStack,
+    });
+
+    // Also log to console for development
+    console.error('Uncaught error:', error, errorInfo);
   }
 
   public render() {

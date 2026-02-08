@@ -836,3 +836,157 @@ export interface Notice {
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
+
+// ==========================================
+// H. Monitoring & Logging (NEW)
+// ==========================================
+
+/**
+ * Error severity levels
+ */
+export type ErrorSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+/**
+ * Error categories for classification
+ */
+export type ErrorCategory =
+  | 'RUNTIME'        // JavaScript runtime errors (TypeError, ReferenceError, etc.)
+  | 'NETWORK'        // Network failures (API calls, Firestore queries)
+  | 'AUTH'           // Authentication/authorization errors
+  | 'VALIDATION'     // Form validation errors
+  | 'PAYMENT'        // Payment processing errors
+  | 'DATA_INTEGRITY' // Data consistency issues
+  | 'PERFORMANCE'    // Performance degradation
+  | 'UNKNOWN';       // Uncategorized errors
+
+/**
+ * Error log entry
+ * Collection: `logs/errors/{date}/{errorId}`
+ * Path: `logs/2026-02-06/err_abc123`
+ *
+ * ARCHITECTURE:
+ * - Date-partitioned collection for efficient querying
+ * - Automatic retention: delete logs older than 90 days
+ * - Indexes on: timestamp, severity, category, userId
+ */
+export interface ErrorLog {
+  id: string; // errorId (auto-generated: err_{timestamp}_{random})
+  timestamp: Timestamp; // When error occurred
+  severity: ErrorSeverity; // Impact level
+  category: ErrorCategory; // Error type
+
+  // Error details
+  message: string; // Error message
+  stack?: string; // Stack trace (if available)
+  errorCode?: string; // Custom error code (e.g., "PAYMENT_001")
+
+  // Context
+  userId?: string; // User who encountered the error (if authenticated)
+  userAgent?: string; // Browser/device info
+  url?: string; // Page where error occurred
+  route?: string; // React Router path
+
+  // Additional context
+  metadata?: {
+    [key: string]: unknown; // Flexible metadata for debugging
+    component?: string; // React component where error occurred
+    action?: string; // User action that triggered error
+    apiEndpoint?: string; // API call that failed
+    firestoreQuery?: string; // Firestore query that failed
+  };
+
+  // Resolution tracking
+  resolved: boolean; // Whether error has been resolved
+  resolvedAt?: Timestamp; // When error was resolved
+  resolvedBy?: string; // Admin who resolved
+  notes?: string; // Resolution notes
+
+  // Alerting
+  alertSent: boolean; // Whether email alert was sent
+  alertSentAt?: Timestamp; // When alert was sent
+
+  // Counting
+  occurrenceCount: number; // How many times this error occurred
+  firstSeenAt: Timestamp; // When error first occurred
+  lastSeenAt: Timestamp; // When error last occurred
+}
+
+/**
+ * Performance metric entry
+ * Collection: `logs/performance/{date}/{metricId}`
+ * Path: `logs/2026-02-06/perf_xyz789`
+ *
+ * METRICS TRACKED:
+ * - Web Vitals: LCP, FID, CLS
+ * - API response times
+ * - Page load times
+ * - Custom performance markers
+ */
+export interface PerformanceMetric {
+  id: string; // metricId (auto-generated)
+  timestamp: Timestamp; // When metric was collected
+
+  // Metric type
+  metricType: 'LCP' | 'FID' | 'CLS' | 'PAGE_LOAD' | 'API_RESPONSE' | 'CUSTOM';
+  metricName: string; // Human-readable name (e.g., "Registration Page Load Time")
+  value: number; // Metric value in milliseconds (or score for CLS)
+  unit: 'ms' | 'score'; // Unit of measurement
+
+  // Context
+  userId?: string; // User who experienced this metric
+  url?: string; // Page URL
+  route?: string; // React Router path
+
+  // Thresholds
+  threshold?: number; // Performance threshold (for alerting)
+  isPoor: boolean; // Whether metric indicates poor performance
+
+  // Additional metadata
+  metadata?: {
+    [key: string]: unknown;
+    connectionType?: string; // '4g', '3g', etc.
+    deviceType?: string; // 'mobile', 'desktop', 'tablet'
+    apiEndpoint?: string; // For API_RESPONSE metrics
+    cacheStatus?: string; // 'hit', 'miss', 'partial'
+  };
+}
+
+/**
+ * Data integrity alert
+ * Collection: `logs/data_integrity/{date}/{alertId}`
+ * Path: `logs/2026-02-06/integrity_def456`
+ *
+ * USE CASES:
+ * - Negative payment amounts
+ * - Duplicate member codes
+ * - Invalid timestamps
+ * - Orphaned records
+ */
+export interface DataIntegrityAlert {
+  id: string; // alertId (auto-generated)
+  timestamp: Timestamp; // When anomaly detected
+  severity: ErrorSeverity; // Impact level
+
+  // Anomaly details
+  collection: string; // Firestore collection path (e.g., "conferences/kap_2026spring/registrations")
+  documentId: string; // Document ID with anomaly
+  field: string; // Field name with issue
+  expectedValue: unknown; // What value should be
+  actualValue: unknown; // What value actually is
+  rule: string; // Validation rule that was violated (e.g., "paymentAmount > 0")
+
+  // Context
+  detectedBy: 'TRIGGER' | 'SCHEDULED_CHECK'; // How anomaly was detected
+  userId?: string; // User who made the change (if available)
+
+  // Resolution
+  resolved: boolean;
+  resolvedAt?: Timestamp;
+  resolvedBy?: string;
+  resolutionAction?: string; // 'MANUAL_FIX', 'AUTOMATED_ROLLBACK', etc.
+  notes?: string;
+
+  // Alerting
+  alertSent: boolean;
+  alertSentAt?: Timestamp;
+}

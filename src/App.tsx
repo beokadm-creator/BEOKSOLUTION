@@ -56,6 +56,7 @@ import MembershipPaymentLayout from './layouts/MembershipPaymentLayout';
 import { ConferenceMyPageRedirect } from '@/components/common/ConferenceMyPageRedirect';
 import { Toaster } from 'react-hot-toast';
 import { GlobalErrorBoundary } from './components/common/GlobalErrorBoundary';
+import { WebVitalsMonitor } from './components/monitoring/WebVitalsMonitor';
 
 import LandingPage from './pages/LandingPage';
 import SocietyLandingPage from './pages/SocietyLandingPage';
@@ -209,6 +210,7 @@ const App: React.FC = () => {
     return (
       <GlobalErrorBoundary>
         <Router>
+          <WebVitalsMonitor />
           <div className="App font-sans text-slate-900">
             <Toaster
               position="top-center"
@@ -245,11 +247,12 @@ const App: React.FC = () => {
   }
 
   // 2. USER DOMAIN (Main & Society)
-  return (
-    <GlobalErrorBoundary>
-      <Router>
-        <div className="App font-sans text-slate-900">
-          <Toaster
+    return (
+      <GlobalErrorBoundary>
+        <Router>
+          <WebVitalsMonitor />
+          <div className="App font-sans text-slate-900">
+            <Toaster
             position="top-center"
             toastOptions={{
               duration: 3000,

@@ -123,5 +123,14 @@ service cloud.firestore {
     match /members/{document=**} {
       allow read, update: if request.auth != null;
     }
+
+    // Monitoring & Logging (Admin Only)
+    match /logs/{document=**} {
+      // Only super admin can read logs
+      allow read: if request.auth != null && request.auth.token.email == 'aaron@beoksolution.com';
+      // Logs are write-only (via Cloud Functions), no direct client writes
+      allow write: if false;
+    }
   }
 }
+
