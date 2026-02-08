@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { onCLS, onINP, onLCP, onFCP, onTTFB } from 'web-vitals';
 import { logPerformanceIssue } from '@/utils/errorLogger';
 
@@ -17,12 +17,12 @@ import { logPerformanceIssue } from '@/utils/errorLogger';
  * Simply include <WebVitalsMonitor /> in your App.tsx
  */
 export function WebVitalsMonitor() {
-    const [initialized, setInitialized] = useState(false);
+    const initializedRef = useRef(false);
 
     useEffect(() => {
-        if (initialized) return; // Run only once
+        if (initializedRef.current) return; // Run only once
 
-        setInitialized(true);
+        initializedRef.current = true;
 
         // Thresholds for "poor" performance (based on Web Vitals benchmarks)
         const THRESHOLDS = {
@@ -143,29 +143,10 @@ export function WebVitalsMonitor() {
         });
 
         console.log('[WebVitals] Monitoring initialized');
-    }, [initialized]);
+    }, []);
 
     // This component doesn't render anything
     return null;
 }
 
-/**
- * Hook to manually report performance metrics
- * Useful for custom performance measurements
- */
-export function usePerformanceReporting() {
-    const reportMetric = (
-        metricName: string,
-        value: number,
-        threshold: number,
-        metadata?: Record<string, unknown>
-    ) => {
-        logPerformanceIssue(metricName, value, threshold, {
-            ...metadata,
-            url: window.location.href,
-            route: window.location.pathname,
-        });
-    };
 
-    return { reportMetric };
-}

@@ -1,12 +1,13 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useSuperAdmin } from '../../hooks/useSuperAdmin';
+import { useMonitoringData } from '../../hooks/useMonitoringData';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../../components/ui/card';
-import { LogOut, Plus, Building2, Calendar, Edit, Save, Users, Settings, Trash2, Key, ShieldCheck, Search, Filter } from 'lucide-react';
+import { LogOut, Plus, Building2, Calendar, Edit, Save, Users, Settings, Trash2, Key, ShieldCheck, Search, Filter, Activity } from 'lucide-react';
 import { auth, functions } from '../../firebase';
 import { httpsCallable } from 'firebase/functions';
 import { doc, updateDoc, getDocs, collection, getDoc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
@@ -17,7 +18,7 @@ import { Textarea } from '../../components/ui/textarea';
 
 const SuperAdminPage: React.FC = () => {
     const { societies, createSociety, createConference, loading } = useSuperAdmin();
-    const [activeTab, setActiveTab] = useState<'SOCIETY' | 'CONFERENCE' | 'MEMBERS' | 'CODES' | 'SETTINGS'>('SOCIETY');
+    const [activeTab, setActiveTab] = useState<'SOCIETY' | 'CONFERENCE' | 'MEMBERS' | 'CODES' | 'SETTINGS' | 'MONITORING'>('SOCIETY');
 
     const [socNameKo, setSocNameKo] = useState('');
     const [socNameEn, setSocNameEn] = useState('');
@@ -60,6 +61,11 @@ const SuperAdminPage: React.FC = () => {
     const [editingSoc, setEditingSoc] = useState<{ id: string; name: { ko: string; en?: string }; description?: { ko?: string }; homepageUrl?: string; adminEmails?: string[] } | null>(null);
     const [editDescKo, setEditDescKo] = useState('');
     const [editHomepage, setEditHomepage] = useState('');
+
+    // Monitoring state
+    const today = new Date().toISOString().split('T')[0];
+    const [monitoringDate, setMonitoringDate] = useState(today);
+    const { errorLogs, performanceMetrics, dataIntegrityAlerts, loading: monitoringLoading, refetch: refetchMonitoring } = useMonitoringData(monitoringDate);
 
     const fetchMembers = useCallback(async () => {
         console.log('[SuperAdminPage] fetchMembers called, currentSocietyId:', currentSocietyId);
@@ -341,11 +347,12 @@ const SuperAdminPage: React.FC = () => {
                             { id: 'CONFERENCE', label: 'Conferences', icon: <Calendar className="w-4 h-4" /> },
                             { id: 'MEMBERS', label: 'Members', icon: <Users className="w-4 h-4" /> },
                             { id: 'CODES', label: 'Codes', icon: <Key className="w-4 h-4" /> },
-                            { id: 'SETTINGS', label: 'Settings', icon: <Settings className="w-4 h-4" /> }
+                            { id: 'SETTINGS', label: 'Settings', icon: <Settings className="w-4 h-4" /> },
+                            { id: 'MONITORING', label: '모니터링', icon: <Activity className="w-4 h-4" /> }
                         ].map(tab => (
                             <button
                                 key={tab.id}
-                                onClick={() => setActiveTab(tab.id as 'SOCIETY' | 'CONFERENCE' | 'MEMBERS' | 'CODES' | 'SETTINGS')}
+                                onClick={() => setActiveTab(tab.id as 'SOCIETY' | 'CONFERENCE' | 'MEMBERS' | 'CODES' | 'SETTINGS' | 'MONITORING')}
                                 className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === tab.id ? 'bg-[#fbbf24] text-black' : 'bg-[#1e1e1e] text-gray-400 hover:bg-[#333] hover:text-white'}`}
                             >
                                 {tab.icon}
@@ -871,6 +878,220 @@ const SuperAdminPage: React.FC = () => {
                                 )}
                             </CardContent>
                         </Card>
+                    </div>
+                )}
+
+                {activeTab === 'MONITORING' && (
+                    <div className="max-w-7xl mx-auto space-y-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-2xl font-bold text-[#fbbf24] mb-2">시스템 모니터링</h2>
+                                <p className="text-gray-400 text-sm">실시간 오류, 성능, 데이터 무결성 추적</p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <input
+                                    type="date"
+                                    value={monitoringDate}
+                                    onChange={(e) => setMonitoringDate(e.target.value)}
+                                    className="bg-[#2a2a2a] border border-[#333] text-gray-200 px-4 py-2 rounded-lg focus:border-[#fbbf24] focus:outline-none"
+                                />
+                                <button
+                                    onClick={refetchMonitoring}
+                                    className="bg-[#fbbf24] hover:bg-[#e0a520] text-black px-4 py-2 rounded-lg font-semibold flex items-center gap-2"
+                                >
+                                    새로고침
+                                </button>
+                            </div>
+                        </div>
+
+                        {monitoringLoading ? (
+                            <div className="flex flex-col items-center justify-center py-20 gap-4">
+                                <LoadingSpinner />
+                                <p className="text-sm text-gray-400">모니터링 데이터 로딩 중...</p>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Error Logs Section */}
+                                <Card className="shadow-lg border-t-4 border-t-red-500 bg-[#1e1e1e] border-[#333]">
+                                    <CardHeader className="pb-4">
+                                        <CardTitle className="text-xl flex items-center gap-2 text-red-400">
+                                            ⚠️ 오류 로그 ({errorLogs.length})
+                                        </CardTitle>
+                                        <CardDescription className="text-gray-400">
+                                            시스템 오류 및 예외 사항 추적
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="p-0">
+                                        {errorLogs.length === 0 ? (
+                                            <div className="text-center py-12 text-gray-400">
+                                                <div className="text-4xl mb-2">✅</div>
+                                                <p>오류 없음</p>
+                                            </div>
+                                        ) : (
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-sm text-left">
+                                                    <thead className="bg-[#2a2a2a] text-gray-400 uppercase text-xs font-semibold">
+                                                        <tr>
+                                                            <th className="p-4 pl-6">시간</th>
+                                                            <th className="p-4">심각도</th>
+                                                            <th className="p-4">카테고리</th>
+                                                            <th className="p-4">메시지</th>
+                                                            <th className="p-4">발생 횟수</th>
+                                                            <th className="p-4">URL</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-[#333]">
+                                                        {errorLogs.map((log) => (
+                                                            <tr key={log.id} className="hover:bg-[#2a2a2a] transition-colors">
+                                                                <td className="p-4 pl-6 text-gray-300">
+                                                                    {log.timestamp?.toDate ?
+                                                                        new Date(log.timestamp.toDate()).toLocaleTimeString('ko-KR') :
+                                                                        '-'}
+                                                                </td>
+                                                                <td className="p-4">
+                                                                    <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                                                        log.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400' :
+                                                                        log.severity === 'HIGH' ? 'bg-orange-500/20 text-orange-400' :
+                                                                        log.severity === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                                        'bg-gray-500/20 text-gray-400'
+                                                                    }`}>
+                                                                        {log.severity}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-4 text-gray-300">{log.category}</td>
+                                                                <td className="p-4 text-gray-200 max-w-md truncate">{log.message}</td>
+                                                                <td className="p-4 text-center font-bold text-gray-300">{log.occurrenceCount || 1}</td>
+                                                                <td className="p-4 text-gray-400 text-xs max-w-xs truncate">{log.url || '-'}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+
+                                {/* Performance Metrics Section */}
+                                <Card className="shadow-lg border-t-4 border-t-blue-500 bg-[#1e1e1e] border-[#333]">
+                                    <CardHeader className="pb-4">
+                                        <CardTitle className="text-xl flex items-center gap-2 text-blue-400">
+                                            📊 성능 지표 ({performanceMetrics.length})
+                                        </CardTitle>
+                                        <CardDescription className="text-gray-400">
+                                            웹 바이탈 및 API 성능 측정
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="p-0">
+                                        {performanceMetrics.length === 0 ? (
+                                            <div className="text-center py-12 text-gray-400">
+                                                <div className="text-4xl mb-2">📈</div>
+                                                <p>성능 데이터 없음</p>
+                                            </div>
+                                        ) : (
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-sm text-left">
+                                                    <thead className="bg-[#2a2a2a] text-gray-400 uppercase text-xs font-semibold">
+                                                        <tr>
+                                                            <th className="p-4 pl-6">시간</th>
+                                                            <th className="p-4">지표</th>
+                                                            <th className="p-4">값</th>
+                                                            <th className="p-4">경로</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-[#333]">
+                                                        {performanceMetrics.slice(0, 20).map((metric) => (
+                                                            <tr key={metric.id} className="hover:bg-[#2a2a2a] transition-colors">
+                                                                <td className="p-4 pl-6 text-gray-300">
+                                                                    {metric.timestamp?.toDate ?
+                                                                        new Date(metric.timestamp.toDate()).toLocaleTimeString('ko-KR') :
+                                                                        '-'}
+                                                                </td>
+                                                                <td className="p-4 text-gray-300 font-mono">{metric.metricName}</td>
+                                                                <td className="p-4">
+                                                                    <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                                                        metric.value > 3000 ? 'bg-red-500/20 text-red-400' :
+                                                                        metric.value > 1000 ? 'bg-yellow-500/20 text-yellow-400' :
+                                                                        'bg-green-500/20 text-green-400'
+                                                                    }`}>
+                                                                        {metric.value.toFixed(0)} {metric.unit}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-4 text-gray-400 text-xs max-w-xs truncate">{metric.url || metric.route || '-'}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+
+                                {/* Data Integrity Alerts Section */}
+                                <Card className="shadow-lg border-t-4 border-t-orange-500 bg-[#1e1e1e] border-[#333]">
+                                    <CardHeader className="pb-4">
+                                        <CardTitle className="text-xl flex items-center gap-2 text-orange-400">
+                                            🛡️ 데이터 무결성 알림 ({dataIntegrityAlerts.length})
+                                        </CardTitle>
+                                        <CardDescription className="text-gray-400">
+                                            데이터 무결성 위반 사항 감지
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="p-0">
+                                        {dataIntegrityAlerts.length === 0 ? (
+                                            <div className="text-center py-12 text-gray-400">
+                                                <div className="text-4xl mb-2">✅</div>
+                                                <p>무결성 이슈 없음</p>
+                                            </div>
+                                        ) : (
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-sm text-left">
+                                                    <thead className="bg-[#2a2a2a] text-gray-400 uppercase text-xs font-semibold">
+                                                        <tr>
+                                                            <th className="p-4 pl-6">시간</th>
+                                                            <th className="p-4">심각도</th>
+                                                            <th className="p-4">컬렉션</th>
+                                                            <th className="p-4">문서 ID</th>
+                                                            <th className="p-4">위반 규칙</th>
+                                                            <th className="p-4">해결 여부</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-[#333]">
+                                                        {dataIntegrityAlerts.map((alert) => (
+                                                            <tr key={alert.id} className="hover:bg-[#2a2a2a] transition-colors">
+                                                                <td className="p-4 pl-6 text-gray-300">
+                                                                    {alert.timestamp?.toDate ?
+                                                                        new Date(alert.timestamp.toDate()).toLocaleTimeString('ko-KR') :
+                                                                        '-'}
+                                                                </td>
+                                                                <td className="p-4">
+                                                                    <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                                                        alert.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400' :
+                                                                        alert.severity === 'HIGH' ? 'bg-orange-500/20 text-orange-400' :
+                                                                        'bg-yellow-500/20 text-yellow-400'
+                                                                    }`}>
+                                                                        {alert.severity}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-4 text-gray-300 text-xs font-mono">{alert.collection}</td>
+                                                                <td className="p-4 text-gray-300 text-xs font-mono max-w-xs truncate">{alert.documentId}</td>
+                                                                <td className="p-4 text-gray-200 text-sm">{alert.rule}</td>
+                                                                <td className="p-4">
+                                                                    <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                                                        alert.resolved ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                                                                    }`}>
+                                                                        {alert.resolved ? '해결됨' : '미해결'}
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </>
+                        )}
                     </div>
                 )}
             </main>
