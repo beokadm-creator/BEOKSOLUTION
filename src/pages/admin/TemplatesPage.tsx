@@ -15,6 +15,38 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/ta
 import { Plus, Trash2, RefreshCw, Mail, MessageCircle, Info, Save, ToggleLeft, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { NotificationEventType, AlimTalkButton, EmailConfig, KakaoConfig, NotificationTemplate, EVENT_TYPE_PRESETS } from '../../types/schema';
+import { Send, ArrowRight, Check } from 'lucide-react';
+
+// Aligo template interfaces
+interface AligoTemplateButton {
+    name: string;
+    linkType: string;
+    linkMo: string;
+    linkPc: string;
+}
+
+interface AligoTemplate {
+    tpl_code: string;
+    tpl_name: string;
+    tpl_content: string;
+    tpl_button: string | AligoTemplateButton[];
+    insp_status?: string;
+    [key: string]: unknown;
+}
+
+interface AligoTemplateResponse {
+    success: boolean;
+    message?: string;
+    data: {
+        list: AligoTemplate[];
+        [key: string]: unknown;
+    };
+}
+
+interface SendTestAlimTalkResult {
+    success: boolean;
+    message?: string;
+}
 
 export default function TemplatesPage() {
     const { selectedSocietyId } = useAdminStore();
@@ -53,8 +85,19 @@ export default function TemplatesPage() {
 
     // Aligo Import State
     const [isAligoImportOpen, setIsAligoImportOpen] = useState(false);
-    const [aligoTemplates, setAligoTemplates] = useState<any[]>([]);
+    const [aligoTemplates, setAligoTemplates] = useState<AligoTemplate[]>([]);
     const [loadingAligo, setLoadingAligo] = useState(false);
+
+    // Variable Mapping State
+    const [isMappingDialogOpen, setIsMappingDialogOpen] = useState(false);
+    const [pendingTemplate, setPendingTemplate] = useState<AligoTemplate | null>(null);
+    const [detectedVariables, setDetectedVariables] = useState<string[]>([]);
+    const [variableMapping, setVariableMapping] = useState<Record<string, string>>({});
+
+    // Test Send State
+    const [testReceiverPhone, setTestReceiverPhone] = useState('');
+    const [isTestSending, setIsTestSending] = useState(false);
+    const [isTestPopoverOpen, setIsTestPopoverOpen] = useState(false);
 
     // Fetch Aligo Templates
     const handleFetchAligoTemplates = async () => {
@@ -63,7 +106,7 @@ export default function TemplatesPage() {
         try {
             const getAligoTemplatesFn = httpsCallable(functions, 'getAligoTemplates');
             const result = await getAligoTemplatesFn();
-            const data = result.data as any;
+            const data = result.data as AligoTemplateResponse;
 
             if (data.success && data.data && data.data.list) {
                 setAligoTemplates(data.data.list);
@@ -71,21 +114,46 @@ export default function TemplatesPage() {
             } else {
                 console.error("Aligo API Error:", data);
                 if (data.data && data.data.message) {
-                    toast.error(`알리고 오류: ${data.data.message}`);
+                    toast.error(`알림톡 오류: ${data.data.message}`);
                 } else {
-                    toast.error("알리고 템플릿 목록을 불러오지 못했습니다.");
+                    toast.error("알림톡 템플릿 목록을 불러오지 못했습니다.");
                 }
             }
         } catch (error) {
-            console.error("Failed to fetch Aligo templates:", error);
-            toast.error("알리고 템플릿 호출 중 오류가 발생했습니다.");
+            console.error("Failed to fetch AlimTalk templates:", error);
+            toast.error("알림톡 템플릿 호출 중 오류가 발생했습니다.");
         } finally {
             setLoadingAligo(false);
         }
     };
 
-    const handleSelectAligoTemplate = (tpl: any) => {
-        setKakaoContent(tpl.tpl_content);
+    const extractVariables = (text: string) => {
+        const regex = /#\{([^}]+)\}/g;
+        const matches = text.match(regex);
+        return matches ? [...new Set(matches)] : [];
+    };
+
+    const handleSelectAligoTemplate = (tpl: AligoTemplate) => {
+        const content = tpl.tpl_content;
+        const variables = extractVariables(content);
+
+        // If variables found, open mapping dialog
+        if (variables.length > 0) {
+            setPendingTemplate(tpl);
+            setDetectedVariables(variables);
+            // Initialize mapping with empty strings
+            const initialMapping: Record<string, string> = {};
+            variables.forEach(v => { initialMapping[v] = ''; });
+            setVariableMapping(initialMapping);
+            setIsMappingDialogOpen(true);
+        } else {
+            // No variables, proceed directly
+            finalizeTemplateLoad(tpl, content);
+        }
+    };
+
+    const finalizeTemplateLoad = (tpl: AligoTemplate, finalContent: string) => {
+        setKakaoContent(finalContent);
         setKakaoTemplateCode(tpl.tpl_code);
 
         // Parse buttons if any
@@ -95,9 +163,9 @@ export default function TemplatesPage() {
                 const buttons = typeof tpl.tpl_button === 'string' ? JSON.parse(tpl.tpl_button) : tpl.tpl_button;
 
                 if (Array.isArray(buttons)) {
-                    const mappedButtons = buttons.map((b: any) => ({
+                    const mappedButtons = buttons.map((b: AligoTemplateButton) => ({
                         name: b.name,
-                        type: b.linkType || 'WL',
+                        type: (b.linkType || 'WL') as 'WL' | 'AL' | 'BK' | 'MD',
                         linkMobile: b.linkMo || '',
                         linkPc: b.linkPc || ''
                     }));
@@ -122,7 +190,72 @@ export default function TemplatesPage() {
         }
 
         setIsAligoImportOpen(false);
-        toast.success("알리고 템플릿을 불러왔습니다.");
+        setIsMappingDialogOpen(false);
+        setPendingTemplate(null);
+        toast.success("알림톡 템플릿을 불러왔습니다.");
+    };
+
+    const applyMapping = () => {
+        if (!pendingTemplate) return;
+
+        let content = pendingTemplate.tpl_content;
+
+        // Simple string replacement for each mapped variable
+        Object.entries(variableMapping).forEach(([original, systemVar]) => {
+            if (systemVar) {
+                // Replace globally
+                // original is like "#{고객명}"
+                // systemVar is like "#{userName}" (value from select)
+                content = content.replaceAll(original, systemVar);
+            }
+        });
+
+        finalizeTemplateLoad(pendingTemplate, content);
+    };
+
+    const handleSendTest = async () => {
+        if (!testReceiverPhone) {
+            toast.error("수신자 전화번호를 입력해주세요.");
+            return;
+        }
+
+        if (!kakaoContent) {
+            toast.error("발송할 알림톡 내용이 없습니다.");
+            return;
+        }
+
+        if (!kakaoTemplateCode) {
+            toast.error("알림톡 템플릿 코드가 없습니다. NHN 불러오기를 통해 템플릿을 선택하거나 코드를 입력해주세요.");
+            return;
+        }
+
+        setIsTestSending(true);
+        try {
+            const sendTestFn = httpsCallable(functions, 'sendTestAlimTalk');
+            const result = await sendTestFn({
+                recipient: testReceiverPhone,
+                templateCode: kakaoTemplateCode,
+                content: kakaoContent,
+                buttons: kakaoButtons,
+                societyId: targetSocietyId,
+                eventType: selectedEventType
+            });
+
+            const data = result.data as SendTestAlimTalkResult;
+            if (data.success) {
+                toast.success("테스트 발송이 완료되었습니다.");
+                setIsTestPopoverOpen(false);
+            } else {
+                console.error("Test send failed:", data);
+                toast.error(`발송 실패: ${data.message || 'Unknown error'}`);
+            }
+        } catch (error: unknown) {
+            console.error("Error sending test:", error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            toast.error(`발송 중 오류 발생: ${errorMessage}`);
+        } finally {
+            setIsTestSending(false);
+        }
     };
 
     // Get Society ID
@@ -247,6 +380,12 @@ export default function TemplatesPage() {
         if (!targetSocietyId) return;
         if (!templateName) {
             toast.error("템플릿 이름을 입력해주세요.");
+            return;
+        }
+
+        // Check for partial email config
+        if ((emailSubject && !emailBody) || (!emailSubject && emailBody)) {
+            toast.error("이메일 설정을 위해서는 제목과 본문을 모두 입력해야 합니다.");
             return;
         }
 
@@ -780,7 +919,7 @@ export default function TemplatesPage() {
                                         className="h-7 text-xs border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100"
                                     >
                                         {loadingAligo ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : <Download className="w-3 h-3 mr-1" />}
-                                        알리고 불러오기
+                                        NHN 불러오기
                                     </Button>
                                     <Badge variant="outline" className="text-xs text-slate-400 font-normal">선택사항</Badge>
                                 </div>
@@ -917,13 +1056,103 @@ export default function TemplatesPage() {
                         </section>
                     </div>
 
-                    <DialogFooter className="p-6 border-t border-slate-100 bg-slate-50 sticky bottom-0 z-10">
-                        <Button variant="ghost" onClick={() => setIsDialogOpen(false)} className="mr-2">
-                            취소
-                        </Button>
-                        <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white min-w-[100px]">
-                            <Save className="w-4 h-4 mr-2" />
-                            저장하기
+                    <DialogFooter className="p-6 border-t border-slate-100 bg-slate-50 sticky bottom-0 z-10 flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                            {/* Test Send Popover Area */}
+                            {isTestPopoverOpen ? (
+                                <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
+                                    <Input
+                                        placeholder="01012345678"
+                                        value={testReceiverPhone}
+                                        onChange={e => setTestReceiverPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                                        className="h-8 w-32 text-xs"
+                                    />
+                                    <Button size="sm" onClick={handleSendTest} disabled={isTestSending} className="h-8 text-xs bg-slate-800 hover:bg-slate-900 text-white">
+                                        {isTestSending ? "발송중..." : "전송"}
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => setIsTestPopoverOpen(false)} className="h-8 w-8 p-0 text-slate-400">
+                                        &times;
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Button variant="outline" size="sm" onClick={() => setIsTestPopoverOpen(true)} className="text-slate-600 border-slate-200 hover:bg-slate-100">
+                                    <Send className="w-3.5 h-3.5 mr-2" />
+                                    테스트 발송
+                                </Button>
+                            )}
+                        </div>
+
+                        <div className="flex items-center">
+                            <Button variant="ghost" onClick={() => setIsDialogOpen(false)} className="mr-2">
+                                취소
+                            </Button>
+                            <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white min-w-[100px]">
+                                <Save className="w-4 h-4 mr-2" />
+                                저장하기
+                            </Button>
+                        </div>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Variable Mapping Dialog */}
+            <Dialog open={isMappingDialogOpen} onOpenChange={setIsMappingDialogOpen}>
+                <DialogContent className="max-w-xl bg-white rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle>템플릿 변수 연결</DialogTitle>
+                        <DialogDescription>
+                            불러온 템플릿의 변수({detectedVariables.length}개)를 시스템 데이터와 연결해주세요.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="py-4 space-y-4">
+                        <div className="text-sm bg-blue-50 text-blue-700 p-4 rounded-lg flex gap-3">
+                            <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                            <p>
+                                템플릿에 포함된 <strong>#{`{변수명}`}</strong>을 시스템 값으로 자동 변환합니다.
+                                올바르게 매핑하지 않으면 발송 시 내용이 비어있을 수 있습니다.
+                            </p>
+                        </div>
+
+                        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+                            {detectedVariables.map((variable) => (
+                                <div key={variable} className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                    <div className="flex items-center gap-3">
+                                        <Badge variant="outline" className="bg-white font-mono text-slate-600 border-slate-200">
+                                            {variable}
+                                        </Badge>
+                                        <ArrowRight className="w-4 h-4 text-slate-300" />
+                                    </div>
+                                    <div className="flex-1 ml-4">
+                                        <Select
+                                            value={variableMapping[variable] || ''}
+                                            onValueChange={(val) => setVariableMapping(prev => ({ ...prev, [variable]: val }))}
+                                        >
+                                            <SelectTrigger className="bg-white h-9">
+                                                <SelectValue placeholder="시스템 변수 선택" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {currentVariables.map(v => (
+                                                    <SelectItem key={v.key} value={`#{${v.key}}`}>
+                                                        {v.label} (#{`{${v.key}}`})
+                                                    </SelectItem>
+                                                ))}
+                                                <SelectItem value="SKIP">
+                                                    변환하지 않음 (그대로 유지)
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setIsMappingDialogOpen(false)}>취소</Button>
+                        <Button onClick={applyMapping} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                            <Check className="w-4 h-4 mr-2" />
+                            적용 및 불러오기
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -938,11 +1167,11 @@ export default function TemplatesPage() {
                                 <Download className="w-5 h-5" />
                             </div>
                             <DialogTitle className="text-xl font-bold text-slate-900">
-                                알리고 템플릿 불러오기
+                                NHN 알림톡 템플릿 불러오기
                             </DialogTitle>
                         </div>
                         <DialogDescription className="text-slate-500 ml-11">
-                            알리고에 등록된 알림톡 템플릿 목록입니다.
+                            NHN Cloud에 등록된 알림톡 템플릿 목록입니다.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -953,7 +1182,7 @@ export default function TemplatesPage() {
                                     불러온 템플릿이 없습니다.
                                 </div>
                             ) : (
-                                aligoTemplates.map((tpl: any) => (
+                                aligoTemplates.map((tpl: AligoTemplate) => (
                                     <Card key={tpl.tpl_code} className="transition-all hover:bg-slate-50/50 cursor-pointer border-slate-100 group" onClick={() => handleSelectAligoTemplate(tpl)}>
                                         <CardContent className="p-4">
                                             <div className="flex justify-between items-start mb-2">
