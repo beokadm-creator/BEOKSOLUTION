@@ -1,34 +1,43 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { CheckCircle2, Download, Home, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { useUserStore } from '../store/userStore';
-import { useConference } from '../hooks/useConference';
 
 const RegistrationSuccessPage: React.FC = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const { language } = useUserStore();
-    const conference = useConference();
 
-    // Determine targetSlug: extract pure slug from composite ID like "kadd_2026spring" -> "2026spring"
-    // This ensures we redirect to /2026spring not /kadd_2026spring
-    const finalSlug = (() => {
-        // First try to use conference.slug from document data (cleanest approach)
-        if (conference.slug) {
-            return conference.slug;
+    // Extract slug from URL params or sessionStorage using useMemo
+    const finalSlug = useMemo(() => {
+        // Priority 1: URL searchParams (from PaymentSuccessHandler)
+        const slugFromParams = searchParams.get('conferenceSlug') || searchParams.get('slug');
+
+        if (slugFromParams) {
+            return slugFromParams;
         }
-        // Fallback: extract pure slug from composite ID
-        if (conference.id) {
-            const parts = conference.id.split('_');
-            if (parts.length > 1) {
-                // parts[0] = societyId, parts[1] onwards = slug
-                return parts.slice(1).join('_');
+
+        // Priority 2: sessionStorage (fallback)
+        const storedSlug = sessionStorage.getItem('current_conference_slug');
+        if (storedSlug) {
+            return storedSlug;
+        }
+
+        // Priority 3: Extract from orderId (format: kadd_2026spring_xxx)
+        const orderId = searchParams.get('orderId');
+        if (orderId) {
+            const parts = orderId.split('_');
+            if (parts.length >= 2) {
+                // Assume format: societyId_slug_timestamp
+                return parts[1]; // Extract slug part
             }
         }
-        return 'home';
-    })();
+
+        // Fallback: default slug
+        return '2026spring';
+    }, [searchParams]);
 
     const orderId = searchParams.get('orderId');
     const userName = searchParams.get('name');

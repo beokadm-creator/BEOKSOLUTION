@@ -51,7 +51,7 @@ const PaymentSuccessHandler: React.FC = () => {
                 // Since we didn't save PENDING doc in Firestore, we must use session data.
                 const pendingDataStr = sessionStorage.getItem(`pending_reg_${orderId}`);
 
-                let regData: any = null;
+                let regData: Partial<Registration> | null = null;
                 if (pendingDataStr) {
                     try {
                         regData = JSON.parse(pendingDataStr);
@@ -72,7 +72,7 @@ const PaymentSuccessHandler: React.FC = () => {
                             const pureSlug = confId.includes('_') ? confId.split('_').slice(1).join('_') : confId;
                             const userName = regData.userInfo?.name || regData.name || '';
                             sessionStorage.removeItem(`payment_processing_${paymentKey}`);
-                            window.location.href = `/${pureSlug}/register/success?orderId=${orderId}&name=${encodeURIComponent(userName)}`;
+                            window.location.href = `/${pureSlug}/register/success?orderId=${orderId}&name=${encodeURIComponent(userName)}&conferenceSlug=${pureSlug}`;
                             return;
                         }
                     }
@@ -154,7 +154,8 @@ const PaymentSuccessHandler: React.FC = () => {
                     // Use pure slug (extract from confId like "kadd_2026spring" -> "2026spring")
                     const pureSlug = confId.includes('_') ? confId.split('_').slice(1).join('_') : confId;
                     sessionStorage.removeItem(`payment_processing_${paymentKey}`); // Cleanup
-                    window.location.href = `/${pureSlug}/register/success?orderId=${orderId}&name=${encodeURIComponent(userData.name)}`;
+                    // Pass conferenceSlug as URL param for proper navigation
+                    window.location.href = `/${pureSlug}/register/success?orderId=${orderId}&name=${encodeURIComponent(userData.name)}&conferenceSlug=${pureSlug}`;
                 } else {
                     console.error("Payment Confirmation Failed:", resData);
                     toast.error("결제 확인에 실패했습니다. 관리자에게 문의해주세요.");
