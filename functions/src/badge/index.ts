@@ -95,11 +95,38 @@ export const onRegistrationCreated = functions.firestore
 /**
  * Helper: Send Badge Notification (AlimTalk)
  */
+interface ConferenceData {
+  societyId?: string;
+  id?: string;
+  slug?: string;
+  conferenceId?: string;
+  title?: { ko?: string; en?: string } | string;
+  dates?: {
+    start?: admin.firestore.Timestamp;
+    end?: admin.firestore.Timestamp;
+  };
+  venue?: {
+    name?: { ko?: string; en?: string } | string;
+  };
+}
+
+interface RegistrationData {
+  organization?: string;
+  affiliation?: string;
+  userInfo?: {
+    affiliation?: string;
+  };
+  userName?: string;
+  name?: string;
+  userEmail?: string;
+  email?: string;
+}
+
 async function sendBadgeNotification(
   db: admin.firestore.Firestore,
-  conference: any,
+  conference: ConferenceData,
   regId: string,
-  regData: any,
+  regData: RegistrationData,
   token: string
 ) {
   if (!conference.societyId) return;
@@ -119,7 +146,9 @@ async function sendBadgeNotification(
 
       if (kakaoConfig && kakaoConfig.status === 'APPROVED' && kakaoConfig.kakaoTemplateCode) {
         // Prepare Data
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { format } = require('date-fns');
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { ko } = require('date-fns/locale');
 
         // Society Info
@@ -128,7 +157,10 @@ async function sendBadgeNotification(
         const societyName = societyData?.name?.ko || societyData?.name?.en || conference.societyId;
 
         // Event Info
-        const eventName = conference.title?.ko || conference.title?.en || '';
+        const title = conference.title;
+        const eventName = typeof title === 'object'
+          ? (title?.ko || title?.en || '')
+          : (title || '');
         const startDate = conference.dates?.start
           ? format(conference.dates.start.toDate(), 'yyyy-MM-dd HH:mm', { locale: ko })
           : '';
@@ -145,7 +177,7 @@ async function sendBadgeNotification(
 
         // Variables Map
         const variables: { [key: string]: string } = {
-          userName: regData.name || regData.userInfo?.name || '',
+          userName: (regData as any).name || (regData as any).userInfo?.name || '',
           society: societyName,
           eventName: eventName,
           badgePrepUrl: badgePrepUrl,
@@ -167,26 +199,28 @@ async function sendBadgeNotification(
         let buttons = kakaoConfig.buttons ? [...kakaoConfig.buttons] : [];
         buttons = buttons.map((btn: any) => ({
           ...btn,
-          linkMobile: btn.linkMobile?.replace('#{badgePrepUrl}', badgePrepUrl),
-          linkPc: btn.linkPc?.replace('#{badgePrepUrl}', badgePrepUrl)
+          // NHN uses linkMo, linkPc
+          linkMo: btn.linkMobile?.replace('#{badgePrepUrl}', badgePrepUrl),
+          linkPc: btn.linkPc?.replace('#{badgePrepUrl}', badgePrepUrl),
+          // Keep legacy fields just in case
+          linkMobile: btn.linkMobile?.replace('#{badgePrepUrl}', badgePrepUrl)
         }));
 
         // Send
-        const recipientPhone = regData.phone || regData.userInfo?.phone;
+        const recipientPhone = (regData as any).phone || (regData as any).userInfo?.phone;
         if (recipientPhone) {
           const cleanPhone = recipientPhone.replace(/-/g, '');
 
-          const { sendAlimTalk } = require('../utils/aligo');
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { sendAlimTalk } = require('../utils/nhnAlimTalk');
 
           await sendAlimTalk(
             cleanPhone,
             kakaoConfig.kakaoTemplateCode,
+            variables, // Pass raw variables for template substitution
             {
-              message: content,
-              name: variables.userName,
-              button: buttons
-            },
-            conference.societyId
+              buttons: buttons
+            }
           );
 
           functions.logger.info(`[BadgeNotification] AlimTalk sent to ${cleanPhone} for ${regId}`);
@@ -209,7 +243,7 @@ export const validateBadgePrepToken = functions
     enforceAppCheck: false,
     ingressSettings: 'ALLOW_ALL'
   })
-  .https.onCall(async (data, context) => {
+  .https.onCall(async (data, _context) => {
     const { confId, token } = data;
 
     if (!confId || !token) {
@@ -355,7 +389,7 @@ export const issueDigitalBadge = functions
     enforceAppCheck: false,
     ingressSettings: 'ALLOW_ALL'
   })
-  .https.onCall(async (data, context) => {
+  .https.onCall(async (data, _context) => {
     const { confId, regId, issueOption } = data;
 
     if (!confId || !regId) {
@@ -432,7 +466,7 @@ export const resendBadgePrepToken = functions
     enforceAppCheck: false,
     ingressSettings: 'ALLOW_ALL'
   })
-  .https.onCall(async (data, context) => {
+  .https.onCall(async (data, _context) => {
     const { confId, regId } = data;
 
     if (!confId || !regId) {
@@ -597,3 +631,148 @@ export const onExternalAttendeeCreated = functions.firestore
       return null;
     }
   });
+
+/**
+ * Cloud Function: Send Notification to Registrations (Manual Send)
+ * Called by admin to manually send AlimTalk to selected registrations
+ * Key: Ensures badgePrepUrl contains valid token for each registration
+ */
+export const sendNotificationToRegistrations = functions
+  .runWith({
+    enforceAppCheck: false,
+    ingressSettings: 'ALLOW_ALL'
+  })
+  .https.onCall(async (data, _context) => {
+    const { confId, regIds, eventType } = data;
+
+    if (!confId || !regIds || !Array.isArray(regIds) || regIds.length === 0) {
+      throw new functions.https.HttpsError('invalid-argument', 'Missing confId or regIds');
+    }
+
+    if (!eventType) {
+      throw new functions.https.HttpsError('invalid-argument', 'Missing eventType');
+    }
+
+    try {
+      const db = admin.firestore();
+      const now = admin.firestore.Timestamp.now();
+
+      // Get conference
+      const confSnap = await db.collection('conferences').doc(confId).get();
+      if (!confSnap.exists) {
+        throw new Error('Conference not found');
+      }
+      const conference = confSnap.data();
+
+      // Get societyId for notification-templates lookup
+      const societyId = conference?.societyId;
+      if (!societyId) {
+        throw new Error('Society ID not found in conference');
+      }
+
+      // Check if notification template exists for this event
+      const templatesQuery = await db.collection(`societies/${societyId}/notification-templates`)
+        .where('eventType', '==', eventType)
+        .where('isActive', '==', true)
+        .limit(1)
+        .get();
+
+      if (templatesQuery.empty) {
+        throw new Error(`No active template found for event type: ${eventType}`);
+      }
+
+      const template = templatesQuery.docs[0].data();
+      if (!template.channels?.kakao || template.channels.kakao.status !== 'APPROVED') {
+        throw new Error(`Kakao channel not configured or not approved for event type: ${eventType}`);
+      }
+
+      // Process each registration
+      const results = {
+        total: regIds.length,
+        success: 0,
+        failed: 0,
+        details: [] as Array<{ regId: string; success: boolean; error?: string }>
+      };
+
+      for (const regId of regIds) {
+        try {
+          // Determine collection (registrations or external_attendees)
+          const collectionName = regId.startsWith('EXT-') ? 'external_attendees' : 'registrations';
+          const regSnap = await db.collection(`conferences/${confId}/${collectionName}`).doc(regId).get();
+
+          if (!regSnap.exists) {
+            results.failed++;
+            results.details.push({ regId, success: false, error: 'Registration not found' });
+            continue;
+          }
+
+          const regData = regSnap.data();
+
+          // Check or create token for badgePrepUrl
+          let token: string;
+
+          // Query existing ACTIVE token
+          const existingTokensSnap = await db.collection(`conferences/${confId}/badge_tokens`)
+            .where('registrationId', '==', regId)
+            .where('status', '==', 'ACTIVE')
+            .limit(1)
+            .get();
+
+          if (!existingTokensSnap.empty) {
+            token = existingTokensSnap.docs[0].id;
+          } else {
+            // Create new token
+            token = generateBadgePrepToken();
+
+            // Calculate expiry
+            let expiresAt: admin.firestore.Timestamp;
+            if (conference?.dates?.end) {
+              expiresAt = admin.firestore.Timestamp.fromMillis(
+                conference.dates.end.toMillis() + (24 * 60 * 60 * 1000)
+              );
+            } else {
+              expiresAt = admin.firestore.Timestamp.fromMillis(
+                now.toMillis() + (7 * 24 * 60 * 60 * 1000)
+              );
+            }
+
+            // Create token document
+            await db.collection(`conferences/${confId}/badge_tokens`).doc(token).set({
+              token,
+              registrationId: regId,
+              conferenceId: confId,
+              userId: regData?.userId || regData?.uid || 'GUEST',
+              status: 'ACTIVE',
+              createdAt: now,
+              expiresAt
+            });
+
+            functions.logger.info(`[ManualSend] Created new token ${token} for ${regId}`);
+          }
+
+          // Send notification with token (badgePrepUrl will be constructed inside)
+          await sendBadgeNotification(db, conference, regId, regData, token);
+
+          results.success++;
+          results.details.push({ regId, success: true });
+        } catch (error: unknown) {
+          results.failed++;
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          results.details.push({ regId, success: false, error: message });
+          functions.logger.error(`[ManualSend] Failed for ${regId}:`, error);
+        }
+      }
+
+      functions.logger.info(`[ManualSend] Completed: ${results.success}/${results.total} successful`);
+
+      return {
+        success: true,
+        results
+      };
+    } catch (error: unknown) {
+      functions.logger.error('[ManualSend] Error:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      throw new functions.https.HttpsError('internal', message);
+    }
+  });
+

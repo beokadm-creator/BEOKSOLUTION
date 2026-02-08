@@ -1,5 +1,25 @@
 import axios from 'axios';
 
+interface AligoResponse {
+  success: boolean;
+  code?: string;
+  message?: string;
+  data?: unknown;
+  channelId?: string;
+  error?: string;
+  recipient?: string;
+  templateCode?: string;
+}
+
+interface AlimTalkVariables {
+  message?: string;
+  name?: string;
+  button?: unknown;
+  fsubject?: string;
+  fmessage?: string;
+  [key: string]: string | undefined | unknown;
+}
+
 // Platform-level Aligo credentials (hardcoded as requested)
 const ALIGO_CONFIG = {
   apikey: 'xv04ghl3hpm5tajg34kv6bn0ug31h767',
@@ -19,9 +39,9 @@ const ALIGO_CONFIG = {
 export async function sendAlimTalk(
   recipient: string,
   templateCode: string,
-  variables: { [key: string]: string },
+  variables: AlimTalkVariables,
   channelId: string
-): Promise<any> {
+): Promise<AligoResponse> {
   try {
     // Prepare the complete data for Aligo API
     const formData = new URLSearchParams();
@@ -40,7 +60,7 @@ export async function sendAlimTalk(
     formData.append('fsubject', variables.fsubject || '');
     formData.append('fmessage', variables.fmessage || '');
 
-    const response = await axios.post('https://apis.aligo.in/akv10/alimtalk/send', formData, {
+    const response = await axios.post('https://kakaoapi.aligo.in/akv10/alimtalk/send', formData, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       }
@@ -55,11 +75,13 @@ export async function sendAlimTalk(
       message: 'AlimTalk sent successfully'
     };
 
-  } catch (error: any) {
-    console.error('AlimTalk send error:', error);
+  } catch (error: unknown) {
+    const currentIp = await getPublicIp();
+    console.error('AlimTalk send error:', error, 'Server IP:', currentIp);
+    const message = error instanceof Error ? error.message : 'Unknown error';
     return {
       success: false,
-      error: error.message || 'Unknown error occurred',
+      error: `${message} (Server IP: ${currentIp})`,
       channelId,
       recipient,
       templateCode
@@ -71,13 +93,13 @@ export async function sendAlimTalk(
  * Get remaining AlimTalk credits
  * @returns {Promise<Object>} - Credit information
  */
-export async function getAlimTalkRemain(): Promise<any> {
+export async function getAlimTalkRemain(): Promise<{ success: boolean; data?: unknown; error?: string }> {
   try {
     const formData = new URLSearchParams();
     formData.append('apikey', ALIGO_CONFIG.apikey);
     formData.append('userid', ALIGO_CONFIG.userid);
 
-    const response = await axios.post('https://apis.aligo.in/akv10/payment/remain', formData, {
+    const response = await axios.post('https://kakaoapi.aligo.in/akv10/payment/remain', formData, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       }
@@ -87,11 +109,12 @@ export async function getAlimTalkRemain(): Promise<any> {
       success: true,
       data: response.data
     };
-  } catch (error: any) {
+  } catch (error) {
+    const err = error as { message?: string };
     console.error('Get AlimTalk remain error:', error);
     return {
       success: false,
-      error: error.message || 'Unknown error occurred'
+      error: err.message || 'Unknown error occurred'
     };
   }
 }
@@ -107,7 +130,7 @@ export async function getAlimTalkHistory(
   channelId: string,
   page: number = 1,
   limit: number = 50
-): Promise<any> {
+): Promise<{ success: boolean; data?: unknown; error?: string }> {
   try {
     const formData = new URLSearchParams();
     formData.append('apikey', ALIGO_CONFIG.apikey);
@@ -117,7 +140,7 @@ export async function getAlimTalkHistory(
     formData.append('start_date', ''); // Default to recent
     formData.append('enddate', ''); // Default to recent
 
-    const response = await axios.post('https://apis.aligo.in/akv10/history/list', formData, {
+    const response = await axios.post('https://kakaoapi.aligo.in/akv10/history/list', formData, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       }
@@ -127,11 +150,12 @@ export async function getAlimTalkHistory(
       success: true,
       data: response.data
     };
-  } catch (error: any) {
+  } catch (error) {
+    const err = error as { message?: string };
     console.error('Get AlimTalk history error:', error);
     return {
       success: false,
-      error: error.message || 'Unknown error occurred'
+      error: err.message || 'Unknown error occurred'
     };
   }
 }
@@ -140,14 +164,14 @@ export async function getAlimTalkHistory(
  * Get AlimTalk templates
  * @returns {Promise<Object>} - Template list
  */
-export async function getAlimTalkTemplates(): Promise<any> {
+export async function getAlimTalkTemplates(): Promise<{ success: boolean; data?: unknown; error?: string }> {
   try {
     const formData = new URLSearchParams();
     formData.append('apikey', ALIGO_CONFIG.apikey);
     formData.append('userid', ALIGO_CONFIG.userid);
     formData.append('senderkey', ALIGO_CONFIG.senderkey);
 
-    const response = await axios.post('https://apis.aligo.in/akv10/template/list', formData, {
+    const response = await axios.post('https://kakaoapi.aligo.in/akv10/template/list', formData, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       }
@@ -157,12 +181,26 @@ export async function getAlimTalkTemplates(): Promise<any> {
       success: true,
       data: response.data
     };
-  } catch (error: any) {
-    console.error('Get AlimTalk templates error:', error);
+  } catch (error) {
+    const err = error as { code?: string; message?: string };
+    const currentIp = await getPublicIp(); // Fetch IP on error for debugging
+    console.error('Get AlimTalk templates error:', error, 'Server IP:', currentIp);
     return {
       success: false,
-      error: error.message || 'Unknown error occurred'
+      error: `[${err.code || 'ERR'}] ${err.message} (Server IP: ${currentIp})`
     };
+  }
+}
+
+/**
+ * Helper to get current public IP (Cloud Function instance IP)
+ */
+async function getPublicIp(): Promise<string> {
+  try {
+    const response = await axios.get('https://api.ipify.org?format=json', { timeout: 2000 });
+    return response.data.ip;
+  } catch {
+    return 'unknown';
   }
 }
 
@@ -171,5 +209,6 @@ export default {
   getAlimTalkRemain,
   getAlimTalkHistory,
   getAlimTalkTemplates,
+  getPublicIp, // Exporting for direct check if needed
   config: ALIGO_CONFIG
 };
