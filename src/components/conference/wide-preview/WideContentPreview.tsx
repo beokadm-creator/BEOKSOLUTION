@@ -5,6 +5,7 @@ import { WidePricingPreview } from './WidePricingPreview';
 import { WideLocationPreview } from './WideLocationPreview';
 import { WideAboutPreview } from './WideAboutPreview';
 import { WideSponsors } from '../wide/WideSponsors';
+import type { Sponsor } from '@/types/schema';
 
 type LocalizedString = { [lang: string]: string } | string;
 
@@ -66,8 +67,8 @@ export const WideContentPreview: React.FC<WideContentPreviewProps> = ({
           <div id="section-program" className="animate-fade-in pt-8 pb-4">
             <div className="max-w-7xl mx-auto px-6">
               <WideProgramPreview
-                agendas={config.agendas as any}
-                speakers={config.speakers as any}
+                agendas={config.agendas}
+                speakers={config.speakers}
                 lang={lang}
               />
             </div>
@@ -79,7 +80,7 @@ export const WideContentPreview: React.FC<WideContentPreviewProps> = ({
           <div id="section-speakers" className="animate-fade-in pt-8 pb-4">
             <div className="max-w-7xl mx-auto px-6">
               <WideSpeakersPreview
-                speakers={config.speakers as any}
+                speakers={config.speakers}
                 lang={lang}
               />
             </div>
@@ -122,7 +123,7 @@ export const WideContentPreview: React.FC<WideContentPreviewProps> = ({
       case 'sponsors':
         return (
           <div id="section-sponsors" className="animate-fade-in">
-            <WideSponsors sponsors={config.sponsors as any} lang={lang} />
+            <WideSponsors sponsors={config.sponsors as Sponsor[]} lang={lang} />
           </div>
         );
 

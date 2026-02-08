@@ -211,9 +211,9 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 navigate(destination);
             }, 500);
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('[RegistrationModal] Login failed:', error);
-            if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+            if (error instanceof Error && 'code' in error && (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password')) {
                 toast.error(lang === 'ko' ? '이메일 또는 비밀번호가 일치하지 않습니다.' : 'Invalid email or password.');
             } else {
                 toast.error(lang === 'ko' ? '로그인에 실패했습니다.' : 'Login failed.');
@@ -697,7 +697,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                         onClose={() => setShowTermsModal(false)}
                         onAgree={handleTermsAgree}
                         lang={lang}
-                        terms={info as any} // Pass conference info which contains terms
+                        terms={info as { infoConsentText?: string; infoConsentText_en?: string; marketingConsentText?: string; marketingConsentText_en?: string; privacyPolicy?: string; privacyPolicy_en?: string; termsOfService?: string; termsOfService_en?: string } | undefined}
                     />
                 )
             }

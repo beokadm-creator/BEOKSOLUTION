@@ -3,12 +3,12 @@ import { ArrowRight } from 'lucide-react';
 import { Globe } from 'lucide-react';
 import type { Language } from '../../../hooks/useLanguage';
 
-import { Society } from '../../../types/schema';
+import { Society, Conference } from '../../../types/schema';
 
 interface SocietyHomeSectionProps {
   society: Society;
   language?: Language;
-  onRegisterClick?: (conference: any) => void;
+  onRegisterClick?: (conference: Conference) => void;
 }
 
 const SocietyHomeSection: React.FC<SocietyHomeSectionProps> = ({ society, language = 'ko' }) => {
@@ -16,7 +16,8 @@ const SocietyHomeSection: React.FC<SocietyHomeSectionProps> = ({ society, langua
     if (!text) return '';
     if (typeof text === 'string') return text;
     // Handle both index signature and known keys
-    return (text as any)[language] || (text as any).ko || '';
+    const textObj = text as { [lang: string]: string };
+    return textObj[language] || textObj.ko || '';
   };
 
   return (
