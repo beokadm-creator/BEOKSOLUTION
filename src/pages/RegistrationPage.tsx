@@ -411,7 +411,7 @@ export default function RegistrationPage() {
         if (!targetGradeId) {
             // Try finding "Non-member" in grades list first
             const nonMember = grades.find(g => {
-                const n = g.name.toLowerCase();
+                const n = String(g.name || '').toLowerCase();  // ✅ Safe handling of undefined name
                 return n.includes('비회원') || n.includes('non-member');
             });
             if (nonMember) {
