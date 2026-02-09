@@ -70,8 +70,8 @@ export const monitorRegistrationIntegrity = functions.firestore
             });
         }
 
-        // Rule 4: Status must be valid
-        const validStatuses = ['PENDING', 'PAID', 'CANCELLED', 'REFUNDED'];
+        // Rule 4: Status must be valid (matches schema.ts PaymentStatus type)
+        const validStatuses = ['PENDING', 'PAID', 'REFUNDED', 'REFUND_REQUESTED', 'PARTIAL_REFUNDED', 'FAILED'];
         if (newData.paymentStatus && !validStatuses.includes(newData.paymentStatus)) {
             issues.push({
                 field: 'paymentStatus',
