@@ -51,7 +51,7 @@ async function testGetTemplates() {
         // 템플릿 목록 출력
         const templates = result.data?.templateListResponse?.templates || [];
         console.log(`\n총 ${templates.length}개의 템플릿:`);
-        templates.forEach((template: any, index: number) => {
+        templates.forEach((template: unknown, index: number) => {
             console.log(`\n[${index + 1}] ${template.templateName}`);
             console.log(`  - 코드: ${template.templateCode}`);
             console.log(`  - 상태: ${template.templateStatus}`);
@@ -165,7 +165,7 @@ async function testGetMessageList() {
 
         console.log(`\n총 ${totalCount}건의 발송 내역 (최근 10건 표시):`);
 
-        messages.forEach((msg: any, index: number) => {
+        messages.forEach((msg: unknown, index: number) => {
             console.log(`\n[${index + 1}]`);
             console.log(`  Request ID: ${msg.requestId}`);
             console.log(`  수신번호: ${msg.recipientNo}`);

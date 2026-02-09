@@ -53,12 +53,12 @@ export default function TemplatesPage() {
 
     // Aligo Import State
     const [isAligoImportOpen, setIsAligoImportOpen] = useState(false);
-    const [aligoTemplates, setAligoTemplates] = useState<any[]>([]);
+    const [aligoTemplates, setAligoTemplates] = useState<{ templateId: string; name: string; content?: string }[]>([]);
     const [loadingAligo, setLoadingAligo] = useState(false);
 
     // NHN Cloud Import State
     const [isNhnImportOpen, setIsNhnImportOpen] = useState(false);
-    const [nhnTemplates, setNhnTemplates] = useState<any[]>([]);
+    const [nhnTemplates, setNhnTemplates] = useState<{ templateId: string; name: string; content?: string }[]>([]);
     const [loadingNhn, setLoadingNhn] = useState(false);
 
     // Fetch Aligo Templates
@@ -68,7 +68,7 @@ export default function TemplatesPage() {
         try {
             const getAligoTemplatesFn = httpsCallable(functions, 'getAligoTemplates');
             const result = await getAligoTemplatesFn();
-            const data = result.data as any;
+            const data = result.data as { success: boolean; data?: { list?: unknown[]; message?: string } };
 
             if (data.success && data.data && data.data.list) {
                 setAligoTemplates(data.data.list);
@@ -107,7 +107,7 @@ export default function TemplatesPage() {
 
             const getNhnTemplatesFn = httpsCallable(functions, 'getNhnAlimTalkTemplates');
             const result = await getNhnTemplatesFn({ senderKey });
-            const data = result.data as any;
+            const data = result.data as { success: boolean; data?: { templateListResponse?: { templates?: unknown[] } } };
 
             if (data.success && data.data?.templateListResponse?.templates) {
                 const templates = data.data.templateListResponse.templates;
@@ -130,9 +130,9 @@ export default function TemplatesPage() {
         }
     };
 
-    const handleSelectAligoTemplate = (tpl: any) => {
-        setKakaoContent(tpl.tpl_content);
-        setKakaoTemplateCode(tpl.tpl_code);
+    const handleSelectAligoTemplate = (tpl: { tpl_content?: string; tpl_code?: string; tpl_button?: string; tpl_state?: string }) => {
+        setKakaoContent(tpl.tpl_content || '');
+        setKakaoTemplateCode(tpl.tpl_code || '');
 
         // Parse buttons if any
         if (tpl.tpl_button && tpl.tpl_button !== 'null') {
@@ -141,7 +141,7 @@ export default function TemplatesPage() {
                 const buttons = typeof tpl.tpl_button === 'string' ? JSON.parse(tpl.tpl_button) : tpl.tpl_button;
 
                 if (Array.isArray(buttons)) {
-                    const mappedButtons = buttons.map((b: any) => ({
+                    const mappedButtons = buttons.map((b: { name: string; linkType?: string; linkMo?: string; linkPc?: string }) => ({
                         name: b.name,
                         type: b.linkType || 'WL',
                         linkMobile: b.linkMo || '',
@@ -172,13 +172,13 @@ export default function TemplatesPage() {
     };
 
     // Select NHN Cloud Template
-    const handleSelectNhnTemplate = (tpl: any) => {
+    const handleSelectNhnTemplate = (tpl: unknown) => {
         setKakaoContent(tpl.templateContent);
         setKakaoTemplateCode(tpl.templateCode);
 
         // Parse buttons
         if (tpl.buttons && Array.isArray(tpl.buttons)) {
-            const mappedButtons = tpl.buttons.map((b: any) => ({
+            const mappedButtons = tpl.buttons.map((b: unknown) => ({
                 name: b.name,
                 type: b.linkType || 'WL',
                 linkMobile: b.linkMo || '',
@@ -1034,7 +1034,7 @@ export default function TemplatesPage() {
                                     불러온 템플릿이 없습니다.
                                 </div>
                             ) : (
-                                aligoTemplates.map((tpl: any) => (
+                                aligoTemplates.map((tpl: unknown) => (
                                     <Card key={tpl.tpl_code} className="transition-all hover:bg-slate-50/50 cursor-pointer border-slate-100 group" onClick={() => handleSelectAligoTemplate(tpl)}>
                                         <CardContent className="p-4">
                                             <div className="flex justify-between items-start mb-2">
@@ -1093,7 +1093,7 @@ export default function TemplatesPage() {
                                     불러온 템플릿이 없습니다.
                                 </div>
                             ) : (
-                                nhnTemplates.map((tpl: any) => (
+                                nhnTemplates.map((tpl: unknown) => (
                                     <Card key={tpl.templateCode} className="transition-all hover:bg-slate-50/50 cursor-pointer border-slate-100 group" onClick={() => handleSelectNhnTemplate(tpl)}>
                                         <CardContent className="p-4">
                                             <div className="flex justify-between items-start mb-2">
@@ -1112,7 +1112,7 @@ export default function TemplatesPage() {
                                             </div>
                                             {tpl.buttons && tpl.buttons.length > 0 && (
                                                 <div className="flex flex-wrap gap-1.5 mb-3">
-                                                    {tpl.buttons.map((btn: any, idx: number) => (
+                                                    {tpl.buttons.map((btn: unknown, idx: number) => (
                                                         <Badge key={idx} variant="outline" className="text-[10px] bg-white text-slate-600 border-slate-200">
                                                             🔘 {btn.name}
                                                         </Badge>
