@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../../components/ui/card';
-import { LogOut, Plus, Building2, Calendar, Edit, Save, Users, Settings, Trash2, Key, ShieldCheck, Search, Filter, Activity } from 'lucide-react';
+import { LogOut, Plus, Building2, Calendar, Edit, Save, Users, Settings, Trash2, Key, ShieldCheck, Search, Filter, Activity, CheckCircle2, XCircle } from 'lucide-react';
 import { auth, functions } from '../../firebase';
 import { httpsCallable } from 'firebase/functions';
 import { doc, updateDoc, getDocs, collection, getDoc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
@@ -66,6 +66,26 @@ const SuperAdminPage: React.FC = () => {
     const today = new Date().toISOString().split('T')[0];
     const [monitoringDate, setMonitoringDate] = useState(today);
     const { errorLogs, performanceMetrics, dataIntegrityAlerts, loading: monitoringLoading, refetch: refetchMonitoring } = useMonitoringData(monitoringDate);
+    const [resolvingAlertId, setResolvingAlertId] = useState<string | null>(null);
+
+    // Resolve data integrity alert
+    const resolveAlert = async (alertId: string, alertPath: string) => {
+        setResolvingAlertId(alertId);
+        try {
+            const { httpsCallable } = await import('firebase/functions');
+            const { functions: firebaseFunctions } = await import('../../firebase');
+            const resolveAlertFunction = httpsCallable(firebaseFunctions, 'resolveDataIntegrityAlert');
+            
+            await resolveAlertFunction({ alertPath });
+            toast.success('알림이 해결되었습니다');
+            refetchMonitoring(); // Refresh monitoring data
+        } catch (error: any) {
+            console.error('[resolveAlert] Failed:', error);
+            toast.error('알림 해결 실패: ' + error.message);
+        } finally {
+            setResolvingAlertId(null);
+        }
+    };
 
     const fetchMembers = useCallback(async () => {
         console.log('[SuperAdminPage] fetchMembers called, currentSocietyId:', currentSocietyId);
@@ -1048,12 +1068,13 @@ const SuperAdminPage: React.FC = () => {
                                                     <thead className="bg-[#2a2a2a] text-gray-400 uppercase text-xs font-semibold">
                                                         <tr>
                                                             <th className="p-4 pl-6">시간</th>
-                                                            <th className="p-4">심각도</th>
-                                                            <th className="p-4">컬렉션</th>
-                                                            <th className="p-4">문서 ID</th>
-                                                            <th className="p-4">위반 규칙</th>
-                                                            <th className="p-4">해결 여부</th>
-                                                        </tr>
+                                                             <th className="p-4">심각도</th>
+                                                             <th className="p-4">컬렉션</th>
+                                                             <th className="p-4">문서 ID</th>
+                                                             <th className="p-4">위반 규칙</th>
+                                                             <th className="p-4">해결 여부</th>
+                                                             <th className="p-4">작업</th>
+                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-[#333]">
                                                         {dataIntegrityAlerts.map((alert) => (
@@ -1073,15 +1094,38 @@ const SuperAdminPage: React.FC = () => {
                                                                     </span>
                                                                 </td>
                                                                 <td className="p-4 text-gray-300 text-xs font-mono">{alert.collection}</td>
-                                                                <td className="p-4 text-gray-300 text-xs font-mono max-w-xs truncate">{alert.documentId}</td>
-                                                                <td className="p-4 text-gray-200 text-sm">{alert.rule}</td>
-                                                                <td className="p-4">
-                                                                    <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                                                        alert.resolved ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                                                                    }`}>
-                                                                        {alert.resolved ? '해결됨' : '미해결'}
-                                                                    </span>
-                                                                </td>
+                                                                 <td className="p-4 text-gray-300 text-xs font-mono max-w-xs truncate">{alert.documentId}</td>
+                                                                 <td className="p-4 text-gray-200 text-sm">{alert.rule}</td>
+                                                                 <td className="p-4">
+                                                                     <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                                                         alert.resolved ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                                                                     }`}>
+                                                                         {alert.resolved ? '해결됨' : '미해결'}
+                                                                     </span>
+                                                                 </td>
+                                                                 <td className="p-4">
+                                                                     {!alert.resolved && (
+                                                                         <Button
+                                                                             onClick={() => resolveAlert(alert.id, `${alert.timestamp.toDate().toISOString().split('T')[0]}/${alert.id}`)}
+                                                                             disabled={resolvingAlertId === alert.id}
+                                                                             size="sm"
+                                                                             variant="outline"
+                                                                             className="h-8 text-xs"
+                                                                         >
+                                                                             {resolvingAlertId === alert.id ? (
+                                                                                 <>
+                                                                                     <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                                                                     처리 중...
+                                                                                 </>
+                                                                             ) : (
+                                                                                 <>
+                                                                                     <CheckCircle2 className="w-3 h-3 mr-1" />
+                                                                                     해결
+                                                                                 </>
+                                                                             )}
+                                                                         </Button>
+                                                                     )}
+                                                                 </td>
                                                             </tr>
                                                         ))}
                                                     </tbody>

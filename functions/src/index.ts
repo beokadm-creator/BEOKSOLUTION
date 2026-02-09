@@ -8,6 +8,7 @@ import { onRegistrationCreated, onExternalAttendeeCreated, validateBadgePrepToke
 import { migrateExternalAttendeeParticipations } from './migrations/migrateExternalAttendeeParticipations';
 import { monitorRegistrationIntegrity, monitorMemberCodeIntegrity } from './monitoring/dataIntegrity';
 import { dailyErrorReport, weeklyPerformanceReport } from './monitoring/scheduledReports';
+import { resolveDataIntegrityAlert } from './monitoring/resolveAlert';
 
 export const cors = corsLib({ origin: true });
 
@@ -24,7 +25,8 @@ export {
     monitorRegistrationIntegrity,
     monitorMemberCodeIntegrity,
     dailyErrorReport,
-    weeklyPerformanceReport
+    weeklyPerformanceReport,
+    resolveDataIntegrityAlert
 };
 
 import { generateFirebaseAuthUserForExternalAttendee } from './auth/external';
