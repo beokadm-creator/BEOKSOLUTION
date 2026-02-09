@@ -10,7 +10,6 @@
  */
 
 import { test, expect } from '@playwright/test';
-import path from 'path';
 
 // 테스트 설정
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
@@ -238,12 +237,6 @@ test.describe('시나리오 2: 이탈 후 재등록 (세션 복구)', () => {
 
     // 검증: 새로운 빈 상태로 시작해야 함 (세션이 초기화됨)
     await wait(2000); // useNonMemberAuth가 완료될 때까지 대기
-
-    // 비회원 세션 확인 (null이어야 함)
-    const nonMemberSession = await page.evaluate(() => {
-      // RegistrationPage 내부 상태를 직접 확인할 수 없으므로 UI 상태로 확인
-      return null;
-    });
 
     // Step 0이 표시되어야 함 (약관 동의)
     await expect(page.getByText(/이용약관 동의|Terms of Service/)).toBeVisible();
