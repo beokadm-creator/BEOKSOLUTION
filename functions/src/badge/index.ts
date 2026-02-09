@@ -231,7 +231,7 @@ async function sendBadgeNotification(
 
 
         // Get Sender Key from Infrastructure Settings
-        const infraSnap = await db.doc(`infrastructure/${conference.societyId}`).get();
+        const infraSnap = await db.doc(`societies/${conference.societyId}/settings/infrastructure`).get();
         const infraData = infraSnap.data();
         const senderKey = infraData?.notification?.alimTalk?.senderKey;
 
@@ -248,6 +248,7 @@ async function sendBadgeNotification(
           // Map buttons to NHN format
           const nhnButtons = buttons.map((btn: AlimTalkButton, index: number) => ({
             ordering: index + 1,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             type: btn.type as any, // Type cast might be needed if types assume Aligo format
             name: btn.name,
             linkMo: btn.linkMobile,
