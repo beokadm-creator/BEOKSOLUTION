@@ -1,5 +1,4 @@
-import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '@/firebase';
+import { auth } from '@/firebase';
 import type { ErrorLog, ErrorSeverity, ErrorCategory } from '@/types/schema';
 
 /**

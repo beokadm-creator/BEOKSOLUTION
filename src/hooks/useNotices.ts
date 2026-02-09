@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  getNotices,
-  getAllNotices,
   getNotice,
-  getActiveNoticeCount,
   createNotice,
   updateNotice,
   deleteNotice,
@@ -22,15 +19,15 @@ import { useConfContextSafe } from '../contexts/ConfContext';
 export function useNotices() {
   const conferenceData = useConference();
   const [notices, setNotices] = useState<Notice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!conferenceData?.id);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     if (!conferenceData?.id) {
-      setLoading(false);
       return;
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(null);
 
@@ -57,18 +54,18 @@ export function useAllNotices() {
   const conferenceData = useConference();
   const confContext = useConfContextSafe(); // Safe - doesn't throw
   const [notices, setNotices] = useState<Notice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const confId = confContext?.confId || conferenceData?.id;
+  const [loading, setLoading] = useState(!confId);
   const [error, setError] = useState<Error | null>(null);
 
   // Use ConfContext if available (admin pages), otherwise use useConference (public pages)
-  const confId = confContext?.confId || conferenceData?.id;
 
   useEffect(() => {
     if (!confId) {
-      setLoading(false);
       return;
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(null);
 
@@ -93,14 +90,14 @@ export function useAllNotices() {
 export function useNoticeCount() {
   const conferenceData = useConference();
   const [count, setCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!conferenceData?.id);
 
   useEffect(() => {
     if (!conferenceData?.id) {
-      setLoading(false);
       return;
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
 
     const unsubscribe = subscribeToNoticeCount(
@@ -216,15 +213,15 @@ export function useNoticeActions() {
 export function useNotice(noticeId: string | null) {
   const conferenceData = useConference();
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!conferenceData?.id || !noticeId);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     if (!conferenceData?.id || !noticeId) {
-      setLoading(false);
       return;
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(null);
 
