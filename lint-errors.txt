@@ -1,0 +1,294 @@
+
+C:\Users\whhol\Documents\trae_projects\eRegi\functions\src\auth\external.ts
+   62:25  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  120:25  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\functions\src\badge\index.ts
+  100:15  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  102:12  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  122:28  error  A `require()` style import is forbidden   @typescript-eslint/no-require-imports
+  123:24  error  A `require()` style import is forbidden   @typescript-eslint/no-require-imports
+  168:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  179:36  error  A `require()` style import is forbidden   @typescript-eslint/no-require-imports
+  212:30  error  'context' is defined but never used       @typescript-eslint/no-unused-vars
+  358:30  error  'context' is defined but never used       @typescript-eslint/no-unused-vars
+  435:30  error  'context' is defined but never used       @typescript-eslint/no-unused-vars
+
+C:\Users\whhol\Documents\trae_projects\eRegi\functions\src\clear-test-data.ts
+   13:66  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  125:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\functions\src\diagnose-registration.ts
+   54:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   93:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  114:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  135:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  159:73  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  187:28  error  A `require()` style import is forbidden   @typescript-eslint/no-require-imports
+
+C:\Users\whhol\Documents\trae_projects\eRegi\functions\src\index.ts
+    44:32   error  'context' is defined but never used       @typescript-eslint/no-unused-vars
+    59:25   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+    71:32   error  'context' is defined but never used       @typescript-eslint/no-unused-vars
+    85:84   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   231:25   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   243:32   error  'context' is defined but never used       @typescript-eslint/no-unused-vars
+   278:109  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   411:25   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   476:113  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   607:29   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   657:106  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   681:25   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   704:25   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   760:25   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   784:34   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   797:25   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   844:25   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   858:32   error  'context' is defined but never used       @typescript-eslint/no-unused-vars
+   965:21   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   976:32   error  'context' is defined but never used       @typescript-eslint/no-unused-vars
+   985:31   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   993:21   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1027:25   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1040:25   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1136:25   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1151:32   error  'context' is defined but never used       @typescript-eslint/no-unused-vars
+  1180:21   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1221:32   error  'context' is defined but never used       @typescript-eslint/no-unused-vars
+  1244:21   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1276:41   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1285:37   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1306:32   error  '_context' is defined but never used      @typescript-eslint/no-unused-vars
+  1369:56   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1381:21   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1398:32   error  '_context' is defined but never used      @typescript-eslint/no-unused-vars
+  1441:21   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\functions\src\monitoring\dataIntegrity.ts
+   35:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  170:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\functions\src\monitoring\resolveAlert.ts
+  50:25  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\functions\src\monitoring\scheduledReports.ts
+   14:19  error  'context' is defined but never used       @typescript-eslint/no-unused-vars
+   38:73  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   80:25  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   95:19  error  'context' is defined but never used       @typescript-eslint/no-unused-vars
+  163:25  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\functions\src\payment\nice.ts
+  55:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\functions\src\payment\toss.ts
+  23:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  47:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\functions\src\utils\aligo.ts
+   24:12  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   58:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   74:52  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   90:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  110:12  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  130:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  143:55  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  160:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\functions\src\utils\email.ts
+  73:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\registration-guest.spec.ts
+   13:8   error  'path' is defined but never used                       @typescript-eslint/no-unused-vars
+   50:31  error  'step' is defined but never used                       @typescript-eslint/no-unused-vars
+  243:11  error  'nonMemberSession' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  530:71  error  Unexpected any. Specify a different type               @typescript-eslint/no-explicit-any
+  566:18  error  Unexpected any. Specify a different type               @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\scripts\MEMBER_DISCOUNT_FIX.patch.ts
+   18:1   error  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+   60:1   error  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+   71:1   error  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+   84:56  error  Unnecessary escape character: \s                                       no-useless-escape
+   85:56  error  Unnecessary escape character: \s                                       no-useless-escape
+   86:42  error  Unnecessary escape character: \s                                       no-useless-escape
+  113:1   error  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  129:61  error  Unnecessary escape character: \s                                       no-useless-escape
+  138:73  error  Unnecessary escape character: \s                                       no-useless-escape
+  139:73  error  Unnecessary escape character: \s                                       no-useless-escape
+
+C:\Users\whhol\Documents\trae_projects\eRegi\scripts\RegistrationPage2.tsx
+  1:2  error  Parsing error: Expression expected
+
+C:\Users\whhol\Documents\trae_projects\eRegi\scripts\cleanup-ui-patch.tsx
+  4:37  error  React Hook "useState" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function  react-hooks/rules-of-hooks
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\components\conference\RegistrationModal.tsx
+  214:25  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  700:40  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\components\conference\wide-preview\WideContentPreview.tsx
+   69:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   70:46  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   82:46  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  125:56  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\components\conference\wide-preview\WideHeaderPreview.tsx
+  25:3  error  'confId' is defined but never used                        @typescript-eslint/no-unused-vars
+  58:9  error  'handleRegisterClick' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\components\payment\PaymentSuccessHandler.tsx
+  54:30  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\components\society\sections\ConferenceListSection.tsx
+   3:42  error  'Target' is defined but never used           @typescript-eslint/no-unused-vars
+  26:3   error  'onRegisterClick' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\components\society\sections\PresidentGreetingSection.tsx
+  15:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  15:48  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\components\society\sections\SocietyHomeSection.tsx
+  11:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  19:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  19:48  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\components\society\sections\SocietyIntroSection.tsx
+  15:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  15:48  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\hooks\useCheckIn.ts
+  34:25  error  Empty block statement                              no-empty
+  42:17  error  'regRef' is never reassigned. Use 'const' instead  prefer-const
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\hooks\useNotices.ts
+    3:3  error  'getNotices' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+    4:3  error  'getAllNotices' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+    6:3  error  'getActiveNoticeCount' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+   30:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\hooks\useNotices.ts:30:7
+  28 |   useEffect(() => {
+  29 |     if (!conferenceData?.id) {
+> 30 |       setLoading(false);
+     |       ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  31 |       return;
+  32 |     }
+  33 |                       react-hooks/set-state-in-effect
+   68:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\hooks\useNotices.ts:68:7
+  66 |   useEffect(() => {
+  67 |     if (!confId) {
+> 68 |       setLoading(false);
+     |       ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  69 |       return;
+  70 |     }
+  71 |                                   react-hooks/set-state-in-effect
+  100:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\hooks\useNotices.ts:100:7
+   98 |   useEffect(() => {
+   99 |     if (!conferenceData?.id) {
+> 100 |       setLoading(false);
+      |       ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  101 |       return;
+  102 |     }
+  103 |               react-hooks/set-state-in-effect
+  224:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\hooks\useNotices.ts:224:7
+  222 |   useEffect(() => {
+  223 |     if (!conferenceData?.id || !noticeId) {
+> 224 |       setLoading(false);
+      |       ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  225 |       return;
+  226 |     }
+  227 |  react-hooks/set-state-in-effect
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\hooks\useRegistrationsPagination.ts
+  185:8  warning  React Hook useEffect has a missing dependency: 'lastVisible'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\pages\AbstractSubmissionPage.tsx
+  113:30  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  124:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\pages\RegistrationPage.tsx
+   132:95  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   133:55  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   154:46  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1011:64  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\pages\SocietyLandingPage.tsx
+  157:11  error    'textClass' is assigned a value but never used                                                        @typescript-eslint/no-unused-vars
+  162:5   warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-unused-vars')
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\pages\StandAloneBadgePage.tsx
+  194:8  warning  React Hook useEffect has a missing dependency: 'ui'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\pages\UserHubPage.tsx
+  465:43  error  'confId' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  586:53  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  758:49  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\pages\admin\BatchExitPage.tsx
+  59:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  72:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\pages\admin\DashboardPage.tsx
+  15:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  16:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\pages\admin\ExternalAttendeePage.tsx
+  166:17  error  'attendeeData' is never reassigned. Use 'const' instead  prefer-const
+  432:25  error  Unexpected any. Specify a different type                 @typescript-eslint/no-explicit-any
+  514:25  error  Unexpected any. Specify a different type                 @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\pages\admin\RegistrationDetailPage.tsx
+   17:14   error  Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+   24:24   error  Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+   96:25   error  Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free  @typescript-eslint/ban-ts-comment
+  278:140  error  Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+  278:165  error  Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\pages\admin\SponsorManager.tsx
+  49:6  warning  React Hook useEffect has a missing dependency: 'fetchSponsors'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\pages\admin\SuperAdminPage.tsx
+  10:140  error  'XCircle' is defined but never used       @typescript-eslint/no-unused-vars
+  82:25   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\whhol\Documents\trae_projects\eRegi\src\pages\admin\TemplatesPage.tsx
+   56:58  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   66:41  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   87:45  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   98:59  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  956:58  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+??152 problems (148 errors, 4 warnings)
+  2 errors and 1 warning potentially fixable with the `--fix` option.
+

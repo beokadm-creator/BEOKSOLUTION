@@ -30,7 +30,12 @@ interface InfraSettings {
         };
     };
     notification: {
-        channelId: string; // Only Kakao Channel ID needed
+        channelId: string; // Kakao Channel ID (legacy Aligo)
+        nhnAlimTalk?: {
+            enabled: boolean;
+            senderKey: string; // NHN Cloud 발신 프로필 키 (학회별로 다름)
+            resendSendNo?: string; // 대체 발송용 발신번호
+        };
     };
     email: {
         host: string;
@@ -61,6 +66,11 @@ const defaultSettings: InfraSettings = {
     },
     notification: {
         channelId: '',
+        nhnAlimTalk: {
+            enabled: false,
+            senderKey: '',
+            resendSendNo: '',
+        },
     },
     email: {
         host: '',
@@ -110,7 +120,11 @@ export default function InfraPage() {
                             global: { ...defaultSettings.payment.global, ...(data.payment?.global || {}) },
                         },
                         notification: {
-                            channelId: data.notification?.channelId || defaultSettings.notification.channelId
+                            channelId: data.notification?.channelId || defaultSettings.notification.channelId,
+                            nhnAlimTalk: {
+                                ...defaultSettings.notification.nhnAlimTalk,
+                                ...(data.notification?.nhnAlimTalk || {}),
+                            },
                         },
                         email: { ...defaultSettings.email, ...data.email },
                     });
@@ -376,39 +390,135 @@ export default function InfraPage() {
                             </div>
                             <div>
                                 <CardTitle className="text-lg font-bold text-slate-800">Notification Service</CardTitle>
-                                <CardDescription className="text-amber-600/80 font-medium mt-0.5">Aligo KakaoTalk Integration</CardDescription>
+                                <CardDescription className="text-amber-600/80 font-medium mt-0.5">KakaoTalk AlimTalk Integration</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
                     <CardContent className="p-6 space-y-6">
-                        <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex gap-3">
-                            <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                            <div className="text-xs text-blue-900 leading-relaxed">
-                                <p className="font-bold mb-1">Platform Managed Service</p>
-                                API keys are now managed securely by the backend platform. You only need to provide your Kakao Channel ID.
+                        {/* Legacy Aligo Section */}
+                        <div className="space-y-4 pb-4 border-b border-slate-100">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-700">Legacy Aligo Service</h3>
+                                    <p className="text-xs text-slate-500 mt-0.5">Platform-managed API keys</p>
+                                </div>
+                                <Badge className="bg-slate-400 hover:bg-slate-500 text-white border-none py-0.5 h-5 text-[10px]">LEGACY</Badge>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold text-slate-500 uppercase">Kakao Channel ID</Label>
+                                <Input
+                                    value={settings.notification.channelId}
+                                    onChange={(e) => setSettings(prev => ({
+                                        ...prev,
+                                        notification: {
+                                            ...prev.notification,
+                                            channelId: e.target.value
+                                        }
+                                    }))}
+                                    placeholder="@your_channel_id"
+                                    className="h-11 font-medium text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                />
+                                <p className="text-[11px] text-slate-400 pl-1">Must include the '@' symbol (e.g., @mysociety).</p>
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-500 uppercase">Kakao Channel ID</Label>
-                            <Input
-                                value={settings.notification.channelId}
-                                onChange={(e) => setSettings(prev => ({ ...prev, notification: { channelId: e.target.value } }))}
-                                placeholder="@your_channel_id"
-                                className="h-11 font-medium text-sm bg-slate-50 border-slate-200 rounded-xl"
-                            />
-                            <p className="text-[11px] text-slate-400 pl-1">Must include the '@' symbol (e.g., @mysociety).</p>
-                        </div>
+                        {/* NHN AlimTalk Section */}
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-700">NHN Cloud AlimTalk</h3>
+                                    <p className="text-xs text-slate-500 mt-0.5">Society-specific sender profile</p>
+                                </div>
+                                <Badge variant={settings.notification.nhnAlimTalk?.enabled ? 'default' : 'secondary'}
+                                    className={settings.notification.nhnAlimTalk?.enabled ? "bg-emerald-600 hover:bg-emerald-700 h-7" : "bg-slate-200 text-slate-500 h-7"}>
+                                    {settings.notification.nhnAlimTalk?.enabled ? 'Enabled' : 'Disabled'}
+                                </Badge>
+                            </div>
 
-                        <div className="mt-2 bg-amber-50/50 border border-amber-100 p-4 rounded-xl">
-                            <div className="flex justify-between items-center mb-2">
-                                <span className="text-xs font-bold text-amber-800 uppercase">Integration Status</span>
-                                <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white border-none py-0.5 h-5 text-[10px]">ACTIVE</Badge>
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between group hover:border-emerald-200 transition-colors">
+                                <div className="space-y-0.5">
+                                    <Label className="text-sm font-bold text-slate-700">Enable NHN AlimTalk</Label>
+                                    <p className="text-xs text-slate-500">Use NHN Cloud for this society's notifications</p>
+                                </div>
+                                <Switch
+                                    checked={settings.notification.nhnAlimTalk?.enabled || false}
+                                    onChange={(e) => setSettings(prev => ({
+                                        ...prev,
+                                        notification: {
+                                            ...prev.notification,
+                                            nhnAlimTalk: {
+                                                ...prev.notification.nhnAlimTalk!,
+                                                enabled: e.target.checked
+                                            }
+                                        }
+                                    }))}
+                                    className="data-[state=checked]:bg-emerald-600"
+                                />
                             </div>
-                            <div className="w-full bg-amber-200/30 rounded-full h-1.5 overflow-hidden">
-                                <div className="bg-emerald-500 h-full rounded-full w-full animate-pulse"></div>
-                            </div>
-                            <p className="text-[10px] text-amber-600/70 mt-2 font-medium text-right">Service operational and ready.</p>
+
+                            {settings.notification.nhnAlimTalk?.enabled && (
+                                <div className="space-y-4 pt-2 animate-in fade-in slide-in-from-top-4 duration-300">
+                                    <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex gap-3">
+                                        <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                                        <div className="text-xs text-blue-900 leading-relaxed">
+                                            <p className="font-bold mb-1">Society-Specific Configuration</p>
+                                            Each society has its own NHN Cloud sender profile key. Enter the sender key provided by NHN Cloud console for this society.
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold text-slate-500 uppercase">Sender Profile Key</Label>
+                                        <Input
+                                            value={settings.notification.nhnAlimTalk?.senderKey || ''}
+                                            onChange={(e) => setSettings(prev => ({
+                                                ...prev,
+                                                notification: {
+                                                    ...prev.notification,
+                                                    nhnAlimTalk: {
+                                                        ...prev.notification.nhnAlimTalk!,
+                                                        senderKey: e.target.value
+                                                    }
+                                                }
+                                            }))}
+                                            placeholder="e.g., 514116f024d8e322cc2a82a3503bb2eb178370f3"
+                                            className="h-11 font-mono text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                        />
+                                        <p className="text-[11px] text-slate-400 pl-1">40-character hexadecimal string from NHN Cloud console</p>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold text-slate-500 uppercase">Resend Phone Number (Optional)</Label>
+                                        <Input
+                                            value={settings.notification.nhnAlimTalk?.resendSendNo || ''}
+                                            onChange={(e) => setSettings(prev => ({
+                                                ...prev,
+                                                notification: {
+                                                    ...prev.notification,
+                                                    nhnAlimTalk: {
+                                                        ...prev.notification.nhnAlimTalk!,
+                                                        resendSendNo: e.target.value
+                                                    }
+                                                }
+                                            }))}
+                                            placeholder="01012345678"
+                                            className="h-11 font-mono text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                        />
+                                        <p className="text-[11px] text-slate-400 pl-1">For SMS fallback when AlimTalk fails (no hyphens)</p>
+                                    </div>
+
+                                    <div className="mt-2 bg-emerald-50/50 border border-emerald-100 p-4 rounded-xl">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-xs font-bold text-emerald-800 uppercase">NHN Cloud Status</span>
+                                            <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white border-none py-0.5 h-5 text-[10px]">CONFIGURED</Badge>
+                                        </div>
+                                        <div className="w-full bg-emerald-200/30 rounded-full h-1.5 overflow-hidden">
+                                            <div className="bg-emerald-500 h-full rounded-full w-full animate-pulse"></div>
+                                        </div>
+                                        <p className="text-[10px] text-emerald-600/70 mt-2 font-medium text-right">Ready to send notifications.</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { collection, query, orderBy, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc, Timestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../../firebase';
 import { useAdminStore } from '../../store/adminStore';
@@ -56,6 +56,11 @@ export default function TemplatesPage() {
     const [aligoTemplates, setAligoTemplates] = useState<any[]>([]);
     const [loadingAligo, setLoadingAligo] = useState(false);
 
+    // NHN Cloud Import State
+    const [isNhnImportOpen, setIsNhnImportOpen] = useState(false);
+    const [nhnTemplates, setNhnTemplates] = useState<any[]>([]);
+    const [loadingNhn, setLoadingNhn] = useState(false);
+
     // Fetch Aligo Templates
     const handleFetchAligoTemplates = async () => {
         setLoadingAligo(true);
@@ -81,6 +86,47 @@ export default function TemplatesPage() {
             toast.error("알리고 템플릿 호출 중 오류가 발생했습니다.");
         } finally {
             setLoadingAligo(false);
+        }
+    };
+
+    // Fetch NHN Cloud Templates
+    const handleFetchNhnTemplates = async () => {
+        setLoadingNhn(true);
+        try {
+            // Get senderKey from Infrastructure settings
+            const infraDoc = await getDoc(
+                doc(db, 'societies', targetSocietyId!, 'settings', 'infrastructure')
+            );
+            const senderKey = infraDoc.data()?.notification?.nhnAlimTalk?.senderKey;
+
+            if (!senderKey) {
+                toast.error("NHN Cloud 발신 프로필 키가 설정되지 않았습니다.\nInfrastructure Settings에서 먼저 설정해주세요.");
+                setLoadingNhn(false);
+                return;
+            }
+
+            const getNhnTemplatesFn = httpsCallable(functions, 'getNhnAlimTalkTemplates');
+            const result = await getNhnTemplatesFn({ senderKey });
+            const data = result.data as any;
+
+            if (data.success && data.data?.templateListResponse?.templates) {
+                const templates = data.data.templateListResponse.templates;
+
+                if (templates.length === 0) {
+                    toast.error("승인된 템플릿이 없습니다.\nNHN Cloud Console에서 템플릿을 등록하고 승인받아주세요.");
+                } else {
+                    setNhnTemplates(templates);
+                    setIsNhnImportOpen(true);
+                    toast.success(`${templates.length}개의 승인된 템플릿을 불러왔습니다.`);
+                }
+            } else {
+                toast.error("NHN Cloud 템플릿을 불러오지 못했습니다.");
+            }
+        } catch (error) {
+            console.error("Failed to fetch NHN templates:", error);
+            toast.error("NHN Cloud 템플릿 호출 중 오류가 발생했습니다.");
+        } finally {
+            setLoadingNhn(false);
         }
     };
 
@@ -123,6 +169,31 @@ export default function TemplatesPage() {
 
         setIsAligoImportOpen(false);
         toast.success("알리고 템플릿을 불러왔습니다.");
+    };
+
+    // Select NHN Cloud Template
+    const handleSelectNhnTemplate = (tpl: any) => {
+        setKakaoContent(tpl.templateContent);
+        setKakaoTemplateCode(tpl.templateCode);
+
+        // Parse buttons
+        if (tpl.buttons && Array.isArray(tpl.buttons)) {
+            const mappedButtons = tpl.buttons.map((b: any) => ({
+                name: b.name,
+                type: b.linkType || 'WL',
+                linkMobile: b.linkMo || '',
+                linkPc: b.linkPc || ''
+            }));
+            setKakaoButtons(mappedButtons);
+        } else {
+            setKakaoButtons([]);
+        }
+
+        // NHN Cloud returns only approved templates, so set to APPROVED
+        setKakaoStatus('APPROVED');
+
+        setIsNhnImportOpen(false);
+        toast.success("NHN Cloud 템플릿을 불러왔습니다.");
     };
 
     // Get Society ID
@@ -775,6 +846,16 @@ export default function TemplatesPage() {
                                     <Button
                                         variant="outline"
                                         size="sm"
+                                        onClick={handleFetchNhnTemplates}
+                                        disabled={loadingNhn}
+                                        className="h-7 text-xs border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                                    >
+                                        {loadingNhn ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : <Download className="w-3 h-3 mr-1" />}
+                                        NHN Cloud 불러오기
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
                                         onClick={handleFetchAligoTemplates}
                                         disabled={loadingAligo}
                                         className="h-7 text-xs border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100"
@@ -976,6 +1057,70 @@ export default function TemplatesPage() {
                                             </div>
                                             <div className="flex justify-end">
                                                 <Button size="sm" variant="ghost" className="h-8 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 font-bold">
+                                                    선택하기
+                                                </Button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* NHN Cloud Template Import Dialog */}
+            <Dialog open={isNhnImportOpen} onOpenChange={setIsNhnImportOpen}>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto p-0 gap-0 bg-white rounded-2xl overflow-hidden block">
+                    <DialogHeader className="p-6 pb-4 border-b border-slate-100 bg-white sticky top-0 z-10">
+                        <div className="flex items-center gap-3 mb-1">
+                            <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
+                                <Download className="w-5 h-5" />
+                            </div>
+                            <DialogTitle className="text-xl font-bold text-slate-900">
+                                NHN Cloud 템플릿 불러오기
+                            </DialogTitle>
+                        </div>
+                        <DialogDescription className="text-slate-500 ml-11">
+                            NHN Cloud에 등록된 승인된 알림톡 템플릿 목록입니다.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="p-6">
+                        <div className="space-y-4">
+                            {nhnTemplates.length === 0 ? (
+                                <div className="text-center py-10 text-slate-500 font-medium">
+                                    불러온 템플릿이 없습니다.
+                                </div>
+                            ) : (
+                                nhnTemplates.map((tpl: any) => (
+                                    <Card key={tpl.templateCode} className="transition-all hover:bg-slate-50/50 cursor-pointer border-slate-100 group" onClick={() => handleSelectNhnTemplate(tpl)}>
+                                        <CardContent className="p-4">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <h5 className="font-bold text-slate-800 group-hover:text-emerald-600 transition-colors">{tpl.templateName}</h5>
+                                                    <p className="text-xs text-slate-400 font-mono mt-0.5">{tpl.templateCode}</p>
+                                                </div>
+                                                <Badge className="bg-emerald-500">
+                                                    승인됨
+                                                </Badge>
+                                            </div>
+                                            <div className="bg-emerald-50/30 p-3 rounded-lg border border-emerald-100 mb-3 line-clamp-3">
+                                                <p className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed">
+                                                    {tpl.templateContent}
+                                                </p>
+                                            </div>
+                                            {tpl.buttons && tpl.buttons.length > 0 && (
+                                                <div className="flex flex-wrap gap-1.5 mb-3">
+                                                    {tpl.buttons.map((btn: any, idx: number) => (
+                                                        <Badge key={idx} variant="outline" className="text-[10px] bg-white text-slate-600 border-slate-200">
+                                                            🔘 {btn.name}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <div className="flex justify-end">
+                                                <Button size="sm" variant="ghost" className="h-8 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 font-bold">
                                                     선택하기
                                                 </Button>
                                             </div>

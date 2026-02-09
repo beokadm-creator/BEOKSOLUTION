@@ -707,6 +707,55 @@ export const getAligoTemplates = functions
         }
     });
 
+// 6. Get NHN Cloud AlimTalk Templates
+import { getTemplates } from './utils/nhnAlimTalk';
+
+export const getNhnAlimTalkTemplates = functions
+    .runWith({
+        enforceAppCheck: false,
+        ingressSettings: 'ALLOW_ALL'
+    })
+    .https.onCall(async (data, context) => {
+        if (!context.auth) {
+            throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+        }
+
+        const { senderKey } = data;
+
+        if (!senderKey) {
+            throw new functions.https.HttpsError('invalid-argument', 'senderKey is required');
+        }
+
+        try {
+            const result = await getTemplates(senderKey);
+
+            // Filter only APPROVED templates
+            if (result.success && result.data?.templateListResponse?.templates) {
+                const approvedTemplates = result.data.templateListResponse.templates.filter(
+                    (template: any) => template.templateStatus === 'APR'
+                );
+
+                functions.logger.info(`[NHN Templates] Total: ${result.data.templateListResponse.templates.length}, Approved: ${approvedTemplates.length}`);
+
+                return {
+                    success: true,
+                    data: {
+                        ...result.data,
+                        templateListResponse: {
+                            ...result.data.templateListResponse,
+                            templates: approvedTemplates
+                        }
+                    }
+                };
+            }
+
+            return result;
+        } catch (error: any) {
+            functions.logger.error("Error in getNhnAlimTalkTemplates:", error);
+            throw new functions.https.HttpsError('internal', error.message);
+        }
+    });
+
 // --------------------------------------------------------------------------
 // CREATE / LINK ADMIN
 // --------------------------------------------------------------------------
