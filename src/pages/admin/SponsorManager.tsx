@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAdminStore } from '../../store/adminStore';
 import { Sponsor, SponsorDoc, SponsorTier } from '../../types/schema';
 import { Timestamp, collection, getDocs, doc, setDoc, updateDoc, deleteDoc, writeBatch, deleteField } from 'firebase/firestore';
@@ -27,7 +27,7 @@ const SponsorManager: React.FC = () => {
   });
 
   // Fetch sponsors
-  const fetchSponsors = async () => {
+  const fetchSponsors = useCallback(async () => {
     if (!confId) return;
     setLoading(true);
     try {
@@ -42,11 +42,11 @@ const SponsorManager: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [confId]);
 
   useEffect(() => {
     fetchSponsors();
-  }, [confId]);
+  }, [confId, fetchSponsors]);
 
   // Reset form
   const resetForm = () => {

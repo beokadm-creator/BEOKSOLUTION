@@ -110,7 +110,7 @@ const AbstractSubmissionPage: React.FC = () => {
         setAuthors(newAuthors);
     };
 
-    const handleEdit = (sub: any) => {
+    const handleEdit = (sub: unknown) => {
         setEditingId(sub.id);
         setTitleKo(sub.title?.ko || '');
         setTitleEn(sub.title?.en || '');
@@ -121,7 +121,7 @@ const AbstractSubmissionPage: React.FC = () => {
             email: a.email || '',
             affiliation: a.affiliation || '',
             isPresenter: a.isPresenter || false,
-            isFirstAuthor: (a as any).isFirstAuthor || false
+            isFirstAuthor: (a as { isFirstAuthor?: boolean }).isFirstAuthor || false
         })));
         setStep(1); // Go to step 1
         window.scrollTo(0, 0);

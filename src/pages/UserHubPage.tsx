@@ -462,7 +462,6 @@ const UserHubPage: React.FC = () => {
                                 console.log('[UserHub] Conference doc exists:', confSnap.exists());
                                 if (confSnap.exists()) {
                                     cData = confSnap.data();
-                                    const confId = confSnap.id;
                                     console.log('[UserHub] Conference data:', cData);
 
                                     // 🔧 [FIX] Handle multilingual title
@@ -583,7 +582,7 @@ const UserHubPage: React.FC = () => {
 
                             // 3. Otherwise check latest registration
                             regs.sort((a, b) => {
-                                const getTime = (d: any) => {
+                                const getTime = (d: unknown) => {
                                     if (!d) return 0;
                                     if (d.toMillis) return d.toMillis();
                                     if (d.toDate) return d.toDate().getTime();
@@ -755,7 +754,7 @@ const UserHubPage: React.FC = () => {
 
                         // 3. Otherwise check latest registration
                         regs.sort((a, b) => {
-                            const getTime = (d: any) => {
+                            const getTime = (d: unknown) => {
                                 if (!d) return 0;
                                 if (d.toMillis) return d.toMillis();
                                 if (d.toDate) return d.toDate().getTime();

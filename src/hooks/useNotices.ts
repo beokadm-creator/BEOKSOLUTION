@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  getNotices,
-  getAllNotices,
   getNotice,
-  getActiveNoticeCount,
   createNotice,
   updateNotice,
   deleteNotice,
@@ -22,17 +19,14 @@ import { useConfContextSafe } from '../contexts/ConfContext';
 export function useNotices() {
   const conferenceData = useConference();
   const [notices, setNotices] = useState<Notice[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [loading, setLoading] = useState(() => !conferenceData?.id);
 
   useEffect(() => {
-    if (!conferenceData?.id) {
-      setLoading(false);
+    const hasConfId = !!conferenceData?.id;
+
+    if (!hasConfId) {
       return;
     }
-
-    setLoading(true);
-    setError(null);
 
     const unsubscribe = subscribeToNotices(
       conferenceData.id,
@@ -57,20 +51,15 @@ export function useAllNotices() {
   const conferenceData = useConference();
   const confContext = useConfContextSafe(); // Safe - doesn't throw
   const [notices, setNotices] = useState<Notice[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
 
   // Use ConfContext if available (admin pages), otherwise use useConference (public pages)
   const confId = confContext?.confId || conferenceData?.id;
+  const [loading, setLoading] = useState(() => !confId);
 
   useEffect(() => {
     if (!confId) {
-      setLoading(false);
       return;
     }
-
-    setLoading(true);
-    setError(null);
 
     const unsubscribe = subscribeToNotices(
       confId,
@@ -93,15 +82,12 @@ export function useAllNotices() {
 export function useNoticeCount() {
   const conferenceData = useConference();
   const [count, setCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !conferenceData?.id);
 
   useEffect(() => {
     if (!conferenceData?.id) {
-      setLoading(false);
       return;
     }
-
-    setLoading(true);
 
     const unsubscribe = subscribeToNoticeCount(
       conferenceData.id,
@@ -216,17 +202,13 @@ export function useNoticeActions() {
 export function useNotice(noticeId: string | null) {
   const conferenceData = useConference();
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [loading, setLoading] = useState(() => !conferenceData?.id || !noticeId);
 
   useEffect(() => {
     if (!conferenceData?.id || !noticeId) {
-      setLoading(false);
       return;
     }
-
-    setLoading(true);
-    setError(null);
 
     getNotice(conferenceData.id, noticeId)
       .then((data) => {

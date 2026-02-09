@@ -32,7 +32,7 @@ export const monitorRegistrationIntegrity = functions.firestore
         const issues: Array<{
             field: string;
             expected: string;
-            actual: any;
+            actual: unknown;
             rule: string;
             severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
         }> = [];
@@ -167,7 +167,7 @@ export const monitorMemberCodeIntegrity = functions.firestore
         const issues: Array<{
             field: string;
             expected: string;
-            actual: any;
+            actual: unknown;
             rule: string;
             severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
         }> = [];

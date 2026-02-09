@@ -58,13 +58,40 @@
 
 // 기존 코드:
 `
-            // Calculate Price
+            // Calculate Price with Enhanced Normalization
             const periodName = language === 'ko' ? activePeriod.name.ko : (activePeriod.name.en || activePeriod.name.ko);
-            // 가격 찾기 우선순위: ID -> Code -> Name
-            const priceKey = selectedGradeId;
-            const tierPrice = activePeriod.prices[priceKey]
-                           ?? activePeriod.prices[selectedGrade?.code || '']
-                           ?? activePeriod.prices[selectedGrade?.name || ''];
+            
+            // [FIX-DISCOUNT] Enhanced price lookup with normalization
+            const findMatchingPrice = (gradeInfo: any, prices: Record<string, number>): number | null => {
+                if (!gradeInfo?.grade || !prices) return null;
+                
+                const serverGrade = String(gradeInfo.grade).trim();
+                
+                // Try multiple format variations
+                const variants = [
+                    serverGrade.toLowerCase(),                          // "dental hygienist"
+                    serverGrade.toLowerCase().replace(/\s+/g, '_'),    // "dental_hygienist"
+                    serverGrade.toLowerCase().replace(/\s+/g, ''),     // "dentalhygienist"
+                    serverGrade.replace(/\s+/g, '_').toLowerCase(),    // "dental_hygienist" (alternate)
+                ];
+                
+                for (const variant of variants) {
+                    if (prices[variant] !== undefined) {
+                        console.log(`[MemberDiscount] Price match found: "${serverGrade}" → "${variant}" = ${prices[variant]}`);
+                        return prices[variant];
+                    }
+                }
+                
+                console.warn(`[MemberDiscount] No price found for grade "${serverGrade}"`);
+                console.warn('[MemberDiscount] Available price keys:', Object.keys(prices));
+                return null;
+            };
+            
+            // Priority: affiliations grade -> selectedGrade
+            const tierPrice = findMatchingPrice(memberVerificationData, activePeriod?.prices || {})
+                           ?? activePeriod?.prices[selectedGradeId]
+                           ?? activePeriod?.prices[selectedGrade?.code || '']
+                           ?? activePeriod?.prices[selectedGrade?.name || ''];
 `;
 
 // 수정된 코드:

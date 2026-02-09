@@ -52,10 +52,11 @@ async function testGetTemplates() {
         const templates = result.data?.templateListResponse?.templates || [];
         console.log(`\n총 ${templates.length}개의 템플릿:`);
         templates.forEach((template: unknown, index: number) => {
-            console.log(`\n[${index + 1}] ${template.templateName}`);
-            console.log(`  - 코드: ${template.templateCode}`);
-            console.log(`  - 상태: ${template.templateStatus}`);
-            console.log(`  - 내용: ${template.templateContent?.substring(0, 50)}...`);
+            const tpl = template as { templateName?: string; templateCode?: string; templateStatus?: string; templateContent?: string };
+            console.log(`\n[${index + 1}] ${tpl.templateName}`);
+            console.log(`  - 코드: ${tpl.templateCode}`);
+            console.log(`  - 상태: ${tpl.templateStatus}`);
+            console.log(`  - 내용: ${tpl.templateContent?.substring(0, 50)}...`);
         });
     } else {
         console.error('❌ 실패:', result.error);
@@ -166,12 +167,13 @@ async function testGetMessageList() {
         console.log(`\n총 ${totalCount}건의 발송 내역 (최근 10건 표시):`);
 
         messages.forEach((msg: unknown, index: number) => {
+            const message = msg as { requestId?: string; recipientNo?: string; templateCode?: string; requestDate?: string; messageStatus?: string; resultCodeName?: string };
             console.log(`\n[${index + 1}]`);
-            console.log(`  Request ID: ${msg.requestId}`);
-            console.log(`  수신번호: ${msg.recipientNo}`);
-            console.log(`  템플릿: ${msg.templateCode}`);
-            console.log(`  발송일시: ${msg.requestDate}`);
-            console.log(`  상태: ${msg.messageStatus} (${msg.resultCodeName})`);
+            console.log(`  Request ID: ${message.requestId}`);
+            console.log(`  수신번호: ${message.recipientNo}`);
+            console.log(`  템플릿: ${message.templateCode}`);
+            console.log(`  발송일시: ${message.requestDate}`);
+            console.log(`  상태: ${message.messageStatus} (${message.resultCodeName})`);
         });
     } else {
         console.error('❌ 실패:', result.error);

@@ -10,13 +10,14 @@ const db = admin.firestore();
  * 1. Firebase Console → Functions → 이 함수 호출
  * 2. 또는 callable function으로 실행
  */
-export const clearTestData = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+export const clearTestData = functions.https.onCall(async (data: unknown, context: functions.https.CallableContext) => {
     // 인증 체크 (Super Admin만 실행 가능)
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', '인증이 필요합니다');
     }
 
-    const { conferenceSlug } = data;
+    const requestData = data as { conferenceSlug?: string };
+    const { conferenceSlug } = requestData;
     const targetConfId = conferenceSlug || 'kadd_2026spring';
 
     console.log(`[TestData Cleanup] Starting cleanup for conference: ${targetConfId}`);
@@ -122,8 +123,9 @@ export const clearTestData = functions.https.onCall(async (data: any, context: f
             result
         };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[TestData Cleanup] Error:', error);
-        throw new functions.https.HttpsError('internal', error.message);
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+        throw new functions.https.HttpsError('internal', errorMessage);
     }
 });

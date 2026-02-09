@@ -34,9 +34,9 @@ export const approveNicePayment = async (tid: string, amt: number, mid: string, 
         // According to docs, usually we just send TID, MID, Amt, SignData, EdiDate etc.
         // Let's check standard approval params:
         // TID, MID, Amt, EdiDate, SignData, CharSet(utf-8), EdiType(JSON)
-        
+
         const ediDate = format(new Date(), 'yyyyMMddHHmmss');
-        
+
         params.append('MID', mid);
         params.append('Amt', amt.toString());
         params.append('EdiDate', ediDate);
@@ -52,8 +52,12 @@ export const approveNicePayment = async (tid: string, amt: number, mid: string, 
         });
 
         return response.data;
-    } catch (error: any) {
-        console.error('NicePay Approval Error:', error.response?.data || error.message);
+    } catch (error: unknown) {
+        const errorData = error && typeof error === 'object' && 'response' in error
+            ? (error as { response?: { data?: unknown } }).response?.data
+            : undefined;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('NicePay Approval Error:', errorData || errorMessage);
         throw new Error('Payment Approval Failed');
     }
 };

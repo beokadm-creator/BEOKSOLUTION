@@ -4,6 +4,29 @@ import corsLib from 'cors';
 import { getNiceAuthParams, approveNicePayment } from './payment/nice';
 import { approveTossPayment, cancelTossPayment as cancelTossPaymentApi } from './payment/toss';
 
+// Type definitions for Cloud Functions data (aligned with schema.ts)
+interface NicePaymentData {
+  amt: string;
+  mid: string;
+  key: string;
+  [key: string]: unknown;
+}
+
+interface TossPaymentData {
+  paymentKey: string;
+  orderId: string;
+  amount: number;
+  [key: string]: unknown;
+}
+
+interface RegistrationData {
+  userId?: string;
+  email?: string;
+  phone?: string;
+  name?: string;
+  [key: string]: unknown;
+}
+
 import { onRegistrationCreated, onExternalAttendeeCreated, validateBadgePrepToken, issueDigitalBadge, resendBadgePrepToken } from './badge/index';
 import { migrateExternalAttendeeParticipations } from './migrations/migrateExternalAttendeeParticipations';
 import { monitorRegistrationIntegrity, monitorMemberCodeIntegrity } from './monitoring/dataIntegrity';
@@ -41,7 +64,7 @@ export const prepareNicePayment = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+    .https.onCall(async (data, _context) => {
         // Allow public access for registration? Or authenticated?
         // Registration page might be accessed by Guest (Anonymously authenticated usually).
         // Let's allow public for now, or check context.auth if anonymous auth is used.
@@ -56,10 +79,9 @@ export const prepareNicePayment = functions
         try {
             const result = getNiceAuthParams(amt, mid, key);
             return result;
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-            functions.logger.error("Error in prepareNicePayment:", errorMessage);
-            throw new functions.https.HttpsError('internal', errorMessage);
+        } catch (error: any) {
+            functions.logger.error("Error in prepareNicePayment:", error);
+            throw new functions.https.HttpsError('internal', error.message);
         }
     });
 
@@ -69,7 +91,7 @@ export const confirmNicePayment = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+    .https.onCall(async (data, context) => {
         // [FIX-20250124-04] Force recompile by adding comment
         const { tid, amt, mid, key, regId, confId, userData } = data;
 
@@ -83,11 +105,10 @@ export const confirmNicePayment = functions
 
         try {
             // 1. Call NicePay API
-            const approvalResult = await approveNicePayment(tid, amt, mid, key) as unknown;
-            const result = approvalResult as { ResultCode?: string; Moid?: string; moid?: string;[key: string]: unknown };
+            const approvalResult = await approveNicePayment(tid, amt, mid, key) as any;
 
             // 2. Check Result
-            if (result.ResultCode === '3001' || result.ResultCode === '4100' || result.ResultCode === '4000') {
+            if (approvalResult.ResultCode === '3001' || approvalResult.ResultCode === '4100' || approvalResult.ResultCode === '4000') {
                 // Success Codes (3001: Card, 4100: Bank Transfer? Need to verify codes.
                 // Actually 3001 is common success for Credit Card.
                 // Let's assume success if ResultCode starts with 3 or 4 or is '0000' (some versions).
@@ -127,14 +148,14 @@ export const confirmNicePayment = functions
                         paymentStatus: 'PAID',
                         paymentMethod: 'CARD',
                         paymentKey: tid,
-                        orderId: result?.Moid || result?.moid || regId,
+                        orderId: approvalResult?.Moid || approvalResult?.moid || regId,
                         amount: parseInt(amt, 10),
                         tier: userData.tier || null,
                         categoryName: userData.categoryName || null,
                         memberVerificationData: null, // Will be populated if member verified
                         isAnonymous: userData.isAnonymous || false,
                         agreements: {}, // Will be populated from session data if needed
-                        paymentDetails: result,
+                        paymentDetails: approvalResult,
                         receiptNumber: `${dateStr}-${rand}`,
                         confirmationQr: `CONF-${regId}`,
                         badgeQr: null,
@@ -224,15 +245,15 @@ export const confirmNicePayment = functions
                     }
                 }
 
-                return { success: true, data: result };
+                return { success: true, data: approvalResult };
             } else {
                 // Failed
-                return { success: false, message: (result as { ResultMsg?: string }).ResultMsg, code: result.ResultCode };
+                return { success: false, message: approvalResult.ResultMsg, code: approvalResult.ResultCode };
             }
 
-        } catch (error: unknown) {
+        } catch (error: any) {
             functions.logger.error("Error in confirmNicePayment:", error);
-            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
+            throw new functions.https.HttpsError('internal', error.message);
         }
     });
 
@@ -242,7 +263,7 @@ export const confirmTossPayment = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+    .https.onCall(async (data, context) => {
         const { paymentKey, orderId, amount, regId, confId, secretKey, userData } = data;
 
         if (!paymentKey || !orderId || !amount) {
@@ -277,7 +298,7 @@ export const confirmTossPayment = functions
             }
 
             // 1. Call Toss API
-            const approvalResult = await approveTossPayment(paymentKey, orderId, amount, finalSecretKey) as unknown;
+            const approvalResult = await approveTossPayment(paymentKey, orderId, amount, finalSecretKey) as any;
 
             // 2. If success (no error thrown), create Registration document
             // [FIX-20250124-01] Create Registration document on successful payment (instead of updating)
@@ -294,7 +315,7 @@ export const confirmTossPayment = functions
                 const societyId = confSnap.data()?.societyId;
 
                 // Determine payment method from approval result
-                const paymentMethod = ((approvalResult as { method?: string })?.method) || 'CARD';
+                const paymentMethod = (approvalResult?.method as string) || 'CARD';
 
                 // Create Registration document with PAID status
                 await regRef.set({
@@ -410,9 +431,9 @@ export const confirmTossPayment = functions
 
             return { success: true, data: approvalResult };
 
-        } catch (error: unknown) {
+        } catch (error: any) {
             functions.logger.error("Error in confirmTossPayment:", error);
-            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
+            throw new functions.https.HttpsError('internal', error.message);
         }
     });
 
@@ -475,7 +496,7 @@ export const confirmTossPaymentHttp = functions
                 }
 
                 // 1. Call Toss API
-                const approvalResult = await approveTossPayment(paymentKey, orderId, amount, finalSecretKey) as unknown;
+                const approvalResult = await approveTossPayment(paymentKey, orderId, amount, finalSecretKey) as any;
 
                 // 2. If success (no error thrown), create Registration document
                 if (regId && confId) {
@@ -490,7 +511,7 @@ export const confirmTossPaymentHttp = functions
                     const societyId = confSnap.data()?.societyId;
 
                     // Determine payment method from approval result
-                    const paymentMethod = ((approvalResult as { method?: string })?.method) || 'CARD';
+                    const paymentMethod = (approvalResult?.method as string) || 'CARD';
 
                     // Create Registration document with PAID status
                     await regRef.set({
@@ -606,10 +627,9 @@ export const confirmTossPaymentHttp = functions
                 // Return success response
                 res.status(200).json({ success: true, data: approvalResult });
 
-            } catch (error: unknown) {
+            } catch (error: any) {
                 functions.logger.error("Error in confirmTossPaymentHttp:", error);
-                const errorMessage = error instanceof Error ? error.message : 'Payment confirmation failed';
-                res.status(500).json({ error: errorMessage });
+                res.status(500).json({ error: error.message || 'Payment confirmation failed' });
             }
         });
     });
@@ -657,11 +677,10 @@ export const cancelTossPayment = functions
 
             // 1. Call Toss API
             // Imported from ./payment/toss.ts (need to update import if not already done)
-            const cancelResult = await cancelTossPaymentApi(paymentKey, cancelReason, finalSecretKey) as unknown;
-            const result = cancelResult as { status?: string; totalAmount?: number;[key: string]: unknown };
+            const cancelResult = await cancelTossPaymentApi(paymentKey, cancelReason, finalSecretKey) as any;
 
             // 2. Update DB Status (Cancel)
-            if (regId && (result.status === 'CANCELED' || result.status === 'PARTIAL_CANCELED')) {
+            if (regId) {
                 const regRef = db.collection(`conferences/${confId}/registrations`).doc(regId);
                 await regRef.update({
                     status: 'CANCELED',
@@ -676,15 +695,15 @@ export const cancelTossPayment = functions
                     timestamp: admin.firestore.FieldValue.serverTimestamp(),
                     method: 'ADMIN_MANUAL_PG',
                     reason: cancelReason,
-                    amount: result.totalAmount // Optional: Check actual result structure
+                    amount: cancelResult.totalAmount // Optional: Check actual result structure
                 });
             }
 
             return { success: true, data: cancelResult };
 
-        } catch (error: unknown) {
+        } catch (error: any) {
             functions.logger.error("Error in cancelTossPayment:", error);
-            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
+            throw new functions.https.HttpsError('internal', error.message);
         }
     });
 
@@ -705,9 +724,9 @@ export const getAligoTemplates = functions
         try {
             const result = await getAlimTalkTemplates();
             return result;
-        } catch (error: unknown) {
+        } catch (error: any) {
             functions.logger.error("Error in getAligoTemplates:", error);
-            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
+            throw new functions.https.HttpsError('internal', error.message);
         }
     });
 
@@ -736,7 +755,7 @@ export const getNhnAlimTalkTemplates = functions
             // Filter only APPROVED templates
             if (result.success && result.data?.templateListResponse?.templates) {
                 const approvedTemplates = result.data.templateListResponse.templates.filter(
-                    (template: unknown) => (template as { templateStatus?: string }).templateStatus === 'APR'
+                    (template: any) => template.templateStatus === 'APR'
                 );
 
                 functions.logger.info(`[NHN Templates] Total: ${result.data.templateListResponse.templates.length}, Approved: ${approvedTemplates.length}`);
@@ -754,9 +773,9 @@ export const getNhnAlimTalkTemplates = functions
             }
 
             return result;
-        } catch (error: unknown) {
+        } catch (error: any) {
             functions.logger.error("Error in getNhnAlimTalkTemplates:", error);
-            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
+            throw new functions.https.HttpsError('internal', error.message);
         }
     });
 
@@ -810,8 +829,8 @@ export const createSocietyAdminUser = functions
                     };
                 }
 
-            } catch (e: unknown) {
-                if (typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === 'auth/user-not-found') {
+            } catch (e: any) {
+                if (e.code === 'auth/user-not-found') {
                     // User does not exist -> Create
                     if (!password) {
                         throw new functions.https.HttpsError('invalid-argument', 'Password is required for new users.');
@@ -834,10 +853,9 @@ export const createSocietyAdminUser = functions
                 // Merge existing claims if any? For now, overwrite/add.
                 const currentClaims = userRecord.customClaims || {};
                 await admin.auth().setCustomUserClaims(userRecord.uid, { ...currentClaims, role: 'CONF_ADMIN', societyId });
-            } catch (claimError: unknown) {
-                const claimErrorMessage = claimError instanceof Error ? claimError.message : String(claimError);
-                functions.logger.error("Claim Error (IAM/Permission Issue?):", claimErrorMessage);
-                warning = `User created/linked, but custom claims failed: ${claimErrorMessage}`;
+            } catch (claimError: any) {
+                functions.logger.error("Claim Error (IAM/Permission Issue?):", claimError);
+                warning = `User created/linked, but custom claims failed: ${claimError.message}`;
             }
 
             // 5. Update Firestore
@@ -848,10 +866,9 @@ export const createSocietyAdminUser = functions
 
             return { success: true, uid: userRecord.uid, warning };
 
-        } catch (error: unknown) {
+        } catch (error: any) {
             functions.logger.error("Error in createSocietyAdminUser:", error);
-            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-            throw new functions.https.HttpsError('internal', `Failed to create/link admin: ${errorMessage}`, error);
+            throw new functions.https.HttpsError('internal', `Failed to create/link admin: ${error.message}`, error);
         }
     });
 
@@ -896,9 +913,9 @@ export const removeSocietyAdminUser = functions
             }
 
             return { success: true };
-        } catch (error: unknown) {
+        } catch (error: any) {
             functions.logger.error("Error in removeSocietyAdminUser:", error);
-            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
+            throw new functions.https.HttpsError('internal', error.message);
         }
     });
 
@@ -910,7 +927,7 @@ export const sendAuthCode = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+    .https.onCall(async (data, context) => {
         const { phone, code } = data;
 
         if (!phone || !code) {
@@ -972,7 +989,7 @@ export const verifyMemberIdentity = functions
                 if (member.expiryDate) {
                     let exp = member.expiryDate;
                     // Handle Firestore Timestamp or Date string
-                    if (typeof exp === 'object' && exp !== null && 'toDate' in exp && typeof exp.toDate === 'function') {
+                    if (exp.toDate) {
                         exp = exp.toDate();
                     } else if (typeof exp === 'string') {
                         exp = new Date(exp);
@@ -1017,9 +1034,9 @@ export const verifyMemberIdentity = functions
 
             return { success: false, message: "Member not found. Please check your name and license number." };
 
-        } catch (e: unknown) {
+        } catch (e: any) {
             functions.logger.error("Verify Member Error:", e);
-            const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
+            throw new functions.https.HttpsError('internal', e.message);
         }
     });
 
@@ -1028,7 +1045,7 @@ export const checkEmailExists = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+    .https.onCall(async (data, context) => {
         const { email } = data;
         if (!email) return { exists: false };
 
@@ -1037,18 +1054,17 @@ export const checkEmailExists = functions
             try {
                 await admin.auth().getUserByEmail(email);
                 return { exists: true };
-            } catch (authErr: unknown) {
-                if (typeof authErr === 'object' && authErr !== null && 'code' in authErr && (authErr as { code: string }).code === 'auth/user-not-found') {
+            } catch (authErr: any) {
+                if (authErr.code === 'auth/user-not-found') {
                     // 2. Check Firestore 'users' collection (Fallback)
                     const userSnap = await admin.firestore().collection('users').where('email', '==', email).limit(1).get();
                     return { exists: !userSnap.empty };
                 }
                 throw authErr;
             }
-        } catch (e: unknown) {
+        } catch (e: any) {
             functions.logger.error("Email Check Error:", e);
-            const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred';
-            throw new functions.https.HttpsError('internal', errorMessage);
+            throw new functions.https.HttpsError('internal', e.message);
         }
     });
 
@@ -1080,12 +1096,11 @@ export const deleteUserAccount = functions
         try {
             await admin.auth().deleteUser(uid);
             functions.logger.info(`Auth user ${uid} deleted.`);
-        } catch (error: unknown) {
-            if (typeof error === 'object' && error !== null && 'code' in error && (error as { code: string }).code === 'auth/user-not-found') {
+        } catch (error: any) {
+            if (error.code === 'auth/user-not-found') {
                 functions.logger.warn(`Auth user ${uid} already missing. Skipping.`);
             } else {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                functions.logger.error(`Auth delete error: ${errorMessage}`);
+                functions.logger.error(`Auth delete error: ${error.message}`);
                 // Proceed to DB delete even if Auth delete fails
             }
         }
@@ -1094,7 +1109,7 @@ export const deleteUserAccount = functions
         try {
             await admin.firestore().collection('users').doc(uid).delete();
             functions.logger.info(`Firestore doc ${uid} deleted.`);
-        } catch (error: unknown) {
+        } catch (error: any) {
             functions.logger.error(`Firestore delete error: ${error}`);
             // Don't throw, just log. We want to return success to client to clear the list.
         }
@@ -1175,9 +1190,8 @@ export const mintCrossDomainToken = functions
                     const decodedToken = await admin.auth().verifyIdToken(data.idToken);
                     uid = decodedToken.uid;
                     functions.logger.info(`[Hydration] Verified ID Token for UID: ${uid}`);
-                } catch (verifyErr: unknown) {
-                    const verifyErrorMessage = verifyErr instanceof Error ? verifyErr.message : String(verifyErr);
-                    functions.logger.warn(`[Hydration] Invalid ID Token:`, verifyErrorMessage);
+                } catch (verifyErr) {
+                    functions.logger.warn(`[Hydration] Invalid ID Token:`, verifyErr);
                     throw new functions.https.HttpsError('unauthenticated', 'Invalid ID Token');
                 }
             } else {
@@ -1191,10 +1205,9 @@ export const mintCrossDomainToken = functions
 
             functions.logger.info(`[Mint Success] Custom token created for UID: ${uid}`);
             return { token: customToken };
-        } catch (error: unknown) {
+        } catch (error: any) {
             functions.logger.error("Mint Cross Domain Token Error:", error);
-            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-            throw new functions.https.HttpsError('internal', errorMessage);
+            throw new functions.https.HttpsError('internal', error.message || 'Failed to mint custom token');
         }
     });
 
@@ -1207,7 +1220,7 @@ const LINK_SECRET = process.env.LINK_SECRET || 'eregi_v2_secure_link_key_2026';
 
 export const verifyAccessLink = functions
     .runWith({ enforceAppCheck: false, ingressSettings: 'ALLOW_ALL' })
-    .https.onCall(async (data, _context) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+    .https.onCall(async (data, context) => {
         const { token } = data;
         if (!token) throw new functions.https.HttpsError('invalid-argument', 'Token required');
 
@@ -1236,9 +1249,8 @@ export const verifyAccessLink = functions
             }
 
             return { valid: true, payload };
-        } catch (e: unknown) {
-            const errorMessage = e instanceof Error ? e.message : String(e);
-            functions.logger.warn(`[Security] Token Verification Failed: ${errorMessage}`);
+        } catch (e: any) {
+            functions.logger.warn(`[Security] Token Verification Failed: ${e.message}`);
             throw new functions.https.HttpsError('permission-denied', 'Invalid or expired token');
         }
     });
@@ -1278,7 +1290,7 @@ export const checkNonMemberEmailExists = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+    .https.onCall(async (data, context) => {
         const { email, confId } = data;
         if (!email || !confId) {
             throw new functions.https.HttpsError('invalid-argument', 'email and confId are required');
@@ -1301,9 +1313,9 @@ export const checkNonMemberEmailExists = functions
             }
 
             return { exists: false };
-        } catch (e: unknown) {
+        } catch (e: any) {
             functions.logger.error("Non-Member Email Check Error:", e);
-            const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
+            throw new functions.https.HttpsError('internal', e.message);
         }
     });
 
@@ -1333,7 +1345,7 @@ function shouldMonitor(): boolean {
 /**
  * Check if daily write limit has been reached
  */
-async function checkDailyWriteLimit(db: admin.firestore.Firestore, date: string): Promise<boolean> {
+async function checkDailyWriteLimit(db: any, date: string): Promise<boolean> {
     const statsRef = db.doc(`logs/stats/${date}`);
     const statsDoc = await statsRef.get();
 
@@ -1342,15 +1354,13 @@ async function checkDailyWriteLimit(db: admin.firestore.Firestore, date: string)
         return false;
     }
 
-    const data = statsDoc.data();
-    if (data && data.writeCount >= MAX_DAILY_WRITES) {
+    const data = statsDoc.data() as any;
+    if (data.writeCount >= MAX_DAILY_WRITES) {
         functions.logger.warn(`Daily write limit reached: ${data.writeCount}`);
         return true;
     }
 
-    if (data) {
-        await statsRef.update({ writeCount: data.writeCount + 1, lastUpdated: admin.firestore.Timestamp.now() });
-    }
+    await statsRef.update({ writeCount: data.writeCount + 1, lastUpdated: admin.firestore.Timestamp.now() });
     return false;
 }
 
@@ -1365,7 +1375,7 @@ export const logError = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+    .https.onCall(async (data, _context) => {
         const { errorId, errorData } = data;
 
         if (!errorId || !errorData) {
@@ -1422,20 +1432,17 @@ export const logError = functions
                         });
                         await errorRef.update({ alertSent: true });
                         functions.logger.log(`[Alert] Critical error detected: ${errorId}`);
-                    } catch (emailError: unknown) {
-                        const emailErrorMessage = emailError instanceof Error ? emailError.message : String(emailError);
-                        functions.logger.error('[logError] Failed to send email alert:', emailErrorMessage);
+                    } catch (emailError) {
+                        functions.logger.error('[Alert] Failed to send email:', emailError);
                     }
                 }
             } else {
                 // Existing error - increment count
-                const currentData = errorDoc.data();
-                if (currentData) {
-                    await errorRef.update({
-                        lastSeenAt: now,
-                        occurrenceCount: currentData.occurrenceCount + 1,
-                    });
-                }
+                const currentData = errorDoc.data() as any;
+                await errorRef.update({
+                    lastSeenAt: now,
+                    occurrenceCount: currentData.occurrenceCount + 1,
+                });
             }
 
             return {
@@ -1443,10 +1450,9 @@ export const logError = functions
                 errorId,
                 isFirstOccurrence
             };
-        } catch (e: unknown) {
-            const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred';
-            functions.logger.error("[logError] Error logging failed:", errorMessage);
-            throw new functions.https.HttpsError('internal', errorMessage);
+        } catch (e: any) {
+            functions.logger.error("[logError] Error logging failed:", e);
+            throw new functions.https.HttpsError('internal', e.message);
         }
     });
 
@@ -1461,7 +1467,7 @@ export const logPerformance = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+    .https.onCall(async (data, _context) => {
         const { metricName, value, unit = 'ms', threshold, context: metricContext } = data;
 
         if (!metricName || value === undefined) {
@@ -1504,8 +1510,8 @@ export const logPerformance = functions
                 metricId,
                 isPoor
             };
-        } catch (e: unknown) {
+        } catch (e: any) {
             functions.logger.error("[logPerformance] Performance logging failed:", e);
-            const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
+            throw new functions.https.HttpsError('internal', e.message);
         }
     });

@@ -22,7 +22,6 @@ export const WideHeaderPreview: React.FC<WideHeaderPreviewProps> = ({
   societyName,
   logoUrl,
   slug,
-  confId,
 }) => {
   const navigate = useNavigate();
   const [isScrolled, setIsScrolled] = useState(false);
@@ -53,14 +52,6 @@ export const WideHeaderPreview: React.FC<WideHeaderPreviewProps> = ({
 
   const handleNavigation = (path: string) => {
     navigate(path);
-  };
-
-  const handleRegisterClick = () => {
-    if (auth.user) {
-      handleNavigation(`/${slug}/mypage`);
-    } else {
-      handleNavigation(`/${slug}/auth`);
-    }
   };
 
   return (

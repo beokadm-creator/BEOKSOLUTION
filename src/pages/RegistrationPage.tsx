@@ -129,8 +129,8 @@ export default function RegistrationPage() {
         }
 
         // Priority 3: Check location.state (may be lost during navigation)
-        if (paramCalculatedPrice === undefined && location.state && typeof (location.state as any).calculatedPrice === 'number') {
-            paramCalculatedPrice = (location.state as any).calculatedPrice;
+        if (paramCalculatedPrice === undefined && location.state && typeof (location.state as { calculatedPrice?: number }).calculatedPrice === 'number') {
+            paramCalculatedPrice = (location.state as { calculatedPrice?: number }).calculatedPrice;
             console.log('[RegistrationPage] Using calculated price from location.state:', paramCalculatedPrice);
         }
     } catch (e) {
@@ -151,7 +151,7 @@ export default function RegistrationPage() {
     const [nicePaySecret, setNicePaySecret] = useState('');
     const [paymentWidget, setPaymentWidget] = useState<PaymentWidgetInstance | null>(null);
     const paymentMethodsWidgetRef = useRef<HTMLDivElement>(null);
-    const paymentMethodsInstanceRef = useRef<any>(null);
+    const paymentMethodsInstanceRef = useRefunknown>(null);
 
     // State - Form
     const [formData, setFormData] = useState({
@@ -500,11 +500,17 @@ export default function RegistrationPage() {
                 );
             }
         }
+
+        // paymentMethodsInstanceRef is a ref and should not be in dependencies
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [paymentWidget, price]);
 
     // Reset instance ref if widget changes
     useEffect(() => {
         paymentMethodsInstanceRef.current = null;
+
+        // paymentMethodsInstanceRef is a ref and should not be in dependencies
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [paymentWidget]);
 
 
@@ -1008,7 +1014,7 @@ export default function RegistrationPage() {
                         <DialogTitle>{language === 'ko' ? '환불규정' : 'Refund Policy'}</DialogTitle>
                     </DialogHeader>
                     <div className="mt-4 whitespace-pre-wrap text-sm text-slate-600 leading-relaxed">
-                        {regSettings?.refundPolicy || (info as any)?.refundPolicy ||
+                        {regSettings?.refundPolicy || info?.refundPolicy ||
                             "2026년 3월 5일 17시까지 전액 환불 이후 환불은 불가 합니다. 카드결제 : 승인취소 퀵계좌이체 등 : 시스템에서 계좌 환불 * 카드사 승인 사정에 따라 환불이 영업일 기준 5일 이상 발생할 수 있습니다. 자세한 사항은 사무국으로 문의주시기 바랍니다."}
                     </div>
                     <div className="mt-6 flex justify-end">

@@ -70,7 +70,7 @@ export async function sendEmail({
         });
 
         console.log(`[Email] Sent to: ${Array.isArray(to) ? to.join(', ') : to}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[Email] Failed to send:', error);
         throw error;
     }
