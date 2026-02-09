@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/ta
 import { UserPlus, Upload, Download, FileText, Badge, CheckCircle2, Trash2, Loader2, Eye, EyeOff, Copy, MessageCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ExternalAttendee } from '../../types/schema';
+import ExternalAttendeeMigration from '../../components/admin/ExternalAttendeeMigration';
 
 const ExternalAttendeePage: React.FC = () => {
     const navigate = useNavigate();
@@ -127,8 +128,10 @@ const ExternalAttendeePage: React.FC = () => {
             registeredBy: auth.user?.id || 'ADMIN',
             deleted: false,
             createdAt: Timestamp.now(),
-            updatedAt: Timestamp.now()
-        };
+            updatedAt: Timestamp.now(),
+            userId: undefined,
+            authCreated: false
+        } as ExternalAttendee;
     };
 
     // Handle individual registration
@@ -193,30 +196,32 @@ const ExternalAttendeePage: React.FC = () => {
             });
 
             // [SCENARIO FIX] Force Signup & Generate UID immediately
-            if (formData.password) {
-                try {
-                    const functions = getFunctions();
-                    const generateAuthUserFn = httpsCallable(functions, 'generateFirebaseAuthUserForExternalAttendee');
-                    const authResult = await generateAuthUserFn({
-                        confId,
-                        externalId: attendeeData.id,
-                        password: formData.password,
-                        email: formData.email,
-                        name: formData.name,
-                        phone: formData.phone,
-                        organization: formData.organization,
-                        licenseNumber: formData.licenseNumber
-                    }) as { data: { success: boolean; uid: string; message: string } };
+            // 비밀번호가 없으면 전화번호 뒷 4자리 사용
+            const passwordToUse = formData.password || (formData.phone ? formData.phone.slice(-4) : '123456');
 
-                    if (authResult.data.success) {
-                        toast.success('회원 계정이 자동으로 생성되었습니다.');
-                        // Update local state with new userId
-                        attendeeData.userId = authResult.data.uid;
-                    }
-                } catch (authError) {
-                    console.error('Failed to auto-create auth user:', authError);
-                    toast.error('회원 계정 생성 실패 (나중에 명찰 발급 시 재시도됩니다)');
+            try {
+                const functions = getFunctions();
+                const generateAuthUserFn = httpsCallable(functions, 'generateFirebaseAuthUserForExternalAttendee');
+                const authResult = await generateAuthUserFn({
+                    confId,
+                    externalId: attendeeData.id,
+                    password: passwordToUse,
+                    email: formData.email,
+                    name: formData.name,
+                    phone: formData.phone,
+                    organization: formData.organization,
+                    licenseNumber: formData.licenseNumber
+                }) as { data: { success: boolean; uid: string; message: string } };
+
+                if (authResult.data.success) {
+                    toast.success(`회원 계정이 생성되었습니다. (PW: ${passwordToUse})`);
+                    // Update local state with new userId
+                    attendeeData.userId = authResult.data.uid;
+                    attendeeData.password = passwordToUse; // Update local data with generated password
                 }
+            } catch (authError) {
+                console.error('Failed to auto-create auth user:', authError);
+                toast.error('회원 계정 생성 실패 (나중에 명찰 발급 시 재시도됩니다)');
             }
 
             setExternalAttendees(prev => [attendeeData, ...prev]);
@@ -956,7 +961,10 @@ const ExternalAttendeePage: React.FC = () => {
 
                     {/* List Tab */}
                     <TabsContent value="list">
-                        <Card>
+                        {/* Migration Tool */}
+                        {confId && <ExternalAttendeeMigration confId={confId} />}
+
+                        <Card className="mt-6">
                             <CardHeader>
                                 <div className="flex justify-between items-center">
                                     <CardTitle className="flex items-center gap-2">

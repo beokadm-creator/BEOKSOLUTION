@@ -19,14 +19,18 @@ export {
     issueDigitalBadge,
     resendBadgePrepToken,
     generateFirebaseAuthUserForExternalAttendee,
+    migrateExternalAttendeeParticipations,
     monitorRegistrationIntegrity,
     monitorMemberCodeIntegrity,
     dailyErrorReport,
     weeklyPerformanceReport
 };
 
+
 import { generateFirebaseAuthUserForExternalAttendee } from './auth/external';
+import { migrateExternalAttendeeParticipations } from './migrations/migrateExternalAttendeeParticipations';
 import { sendErrorAlertEmail, sendDailyErrorReport } from './utils/email';
+
 
 // --------------------------------------------------------------------------
 // PAYMENT: NICEPAY UTILITIES

@@ -687,6 +687,7 @@ export interface ExternalAttendee {
   checkInTime: Timestamp | null;
   badgeIssued?: boolean;
   badgeIssuedAt?: Timestamp;
+  authCreated?: boolean; // Flag to indicate if Firebase Auth user has been created
 
   // Deletion status
   deleted?: boolean;
