@@ -125,3 +125,23 @@ service cloud.firestore {
     }
   }
 }
+
+    // --- MONITORING & LOGGING ---
+    // Logs collection for error tracking and performance monitoring
+    match /logs/{type}/{date}/{documentId} {
+      // Allow read for super admin only
+      allow read: if request.auth != null && request.auth.token.email == 'aaron@beoksolution.com';
+      
+      // Allow write for Cloud Functions only (authenticated users)
+      allow write: if request.auth != null;
+      
+      // TTL policy: Documents automatically deleted after 30 days
+      // This must be configured in Firestore indexes
+    }
+    
+    // Logs stats for rate limiting
+    match /logs/stats/{date} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

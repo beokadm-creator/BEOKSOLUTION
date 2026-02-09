@@ -6,6 +6,8 @@ import { approveTossPayment, cancelTossPayment as cancelTossPaymentApi } from '.
 
 import { onRegistrationCreated, onExternalAttendeeCreated, validateBadgePrepToken, issueDigitalBadge, resendBadgePrepToken } from './badge/index';
 import { migrateExternalAttendeeParticipations } from './migrations/migrateExternalAttendeeParticipations';
+import { monitorRegistrationIntegrity, monitorMemberCodeIntegrity } from './monitoring/dataIntegrity';
+import { dailyErrorReport, weeklyPerformanceReport } from './monitoring/scheduledReports';
 
 export const cors = corsLib({ origin: true });
 
@@ -18,7 +20,11 @@ export {
     issueDigitalBadge,
     resendBadgePrepToken,
     generateFirebaseAuthUserForExternalAttendee,
-    migrateExternalAttendeeParticipations
+    migrateExternalAttendeeParticipations,
+    monitorRegistrationIntegrity,
+    monitorMemberCodeIntegrity,
+    dailyErrorReport,
+    weeklyPerformanceReport
 };
 
 import { generateFirebaseAuthUserForExternalAttendee } from './auth/external';
@@ -1240,3 +1246,198 @@ export const checkNonMemberEmailExists = functions
     });
 
 
+
+// --------------------------------------------------------------------------
+// MONITORING: Error Logging & Performance Tracking
+// --------------------------------------------------------------------------
+
+// Import email utilities
+import { sendErrorAlertEmail } from './utils/email';
+
+/**
+ * Sampling Configuration for Monitoring
+ * Adjust these values to control monitoring cost and performance
+ */
+const SAMPLING_RATE = Number(process.env.MONITORING_SAMPLING_RATE) || 0.1; // 10% default
+const MAX_DAILY_WRITES = Number(process.env.MONITORING_MAX_DAILY_WRITES) || 10000; // Safety limit
+
+/**
+ * Check if monitoring should run based on sampling rate
+ */
+function shouldMonitor(): boolean {
+    return Math.random() < SAMPLING_RATE;
+}
+
+/**
+ * Check if daily write limit has been reached
+ */
+async function checkDailyWriteLimit(db: any, date: string): Promise<boolean> {
+    const statsRef = db.doc(`logs/stats/${date}`);
+    const statsDoc = await statsRef.get();
+
+    if (!statsDoc.exists) {
+        await statsRef.set({ writeCount: 1, lastUpdated: admin.firestore.Timestamp.now() });
+        return false;
+    }
+
+    const data = statsDoc.data() as any;
+    if (data.writeCount >= MAX_DAILY_WRITES) {
+        functions.logger.warn(`Daily write limit reached: ${data.writeCount}`);
+        return true;
+    }
+
+    await statsRef.update({ writeCount: data.writeCount + 1, lastUpdated: admin.firestore.Timestamp.now() });
+    return false;
+}
+
+/**
+ * Log Error
+ *
+ * Logs client-side errors to Firestore for monitoring
+ * Includes deduplication and automatic alerting for critical errors
+ */
+export const logError = functions
+    .runWith({
+        enforceAppCheck: false,
+        ingressSettings: 'ALLOW_ALL'
+    })
+    .https.onCall(async (data, _context) => {
+        const { errorId, errorData } = data;
+
+        if (!errorId || !errorData) {
+            throw new functions.https.HttpsError('invalid-argument', 'errorId and errorData are required');
+        }
+
+        try {
+            // Apply sampling
+            if (!shouldMonitor()) {
+                functions.logger.log(`[Sampling] Skipping error logging: ${errorId}`);
+                return { success: true, sampled: true };
+            }
+
+            const db = admin.firestore();
+            const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+            // Check daily write limit
+            const limitReached = await checkDailyWriteLimit(db, today);
+            if (limitReached) {
+                functions.logger.warn(`[Limit] Daily write limit reached, skipping error logging`);
+                return { success: true, limited: true };
+            }
+
+            const errorRef = db.doc(`logs/errors/${today}/${errorId}`);
+            const errorDoc = await errorRef.get();
+
+            const now = admin.firestore.Timestamp.now();
+            const isFirstOccurrence = !errorDoc.exists;
+
+            if (isFirstOccurrence) {
+                // New error - create log entry
+                await errorRef.set({
+                    id: errorId,
+                    timestamp: now,
+                    firstSeenAt: now,
+                    lastSeenAt: now,
+                    occurrenceCount: 1,
+                    resolved: false,
+                    alertSent: false,
+                    ...errorData
+                });
+
+                // Send alert for critical/high severity errors
+                if (errorData.severity === 'CRITICAL' || errorData.severity === 'HIGH') {
+                    try {
+                        await sendErrorAlertEmail({
+                            errorId,
+                            message: errorData.message,
+                            severity: errorData.severity,
+                            category: errorData.category,
+                            occurrenceCount: 1,
+                            url: errorData.url,
+                            userId: errorData.userId,
+                        });
+                        await errorRef.update({ alertSent: true });
+                        functions.logger.log(`[Alert] Critical error detected: ${errorId}`);
+                    } catch (emailError) {
+                        functions.logger.error('[Alert] Failed to send email:', emailError);
+                    }
+                }
+            } else {
+                // Existing error - increment count
+                const currentData = errorDoc.data() as any;
+                await errorRef.update({
+                    lastSeenAt: now,
+                    occurrenceCount: currentData.occurrenceCount + 1,
+                });
+            }
+
+            return {
+                success: true,
+                errorId,
+                isFirstOccurrence
+            };
+        } catch (e: any) {
+            functions.logger.error("[logError] Error logging failed:", e);
+            throw new functions.https.HttpsError('internal', e.message);
+        }
+    });
+
+/**
+ * Log Performance
+ *
+ * Logs performance metrics to Firestore
+ * Used for Web Vitals, API response times, page load times
+ */
+export const logPerformance = functions
+    .runWith({
+        enforceAppCheck: false,
+        ingressSettings: 'ALLOW_ALL'
+    })
+    .https.onCall(async (data, _context) => {
+        const { metricName, value, unit = 'ms', threshold, context: metricContext } = data;
+
+        if (!metricName || value === undefined) {
+            throw new functions.https.HttpsError('invalid-argument', 'metricName and value are required');
+        }
+
+        try {
+            // Apply sampling (performance is less critical, sample more aggressively)
+            if (Math.random() > (SAMPLING_RATE * 0.5)) {
+                return { success: true, sampled: true };
+            }
+
+            const db = admin.firestore();
+            const today = new Date().toISOString().split('T')[0];
+
+            // Check daily write limit
+            const limitReached = await checkDailyWriteLimit(db, today);
+            if (limitReached) {
+                return { success: true, limited: true };
+            }
+
+            const metricId = `perf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const metricRef = db.doc(`logs/performance/${today}/${metricId}`);
+
+            const isPoor = threshold && value > threshold;
+
+            await metricRef.set({
+                id: metricId,
+                timestamp: admin.firestore.Timestamp.now(),
+                metricName,
+                value,
+                unit,
+                threshold,
+                isPoor,
+                ...metricContext
+            });
+
+            return {
+                success: true,
+                metricId,
+                isPoor
+            };
+        } catch (e: any) {
+            functions.logger.error("[logPerformance] Performance logging failed:", e);
+            throw new functions.https.HttpsError('internal', e.message);
+        }
+    });
