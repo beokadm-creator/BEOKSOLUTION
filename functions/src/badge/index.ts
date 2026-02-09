@@ -2,7 +2,7 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { sendAlimTalk } from '../utils/aligo';
+import { sendAlimTalk } from '../utils/nhnAlimTalk';
 
 // Local type definitions (aligned with schema.ts)
 interface Conference {
@@ -52,9 +52,11 @@ interface ExternalAttendee extends Registration {
 
 interface AlimTalkButton {
   name: string;
-  type: 'WL' | 'AL' | 'BK' | 'MD';
+  type: string;
   linkMobile?: string;
   linkPc?: string;
+  linkType?: string; // NHN uses linkType? No, it uses 'type'
+  // NHN specific fields might be needed mapping
 }
 
 /**
@@ -227,21 +229,38 @@ async function sendBadgeNotification(
           linkPc: btn.linkPc?.replace('#{badgePrepUrl}', badgePrepUrl)
         }));
 
-        // Send
+
+        // Get Sender Key from Infrastructure Settings
+        const infraSnap = await db.doc(`infrastructure/${conference.societyId}`).get();
+        const infraData = infraSnap.data();
+        const senderKey = infraData?.notification?.alimTalk?.senderKey;
+
+        if (!senderKey) {
+          functions.logger.error(`[BadgeNotification] No Sender Key found for society ${conference.societyId}`);
+          return;
+        }
+
+        // Send (NHN AlimTalk)
         const recipientPhone = regData.phone || regData.userInfo?.phone;
         if (recipientPhone) {
           const cleanPhone = recipientPhone.replace(/-/g, '');
 
-          await sendAlimTalk(
-            cleanPhone,
-            kakaoConfig.kakaoTemplateCode,
-            {
-              message: content,
-              name: variables.userName,
-              button: JSON.stringify(buttons)
-            },
-            conference.societyId
-          );
+          // Map buttons to NHN format
+          const nhnButtons = buttons.map((btn: AlimTalkButton, index: number) => ({
+            ordering: index + 1,
+            type: btn.type as any, // Type cast might be needed if types assume Aligo format
+            name: btn.name,
+            linkMo: btn.linkMobile,
+            linkPc: btn.linkPc
+          }));
+
+          await sendAlimTalk({
+            senderKey,
+            templateCode: kakaoConfig.kakaoTemplateCode,
+            recipientNo: cleanPhone,
+            content: content,
+            buttons: nhnButtons.length > 0 ? nhnButtons : undefined
+          });
 
           functions.logger.info(`[BadgeNotification] AlimTalk sent to ${cleanPhone} for ${regId}`);
         }

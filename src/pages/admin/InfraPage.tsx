@@ -30,7 +30,7 @@ interface InfraSettings {
         };
     };
     notification: {
-        channelId: string; // Kakao Channel ID (legacy Aligo)
+        // channelId removed (legacy Aligo)
         nhnAlimTalk?: {
             enabled: boolean;
             senderKey: string; // NHN Cloud 발신 프로필 키 (학회별로 다름)
@@ -65,7 +65,8 @@ const defaultSettings: InfraSettings = {
         },
     },
     notification: {
-        channelId: '',
+        // channelId removed
+
         nhnAlimTalk: {
             enabled: false,
             senderKey: '',
@@ -120,7 +121,7 @@ export default function InfraPage() {
                             global: { ...defaultSettings.payment.global, ...(data.payment?.global || {}) },
                         },
                         notification: {
-                            channelId: data.notification?.channelId || defaultSettings.notification.channelId,
+                            // channelId removed
                             nhnAlimTalk: {
                                 ...defaultSettings.notification.nhnAlimTalk,
                                 ...(data.notification?.nhnAlimTalk || {}),
@@ -395,33 +396,7 @@ export default function InfraPage() {
                         </div>
                     </CardHeader>
                     <CardContent className="p-6 space-y-6">
-                        {/* Legacy Aligo Section */}
-                        <div className="space-y-4 pb-4 border-b border-slate-100">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="text-sm font-bold text-slate-700">Legacy Aligo Service</h3>
-                                    <p className="text-xs text-slate-500 mt-0.5">Platform-managed API keys</p>
-                                </div>
-                                <Badge className="bg-slate-400 hover:bg-slate-500 text-white border-none py-0.5 h-5 text-[10px]">LEGACY</Badge>
-                            </div>
 
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 uppercase">Kakao Channel ID</Label>
-                                <Input
-                                    value={settings.notification.channelId}
-                                    onChange={(e) => setSettings(prev => ({
-                                        ...prev,
-                                        notification: {
-                                            ...prev.notification,
-                                            channelId: e.target.value
-                                        }
-                                    }))}
-                                    placeholder="@your_channel_id"
-                                    className="h-11 font-medium text-sm bg-slate-50 border-slate-200 rounded-xl"
-                                />
-                                <p className="text-[11px] text-slate-400 pl-1">Must include the '@' symbol (e.g., @mysociety).</p>
-                            </div>
-                        </div>
 
                         {/* NHN AlimTalk Section */}
                         <div className="space-y-4">

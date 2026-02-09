@@ -689,27 +689,7 @@ export const cancelTossPayment = functions
     });
 
 
-// 5. Get Aligo Templates
-import { getAlimTalkTemplates } from './utils/aligo';
 
-export const getAligoTemplates = functions
-    .runWith({
-        enforceAppCheck: false,
-        ingressSettings: 'ALLOW_ALL'
-    })
-    .https.onCall(async (data, context) => {
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
-        }
-
-        try {
-            const result = await getAlimTalkTemplates();
-            return result;
-        } catch (error: unknown) {
-            functions.logger.error("Error in getAligoTemplates:", error);
-            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
-        }
-    });
 
 // 6. Get NHN Cloud AlimTalk Templates
 import { getTemplates } from './utils/nhnAlimTalk';
