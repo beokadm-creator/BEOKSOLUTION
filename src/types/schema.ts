@@ -936,6 +936,8 @@ export interface PerformanceMetric {
   userId?: string; // User who experienced this metric
   url?: string; // Page URL
   route?: string; // React Router path
+  confId?: string; // Conference ID (for filtering)
+  societyId?: string; // Society ID (for filtering)
 
   // Thresholds
   threshold?: number; // Performance threshold (for alerting)

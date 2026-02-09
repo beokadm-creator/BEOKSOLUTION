@@ -104,15 +104,48 @@ export const generateFirebaseAuthUserForExternalAttendee = functions
                 authCreatedAt: admin.firestore.FieldValue.serverTimestamp()
             });
 
-            // 4. Create Participation Record (For accessing the conference)
+            // 4. Fetch Conference Data for Complete Participation Record
+            const confDoc = await db.collection('conferences').doc(confId).get();
+            if (!confDoc.exists) {
+                throw new functions.https.HttpsError('not-found', `Conference ${confId} not found`);
+            }
+            const confData = confDoc.data();
+
+            // 5. Create Participation Record (For accessing the conference)
             // This is CRITICAL for "Normal Course Taking System"
+            // MUST include all fields that UserHubPage expects for display
             await db.collection('users').doc(uid).collection('participations').doc(externalId).set({
+                // Core identification
                 conferenceId: confId,
                 registrationId: externalId,
+                slug: confData?.slug || confId, // CRITICAL: Required by UserHubPage line 442
+                conferenceSlug: confData?.slug || confId,
+
+                // Society information
+                societyId: confData?.societyId || 'kadd', // CRITICAL: Required by UserHubPage line 506
+                societyName: confData?.societyName || '',
+
+                // Conference details for display
+                conferenceName: confData?.title?.ko || confData?.title?.en || confData?.title || confId,
+
+                // User information
+                userName: attendeeData.name,
+                userId: uid,
+
+                // Registration metadata
                 role: 'ATTENDEE',
                 type: 'EXTERNAL',
                 registeredAt: admin.firestore.FieldValue.serverTimestamp(),
-                status: 'COMPLETED'
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+
+                // Payment status - CRITICAL for UserHubPage filtering (lines 562-563, 734-735)
+                status: 'PAID', // External attendees are pre-paid
+                paymentStatus: 'PAID',
+
+                // Additional metadata
+                earnedPoints: 0,
+                amount: 0
             }, { merge: true });
 
             return { success: true, uid, message: isNew ? 'Created new account' : 'Linked existing account' };
