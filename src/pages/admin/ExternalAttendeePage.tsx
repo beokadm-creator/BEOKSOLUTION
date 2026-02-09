@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/ta
 import { UserPlus, Upload, Download, FileText, Badge, CheckCircle2, Trash2, Loader2, Eye, EyeOff, Copy, MessageCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ExternalAttendee } from '../../types/schema';
+import ExternalAttendeeMigration from '../../components/admin/ExternalAttendeeMigration';
 
 const ExternalAttendeePage: React.FC = () => {
     const navigate = useNavigate();
@@ -1115,6 +1116,9 @@ const ExternalAttendeePage: React.FC = () => {
                         </Card>
                     </TabsContent>
                 </Tabs>
+
+                {/* External Attendee Migration Tool */}
+                {confId && <ExternalAttendeeMigration confId={confId} />}
             </div>
 
             {/* Voucher Modal */}

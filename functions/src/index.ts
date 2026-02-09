@@ -5,6 +5,7 @@ import { getNiceAuthParams, approveNicePayment } from './payment/nice';
 import { approveTossPayment, cancelTossPayment as cancelTossPaymentApi } from './payment/toss';
 
 import { onRegistrationCreated, onExternalAttendeeCreated, validateBadgePrepToken, issueDigitalBadge, resendBadgePrepToken } from './badge/index';
+import { migrateExternalAttendeeParticipations } from './migrations/migrateExternalAttendeeParticipations';
 
 export const cors = corsLib({ origin: true });
 
@@ -16,7 +17,8 @@ export {
     validateBadgePrepToken,
     issueDigitalBadge,
     resendBadgePrepToken,
-    generateFirebaseAuthUserForExternalAttendee
+    generateFirebaseAuthUserForExternalAttendee,
+    migrateExternalAttendeeParticipations
 };
 
 import { generateFirebaseAuthUserForExternalAttendee } from './auth/external';

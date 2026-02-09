@@ -687,6 +687,7 @@ export interface ExternalAttendee {
   checkInTime: Timestamp | null;
   badgeIssued?: boolean;
   badgeIssuedAt?: Timestamp;
+  authCreated?: boolean; // Flag to indicate if Firebase Auth user has been created
 
   // Deletion status
   deleted?: boolean;
@@ -835,4 +836,61 @@ export interface Notice {
   authorName?: string; // Snapshot of creator name
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+// ==========================================
+// H. Monitoring & Logging
+// ==========================================
+
+/**
+ * Collection: `logs/errors/{date}/{logId}`
+ * System error logs for monitoring
+ */
+export interface ErrorLog {
+  id: string;
+  timestamp: Timestamp;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  category: string;
+  message: string;
+  stackTrace?: string;
+  userId?: string;
+  url?: string;
+  route?: string;
+  userAgent?: string;
+  occurrenceCount?: number;
+  resolved?: boolean;
+}
+
+/**
+ * Collection: `logs/performance/{date}/{metricId}`
+ * Performance metrics for monitoring
+ */
+export interface PerformanceMetric {
+  id: string;
+  timestamp: Timestamp;
+  metricName: string;
+  value: number;
+  unit: string;
+  threshold?: number;
+  url?: string;
+  route?: string;
+  userId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Collection: `logs/data_integrity/{date}/{alertId}`
+ * Data integrity alerts for monitoring
+ */
+export interface DataIntegrityAlert {
+  id: string;
+  timestamp: Timestamp;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  collection: string;
+  documentId: string;
+  rule: string;
+  description: string;
+  resolved: boolean;
+  resolvedAt?: Timestamp;
+  resolvedBy?: string;
 }
