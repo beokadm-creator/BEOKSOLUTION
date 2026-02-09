@@ -140,6 +140,8 @@ export async function logError(
     action?: string;
     apiEndpoint?: string;
     firestoreQuery?: string;
+    confId?: string;       // Conference context
+    societyId?: string;    // Society context
     [key: string]: unknown;
   }
 ): Promise<void> {
@@ -219,6 +221,8 @@ export async function logPerformanceIssue(
   context?: {
     url?: string;
     route?: string;
+    confId?: string;       // Conference context
+    societyId?: string;    // Society context
     [key: string]: unknown;
   }
 ): Promise<void> {

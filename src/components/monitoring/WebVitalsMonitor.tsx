@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { onCLS, onINP, onLCP, onFCP, onTTFB } from 'web-vitals';
 import { logPerformanceIssue } from '@/utils/errorLogger';
+import { extractConfIdFromPath, extractSocietyIdFromPath } from '@/utils/pathHelper';
 
 /**
  * WebVitalsMonitor Component
@@ -23,6 +24,12 @@ export function WebVitalsMonitor() {
         if (initializedRef.current) return; // Run only once
 
         initializedRef.current = true;
+
+        // Extract context from URL
+        const confId = extractConfIdFromPath();
+        const societyId = extractSocietyIdFromPath();
+
+        console.log('[WebVitals] Context:', { confId, societyId });
 
         // Thresholds for "poor" performance (based on Web Vitals benchmarks)
         const THRESHOLDS = {
@@ -52,6 +59,8 @@ export function WebVitalsMonitor() {
                 {
                     url,
                     route,
+                    confId,
+                    societyId,
                     metricType: 'LCP',
                     unit: 'ms',
                 }
@@ -73,6 +82,8 @@ export function WebVitalsMonitor() {
                 {
                     url,
                     route,
+                    confId,
+                    societyId,
                     metricType: 'INP',
                     unit: 'ms',
                 }
@@ -94,6 +105,8 @@ export function WebVitalsMonitor() {
                 {
                     url,
                     route,
+                    confId,
+                    societyId,
                     metricType: 'CLS',
                     unit: 'score',
                 }
@@ -115,6 +128,8 @@ export function WebVitalsMonitor() {
                 {
                     url,
                     route,
+                    confId,
+                    societyId,
                     metricType: 'FCP',
                     unit: 'ms',
                 }
@@ -136,6 +151,8 @@ export function WebVitalsMonitor() {
                 {
                     url,
                     route,
+                    confId,
+                    societyId,
                     metricType: 'TTFB',
                     unit: 'ms',
                 }
