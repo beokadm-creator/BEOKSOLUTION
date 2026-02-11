@@ -149,6 +149,7 @@ export default function RegistrationPage() {
 
     // Payment Config
     const [tossClientKey, setTossClientKey] = useState<string | null>(null);
+    const [tossStoreId, setTossStoreId] = useState<string | null>(null);
     const [paymentProvider, setPaymentProvider] = useState<string>('TOSS');
     const [nicePaySecret, setNicePaySecret] = useState('');
     const [paymentWidget, setPaymentWidget] = useState<PaymentWidgetInstance | null>(null);

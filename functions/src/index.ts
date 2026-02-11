@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import corsLib from 'cors';
@@ -9,6 +10,8 @@ import { migrateExternalAttendeeParticipations } from './migrations/migrateExter
 import { monitorRegistrationIntegrity, monitorMemberCodeIntegrity } from './monitoring/dataIntegrity';
 import { dailyErrorReport, weeklyPerformanceReport } from './monitoring/scheduledReports';
 import { resolveDataIntegrityAlert } from './monitoring/resolveAlert';
+import { healthCheck, scheduledHealthCheck } from './health';
+import { checkAlimTalkConfig, checkAlimTalkConfigHttp } from './alimtalk/checkConfig';
 
 export const cors = corsLib({ origin: true });
 
@@ -26,8 +29,15 @@ export {
     monitorMemberCodeIntegrity,
     dailyErrorReport,
     weeklyPerformanceReport,
-    resolveDataIntegrityAlert
+    resolveDataIntegrityAlert,
+    healthCheck,
+    scheduledHealthCheck,
+    checkAlimTalkConfig,
+    checkAlimTalkConfigHttp,
+    sendAlimTalkTest
 };
+
+import { sendAlimTalkTest } from './alimtalk/sendTest';
 
 import { generateFirebaseAuthUserForExternalAttendee } from './auth/external';
 
@@ -258,6 +268,7 @@ export const confirmTossPayment = functions
             const societyId = confSnap.data()?.societyId;
 
             let finalSecretKey = secretKey; // Fallback
+            let finalStoreId: string | null = null;
 
             if (societyId) {
                 const infraSnap = await db.collection('societies').doc(societyId).collection('settings').doc('infrastructure').get();
@@ -265,7 +276,8 @@ export const confirmTossPayment = functions
                     const infraData = infraSnap.data();
                     if (infraData?.payment?.domestic?.secretKey) {
                         finalSecretKey = infraData.payment.domestic.secretKey;
-                        functions.logger.info(`[TossPayment] Loaded Secure Key for ${societyId} (Starts with: ${finalSecretKey.substring(0, 5)}...)`);
+                        finalStoreId = infraData.payment.domestic.storeId || null;
+                        functions.logger.info(`[TossPayment] Loaded Secure Key for ${societyId} (Starts with: ${finalSecretKey.substring(0, 5)}...) StoreId: ${finalStoreId}`);
                     }
                 }
             }
@@ -275,7 +287,7 @@ export const confirmTossPayment = functions
             }
 
             // 1. Call Toss API
-            const approvalResult = await approveTossPayment(paymentKey, orderId, amount, finalSecretKey) as any;
+            const approvalResult = await approveTossPayment(paymentKey, orderId, amount, finalSecretKey, finalStoreId) as any;
 
             // 2. If success (no error thrown), create Registration document
             // [FIX-20250124-01] Create Registration document on successful payment (instead of updating)
@@ -455,6 +467,7 @@ export const confirmTossPaymentHttp = functions
                 const societyId = confSnap.data()?.societyId;
 
                 let finalSecretKey = secretKey; // Fallback
+                let finalStoreId: string | null = null;
 
                 if (societyId) {
                     const infraSnap = await db.collection('societies').doc(societyId).collection('settings').doc('infrastructure').get();
@@ -462,7 +475,8 @@ export const confirmTossPaymentHttp = functions
                         const infraData = infraSnap.data();
                         if (infraData?.payment?.domestic?.secretKey) {
                             finalSecretKey = infraData.payment.domestic.secretKey;
-                            functions.logger.info(`[TossPaymentHttp] Loaded Secure Key for ${societyId} (Starts with: ${finalSecretKey.substring(0, 5)}...)`);
+                            finalStoreId = infraData.payment.domestic.storeId || null;
+                            functions.logger.info(`[TossPaymentHttp] Loaded Secure Key for ${societyId} (Starts with: ${finalSecretKey.substring(0, 5)}...) StoreId: ${finalStoreId}`);
                         }
                     }
                 }
@@ -473,7 +487,7 @@ export const confirmTossPaymentHttp = functions
                 }
 
                 // 1. Call Toss API
-                const approvalResult = await approveTossPayment(paymentKey, orderId, amount, finalSecretKey) as any;
+                const approvalResult = await approveTossPayment(paymentKey, orderId, amount, finalSecretKey, finalStoreId) as any;
 
                 // 2. If success (no error thrown), create Registration document
                 if (regId && confId) {
@@ -685,10 +699,10 @@ export const cancelTossPayment = functions
     });
 
 
-// 5. Get Aligo Templates
-import { getAlimTalkTemplates } from './utils/aligo';
+// 5. Get NHN Cloud AlimTalk Templates
+import { getTemplateList } from './utils/nhnCloud';
 
-export const getAligoTemplates = functions
+export const getNHNTemplates = functions
     .runWith({
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
@@ -698,11 +712,40 @@ export const getAligoTemplates = functions
             throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
         }
 
+        const { societyId } = data;
+        if (!societyId) {
+            throw new functions.https.HttpsError('invalid-argument', 'societyId is required');
+        }
+
         try {
-            const result = await getAlimTalkTemplates();
+            // Get NHN Cloud config from Firestore
+            const infraSnap = await admin.firestore()
+                .collection('societies')
+                .doc(societyId)
+                .collection('settings')
+                .doc('infrastructure')
+                .get();
+
+            if (!infraSnap.exists) {
+                throw new Error('Infrastructure settings not found');
+            }
+
+            const infraData = infraSnap.data();
+            const nhnConfig = infraData?.notification;
+
+            if (!nhnConfig?.appKey || !nhnConfig?.secretKey || !nhnConfig?.senderKey) {
+                throw new Error('NHN Cloud configuration is incomplete');
+            }
+
+            const result = await getTemplateList({
+                appKey: nhnConfig.appKey,
+                secretKey: nhnConfig.secretKey,
+                senderKey: nhnConfig.senderKey
+            });
+
             return result;
         } catch (error: any) {
-            functions.logger.error("Error in getAligoTemplates:", error);
+            functions.logger.error("Error in getNHNTemplates:", error);
             throw new functions.https.HttpsError('internal', error.message);
         }
     });
@@ -1443,3 +1486,6 @@ export const logPerformance = functions
             throw new functions.https.HttpsError('internal', e.message);
         }
     });
+
+// 7. Debug Tools
+export { debugNHNTemplate, sendTestAlimTalkHTTP } from './debug';
