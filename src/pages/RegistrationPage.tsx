@@ -129,7 +129,9 @@ export default function RegistrationPage() {
         }
 
         // Priority 3: Check location.state (may be lost during navigation)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (paramCalculatedPrice === undefined && location.state && typeof (location.state as any).calculatedPrice === 'number') {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             paramCalculatedPrice = (location.state as any).calculatedPrice;
             console.log('[RegistrationPage] Using calculated price from location.state:', paramCalculatedPrice);
         }
@@ -151,6 +153,7 @@ export default function RegistrationPage() {
     const [nicePaySecret, setNicePaySecret] = useState('');
     const [paymentWidget, setPaymentWidget] = useState<PaymentWidgetInstance | null>(null);
     const paymentMethodsWidgetRef = useRef<HTMLDivElement>(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const paymentMethodsInstanceRef = useRef<any>(null);
 
     // State - Form
@@ -493,14 +496,21 @@ export default function RegistrationPage() {
             } else {
                 // Initial Render
                 console.log('[PaymentWidget] Rendering methods with:', price);
+                const renderOptions: { variantKey: string; storeId?: string } = { variantKey: 'DEFAULT' };
+                if (tossStoreId) {
+                    renderOptions.storeId = tossStoreId;
+                    console.log('[PaymentWidget] Using Store ID:', tossStoreId);
+                }
+
                 paymentMethodsInstanceRef.current = paymentWidget.renderPaymentMethods(
                     '#payment-widget',
                     amount,
-                    { variantKey: 'DEFAULT' }
+                    renderOptions
                 );
             }
         }
-    }, [paymentWidget, price]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [paymentWidget, price, tossStoreId]);
 
     // Reset instance ref if widget changes
     useEffect(() => {
@@ -1008,6 +1018,7 @@ export default function RegistrationPage() {
                         <DialogTitle>{language === 'ko' ? '환불규정' : 'Refund Policy'}</DialogTitle>
                     </DialogHeader>
                     <div className="mt-4 whitespace-pre-wrap text-sm text-slate-600 leading-relaxed">
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {regSettings?.refundPolicy || (info as any)?.refundPolicy ||
                             "2026년 3월 5일 17시까지 전액 환불 이후 환불은 불가 합니다. 카드결제 : 승인취소 퀵계좌이체 등 : 시스템에서 계좌 환불 * 카드사 승인 사정에 따라 환불이 영업일 기준 5일 이상 발생할 수 있습니다. 자세한 사항은 사무국으로 문의주시기 바랍니다."}
                     </div>

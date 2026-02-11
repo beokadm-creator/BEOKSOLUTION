@@ -30,7 +30,9 @@ interface InfraSettings {
         };
     };
     notification: {
-        channelId: string; // Only Kakao Channel ID needed
+        appKey: string;      // NHN Cloud App Key
+        secretKey: string;   // NHN Cloud Secret Key
+        senderKey: string;   // Kakao Sender Key (발신 프로필 키)
     };
     email: {
         host: string;
@@ -47,6 +49,7 @@ const defaultSettings: InfraSettings = {
         domestic: {
             provider: '',
             merchantId: '',
+            storeId: '',
             apiKey: '',
             secretKey: '',
             isTestMode: true,
@@ -60,7 +63,9 @@ const defaultSettings: InfraSettings = {
         },
     },
     notification: {
-        channelId: '',
+        appKey: '',
+        secretKey: '',
+        senderKey: '',
     },
     email: {
         host: '',
@@ -109,9 +114,7 @@ export default function InfraPage() {
                             domestic: { ...defaultSettings.payment.domestic, ...(data.payment?.domestic || {}) },
                             global: { ...defaultSettings.payment.global, ...(data.payment?.global || {}) },
                         },
-                        notification: {
-                            channelId: data.notification?.channelId || defaultSettings.notification.channelId
-                        },
+                        notification: { ...defaultSettings.notification, ...data.notification },
                         email: { ...defaultSettings.email, ...data.email },
                     });
                 }
@@ -250,6 +253,16 @@ export default function InfraPage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-slate-500 uppercase">Store ID (Sub-mall ID)</Label>
+                                    <Input
+                                        value={settings.payment.domestic.storeId || ''}
+                                        onChange={(e) => setSettings(prev => ({ ...prev, payment: { ...prev.payment, domestic: { ...prev.payment.domestic, storeId: e.target.value } } }))}
+                                        className="h-11 font-mono text-sm bg-slate-50 border-slate-200 focus:bg-white transition-colors rounded-xl"
+                                        placeholder="Optional: Only for ConnectPay (Platform)"
+                                    />
+                                    <p className="text-[10px] text-slate-400">Leave empty for General Merchant. Required for Platform accounts.</p>
+                                </div>
+                                <div className="space-y-2">
                                     <Label className="text-xs font-bold text-slate-500 uppercase">Client API Key</Label>
                                     <Input
                                         value={settings.payment.domestic.apiKey}
@@ -376,7 +389,7 @@ export default function InfraPage() {
                             </div>
                             <div>
                                 <CardTitle className="text-lg font-bold text-slate-800">Notification Service</CardTitle>
-                                <CardDescription className="text-amber-600/80 font-medium mt-0.5">Aligo KakaoTalk Integration</CardDescription>
+                                <CardDescription className="text-amber-600/80 font-medium mt-0.5">NHN Cloud KakaoTalk Bizmessage</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
@@ -384,31 +397,61 @@ export default function InfraPage() {
                         <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex gap-3">
                             <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                             <div className="text-xs text-blue-900 leading-relaxed">
-                                <p className="font-bold mb-1">Platform Managed Service</p>
-                                API keys are now managed securely by the backend platform. You only need to provide your Kakao Channel ID.
+                                <p className="font-bold mb-1">NHN Cloud Integration</p>
+                                Configure your NHN Cloud KakaoTalk Bizmessage credentials. Get these from your NHN Cloud Console.
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-500 uppercase">Kakao Channel ID</Label>
-                            <Input
-                                value={settings.notification.channelId}
-                                onChange={(e) => setSettings(prev => ({ ...prev, notification: { channelId: e.target.value } }))}
-                                placeholder="@your_channel_id"
-                                className="h-11 font-medium text-sm bg-slate-50 border-slate-200 rounded-xl"
-                            />
-                            <p className="text-[11px] text-slate-400 pl-1">Must include the '@' symbol (e.g., @mysociety).</p>
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold text-slate-500 uppercase">App Key</Label>
+                                <Input
+                                    value={settings.notification.appKey}
+                                    onChange={(e) => setSettings(prev => ({ ...prev, notification: { ...prev.notification, appKey: e.target.value } }))}
+                                    placeholder="NHN Cloud App Key"
+                                    className="h-11 font-mono text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                    type="password"
+                                />
+                                <p className="text-[11px] text-slate-400 pl-1">Found in NHN Cloud Console → KakaoTalk Bizmessage → App Key</p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold text-slate-500 uppercase">Secret Key</Label>
+                                <Input
+                                    value={settings.notification.secretKey}
+                                    onChange={(e) => setSettings(prev => ({ ...prev, notification: { ...prev.notification, secretKey: e.target.value } }))}
+                                    placeholder="NHN Cloud Secret Key"
+                                    className="h-11 font-mono text-sm bg-slate-50 border-slate-200 rounded-xl tracking-widest"
+                                    type="password"
+                                />
+                                <p className="text-[11px] text-slate-400 pl-1">API authentication secret key</p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold text-slate-500 uppercase">Sender Key (발신 프로필 키)</Label>
+                                <Input
+                                    value={settings.notification.senderKey}
+                                    onChange={(e) => setSettings(prev => ({ ...prev, notification: { ...prev.notification, senderKey: e.target.value } }))}
+                                    placeholder="Kakao Sender Key"
+                                    className="h-11 font-mono text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                />
+                                <p className="text-[11px] text-slate-400 pl-1">Kakao Channel sender profile key (발신 프로필 키)</p>
+                            </div>
                         </div>
 
                         <div className="mt-2 bg-amber-50/50 border border-amber-100 p-4 rounded-xl">
                             <div className="flex justify-between items-center mb-2">
                                 <span className="text-xs font-bold text-amber-800 uppercase">Integration Status</span>
-                                <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white border-none py-0.5 h-5 text-[10px]">ACTIVE</Badge>
+                                <Badge className={`${settings.notification.appKey && settings.notification.secretKey && settings.notification.senderKey ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-slate-400'} text-white border-none py-0.5 h-5 text-[10px]`}>
+                                    {settings.notification.appKey && settings.notification.secretKey && settings.notification.senderKey ? 'CONFIGURED' : 'NOT CONFIGURED'}
+                                </Badge>
                             </div>
                             <div className="w-full bg-amber-200/30 rounded-full h-1.5 overflow-hidden">
-                                <div className="bg-emerald-500 h-full rounded-full w-full animate-pulse"></div>
+                                <div className={`${settings.notification.appKey && settings.notification.secretKey && settings.notification.senderKey ? 'bg-emerald-500 w-full' : 'bg-slate-400 w-1/3'} h-full rounded-full transition-all duration-500`}></div>
                             </div>
-                            <p className="text-[10px] text-amber-600/70 mt-2 font-medium text-right">Service operational and ready.</p>
+                            <p className="text-[10px] text-amber-600/70 mt-2 font-medium text-right">
+                                {settings.notification.appKey && settings.notification.secretKey && settings.notification.senderKey ? 'Ready to send AlimTalk messages' : 'Please configure all fields'}
+                            </p>
                         </div>
                     </CardContent>
                 </Card>
