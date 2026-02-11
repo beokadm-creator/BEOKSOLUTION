@@ -254,8 +254,10 @@ export default function RegistrationPage() {
                     // Use DB key if configured, otherwise fallback to default test key
                     const apiKey = domesticPayment?.apiKey || defaultClientKey;
                     const secretKey = domesticPayment?.secretKey || '';
+                    const storeId = domesticPayment?.storeId || null;
 
                     setTossClientKey(apiKey);
+                    setTossStoreId(storeId);
                     setNicePaySecret(secretKey);
                     setPaymentProvider(domesticPayment?.provider || 'TOSS');
 
