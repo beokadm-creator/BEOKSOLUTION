@@ -62,6 +62,12 @@ interface UserReg {
     receiptConfig?: ReceiptConfig;
     userName?: string;
     status?: string; // Generic status field from Firestore (PAID, CANCELED, etc.)
+    virtualAccount?: {
+        bank: string;
+        accountNumber: string;
+        customerName?: string;
+        dueDate?: string;
+    };
 }
 
 interface Affiliation {
@@ -139,8 +145,11 @@ const UserHubPage: React.FC = () => {
 
     // Modal State
     const [showCertModal, setShowCertModal] = useState(false);
+    const [showVirtualAccountModal, setShowVirtualAccountModal] = useState(false);
     const [verifyForm, setVerifyForm] = useState({ societyId: "", name: "", code: "" });
     const [isSocLocked, setIsSocLocked] = useState(false);
+    // State for Virtual Account Modal
+    const [selectedVirtualAccountReg, setSelectedVirtualAccountReg] = useState<UserReg | null>(null);
     // [Fix-Step 263] Use Hook
     const { verifyMember, loading: verifyLoading } = useMemberVerification();
     const verifyFormInitializedRef = useRef(false);
@@ -539,7 +548,8 @@ const UserHubPage: React.FC = () => {
                                 paymentDate: data.createdAt || data.updatedAt || data.registeredAt,
                                 receiptConfig: receiptConfig,
                                 userName: data.userName || user.name || (user as { displayName?: string }).displayName,
-                                status: data.status
+                                status: data.status,
+                                virtualAccount: data.virtualAccount
                             };
                         });
 
@@ -600,8 +610,9 @@ const UserHubPage: React.FC = () => {
 
                             // WHITE-LIST STRATEGY: Only allow known valid unfinished statuses
                             // If it is 'COMPLETED' but not caught by step 1 (PAID), it is invalid (zombie).
-                            if (['PENDING', 'READY', 'SUBMITTED'].includes(pStatus) ||
-                                ['PENDING', 'READY', 'SUBMITTED'].includes(status)) {
+                            if (['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT'].includes(pStatus) ||
+                                ['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT'].includes(status) ||
+                                pStatus === 'WAITING_FOR_DEPOSIT' || status === 'WAITING_FOR_DEPOSIT') {
                                 activeRegs.push(latest);
                             } else {
                                 console.log(`[UserHub] Hiding conference ${slug} due to invalid status: p=${pStatus}, s=${status}`);
@@ -712,7 +723,8 @@ const UserHubPage: React.FC = () => {
                             paymentDate: data.createdAt || data.updatedAt || data.registeredAt,
                             receiptConfig: receiptConfig,
                             userName: data.userName || user.name || (user as { displayName?: string }).displayName,
-                            status: data.status
+                            status: data.status,
+                            virtualAccount: data.virtualAccount
                         };
                     });
 
@@ -771,8 +783,9 @@ const UserHubPage: React.FC = () => {
                         const status = (latest.status || '').toUpperCase();
 
                         // WHITE-LIST STRATEGY: Only allow known valid unfinished statuses
-                        if (['PENDING', 'READY', 'SUBMITTED'].includes(pStatus) ||
-                            ['PENDING', 'READY', 'SUBMITTED'].includes(status)) {
+                        if (['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT'].includes(pStatus) ||
+                            ['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT'].includes(status) ||
+                            pStatus === 'WAITING_FOR_DEPOSIT' || status === 'WAITING_FOR_DEPOSIT') {
                             activeRegs.push(latest);
                         } else {
                             console.log(`[UserHub] Hiding conference ${slug} due to invalid status: p=${pStatus}, s=${status} (Realtime)`);
@@ -1070,8 +1083,12 @@ const UserHubPage: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="mt-auto border-t border-slate-100 pt-4 flex items-center justify-between">
-                                    <span className={r.earnedPoints ? "bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold" : "bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-xs"}>
-                                        {r.earnedPoints ? `+${r.earnedPoints} pts` : `[DBG] p:${r.paymentStatus} s:${r.status}`}
+                                    <span className={r.earnedPoints ? "bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold" :
+                                        (r.status === 'PENDING_PAYMENT' || r.paymentStatus === 'WAITING_FOR_DEPOSIT') ? "bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-xs font-bold border border-orange-100" :
+                                            "bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-xs"}>
+                                        {r.earnedPoints ? `+${r.earnedPoints} pts` :
+                                            (r.status === 'PENDING_PAYMENT' || r.paymentStatus === 'WAITING_FOR_DEPOSIT') ? '입금 대기 (가상계좌)' :
+                                                `[STATUS] ${r.paymentStatus || r.status}`}
                                     </span>
                                     <div className="flex gap-2">
                                         <Button
@@ -1103,6 +1120,20 @@ const UserHubPage: React.FC = () => {
                                                 className="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs gap-1.5 shadow-sm border border-slate-200"
                                             >
                                                 <Printer size={14} /> 영수증
+                                            </Button>
+                                        )}
+                                        {(r.status === 'PENDING_PAYMENT' || r.paymentStatus === 'WAITING_FOR_DEPOSIT') && r.virtualAccount && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedVirtualAccountReg(r);
+                                                    setShowVirtualAccountModal(true);
+                                                }}
+                                                className="bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold text-xs gap-1.5 shadow-sm border border-orange-200"
+                                            >
+                                                <CreditCard size={14} /> 계좌 확인
                                             </Button>
                                         )}
                                     </div>
@@ -1394,6 +1425,54 @@ const UserHubPage: React.FC = () => {
                                 </Button>
                             }
                         />
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Virtual Account Modal */}
+            <Dialog open={showVirtualAccountModal} onOpenChange={setShowVirtualAccountModal}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>가상계좌 입금 정보</DialogTitle>
+                    </DialogHeader>
+                    {selectedVirtualAccountReg && selectedVirtualAccountReg.virtualAccount && (
+                        <div className="bg-white p-6 rounded-xl border border-orange-200 shadow-sm mt-2">
+                            <h3 className="text-lg font-bold text-orange-800 mb-4 border-b border-orange-100 pb-2">
+                                입금 계좌 안내
+                            </h3>
+                            <div className="space-y-3">
+                                <div className="flex justify-between">
+                                    <span className="text-gray-500">은행</span>
+                                    <span className="font-bold">{selectedVirtualAccountReg.virtualAccount.bank}</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                                    <span className="text-gray-500">계좌번호</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-lg text-blue-600">{selectedVirtualAccountReg.virtualAccount.accountNumber}</span>
+                                    </div>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-gray-500">예금주</span>
+                                    <span className="font-medium">{selectedVirtualAccountReg.virtualAccount.customerName || 'Toss Payments'}</span>
+                                </div>
+                                {selectedVirtualAccountReg.virtualAccount.dueDate && (
+                                    <div className="flex justify-between text-red-500 pt-2 border-t border-dashed border-gray-200 mt-2">
+                                        <span className="font-medium">입금기한</span>
+                                        <span className="font-bold">
+                                            {new Date(selectedVirtualAccountReg.virtualAccount.dueDate).toLocaleString()}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="mt-6 text-xs text-gray-400 text-center">
+                                ※ 입금 기한 내에 입금하지 않으시면 자동 취소됩니다.
+                            </div>
+                        </div>
+                    )}
+                    <div className="flex justify-center mt-4">
+                        <Button onClick={() => setShowVirtualAccountModal(false)} className="w-full bg-slate-900 text-white hover:bg-slate-800">
+                            확인
+                        </Button>
                     </div>
                 </DialogContent>
             </Dialog>
