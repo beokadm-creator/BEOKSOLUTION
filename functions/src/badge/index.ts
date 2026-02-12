@@ -4,7 +4,10 @@ import * as admin from 'firebase-admin';
 /**
  * Generate a secure random token for badge prep
  */
-function generateBadgePrepToken(): string {
+/**
+ * Generate a secure random token for badge prep
+ */
+export function generateBadgePrepToken(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let token = 'TKN-';
   for (let i = 0; i < 32; i++) {
@@ -95,7 +98,10 @@ export const onRegistrationCreated = functions.firestore
 /**
  * Helper: Send Badge Notification (AlimTalk)
  */
-async function sendBadgeNotification(
+/**
+ * Helper: Send Badge Notification (AlimTalk)
+ */
+export async function sendBadgeNotification(
   db: admin.firestore.Firestore,
   conference: any,
   regId: string,
@@ -174,19 +180,23 @@ async function sendBadgeNotification(
         // Send
         const recipientPhone = regData.phone || regData.userInfo?.phone;
         if (recipientPhone) {
-          const cleanPhone = recipientPhone.replace(/-/g, '');
+          // Remove hyphens, spaces, and non-numeric characters
+          const cleanPhone = recipientPhone.replace(/[^0-9]/g, '');
 
-          const { sendAlimTalk } = require('../utils/aligo');
+          // NHN Cloud AlimTalk 발송
+          const { sendAlimTalk } = require('../services/notificationService');
 
           await sendAlimTalk(
-            cleanPhone,
-            kakaoConfig.kakaoTemplateCode,
             {
-              message: content,
-              name: variables.userName,
-              button: buttons
+              phone: cleanPhone,
+              templateCode: kakaoConfig.kakaoTemplateCode,
+              variables: {
+                ...variables,
+                message: content
+              },
+              buttons: buttons
             },
-            conference.societyId
+            conference.societyId  // societyId 전달
           );
 
           functions.logger.info(`[BadgeNotification] AlimTalk sent to ${cleanPhone} for ${regId}`);
@@ -223,6 +233,85 @@ export const validateBadgePrepToken = functions
       const tokenSnap = await db.collection(`conferences/${confId}/badge_tokens`).doc(token).get();
 
       if (!tokenSnap.exists) {
+        // [LEGACY SUPPORT] Try to find token in registrations collection (Auto-migration)
+        functions.logger.info(`[BadgeToken] Token doc not found for ${token}, searching legacy fields...`);
+
+        let legacyRegSnap: admin.firestore.QueryDocumentSnapshot | null = null;
+
+
+        // 1. Check registrations
+        const regQuery = await db.collection(`conferences/${confId}/registrations`)
+          .where('badgePrepToken', '==', token)
+          .limit(1)
+          .get();
+
+        if (!regQuery.empty) {
+          legacyRegSnap = regQuery.docs[0];
+        } else {
+          // 2. Check external_attendees
+          const extQuery = await db.collection(`conferences/${confId}/external_attendees`)
+            .where('badgePrepToken', '==', token)
+            .limit(1)
+            .get();
+
+          if (!extQuery.empty) {
+            legacyRegSnap = extQuery.docs[0];
+
+          }
+        }
+
+        if (legacyRegSnap) {
+          // Found legacy token! Migrate it immediately.
+          const regData = legacyRegSnap.data();
+          const now = admin.firestore.Timestamp.now();
+
+          // Calculate expiry (Default 7 days from now as we don't know original issue time)
+          const expiresAt = admin.firestore.Timestamp.fromMillis(
+            now.toMillis() + (7 * 24 * 60 * 60 * 1000)
+          );
+
+          const newTokenData = {
+            token,
+            registrationId: legacyRegSnap.id,
+            conferenceId: confId,
+            userId: regData.userId || 'GUEST',
+            status: 'ACTIVE',
+            createdAt: now,
+            expiresAt,
+            migratedAt: now,
+            isLegacy: true
+          };
+
+          await db.collection(`conferences/${confId}/badge_tokens`).doc(token).set(newTokenData);
+          functions.logger.info(`[BadgeToken] Legacy token migrated for ${legacyRegSnap.id}`);
+
+          // Mock snapshot for downstream logic
+          // We need to reload or just construct object. 
+          // Simplest is to recursive call or just proceed. 
+          // Let's proceed by returning the match.
+
+          // Return result immediately to avoid complex flow control
+          return {
+            valid: true,
+            tokenStatus: 'ACTIVE',
+            registration: {
+              id: legacyRegSnap.id,
+              name: regData.name || regData.userInfo?.name,
+              email: regData.email || regData.userInfo?.email,
+              phone: regData.phone || regData.userInfo?.phone,
+              affiliation: regData.affiliation || regData.organization || regData.userInfo?.affiliation || '',
+              licenseNumber: regData.licenseNumber || regData.userInfo?.licenseNumber || '',
+              confirmationQr: regData.confirmationQr,
+              badgeQr: regData.badgeQr,
+              badgeIssued: !!regData.badgeIssued,
+              attendanceStatus: regData.attendanceStatus || 'OUTSIDE',
+              currentZone: regData.currentZone,
+              totalMinutes: regData.totalMinutes || 0,
+              receiptNumber: regData.receiptNumber
+            }
+          };
+        }
+
         return { valid: false, error: 'TOKEN_NOT_FOUND' };
       }
 

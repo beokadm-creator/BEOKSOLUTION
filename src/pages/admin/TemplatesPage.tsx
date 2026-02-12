@@ -51,48 +51,47 @@ export default function TemplatesPage() {
     const [kakaoTemplateCode, setKakaoTemplateCode] = useState('');
     const [kakaoStatus, setKakaoStatus] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
 
-    // Aligo Import State
-    const [isAligoImportOpen, setIsAligoImportOpen] = useState(false);
-    const [aligoTemplates, setAligoTemplates] = useState<any[]>([]);
-    const [loadingAligo, setLoadingAligo] = useState(false);
+    // NHN Cloud Import State
+    const [isNHNImportOpen, setIsNHNImportOpen] = useState(false);
+    const [nhnTemplates, setNHNTemplates] = useState<any[]>([]);
+    const [loadingNHN, setLoadingNHN] = useState(false);
 
-    // Fetch Aligo Templates
-    const handleFetchAligoTemplates = async () => {
-        setLoadingAligo(true);
-        // Only fetch if empty or force refresh? Let's always fetch for now.
+    // Fetch NHN Cloud Templates
+    const handleFetchNHNTemplates = async () => {
+        setLoadingNHN(true);
         try {
-            const getAligoTemplatesFn = httpsCallable(functions, 'getAligoTemplates');
-            const result = await getAligoTemplatesFn();
+            const getNHNTemplatesFn = httpsCallable(functions, 'getNHNTemplates');
+            // Must pass societyId
+            const result = await getNHNTemplatesFn({ societyId: targetSocietyId });
             const data = result.data as any;
 
-            if (data.success && data.data && data.data.list) {
-                setAligoTemplates(data.data.list);
-                setIsAligoImportOpen(true);
+            if (data.success && data.templates) {
+                setNHNTemplates(data.templates);
+                setIsNHNImportOpen(true);
             } else {
-                console.error("Aligo API Error:", data);
-                if (data.data && data.data.message) {
-                    toast.error(`알리고 오류: ${data.data.message}`);
+                console.error("NHN API Error:", data);
+                if (data.error) {
+                    toast.error(`NHN Cloud 오류: ${data.error}`);
                 } else {
-                    toast.error("알리고 템플릿 목록을 불러오지 못했습니다.");
+                    toast.error("NHN Cloud 템플릿 목록을 불러오지 못했습니다.");
                 }
             }
-        } catch (error) {
-            console.error("Failed to fetch Aligo templates:", error);
-            toast.error("알리고 템플릿 호출 중 오류가 발생했습니다.");
+        } catch (error: any) {
+            console.error("Failed to fetch NHN templates:", error);
+            toast.error(`템플릿 호출 오류: ${error.message || 'Unknown error'}`);
         } finally {
-            setLoadingAligo(false);
+            setLoadingNHN(false);
         }
     };
 
-    const handleSelectAligoTemplate = (tpl: any) => {
-        setKakaoContent(tpl.tpl_content);
-        setKakaoTemplateCode(tpl.tpl_code);
+    const handleSelectNHNTemplate = (tpl: any) => {
+        setKakaoContent(tpl.templateContent);
+        setKakaoTemplateCode(tpl.templateCode);
 
         // Parse buttons if any
-        if (tpl.tpl_button && tpl.tpl_button !== 'null') {
+        if (tpl.buttons && tpl.buttons.length > 0) {
             try {
-                // tpl.tpl_button is often a JSON string
-                const buttons = typeof tpl.tpl_button === 'string' ? JSON.parse(tpl.tpl_button) : tpl.tpl_button;
+                const buttons = tpl.buttons;
 
                 if (Array.isArray(buttons)) {
                     const mappedButtons = buttons.map((b: any) => ({
@@ -112,17 +111,18 @@ export default function TemplatesPage() {
         }
 
         // Auto-set status based on inspection status if available, else default to Approved
-        // Aligo returns: insp_status: 'APR' (Approved), 'REQ' (Request), 'REJ' (Rejected)
-        if (tpl.insp_status === 'APR') {
+        // NHN returns: status: 'TSC01'(REQ), 'TSC02'(INSP), 'TSC03'(APR), 'TSC04'(REJ) OR 'APPROVED', 'REJECTED'
+        const stat = tpl.status;
+        if (stat === 'APPROVED' || stat === 'TSC03') {
             setKakaoStatus('APPROVED');
-        } else if (tpl.insp_status === 'REJ') {
+        } else if (stat === 'REJECTED' || stat === 'TSC04') {
             setKakaoStatus('REJECTED');
         } else {
             setKakaoStatus('PENDING');
         }
 
-        setIsAligoImportOpen(false);
-        toast.success("알리고 템플릿을 불러왔습니다.");
+        setIsNHNImportOpen(false);
+        toast.success("NHN Cloud 템플릿을 불러왔습니다.");
     };
 
     // Get Society ID
@@ -664,8 +664,8 @@ export default function TemplatesPage() {
 
             {/* Template Edit Dialog */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 bg-white rounded-2xl overflow-hidden block">
-                    <DialogHeader className="p-6 pb-4 border-b border-slate-100 bg-white sticky top-0 z-10">
+                <DialogContent className="max-w-4xl max-h-[90vh] p-0 gap-0 bg-white rounded-2xl flex flex-col">
+                    <DialogHeader className="p-6 pb-4 border-b border-slate-100 bg-white flex-shrink-0">
                         <div className="flex items-center gap-3 mb-1">
                             <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
                                 {editingTemplate ? <Save className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
@@ -679,7 +679,7 @@ export default function TemplatesPage() {
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="p-6 space-y-8">
+                    <div className="p-6 space-y-8 overflow-y-auto flex-1">
                         {/* Basic Info Section */}
                         <section className="space-y-4">
                             <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
@@ -775,12 +775,12 @@ export default function TemplatesPage() {
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={handleFetchAligoTemplates}
-                                        disabled={loadingAligo}
+                                        onClick={handleFetchNHNTemplates}
+                                        disabled={loadingNHN}
                                         className="h-7 text-xs border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100"
                                     >
-                                        {loadingAligo ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : <Download className="w-3 h-3 mr-1" />}
-                                        알리고 불러오기
+                                        {loadingNHN ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : <Download className="w-3 h-3 mr-1" />}
+                                        NHN 템플릿 불러오기
                                     </Button>
                                     <Badge variant="outline" className="text-xs text-slate-400 font-normal">선택사항</Badge>
                                 </div>
@@ -917,7 +917,7 @@ export default function TemplatesPage() {
                         </section>
                     </div>
 
-                    <DialogFooter className="p-6 border-t border-slate-100 bg-slate-50 sticky bottom-0 z-10">
+                    <DialogFooter className="p-6 border-t border-slate-100 bg-slate-50 flex-shrink-0">
                         <Button variant="ghost" onClick={() => setIsDialogOpen(false)} className="mr-2">
                             취소
                         </Button>
@@ -929,49 +929,50 @@ export default function TemplatesPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Aligo Template Import Dialog */}
-            <Dialog open={isAligoImportOpen} onOpenChange={setIsAligoImportOpen}>
-                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto p-0 gap-0 bg-white rounded-2xl overflow-hidden block">
-                    <DialogHeader className="p-6 pb-4 border-b border-slate-100 bg-white sticky top-0 z-10">
+            {/* NHN Cloud Template Import Dialog */}
+            <Dialog open={isNHNImportOpen} onOpenChange={setIsNHNImportOpen}>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto p-0 gap-0 bg-white rounded-2xl flex flex-col">
+                    <DialogHeader className="p-6 pb-4 border-b border-slate-100 bg-white flex-shrink-0">
                         <div className="flex items-center gap-3 mb-1">
                             <div className="p-2 bg-amber-50 rounded-lg text-amber-600">
                                 <Download className="w-5 h-5" />
                             </div>
                             <DialogTitle className="text-xl font-bold text-slate-900">
-                                알리고 템플릿 불러오기
+                                NHN Cloud 템플릿 불러오기
                             </DialogTitle>
                         </div>
                         <DialogDescription className="text-slate-500 ml-11">
-                            알리고에 등록된 알림톡 템플릿 목록입니다.
+                            NHN Cloud에 등록된 알림톡 템플릿 목록입니다.
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="p-6">
+                    <div className="p-6 overflow-y-auto flex-1">
                         <div className="space-y-4">
-                            {aligoTemplates.length === 0 ? (
+                            {nhnTemplates.length === 0 ? (
                                 <div className="text-center py-10 text-slate-500 font-medium">
                                     불러온 템플릿이 없습니다.
                                 </div>
                             ) : (
-                                aligoTemplates.map((tpl: any) => (
-                                    <Card key={tpl.tpl_code} className="transition-all hover:bg-slate-50/50 cursor-pointer border-slate-100 group" onClick={() => handleSelectAligoTemplate(tpl)}>
+                                nhnTemplates.map((tpl: any) => (
+                                    <Card key={tpl.templateCode} className="transition-all hover:bg-slate-50/50 cursor-pointer border-slate-100 group" onClick={() => handleSelectNHNTemplate(tpl)}>
                                         <CardContent className="p-4">
                                             <div className="flex justify-between items-start mb-2">
                                                 <div>
-                                                    <h5 className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{tpl.tpl_name}</h5>
-                                                    <p className="text-xs text-slate-400 font-mono mt-0.5">{tpl.tpl_code}</p>
+                                                    <h5 className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{tpl.templateName}</h5>
+                                                    <p className="text-xs text-slate-400 font-mono mt-0.5">{tpl.templateCode}</p>
                                                 </div>
                                                 <Badge className={
-                                                    tpl.insp_status === 'APR' ? 'bg-emerald-500' :
-                                                        tpl.insp_status === 'REJ' ? 'bg-red-500' : 'bg-slate-500'
+                                                    (tpl.status === 'APPROVED' || tpl.status === 'TSC03') ? 'bg-emerald-500' :
+                                                        (tpl.status === 'REJECTED' || tpl.status === 'TSC04') ? 'bg-red-500' : 'bg-slate-500'
                                                 }>
-                                                    {tpl.insp_status === 'APR' ? '승인' :
-                                                        tpl.insp_status === 'REJ' ? '반려' : '대기'}
+                                                    {tpl.statusName ||
+                                                        ((tpl.status === 'APPROVED' || tpl.status === 'TSC03') ? '승인' :
+                                                            (tpl.status === 'REJECTED' || tpl.status === 'TSC04') ? '반려' : '대기')}
                                                 </Badge>
                                             </div>
                                             <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 mb-3 line-clamp-2">
                                                 <p className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed">
-                                                    {tpl.tpl_content}
+                                                    {tpl.templateContent}
                                                 </p>
                                             </div>
                                             <div className="flex justify-end">

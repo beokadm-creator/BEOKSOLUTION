@@ -149,12 +149,18 @@ const PaymentSuccessHandler: React.FC = () => {
 
                 const resData = result;
                 if (resData.success) {
-                    toast.success("결제가 완료되었습니다!");
-                    // Redirect to Success Page
-                    // Use pure slug (extract from confId like "kadd_2026spring" -> "2026spring")
+                    const paymentStatus = resData.data?.status;
                     const pureSlug = confId.includes('_') ? confId.split('_').slice(1).join('_') : confId;
                     sessionStorage.removeItem(`payment_processing_${paymentKey}`); // Cleanup
-                    window.location.href = `/${pureSlug}/register/success?orderId=${orderId}&name=${encodeURIComponent(userData.name)}`;
+
+                    if (paymentStatus === 'WAITING_FOR_DEPOSIT') {
+                        toast.success("가상계좌가 발급되었습니다. 입금을 완료해주세요.");
+                        // Redirect with virtual_account status
+                        window.location.href = `/${pureSlug}/register/success?orderId=${orderId}&name=${encodeURIComponent(userData.name)}&status=virtual_account`;
+                    } else {
+                        toast.success("결제가 완료되었습니다!");
+                        window.location.href = `/${pureSlug}/register/success?orderId=${orderId}&name=${encodeURIComponent(userData.name)}`;
+                    }
                 } else {
                     console.error("Payment Confirmation Failed:", resData);
                     toast.error("결제 확인에 실패했습니다. 관리자에게 문의해주세요.");

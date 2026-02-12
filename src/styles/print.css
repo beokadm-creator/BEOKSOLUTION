@@ -3,11 +3,12 @@
     visibility: hidden; /* Hide everything by default */
   }
   
-  #print-section, #print-section * {
+  #print-section, #print-section *,
+  #receipt-section, #receipt-section * {
     visibility: visible; /* Show only the print section */
   }
   
-  #print-section {
+  #print-section, #receipt-section {
     position: absolute;
     left: 0;
     top: 0;

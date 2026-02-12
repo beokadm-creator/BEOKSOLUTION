@@ -5,7 +5,7 @@ import corsLib from 'cors';
 import { getNiceAuthParams, approveNicePayment } from './payment/nice';
 import { approveTossPayment, cancelTossPayment as cancelTossPaymentApi } from './payment/toss';
 
-import { onRegistrationCreated, onExternalAttendeeCreated, validateBadgePrepToken, issueDigitalBadge, resendBadgePrepToken } from './badge/index';
+import { onRegistrationCreated, onExternalAttendeeCreated, validateBadgePrepToken, issueDigitalBadge, resendBadgePrepToken, generateBadgePrepToken, sendBadgeNotification } from './badge/index';
 import { migrateExternalAttendeeParticipations } from './migrations/migrateExternalAttendeeParticipations';
 import { monitorRegistrationIntegrity, monitorMemberCodeIntegrity } from './monitoring/dataIntegrity';
 import { dailyErrorReport, weeklyPerformanceReport } from './monitoring/scheduledReports';
@@ -289,9 +289,8 @@ export const confirmTossPayment = functions
             // 1. Call Toss API
             const approvalResult = await approveTossPayment(paymentKey, orderId, amount, finalSecretKey, finalStoreId) as any;
 
-            // 2. If success (no error thrown), create Registration document
-            // [FIX-20250124-01] Create Registration document on successful payment (instead of updating)
-            // This ensures that only paid registrations are stored in the DB
+            // 2. If success (no error thrown), check payment status
+            // [FIX-20250212] Handle Virtual Account (WAITING_FOR_DEPOSIT) vs Normal Payment (DONE)
             if (regId && confId) {
                 const regRef = admin.firestore().collection(`conferences/${confId}/registrations`).doc(regId);
 
@@ -305,8 +304,18 @@ export const confirmTossPayment = functions
 
                 // Determine payment method from approval result
                 const paymentMethod = (approvalResult?.method as string) || 'CARD';
+                const paymentStatus = approvalResult?.status; // 'DONE' or 'WAITING_FOR_DEPOSIT' or 'CANCELED'
 
-                // Create Registration document with PAID status
+                let status = 'PAID';
+                let dbPaymentStatus = 'PAID';
+
+                // [FIX-20250212] Virtual Account Handling
+                if (paymentStatus === 'WAITING_FOR_DEPOSIT') {
+                    status = 'PENDING_PAYMENT';
+                    dbPaymentStatus = 'WAITING_FOR_DEPOSIT';
+                }
+
+                // Create Registration document
                 await regRef.set({
                     id: regId,
                     userId: userData.userId || 'GUEST',
@@ -321,8 +330,8 @@ export const confirmTossPayment = functions
                     phone: userData.phone,
                     name: userData.name,
                     conferenceId: confId,
-                    status: 'PAID',
-                    paymentStatus: 'PAID',
+                    status: status,
+                    paymentStatus: dbPaymentStatus,
                     paymentMethod: paymentMethod,
                     paymentKey: paymentKey,
                     orderId: orderId,
@@ -333,6 +342,7 @@ export const confirmTossPayment = functions
                     isAnonymous: userData.isAnonymous || false,
                     agreementDetails: {},
                     paymentDetails: approvalResult,
+                    virtualAccount: approvalResult.virtualAccount || null, // Create Virtual Account Info
                     receiptNumber: `${dateStr}-${rand}`,
                     confirmationQr: regId, // Use regId directly for InfoDesk scanning
                     badgeQr: null,
@@ -340,81 +350,86 @@ export const confirmTossPayment = functions
                     checkInTime: null,
                     createdAt: admin.firestore.FieldValue.serverTimestamp(),
                     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                    paidAt: admin.firestore.FieldValue.serverTimestamp()
+                    paidAt: status === 'PAID' ? admin.firestore.FieldValue.serverTimestamp() : null
                 }, { merge: false });
 
-                // [Security] Lock the Member Code & Log History
-                try {
-                    // A. Lock Code
-                    if (societyId && userData.memberVerificationData && userData.memberVerificationData.id) {
-                        const memberId = userData.memberVerificationData.id;
-                        const memberRef = admin.firestore().collection('societies').doc(societyId).collection('members').doc(memberId);
-                        await memberRef.update({
-                            used: true,
-                            usedBy: userData.userId || 'unknown',
-                            usedAt: admin.firestore.FieldValue.serverTimestamp()
-                        });
-                        functions.logger.info(`[Member Locked] Member ${memberId} locked for registration ${regId}`);
-                    }
-
-                    // B. Create/Update User Document (users/{uid})
-                    if (userData.userId && userData.userId !== 'GUEST') {
-                        const userRef = admin.firestore().collection('users').doc(userData.userId);
-                        const userSnap = await userRef.get();
-
-                        if (!userSnap.exists) {
-                            // Create new user document (match signup field structure)
-                            await userRef.set({
-                                uid: userData.userId,
-                                email: userData.email,
-                                name: userData.name,
-                                phone: userData.phone,
-                                affiliation: userData.affiliation,
-                                organization: userData.affiliation, // Standard field
-                                licenseNumber: userData.licenseNumber || '',
-                                tier: userData.tier || 'NON_MEMBER',
-                                isAnonymous: false,
-                                isForeigner: false,
-                                country: 'KR',
-                                authStatus: {
-                                    emailVerified: false,
-                                    phoneVerified: false
-                                },
-                                simplePassword: null,
-                                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                // [Security] Lock the Member Code & Log History -> ONLY IF PAID
+                // For Virtual Account, we do this when webhook confirms deposit (DONE).
+                if (status === 'PAID') {
+                    try {
+                        // A. Lock Code
+                        if (societyId && userData.memberVerificationData && userData.memberVerificationData.id) {
+                            const memberId = userData.memberVerificationData.id;
+                            const memberRef = admin.firestore().collection('societies').doc(societyId).collection('members').doc(memberId);
+                            await memberRef.update({
+                                used: true,
+                                usedBy: userData.userId || 'unknown',
+                                usedAt: admin.firestore.FieldValue.serverTimestamp()
                             });
-                            functions.logger.info(`[User Created] User document created for ${userData.userId}`);
-                        } else {
-                            // Update existing user document
-                            await userRef.update({
-                                email: userData.email,
-                                name: userData.name,
-                                phone: userData.phone,
-                                affiliation: userData.affiliation,
-                                organization: userData.affiliation,
-                                updatedAt: admin.firestore.FieldValue.serverTimestamp()
-                            });
-                            functions.logger.info(`[User Updated] User document updated for ${userData.userId}`);
+                            functions.logger.info(`[Member Locked] Member ${memberId} locked for registration ${regId}`);
                         }
 
-                        // C. Log Participation History (users/{uid}/participations/{regId})
-                        await admin.firestore().collection('users').doc(userData.userId).collection('participations').doc(regId).set({
-                            conferenceId: confId,
-                            conferenceName: '', // Will be populated later if needed
-                            registrationId: regId,
-                            societyId: societyId || 'unknown',
-                            role: 'ATTENDEE',
-                            registeredAt: admin.firestore.FieldValue.serverTimestamp(),
-                            paidAt: admin.firestore.FieldValue.serverTimestamp(),
-                            amount: amount,
-                            status: 'COMPLETED'
-                        }, { merge: true });
-                        functions.logger.info(`[History Logged] Participation saved for user ${userData.userId}`);
+                        // B. Create/Update User Document (users/{uid})
+                        if (userData.userId && userData.userId !== 'GUEST') {
+                            const userRef = admin.firestore().collection('users').doc(userData.userId);
+                            const userSnap = await userRef.get();
+
+                            if (!userSnap.exists) {
+                                // Create new user document (match signup field structure)
+                                await userRef.set({
+                                    uid: userData.userId,
+                                    email: userData.email,
+                                    name: userData.name,
+                                    phone: userData.phone,
+                                    affiliation: userData.affiliation,
+                                    organization: userData.affiliation, // Standard field
+                                    licenseNumber: userData.licenseNumber || '',
+                                    tier: userData.tier || 'NON_MEMBER',
+                                    isAnonymous: false,
+                                    isForeigner: false,
+                                    country: 'KR',
+                                    authStatus: {
+                                        emailVerified: false,
+                                        phoneVerified: false
+                                    },
+                                    simplePassword: null,
+                                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                                    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                                });
+                                functions.logger.info(`[User Created] User document created for ${userData.userId}`);
+                            } else {
+                                // Update existing user document
+                                await userRef.update({
+                                    email: userData.email,
+                                    name: userData.name,
+                                    phone: userData.phone,
+                                    affiliation: userData.affiliation,
+                                    organization: userData.affiliation,
+                                    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                                });
+                                functions.logger.info(`[User Updated] User document updated for ${userData.userId}`);
+                            }
+
+                            // C. Log Participation History (users/{uid}/participations/{regId})
+                            await admin.firestore().collection('users').doc(userData.userId).collection('participations').doc(regId).set({
+                                conferenceId: confId,
+                                conferenceName: '', // Will be populated later if needed
+                                registrationId: regId,
+                                societyId: societyId || 'unknown',
+                                role: 'ATTENDEE',
+                                registeredAt: admin.firestore.FieldValue.serverTimestamp(),
+                                paidAt: admin.firestore.FieldValue.serverTimestamp(),
+                                amount: amount,
+                                status: 'COMPLETED'
+                            }, { merge: true });
+                            functions.logger.info(`[History Logged] Participation saved for user ${userData.userId}`);
+                        }
+                    } catch (postProcessError) {
+                        functions.logger.error("Failed to post-process (Lock/History) for Toss Payment:", postProcessError);
+                        // Non-blocking
                     }
-                } catch (postProcessError) {
-                    functions.logger.error("Failed to post-process (Lock/History) for Toss Payment:", postProcessError);
-                    // Non-blocking
+                } else {
+                    functions.logger.info(`[Virtual Account] Registration created in PENDING state for ${regId}. Waiting for deposit.`);
                 }
             }
 
@@ -503,6 +518,16 @@ export const confirmTossPaymentHttp = functions
 
                     // Determine payment method from approval result
                     const paymentMethod = (approvalResult?.method as string) || 'CARD';
+                    const paymentStatus = approvalResult?.status; // 'DONE' or 'WAITING_FOR_DEPOSIT'
+
+                    let status = 'PAID';
+                    let dbPaymentStatus = 'PAID';
+
+                    // [FIX-20250212] Virtual Account Handling
+                    if (paymentStatus === 'WAITING_FOR_DEPOSIT') {
+                        status = 'PENDING_PAYMENT';
+                        dbPaymentStatus = 'WAITING_FOR_DEPOSIT';
+                    }
 
                     // Create Registration document with PAID status
                     await regRef.set({
@@ -519,8 +544,8 @@ export const confirmTossPaymentHttp = functions
                         phone: userData.phone,
                         name: userData.name,
                         conferenceId: confId,
-                        status: 'PAID',
-                        paymentStatus: 'PAID',
+                        status: status,
+                        paymentStatus: dbPaymentStatus,
                         paymentMethod: paymentMethod,
                         paymentKey: paymentKey,
                         orderId: orderId,
@@ -531,6 +556,7 @@ export const confirmTossPaymentHttp = functions
                         isAnonymous: userData.isAnonymous || false,
                         agreementDetails: {},
                         paymentDetails: approvalResult,
+                        virtualAccount: approvalResult.virtualAccount || null,
                         receiptNumber: `${dateStr}-${rand}`,
                         confirmationQr: regId, // Use regId directly for InfoDesk scanning
                         badgeQr: null,
@@ -538,80 +564,84 @@ export const confirmTossPaymentHttp = functions
                         checkInTime: null,
                         createdAt: admin.firestore.FieldValue.serverTimestamp(),
                         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                        paidAt: admin.firestore.FieldValue.serverTimestamp()
+                        paidAt: status === 'PAID' ? admin.firestore.FieldValue.serverTimestamp() : null
                     }, { merge: false });
 
-                    // [Security] Lock the Member Code & Log History
-                    try {
-                        // A. Lock Code
-                        if (societyId && userData.memberVerificationData && userData.memberVerificationData.id) {
-                            const memberId = userData.memberVerificationData.id;
-                            const memberRef = admin.firestore().collection('societies').doc(societyId).collection('members').doc(memberId);
-                            await memberRef.update({
-                                used: true,
-                                usedBy: userData.userId || 'unknown',
-                                usedAt: admin.firestore.FieldValue.serverTimestamp()
-                            });
-                            functions.logger.info(`[Member Locked] Member ${memberId} locked for registration ${regId}`);
-                        }
-
-                        // B. Create/Update User Document (users/{uid})
-                        if (userData.userId && userData.userId !== 'GUEST') {
-                            const userRef = admin.firestore().collection('users').doc(userData.userId);
-                            const userSnap = await userRef.get();
-
-                            if (!userSnap.exists) {
-                                // Create new user document (match signup field structure)
-                                await userRef.set({
-                                    uid: userData.userId,
-                                    email: userData.email,
-                                    name: userData.name,
-                                    phone: userData.phone,
-                                    affiliation: userData.affiliation,
-                                    organization: userData.affiliation, // Standard field
-                                    licenseNumber: userData.licenseNumber || '',
-                                    tier: userData.tier || 'NON_MEMBER',
-                                    isAnonymous: false,
-                                    isForeigner: false,
-                                    country: 'KR',
-                                    authStatus: {
-                                        emailVerified: false,
-                                        phoneVerified: false
-                                    },
-                                    simplePassword: null,
-                                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                                    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                    // [Security] Lock the Member Code & Log History -> ONLY IF PAID
+                    if (status === 'PAID') {
+                        try {
+                            // A. Lock Code
+                            if (societyId && userData.memberVerificationData && userData.memberVerificationData.id) {
+                                const memberId = userData.memberVerificationData.id;
+                                const memberRef = admin.firestore().collection('societies').doc(societyId).collection('members').doc(memberId);
+                                await memberRef.update({
+                                    used: true,
+                                    usedBy: userData.userId || 'unknown',
+                                    usedAt: admin.firestore.FieldValue.serverTimestamp()
                                 });
-                                functions.logger.info(`[User Created] User document created for ${userData.userId}`);
-                            } else {
-                                // Update existing user document
-                                await userRef.update({
-                                    email: userData.email,
-                                    name: userData.name,
-                                    phone: userData.phone,
-                                    affiliation: userData.affiliation,
-                                    organization: userData.affiliation,
-                                    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-                                });
-                                functions.logger.info(`[User Updated] User document updated for ${userData.userId}`);
+                                functions.logger.info(`[Member Locked] Member ${memberId} locked for registration ${regId}`);
                             }
 
-                            // C. Log Participation History (users/{uid}/participations/{regId})
-                            await admin.firestore().collection('users').doc(userData.userId).collection('participations').doc(regId).set({
-                                conferenceId: confId,
-                                conferenceName: '',
-                                registrationId: regId,
-                                societyId: societyId || 'unknown',
-                                role: 'ATTENDEE',
-                                registeredAt: admin.firestore.FieldValue.serverTimestamp(),
-                                paidAt: admin.firestore.FieldValue.serverTimestamp(),
-                                amount: amount,
-                                status: 'COMPLETED'
-                            }, { merge: true });
-                            functions.logger.info(`[History Logged] Participation saved for user ${userData.userId}`);
+                            // B. Create/Update User Document (users/{uid})
+                            if (userData.userId && userData.userId !== 'GUEST') {
+                                const userRef = admin.firestore().collection('users').doc(userData.userId);
+                                const userSnap = await userRef.get();
+
+                                if (!userSnap.exists) {
+                                    // Create new user document (match signup field structure)
+                                    await userRef.set({
+                                        uid: userData.userId,
+                                        email: userData.email,
+                                        name: userData.name,
+                                        phone: userData.phone,
+                                        affiliation: userData.affiliation,
+                                        organization: userData.affiliation, // Standard field
+                                        licenseNumber: userData.licenseNumber || '',
+                                        tier: userData.tier || 'NON_MEMBER',
+                                        isAnonymous: false,
+                                        isForeigner: false,
+                                        country: 'KR',
+                                        authStatus: {
+                                            emailVerified: false,
+                                            phoneVerified: false
+                                        },
+                                        simplePassword: null,
+                                        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                                        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                                    });
+                                    functions.logger.info(`[User Created] User document created for ${userData.userId}`);
+                                } else {
+                                    // Update existing user document
+                                    await userRef.update({
+                                        email: userData.email,
+                                        name: userData.name,
+                                        phone: userData.phone,
+                                        affiliation: userData.affiliation,
+                                        organization: userData.affiliation,
+                                        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                                    });
+                                    functions.logger.info(`[User Updated] User document updated for ${userData.userId}`);
+                                }
+
+                                // C. Log Participation History (users/{uid}/participations/{regId})
+                                await admin.firestore().collection('users').doc(userData.userId).collection('participations').doc(regId).set({
+                                    conferenceId: confId,
+                                    conferenceName: '',
+                                    registrationId: regId,
+                                    societyId: societyId || 'unknown',
+                                    role: 'ATTENDEE',
+                                    registeredAt: admin.firestore.FieldValue.serverTimestamp(),
+                                    paidAt: admin.firestore.FieldValue.serverTimestamp(),
+                                    amount: amount,
+                                    status: 'COMPLETED'
+                                }, { merge: true });
+                                functions.logger.info(`[History Logged] Participation saved for user ${userData.userId}`);
+                            }
+                        } catch (postProcessError) {
+                            functions.logger.error("Failed to post-process (Lock/History) for Toss Payment:", postProcessError);
                         }
-                    } catch (postProcessError) {
-                        functions.logger.error("Failed to post-process (Lock/History) for Toss Payment:", postProcessError);
+                    } else {
+                        functions.logger.info(`[Virtual Account] Registration created in PENDING state for ${regId}. Waiting for deposit.`);
                     }
                 }
 
@@ -1489,3 +1519,215 @@ export const logPerformance = functions
 
 // 7. Debug Tools
 export { debugNHNTemplate, sendTestAlimTalkHTTP } from './debug';
+
+
+/**
+ * --------------------------------------------------------------------------
+ * TOSS PAYMENTS WEBHOOK
+ * --------------------------------------------------------------------------
+ * Handles asynchronous payment notifications:
+ * - Virtual Account Deposit Confirmation (WAITING_FOR_DEPOSIT -> DONE)
+ * - Payment Cancellation (CANCELED)
+ */
+export const onTossWebhook = functions
+    .runWith({
+        enforceAppCheck: false,
+        ingressSettings: 'ALLOW_ALL'
+    })
+    .https.onRequest(async (req, res) => {
+        // Log webhook payload
+        functions.logger.info(">>> [Toss Webhook] Received:", req.body);
+
+        try {
+            const { status, orderId } = req.body;
+
+            if (!status || !orderId) {
+                functions.logger.warn("[Toss Webhook] Missing status or orderId");
+                res.status(400).json({ message: "Missing required fields" });
+                return;
+            }
+
+            const db = admin.firestore();
+
+            // Find Registration Document by orderId (using Collection Group Query)
+            // Note: orderId must be unique across all conferences
+            const regQuery = await db.collectionGroup('registrations').where('orderId', '==', orderId).limit(1).get();
+
+            if (regQuery.empty) {
+                functions.logger.warn(`[Toss Webhook] Registration not found for orderId: ${orderId}`);
+                // Return 200 to acknowledge webhook (prevent retry loop) even if not found
+                res.status(200).json({ message: "Registration not found" });
+                return;
+            }
+
+            const regDoc = regQuery.docs[0];
+            const regData = regDoc.data();
+            const regRef = regDoc.ref;
+            const confId = regData.conferenceId;
+            const userId = regData.userId; // e.g. 'GUEST' or uid
+
+            functions.logger.info(`[Toss Webhook] Processing ${status} for Registration ${regRef.path}`);
+
+            if (status === 'DONE') {
+                // Payment Completed (Deposit Confirmed)
+                if (regData.status === 'PAID') {
+                    // Already Paid - Idempotent
+                    functions.logger.info("[Toss Webhook] Already PAID. Skipping.");
+                    res.status(200).json({ message: "Already processed" });
+                    return;
+                }
+
+                const now = admin.firestore.Timestamp.now();
+
+                // 1. Update Registration Status
+                await regRef.update({
+                    status: 'PAID',
+                    paymentStatus: 'PAID',
+                    paidAt: now,
+                    updatedAt: now,
+                    virtualAccount: req.body.virtualAccount || regData.virtualAccount || null
+                });
+
+                // 2. Lock Membership Code (if applicable)
+                try {
+                    // Need societyId from conference
+                    const confSnap = await db.collection('conferences').doc(confId).get();
+                    const conference = confSnap.data();
+                    const societyId = conference?.societyId;
+
+                    if (societyId && regData.memberVerificationData?.id) {
+                        const memberId = regData.memberVerificationData.id;
+                        await db.collection('societies').doc(societyId).collection('members').doc(memberId).update({
+                            used: true,
+                            usedBy: userId || 'unknown',
+                            usedAt: now
+                        });
+                        functions.logger.info(`[Toss Webhook] Member Locked: ${memberId}`);
+                    }
+
+                    // 3. Update User Document & History (if not guest)
+                    if (userId && userId !== 'GUEST') {
+                        // User Document (Create/Update) logic simplified here
+                        // Assuming user doc exists or was created during registration attempt.
+                        // Here we just ensure participation record is updated to COMPLETED.
+
+                        await db.collection('users').doc(userId).collection('participations').doc(regDoc.id).set({
+                            conferenceId: confId,
+                            conferenceName: '', // Optional
+                            registrationId: regDoc.id,
+                            societyId: societyId || 'unknown',
+                            role: 'ATTENDEE',
+                            registeredAt: regData.createdAt || now,
+                            paidAt: now,
+                            amount: regData.amount,
+                            status: 'COMPLETED'
+                        }, { merge: true });
+                        functions.logger.info(`[Toss Webhook] User History Logged: ${userId}`);
+                    }
+
+                    // 4. Generate Badge Prep Token & Send AlimTalk
+                    // Invoke badge logic manually since onCreate won't trigger for updates or was skipped for PENDING
+                    try {
+                        let token = regData.badgePrepToken; // Check legacy
+
+                        // Check badge_tokens collection first
+                        if (!token) {
+                            const tokenQuery = await db.collection(`conferences/${confId}/badge_tokens`)
+                                .where('registrationId', '==', regDoc.id)
+                                .where('status', '==', 'ACTIVE')
+                                .limit(1)
+                                .get();
+
+                            if (!tokenQuery.empty) {
+                                token = tokenQuery.docs[0].id;
+                            }
+                        }
+
+                        if (!token) {
+                            // Generate New Token
+                            const newToken = generateBadgePrepToken();
+
+                            // Expiry Logic
+                            let expiresAt: admin.firestore.Timestamp;
+                            if (conference?.dates?.end) {
+                                expiresAt = admin.firestore.Timestamp.fromMillis(
+                                    conference.dates.end.toMillis() + (24 * 60 * 60 * 1000)
+                                );
+                            } else {
+                                expiresAt = admin.firestore.Timestamp.fromMillis(
+                                    now.toMillis() + (7 * 24 * 60 * 60 * 1000)
+                                );
+                            }
+
+                            await db.collection(`conferences/${confId}/badge_tokens`).doc(newToken).set({
+                                token: newToken,
+                                registrationId: regDoc.id,
+                                conferenceId: confId,
+                                userId: userId || 'GUEST',
+                                status: 'ACTIVE',
+                                createdAt: now,
+                                expiresAt
+                            });
+
+                            token = newToken;
+                            functions.logger.info(`[Toss Webhook] Generated Badge Token: ${token}`);
+                        }
+
+                        // Send AlimTalk
+                        // Re-fetch updated registration data to include payment info if needed
+                        const updatedRegSnap = await regRef.get();
+                        const updatedRegData = updatedRegSnap.data();
+
+                        await sendBadgeNotification(db, { ...conference, id: confId }, regDoc.id, updatedRegData, token);
+                        functions.logger.info("[Toss Webhook] AlimTalk Sent");
+
+                    } catch (badgeError) {
+                        functions.logger.error("[Toss Webhook] Badge/Notification Error:", badgeError);
+                    }
+
+                } catch (postProcessError) {
+                    functions.logger.error("[Toss Webhook] Post-process Error:", postProcessError);
+                }
+
+                res.status(200).json({ success: true });
+
+            } else if (status === 'CANCELED') {
+                // Payment Canceled
+                await regRef.update({
+                    status: 'CANCELED',
+                    paymentStatus: 'CANCELED',
+                    canceledAt: admin.firestore.FieldValue.serverTimestamp(),
+                    cancelReason: req.body.cancels?.[0]?.cancelReason || 'Webhook Cancellation'
+                });
+
+                // Add Log
+                await regRef.collection('logs').add({
+                    type: 'PAYMENT_CANCELED_WEBHOOK',
+                    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                    data: req.body
+                });
+
+                functions.logger.info(`[Toss Webhook] Registration ${regDoc.id} CANCELED`);
+                res.status(200).json({ success: true });
+
+            } else if (status === 'WAITING_FOR_DEPOSIT') {
+                // Should have been handled by confirmTossPayment, but just in case
+                // Update virtual account info if changed
+                if (req.body.virtualAccount) {
+                    await regRef.update({
+                        virtualAccount: req.body.virtualAccount,
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+                res.status(200).json({ success: true });
+            } else {
+                // Unknown status
+                functions.logger.warn(`[Toss Webhook] Unknown status: ${status}`);
+                res.status(200).json({ message: "Unknown status, ignored" });
+            }
+
+        } catch (error: any) {
+            functions.logger.error("[Toss Webhook] Internal Error:", error);
+            res.status(500).json({ error: error.message });
+        }
+    });

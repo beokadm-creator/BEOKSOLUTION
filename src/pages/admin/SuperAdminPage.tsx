@@ -68,6 +68,16 @@ const SuperAdminPage: React.FC = () => {
     const { errorLogs, performanceMetrics, dataIntegrityAlerts, loading: monitoringLoading, refetch: refetchMonitoring } = useMonitoringData(monitoringDate);
     const [resolvingAlertId, setResolvingAlertId] = useState<string | null>(null);
 
+    // Health Check state
+    const [healthCheckData, setHealthCheckData] = useState<any>(null);
+    const [healthCheckLoading, setHealthCheckLoading] = useState(false);
+
+    // AlimTalk Config Check state
+    const [alimTalkConfigData, setAlimTalkConfigData] = useState<any>(null);
+    const [alimTalkConfigLoading, setAlimTalkConfigLoading] = useState(false);
+    const [selectedSocietyForAlimTalk, setSelectedSocietyForAlimTalk] = useState<string>('');
+
+
     // Resolve data integrity alert
     const resolveAlert = async (alertId: string, alertPath: string) => {
         setResolvingAlertId(alertId);
@@ -75,7 +85,7 @@ const SuperAdminPage: React.FC = () => {
             const { httpsCallable } = await import('firebase/functions');
             const { functions: firebaseFunctions } = await import('../../firebase');
             const resolveAlertFunction = httpsCallable(firebaseFunctions, 'resolveDataIntegrityAlert');
-            
+
             await resolveAlertFunction({ alertPath });
             toast.success('알림이 해결되었습니다');
             refetchMonitoring(); // Refresh monitoring data
@@ -86,6 +96,57 @@ const SuperAdminPage: React.FC = () => {
             setResolvingAlertId(null);
         }
     };
+
+    // Health Check
+    const fetchHealthCheck = async () => {
+        setHealthCheckLoading(true);
+        try {
+            const response = await fetch('https://us-central1-eregi-8fc1e.cloudfunctions.net/healthCheck');
+            const data = await response.json();
+            setHealthCheckData(data);
+            if (data.status === 'healthy') {
+                toast.success('시스템 정상');
+            } else if (data.status === 'degraded') {
+                toast('시스템 경고', { icon: '⚠️' });
+            } else {
+                toast.error('시스템 오류');
+            }
+        } catch (error: any) {
+            console.error('[fetchHealthCheck] Failed:', error);
+            toast.error('헬스체크 실패: ' + error.message);
+            setHealthCheckData({ status: 'unhealthy', error: error.message });
+        } finally {
+            setHealthCheckLoading(false);
+        }
+    };
+
+    // AlimTalk Config Check
+    const fetchAlimTalkConfig = async (societyId: string) => {
+        if (!societyId) {
+            toast.error('학회를 선택하세요');
+            return;
+        }
+
+        setAlimTalkConfigLoading(true);
+        try {
+            const response = await fetch(`https://us-central1-eregi-8fc1e.cloudfunctions.net/checkAlimTalkConfigHttp?societyId=${societyId}`);
+            const data = await response.json();
+            setAlimTalkConfigData(data);
+
+            if (data.success) {
+                toast.success('알림톡 설정 정상');
+            } else {
+                toast.error(`알림톡 설정 오류: ${data.errors?.join(', ')}`);
+            }
+        } catch (error: any) {
+            console.error('[fetchAlimTalkConfig] Failed:', error);
+            toast.error('알림톡 설정 확인 실패: ' + error.message);
+            setAlimTalkConfigData({ success: false, error: error.message });
+        } finally {
+            setAlimTalkConfigLoading(false);
+        }
+    };
+
 
     const fetchMembers = useCallback(async () => {
         console.log('[SuperAdminPage] fetchMembers called, currentSocietyId:', currentSocietyId);
@@ -931,6 +992,157 @@ const SuperAdminPage: React.FC = () => {
                             </div>
                         ) : (
                             <>
+                                {/* Health Check & AlimTalk Config Section */}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* Health Check Card */}
+                                    <Card className="shadow-lg border-t-4 border-t-green-500 bg-[#1e1e1e] border-[#333]">
+                                        <CardHeader className="pb-4">
+                                            <CardTitle className="text-xl flex items-center gap-2 text-green-400">
+                                                <Activity className="w-5 h-5" /> 시스템 헬스체크
+                                            </CardTitle>
+                                            <CardDescription className="text-gray-400">
+                                                Firestore, 환경변수, Functions 상태 확인
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <Button
+                                                onClick={fetchHealthCheck}
+                                                disabled={healthCheckLoading}
+                                                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold"
+                                            >
+                                                {healthCheckLoading ? '확인 중...' : '헬스체크 실행'}
+                                            </Button>
+
+                                            {healthCheckData && (
+                                                <div className="space-y-3">
+                                                    <div className={`p-4 rounded-lg border-2 ${healthCheckData.status === 'healthy' ? 'bg-green-500/10 border-green-500' :
+                                                            healthCheckData.status === 'degraded' ? 'bg-yellow-500/10 border-yellow-500' :
+                                                                'bg-red-500/10 border-red-500'
+                                                        }`}>
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            {healthCheckData.status === 'healthy' ? <CheckCircle2 className="w-5 h-5 text-green-400" /> :
+                                                                healthCheckData.status === 'degraded' ? <Activity className="w-5 h-5 text-yellow-400" /> :
+                                                                    <XCircle className="w-5 h-5 text-red-400" />}
+                                                            <span className="font-bold text-lg">
+                                                                {healthCheckData.status === 'healthy' ? '정상' :
+                                                                    healthCheckData.status === 'degraded' ? '경고' : '오류'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-xs text-gray-400">
+                                                            {healthCheckData.timestamp && new Date(healthCheckData.timestamp).toLocaleString('ko-KR')}
+                                                        </div>
+                                                    </div>
+
+                                                    {healthCheckData.checks && (
+                                                        <div className="space-y-2">
+                                                            {Object.entries(healthCheckData.checks).map(([key, check]: [string, any]) => (
+                                                                <div key={key} className="flex items-center justify-between p-3 bg-[#2a2a2a] rounded-lg">
+                                                                    <div className="flex items-center gap-2">
+                                                                        {check.status === 'pass' ? <CheckCircle2 className="w-4 h-4 text-green-400" /> :
+                                                                            check.status === 'warn' ? <Activity className="w-4 h-4 text-yellow-400" /> :
+                                                                                <XCircle className="w-4 h-4 text-red-400" />}
+                                                                        <span className="text-sm font-medium text-gray-200">{key}</span>
+                                                                    </div>
+                                                                    <span className="text-xs text-gray-400">{check.message}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+
+                                    {/* AlimTalk Config Check Card */}
+                                    <Card className="shadow-lg border-t-4 border-t-purple-500 bg-[#1e1e1e] border-[#333]">
+                                        <CardHeader className="pb-4">
+                                            <CardTitle className="text-xl flex items-center gap-2 text-purple-400">
+                                                💬 알림톡 설정 확인
+                                            </CardTitle>
+                                            <CardDescription className="text-gray-400">
+                                                템플릿, Aligo 설정, Infrastructure 확인
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="flex gap-2">
+                                                <select
+                                                    className="flex-1 p-3 bg-[#2a2a2a] border border-[#333] rounded-lg text-gray-200 focus:border-purple-600"
+                                                    value={selectedSocietyForAlimTalk}
+                                                    onChange={(e) => setSelectedSocietyForAlimTalk(e.target.value)}
+                                                >
+                                                    <option value="">학회 선택...</option>
+                                                    {societies.map(s => <option key={s.id} value={s.id}>{s.name.ko}</option>)}
+                                                </select>
+                                                <Button
+                                                    onClick={() => fetchAlimTalkConfig(selectedSocietyForAlimTalk)}
+                                                    disabled={alimTalkConfigLoading || !selectedSocietyForAlimTalk}
+                                                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold"
+                                                >
+                                                    {alimTalkConfigLoading ? '확인 중...' : '확인'}
+                                                </Button>
+                                            </div>
+
+                                            {alimTalkConfigData && (
+                                                <div className="space-y-3">
+                                                    <div className={`p-4 rounded-lg border-2 ${alimTalkConfigData.success ? 'bg-green-500/10 border-green-500' : 'bg-red-500/10 border-red-500'
+                                                        }`}>
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            {alimTalkConfigData.success ? <CheckCircle2 className="w-5 h-5 text-green-400" /> : <XCircle className="w-5 h-5 text-red-400" />}
+                                                            <span className="font-bold text-lg">
+                                                                {alimTalkConfigData.success ? '설정 정상' : '설정 오류'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-xs text-gray-400">
+                                                            {alimTalkConfigData.timestamp && new Date(alimTalkConfigData.timestamp).toLocaleString('ko-KR')}
+                                                        </div>
+                                                    </div>
+
+                                                    {alimTalkConfigData.summary && (
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <div className="p-3 bg-[#2a2a2a] rounded-lg">
+                                                                <div className="text-xs text-gray-400">총 템플릿</div>
+                                                                <div className="text-2xl font-bold text-gray-200">{alimTalkConfigData.summary.totalTemplates}</div>
+                                                            </div>
+                                                            <div className="p-3 bg-[#2a2a2a] rounded-lg">
+                                                                <div className="text-xs text-gray-400">활성 템플릿</div>
+                                                                <div className="text-2xl font-bold text-green-400">{alimTalkConfigData.summary.activeTemplates}</div>
+                                                            </div>
+                                                            <div className="p-3 bg-[#2a2a2a] rounded-lg">
+                                                                <div className="text-xs text-gray-400">승인된 템플릿</div>
+                                                                <div className="text-2xl font-bold text-blue-400">{alimTalkConfigData.summary.approvedTemplates}</div>
+                                                            </div>
+                                                            <div className="p-3 bg-[#2a2a2a] rounded-lg">
+                                                                <div className="text-xs text-gray-400">Aligo 설정</div>
+                                                                <div className="text-2xl font-bold">
+                                                                    {alimTalkConfigData.summary.hasAligoConfig ? '✅' : '❌'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {alimTalkConfigData.warnings && alimTalkConfigData.warnings.length > 0 && (
+                                                        <div className="p-3 bg-yellow-500/10 border border-yellow-500 rounded-lg">
+                                                            <div className="text-xs font-bold text-yellow-400 mb-1">경고</div>
+                                                            {alimTalkConfigData.warnings.map((warning: string, idx: number) => (
+                                                                <div key={idx} className="text-xs text-gray-300">• {warning}</div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
+                                                    {alimTalkConfigData.errors && alimTalkConfigData.errors.length > 0 && (
+                                                        <div className="p-3 bg-red-500/10 border border-red-500 rounded-lg">
+                                                            <div className="text-xs font-bold text-red-400 mb-1">오류</div>
+                                                            {alimTalkConfigData.errors.map((error: string, idx: number) => (
+                                                                <div key={idx} className="text-xs text-gray-300">• {error}</div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                </div>
+
                                 {/* Error Logs Section */}
                                 <Card className="shadow-lg border-t-4 border-t-red-500 bg-[#1e1e1e] border-[#333]">
                                     <CardHeader className="pb-4">
@@ -969,12 +1181,11 @@ const SuperAdminPage: React.FC = () => {
                                                                         '-'}
                                                                 </td>
                                                                 <td className="p-4">
-                                                                    <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                                                        log.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400' :
+                                                                    <span className={`px-2 py-1 rounded text-xs font-bold ${log.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400' :
                                                                         log.severity === 'HIGH' ? 'bg-orange-500/20 text-orange-400' :
-                                                                        log.severity === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-400' :
-                                                                        'bg-gray-500/20 text-gray-400'
-                                                                    }`}>
+                                                                            log.severity === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                                                'bg-gray-500/20 text-gray-400'
+                                                                        }`}>
                                                                         {log.severity}
                                                                     </span>
                                                                 </td>
@@ -1028,11 +1239,10 @@ const SuperAdminPage: React.FC = () => {
                                                                 </td>
                                                                 <td className="p-4 text-gray-300 font-mono">{metric.metricName}</td>
                                                                 <td className="p-4">
-                                                                    <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                                                        metric.value > 3000 ? 'bg-red-500/20 text-red-400' :
+                                                                    <span className={`px-2 py-1 rounded text-xs font-bold ${metric.value > 3000 ? 'bg-red-500/20 text-red-400' :
                                                                         metric.value > 1000 ? 'bg-yellow-500/20 text-yellow-400' :
-                                                                        'bg-green-500/20 text-green-400'
-                                                                    }`}>
+                                                                            'bg-green-500/20 text-green-400'
+                                                                        }`}>
                                                                         {metric.value.toFixed(0)} {metric.unit}
                                                                     </span>
                                                                 </td>
@@ -1068,13 +1278,13 @@ const SuperAdminPage: React.FC = () => {
                                                     <thead className="bg-[#2a2a2a] text-gray-400 uppercase text-xs font-semibold">
                                                         <tr>
                                                             <th className="p-4 pl-6">시간</th>
-                                                             <th className="p-4">심각도</th>
-                                                             <th className="p-4">컬렉션</th>
-                                                             <th className="p-4">문서 ID</th>
-                                                             <th className="p-4">위반 규칙</th>
-                                                             <th className="p-4">해결 여부</th>
-                                                             <th className="p-4">작업</th>
-                                                         </tr>
+                                                            <th className="p-4">심각도</th>
+                                                            <th className="p-4">컬렉션</th>
+                                                            <th className="p-4">문서 ID</th>
+                                                            <th className="p-4">위반 규칙</th>
+                                                            <th className="p-4">해결 여부</th>
+                                                            <th className="p-4">작업</th>
+                                                        </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-[#333]">
                                                         {dataIntegrityAlerts.map((alert) => (
@@ -1085,47 +1295,45 @@ const SuperAdminPage: React.FC = () => {
                                                                         '-'}
                                                                 </td>
                                                                 <td className="p-4">
-                                                                    <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                                                        alert.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400' :
+                                                                    <span className={`px-2 py-1 rounded text-xs font-bold ${alert.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400' :
                                                                         alert.severity === 'HIGH' ? 'bg-orange-500/20 text-orange-400' :
-                                                                        'bg-yellow-500/20 text-yellow-400'
-                                                                    }`}>
+                                                                            'bg-yellow-500/20 text-yellow-400'
+                                                                        }`}>
                                                                         {alert.severity}
                                                                     </span>
                                                                 </td>
                                                                 <td className="p-4 text-gray-300 text-xs font-mono">{alert.collection}</td>
-                                                                 <td className="p-4 text-gray-300 text-xs font-mono max-w-xs truncate">{alert.documentId}</td>
-                                                                 <td className="p-4 text-gray-200 text-sm">{alert.rule}</td>
-                                                                 <td className="p-4">
-                                                                     <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                                                         alert.resolved ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                                                                     }`}>
-                                                                         {alert.resolved ? '해결됨' : '미해결'}
-                                                                     </span>
-                                                                 </td>
-                                                                 <td className="p-4">
-                                                                     {!alert.resolved && (
-                                                                         <Button
-                                                                             onClick={() => resolveAlert(alert.id, `${alert.timestamp.toDate().toISOString().split('T')[0]}/${alert.id}`)}
-                                                                             disabled={resolvingAlertId === alert.id}
-                                                                             size="sm"
-                                                                             variant="outline"
-                                                                             className="h-8 text-xs"
-                                                                         >
-                                                                             {resolvingAlertId === alert.id ? (
-                                                                                 <>
-                                                                                     <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                                                                     처리 중...
-                                                                                 </>
-                                                                             ) : (
-                                                                                 <>
-                                                                                     <CheckCircle2 className="w-3 h-3 mr-1" />
-                                                                                     해결
-                                                                                 </>
-                                                                             )}
-                                                                         </Button>
-                                                                     )}
-                                                                 </td>
+                                                                <td className="p-4 text-gray-300 text-xs font-mono max-w-xs truncate">{alert.documentId}</td>
+                                                                <td className="p-4 text-gray-200 text-sm">{alert.rule}</td>
+                                                                <td className="p-4">
+                                                                    <span className={`px-2 py-1 rounded text-xs font-bold ${alert.resolved ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                                                                        }`}>
+                                                                        {alert.resolved ? '해결됨' : '미해결'}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-4">
+                                                                    {!alert.resolved && (
+                                                                        <Button
+                                                                            onClick={() => resolveAlert(alert.id, `${alert.timestamp.toDate().toISOString().split('T')[0]}/${alert.id}`)}
+                                                                            disabled={resolvingAlertId === alert.id}
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            className="h-8 text-xs"
+                                                                        >
+                                                                            {resolvingAlertId === alert.id ? (
+                                                                                <>
+                                                                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                                                                    처리 중...
+                                                                                </>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                                                                                    해결
+                                                                                </>
+                                                                            )}
+                                                                        </Button>
+                                                                    )}
+                                                                </td>
                                                             </tr>
                                                         ))}
                                                     </tbody>

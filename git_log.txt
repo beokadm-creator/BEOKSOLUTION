@@ -1,0 +1,279 @@
+commit f9338dbe163308d0681e112b8e85ea7f500ca2d5
+Author: Aaron <beokadm@gmail.com>
+Date:   Mon Feb 9 18:24:47 2026 +0900
+
+    fix: NHN AlimTalk SenderKey 조회 경로 수정
+
+commit 23a8a17421a6a9c830284ab02bec95d4b158d6c8
+Author: Aaron <beokadm@gmail.com>
+Date:   Mon Feb 9 18:17:51 2026 +0900
+
+    refactor: Aligo 알림톡 시스템 제거 및 NHN Cloud 완전 전환
+    
+    - functions/src/utils/aligo.ts 삭제
+    - BadgeNotification 로직을 NHN Cloud로 마이그레이션 (functions/src/badge/index.ts)
+    - TemplatesPage 및 InfraPage에서 Aligo 관련 UI/설정 제거
+    - getAligoTemplates Cloud Function 제거
+
+commit a06e47fbb3435fa00a95c0c9e5b5143537e14935
+Author: Aaron <beokadm@gmail.com>
+Date:   Mon Feb 9 18:08:22 2026 +0900
+
+    fix: TypeScript 타입 안전성 강화 - unknown 타입 에러 수정
+    
+    - 모든 Functions 파일에서 unknown 타입 에러 수정
+    - error.message 접근 시 타입 가드 추가
+    - approvalResult, cancelResult 등 API 응답 타입 assertion 추가
+    - 런타임 로직 변경 없이 컴파일 타임 안전성만 향상
+
+commit 7bb81b569955d4e3723edc8f9d2c0c3c8934d22d
+Author: Aaron <beokadm@gmail.com>
+Date:   Mon Feb 9 17:52:52 2026 +0900
+
+    feat: NHN Cloud AlimTalk 통합 및 템플릿 관리 시스템 구현
+    
+    - NHN Cloud AlimTalk API 통합 (nhnAlimTalk.ts)
+      - 템플릿 조회, 발송, 결과 조회 등 핵심 기능 구현
+      - 버튼, 대체발송(SMS/LMS), 예약발송 지원
+    
+    - 알림 템플릿 관리 페이지 구축 (TemplatesPage.tsx)
+      - 이벤트별 이메일/알림톡 템플릿 통합 관리
+      - Aligo 및 NHN Cloud 템플릿 가져오기 기능
+      - 동적 변수 삽입 및 버튼 설정 UI
+    
+    - 인프라 설정 페이지 개선 (InfraPage.tsx)
+      - NHN Cloud AlimTalk 설정 섹션 추가
+      - 학회별 발신 프로필 키 관리
+      - Legacy Aligo와 병행 운영 지원
+    
+    - TypeScript 타입 안전성 강화
+      - unknown 타입 적용 및 타입 가드 구현
+      - 린트 오류 수정 완료
+
+commit 38159d309188dd00e16f3e8ccef3fe009caaf1c4
+Author: Aaron <beokadm@gmail.com>
+Date:   Mon Feb 9 15:40:50 2026 +0900
+
+    feat: NHN Cloud 알림톡 통합 (학회별 설정 및 승인 템플릿 불러오기 기능 추가)
+
+commit 0995a79f15fa3a8646f0ef2538d2f79961c5c62f
+Author: Aaron <beokadm@gmail.com>
+Date:   Mon Feb 9 13:23:16 2026 +0900
+
+    feat: add manual resolve button for data integrity alerts
+    
+    Add UI and Cloud Function to manually resolve data integrity alerts:
+    - SuperAdmin monitoring table now has '해결' button
+    - Cloud Function: resolveDataIntegrityAlert marks alerts as resolved
+    - Sets resolved: true, resolvedAt, resolvedBy fields
+    
+    This allows admins to manually mark false positive alerts as resolved
+    after fixing the underlying issues.
+    
+    Changes:
+    - SuperAdminPage.tsx: Add resolve button and handler
+    - resolveAlert.ts: New Cloud Function for resolving alerts
+    - index.ts: Export resolveDataIntegrityAlert
+    
+    Users can now click '해결' button to dismiss resolved alerts.
+
+commit d554ce4adcde4866fa22fccc2351f5d9c1e631f3
+Author: Aaron <beokadm@gmail.com>
+Date:   Mon Feb 9 13:16:41 2026 +0900
+
+    fix: prevent TypeError when g.name is undefined in RegistrationPage
+    
+    Fix the 'e.name.toLowerCase is not a function' error that occurred 9 times
+    at https://kadd.eregi.co.kr/2026spring/register.
+    
+    Root cause:
+    - grades array elements may have undefined 'name' property
+    - Calling .toLowerCase() on undefined throws TypeError
+    
+    Solution:
+    - Changed: const n = g.name.toLowerCase();
+    - To: const n = String(g.name || '').toLowerCase();
+    - This safely handles undefined/null values by converting to empty string
+    
+    This is a defensive programming fix that prevents runtime errors
+    when grade data structure is incomplete or malformed.
+
+commit 31e754984d927661166a91ccd0fbd1887b16b7d6
+Author: Aaron <beokadm@gmail.com>
+Date:   Mon Feb 9 13:12:24 2026 +0900
+
+    fix: align paymentStatus validation with schema definition
+    
+    Fix data integrity false positive alerts by updating validStatuses
+    to match the official PaymentStatus type in schema.ts.
+    
+    Changes:
+    - Add REFUND_REQUESTED (already exists in database)
+    - Add PARTIAL_REFUNDED (defined in schema)
+    - Add FAILED (defined in schema)
+    - Remove CANCELLED (not in schema)
+    
+    This fixes the false positive alert for RCLHcwB7s65BMvve9gbl
+    where paymentStatus='REFUND_REQUESTED' was incorrectly flagged.
+    
+    Related to schema.ts:322
+    export type PaymentStatus = 'PAID' | 'REFUND_REQUESTED' | 'REFUNDED' | 'PARTIAL_REFUNDED' | 'PENDING' | 'FAILED';
+
+commit 5714ede1cb84061b8316d2cfab547dbce3e5b12b
+Author: Aaron <beokadm@gmail.com>
+Date:   Mon Feb 9 13:00:33 2026 +0900
+
+    feat: add monitoring system with safety controls
+    
+    Implement comprehensive monitoring with cost and safety controls:
+    - logError: Client error logging with deduplication and critical alerts
+    - logPerformance: Performance metrics tracking with sampling
+    - monitorRegistrationIntegrity: Registration data validation
+    - monitorMemberCodeIntegrity: Member code usage validation
+    - dailyErrorReport: Daily error summary via email (9 AM KST)
+    - weeklyPerformanceReport: Weekly performance report via email
+    
+    Safety Features:
+    - Sampling rate: 10% (configurable via MONITORING_SAMPLING_RATE)
+    - Daily write limit: 10,000 (configurable via MONITORING_MAX_DAILY_WRITES)
+    - Email alerts for CRITICAL/HIGH severity errors
+    - Firestore security rules for logs collection
+    - TTL auto-deletion after 30 days (to be configured)
+    
+    Files Added:
+    - functions/src/utils/email.ts: Email utilities for alerts
+    - functions/src/monitoring/dataIntegrity.ts: Data integrity triggers
+    - functions/src/monitoring/scheduledReports.ts: Scheduled reports
+    - firestore.rules: Logs collection security
+    
+    Files Modified:
+    - functions/src/index.ts: Added monitoring functions with safety controls
+    
+    Environment Variables Required:
+    - EMAIL_USER: Gmail address for sending alerts
+    - EMAIL_PASSWORD: Gmail app password
+    - EMAIL_FROM: From email address
+    - ADMIN_EMAIL: Admin email to receive alerts
+    - MONITORING_SAMPLING_RATE: Sampling rate (default: 0.1)
+    - MONITORING_MAX_DAILY_WRITES: Daily write limit (default: 10000)
+
+commit 47a13a837c3b405b342275c33218c00621cfb9bf
+Merge: 13eb67f a487a52
+Author: Aaron <beokadm@gmail.com>
+Date:   Mon Feb 9 12:42:16 2026 +0900
+
+    Merge feature/restore-external-attendee-migration-safe into main
+    
+    Restores external attendee password auto-generation, migration tool, and monitoring dashboard from v1.0.0 rollback.
+    
+    Safety verified:
+    - Build successful
+    - No breaking changes
+    - All features are additive
+
+commit a487a522a3c68bcbfd1dd9ba1407f7ce7a0b7819
+Author: Aaron <beokadm@gmail.com>
+Date:   Mon Feb 9 12:41:19 2026 +0900
+
+    feat: safely restore external attendee features from rollback
+    
+    This commit restores features that were lost during rollback to v1.0.0 (35aaeed).
+    
+    Restored Features:
+    1. External Attendee Password Auto-Generation
+       - Phone number last 4 digits as default password
+       - Implemented in ExternalAttendeePage.tsx
+    
+    2. External Attendee Migration Tool
+       - Cloud Function: migrateExternalAttendeeParticipations
+       - Admin UI: ExternalAttendeeMigration component with dry-run mode
+       - Updates participation records for proper MyPage display
+    
+    3. Super Admin Monitoring Dashboard
+       - Error logs, performance metrics, data integrity alerts
+       - New hooks: useMonitoringData, usePerformanceReporting
+       - New types: ErrorLog, PerformanceMetric, DataIntegrityAlert
+    
+    Safety Measures:
+    - rolldown-vite configuration preserved
+    - Build verified successfully (6.48s)
+    - No circular dependencies (alert.tsx uses inline cn function)
+    - All new features have proper error handling and fallbacks
+    
+    Breaking Changes: None
+    All changes are additive only, no existing functionality modified.
+    
+    Files Changed:
+    - functions/src/index.ts: Export migrateExternalAttendeeParticipations
+    - functions/src/migrations/migrateExternalAttendeeParticipations.ts: New
+    - src/components/admin/ExternalAttendeeMigration.tsx: New
+    - src/components/ui/alert.tsx: New (with inline cn to prevent circular deps)
+    - src/hooks/useMonitoringData.ts: New
+    - src/hooks/usePerformanceReporting.ts: New
+    - src/pages/admin/ExternalAttendeePage.tsx: Added migration component
+    - src/pages/admin/SuperAdminPage.tsx: Added monitoring tab
+    - src/types/schema.ts: Added monitoring types and authCreated field
+
+commit 13eb67fcc9e6f34372c050b6976ef54c6bbbd69d
+Author: Aaron <beokadm@gmail.com>
+Date:   Thu Feb 5 22:08:07 2026 +0900
+
+    docs: Add critical version control warnings to agent guidelines
+    
+    - Add multi-layer protection system overview to AGENTS.md
+    - Add production baseline warning to README.md
+    - Expand MANDATORY_WORKFLOW.md with detailed step-by-step workflow
+    - Document all 3 protection layers (pre-commit, branch protection, CI/CD)
+    - Add emergency procedures and prohibited actions
+    - Include mandatory pre-work checklist
+    
+    All agents will now see critical warnings before starting any work.
+    This prevents accidental rollbacks and ensures compliance with version control policies.
+
+commit 7aec0cce3893e099166b6d83e4865e88e7611373
+Author: Aaron <beokadm@gmail.com>
+Date:   Thu Feb 5 13:25:38 2026 +0900
+
+    feat: Add version control system with tests, CI/CD, and pre-commit hooks
+
+commit 35aaeedafc31fc107de74d444b23ff4e8d08ebd1
+Author: Aaron <beokadm@gmail.com>
+Date:   Thu Feb 5 12:27:25 2026 +0900
+
+    feat: integrate AlimTalk templates and manual/bulk notification for external attendees
+
+commit 2c88d2640b436483a1a9b3fec1857c4f76042255
+Author: Aaron <beokadm@gmail.com>
+Date:   Thu Feb 5 11:07:45 2026 +0900
+
+    feat: redesign society landing page and conference list sections
+
+commit cafbb6cbd13bd6c0d0cbda6305add5e9cce2acf1
+Author: Aaron <beokadm@gmail.com>
+Date:   Thu Feb 5 08:34:38 2026 +0900
+
+    feat: Add data restoration button for hidden external attendees
+
+commit 276351b8c82c1b08b65d5fde427ad2e36c5096f3
+Author: Aaron <beokadm@gmail.com>
+Date:   Thu Feb 5 08:32:15 2026 +0900
+
+    fix: Initialize deleted field for external attendees to ensure visibility
+
+commit 2b3976f43dd12ecc04eb79b4905905c77dc30882
+Author: Aaron <beokadm@gmail.com>
+Date:   Thu Feb 5 08:08:47 2026 +0900
+
+    feat: Add manual account creation and enhance bulk registration for external attendees
+
+commit d250bf84c53288d579e6766d3853d62b0f0aa6f7
+Author: Aaron <beokadm@gmail.com>
+Date:   Thu Feb 5 08:03:13 2026 +0900
+
+    chore: Deploy external registrant functions and update status
+
+commit a649963a1b61d10be06eb1d2c1dcb6ae7da8de5c
+Author: Aaron <beokadm@gmail.com>
+Date:   Thu Feb 5 07:50:18 2026 +0900
+
+    feat: Finalize V1.0 release

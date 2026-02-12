@@ -123,9 +123,6 @@ service cloud.firestore {
     match /members/{document=**} {
       allow read, update: if request.auth != null;
     }
-  }
-}
-
     // --- MONITORING & LOGGING ---
     // Logs collection for error tracking and performance monitoring
     match /logs/{type}/{date}/{documentId} {
