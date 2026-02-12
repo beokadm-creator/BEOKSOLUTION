@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { BadgeConfig } from '../../types/print';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useExcel } from '../../hooks/useExcel';
 import { useRegistrationsPagination } from '../../hooks/useRegistrationsPagination';
@@ -41,12 +42,20 @@ interface RootRegistration {
     createdAt: Timestamp;
     badgeIssued?: boolean;
     badgeIssuedAt?: Timestamp;
+    virtualAccount?: {
+        bank: string;
+        accountNumber: string;
+        customerName?: string;
+        dueDate?: string;
+    };
 }
 
 const statusToKorean = (status: string) => {
     switch (status) {
         case 'PAID': return '결제완료';
         case 'PENDING': return '대기';
+        case 'WAITING_FOR_DEPOSIT': return '입금대기';
+        case 'PENDING_PAYMENT': return '결제진행중';
         case 'REFUNDED': return '환불완료';
         case 'REFUND_REQUESTED': return '환불요청';
         case 'CANCELED': return '취소됨';
@@ -230,7 +239,7 @@ const RegistrationListPage: React.FC = () => {
             });
             // Only include if status is one of the allowed statuses
             const best = sorted[0];
-            if (['PAID', 'REFUNDED', 'CANCELED', 'REFUND_REQUESTED'].includes(best.status)) {
+            if (['PAID', 'REFUNDED', 'CANCELED', 'REFUND_REQUESTED', 'WAITING_FOR_DEPOSIT', 'PENDING_PAYMENT'].includes(best.status)) {
                 deduplicatedRegs.push(best);
             }
         });
@@ -245,6 +254,8 @@ const RegistrationListPage: React.FC = () => {
                     matchesStatus = r.status === 'PAID';
                 } else if (filterStatus === 'CANCELED') {
                     matchesStatus = r.status === 'CANCELED' || r.status === 'REFUNDED' || r.status === 'REFUND_REQUESTED';
+                } else if (filterStatus === 'WAITING') {
+                    matchesStatus = r.status === 'WAITING_FOR_DEPOSIT' || r.status === 'PENDING_PAYMENT';
                 } else {
                     matchesStatus = r.status === filterStatus;
                 }
@@ -313,6 +324,7 @@ const RegistrationListPage: React.FC = () => {
                     <option value="ALL">전체 상태 (All Status)</option>
                     <option value="SUCCESSFUL">성공 접수 (Successful)</option>
                     <option value="PAID">결제완료 (PAID)</option>
+                    <option value="WAITING">입금대기 (Waiting)</option>
                     <option value="CANCELED">취소/환불 (Canceled)</option>
                 </select>
                 <div className="ml-auto flex gap-2">
@@ -365,10 +377,17 @@ const RegistrationListPage: React.FC = () => {
                                 <td className="p-4 text-sm font-medium text-[#1b4d77]">{(r.amount || 0).toLocaleString()}원</td>
                                 <td className="p-4 text-sm text-gray-500">{r.paymentType || r.paymentMethod || r.method || '카드'}</td>
                                 <td className="p-4">
-                                    <span className={`px-2 py-0.5 rounded text-xs font-bold border ${r.status === 'PAID' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'
+                                    <span className={`px-2 py-0.5 rounded text-xs font-bold border ${r.status === 'PAID' ? 'bg-green-50 text-green-700 border-green-100' :
+                                        (r.status === 'WAITING_FOR_DEPOSIT' || r.status === 'PENDING_PAYMENT') ? 'bg-orange-50 text-orange-700 border-orange-100' :
+                                            'bg-red-50 text-red-700 border-red-100'
                                         }`}>
                                         {statusToKorean(r.status)}
                                     </span>
+                                    {(r.status === 'WAITING_FOR_DEPOSIT' || r.status === 'PENDING_PAYMENT') && r.virtualAccount && (
+                                        <div className="text-[10px] text-gray-500 mt-1">
+                                            {r.virtualAccount.bank} {r.virtualAccount.accountNumber}
+                                        </div>
+                                    )}
                                 </td>
                                 <td className="p-4">
                                     <div className="flex items-center gap-2">
@@ -509,7 +528,7 @@ const RegistrationListPage: React.FC = () => {
                                         org: selectedReg.userOrg || selectedReg.affiliation || '',
                                         category: displayTier(selectedReg.tier) || selectedReg.categoryName || '참가자'
                                     }}
-                                    config={kadd_2026.badge}
+                                    config={kadd_2026.badge as BadgeConfig}
                                 />
                             </div>
                         )}

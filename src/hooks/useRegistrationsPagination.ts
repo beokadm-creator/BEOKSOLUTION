@@ -28,6 +28,12 @@ export interface RootRegistration {
     createdAt: Timestamp;
     badgeIssued?: boolean;
     badgeIssuedAt?: Timestamp;
+    virtualAccount?: {
+        bank: string;
+        accountNumber: string;
+        customerName?: string;
+        dueDate?: string;
+    };
 }
 
 interface UseRegistrationsPaginationParams {
