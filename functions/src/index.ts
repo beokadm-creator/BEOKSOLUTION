@@ -964,14 +964,39 @@ export const verifyMemberIdentity = functions
             const membersRef = admin.firestore().collection('societies').doc(societyId).collection('members');
 
             // Strategy: Check Name + (LicenseNumber OR Code)
-            // 1. Try License Number
-            let q = membersRef.where('name', '==', name).where('licenseNumber', '==', code);
-            let snap = await q.get();
+            // [FIX] Handle 2-character names with space (e.g., "김 결" vs "김결")
+            const checkMember = async (queryName: string, queryCode: string) => {
+                // 1. Try License Number
+                let q = membersRef.where('name', '==', queryName).where('licenseNumber', '==', queryCode);
+                let snap = await q.get();
 
+                if (snap.empty) {
+                    // 2. Try Code field
+                    q = membersRef.where('name', '==', queryName).where('code', '==', queryCode);
+                    snap = await q.get();
+                }
+                return snap;
+            };
+
+            // 1. Try Exact Match
+            let snap = await checkMember(name, code);
+
+            // 2. Try variations for 2-character names (common in legacy DBs)
             if (snap.empty) {
-                // 2. Try Code field
-                q = membersRef.where('name', '==', name).where('code', '==', code);
-                snap = await q.get();
+                const trimmedName = name.replace(/\s+/g, '');
+                
+                // Case A: User entered "김결", DB has "김 결"
+                if (trimmedName.length === 2) {
+                    const spacedName = `${trimmedName[0]} ${trimmedName[1]}`;
+                    if (spacedName !== name) {
+                        snap = await checkMember(spacedName, code);
+                    }
+                }
+
+                // Case B: User entered "김 결", DB has "김결"
+                if (snap.empty && name !== trimmedName) {
+                    snap = await checkMember(trimmedName, code);
+                }
             }
 
             if (!snap.empty) {
@@ -1719,6 +1744,23 @@ export const onTossWebhook = functions
                         updatedAt: admin.firestore.FieldValue.serverTimestamp()
                     });
                 }
+                res.status(200).json({ success: true });
+            } else if (status === 'EXPIRED') {
+                // Virtual Account Payment Window Expired
+                await regRef.update({
+                    status: 'EXPIRED',
+                    paymentStatus: 'CANCELED',
+                    expiredAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+
+                // Add Log
+                await regRef.collection('logs').add({
+                    type: 'PAYMENT_EXPIRED_WEBHOOK',
+                    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                    data: req.body
+                });
+
+                functions.logger.info(`[Toss Webhook] Registration ${regDoc.id} EXPIRED (Virtual Account)`);
                 res.status(200).json({ success: true });
             } else {
                 // Unknown status

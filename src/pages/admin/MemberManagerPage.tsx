@@ -240,8 +240,8 @@ const MemberManagerPage: React.FC = () => {
             // [Fix-Step 347] Use subcollection path
             await addDoc(collection(db, 'societies', targetId, 'members'), {
                 societyId: targetId,
-                name: newName.trim(),
-                code: newCode.trim(),
+                name: newName.replace(/\s+/g, ''), // [FIX] Remove all spaces from name
+                code: newCode.replace(/\s+/g, ''), // [FIX] Remove all spaces from code
                 expiryDate: newExpiry,
                 grade: newGrade,
                 used: false,
@@ -308,8 +308,8 @@ const MemberManagerPage: React.FC = () => {
             }
 
             parsedData.push({
-                name: name.trim(),
-                code: code.trim(),
+                name: name.replace(/\s+/g, ''), // [FIX] Remove all spaces from name
+                code: code.replace(/\s+/g, ''), // [FIX] Remove all spaces from code
                 grade: grade.trim(),
                 expiryDate: expiryDate.trim()
             });
@@ -491,8 +491,8 @@ const MemberManagerPage: React.FC = () => {
         try {
             const memberRef = doc(db, 'societies', targetId, 'members', editingMember.id);
             await updateDoc(memberRef, {
-                name: editForm.name.trim(),
-                code: editForm.code.trim(),
+                name: editForm.name.replace(/\s+/g, ''), // [FIX] Remove all spaces from name
+                code: editForm.code.replace(/\s+/g, ''), // [FIX] Remove all spaces from code
                 grade: editForm.grade.trim(),
                 expiryDate: editForm.expiryDate, // YYYY-MM-DD
                 updatedAt: Timestamp.now()
