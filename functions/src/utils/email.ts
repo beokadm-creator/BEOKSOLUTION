@@ -1,10 +1,8 @@
-import * as nodemailer from 'nodemailer';
-
 /**
  * Email Utility for System Monitoring
  *
- * Sends emails using Gmail SMTP
- * Configuration via environment variables
+ * TEMPORARILY DISABLED - nodemailer dependency not available
+ * All functions are stubs that log but don't send emails
  */
 
 // Email configuration from environment
@@ -18,29 +16,7 @@ if (!EMAIL_USER || !EMAIL_PASSWORD) {
 }
 
 /**
- * Create reusable transporter
- */
-let transporter: nodemailer.Transporter | null = null;
-
-function getTransporter(): nodemailer.Transporter {
-    if (!transporter) {
-        if (!EMAIL_USER || !EMAIL_PASSWORD) {
-            throw new Error('Email configuration not set');
-        }
-
-        transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                user: EMAIL_USER,
-                pass: EMAIL_PASSWORD,
-            },
-        });
-    }
-    return transporter;
-}
-
-/**
- * Send email
+ * Send email - STUB (disabled)
  */
 export async function sendEmail({
     to,
@@ -53,89 +29,24 @@ export async function sendEmail({
     html?: string;
     text?: string;
 }): Promise<void> {
-    try {
-        if (!EMAIL_USER || !EMAIL_PASSWORD) {
-            console.warn('[Email] Skipped - configuration not set');
-            return;
-        }
-
-        const transport = getTransporter();
-
-        await transport.sendMail({
-            from: EMAIL_FROM,
-            to: Array.isArray(to) ? to.join(', ') : to,
-            subject,
-            html: html || text,
-            text: text || html?.replace(/<[^>]*>/g, ''), // Strip HTML if text not provided
-        });
-
-        console.log(`[Email] Sent to: ${Array.isArray(to) ? to.join(', ') : to}`);
-    } catch (error: unknown) {
-        console.error('[Email] Failed to send:', error);
-        throw error;
-    }
+    console.warn('[Email] Email sending temporarily disabled:', { to, subject });
 }
 
 /**
- * Send error alert email to admin
+ * Send error alert email - STUB (disabled)
  */
 export async function sendErrorAlertEmail({
-    errorId,
-    message,
-    severity,
-    category,
-    occurrenceCount,
-    url,
-    userId,
+    error,
+    context,
 }: {
-    errorId: string;
-    message: string;
-    severity: string;
-    category: string;
-    occurrenceCount: number;
-    url?: string;
-    userId?: string;
+    error: Error;
+    context?: Record<string, unknown>;
 }): Promise<void> {
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@eregi.co.kr';
-
-    const severityColors = {
-        CRITICAL: '#dc2626',
-        HIGH: '#f97316',
-        MEDIUM: '#eab308',
-        LOW: '#6b7280',
-    };
-
-    const color = severityColors[severity as keyof typeof severityColors] || '#6b7280';
-
-    const html = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: ${color};">⚠️ ${severity} Error Detected</h2>
-
-            <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
-                <p><strong>Error ID:</strong> ${errorId}</p>
-                <p><strong>Message:</strong> ${message}</p>
-                <p><strong>Category:</strong> ${category}</p>
-                <p><strong>Severity:</strong> <span style="color: ${color}; font-weight: bold;">${severity}</span></p>
-                <p><strong>Occurrences:</strong> ${occurrenceCount}</p>
-                ${url ? `<p><strong>URL:</strong> <a href="${url}">${url}</a></p>` : ''}
-                ${userId ? `<p><strong>User ID:</strong> ${userId}</p>` : ''}
-            </div>
-
-            <p style="color: #6b7280; font-size: 14px;">
-                Check the monitoring dashboard for more details.
-            </p>
-        </div>
-    `;
-
-    await sendEmail({
-        to: adminEmail,
-        subject: `🚨 [${severity}] ${category} Error Detected`,
-        html,
-    });
+    console.warn('[Email] Error alert email temporarily disabled:', { error: error.message, context });
 }
 
 /**
- * Send daily error report
+ * Send daily error report - STUB (disabled)
  */
 export async function sendDailyErrorReport({
     date,
@@ -148,62 +59,18 @@ export async function sendDailyErrorReport({
     totalErrors: number;
     criticalErrors: number;
     highErrors: number;
-    topErrors: Array<{ message: string; occurrenceCount: number; severity: string }>;
+    topErrors: Array<{ message: string; count: number }>;
 }): Promise<void> {
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@eregi.co.kr';
-
-    const html = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2>📊 Daily Error Report - ${date}</h2>
-
-            <div style="display: flex; gap: 16px; margin: 20px 0;">
-                <div style="flex: 1; background: #f3f4f6; padding: 16px; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 24px; font-weight: bold; color: #dc2626;">${criticalErrors}</div>
-                    <div style="font-size: 14px; color: #6b7280;">Critical</div>
-                </div>
-                <div style="flex: 1; background: #f3f4f6; padding: 16px; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 24px; font-weight: bold; color: #f97316;">${highErrors}</div>
-                    <div style="font-size: 14px; color: #6b7280;">High</div>
-                </div>
-                <div style="flex: 1; background: #f3f4f6; padding: 16px; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 24px; font-weight: bold; color: #6b7280;">${totalErrors}</div>
-                    <div style="font-size: 14px; color: #6b7280;">Total</div>
-                </div>
-            </div>
-
-            ${topErrors.length > 0 ? `
-                <h3>Top Errors</h3>
-                <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-                    <thead>
-                        <tr style="background: #f3f4f6;">
-                            <th style="padding: 8px; text-align: left; border-bottom: 2px solid #e5e7eb;">Error</th>
-                            <th style="padding: 8px; text-align: center; border-bottom: 2px solid #e5e7eb;">Count</th>
-                            <th style="padding: 8px; text-align: center; border-bottom: 2px solid #e5e7eb;">Severity</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${topErrors.map(error => `
-                            <tr>
-                                <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${error.message}</td>
-                                <td style="padding: 8px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: bold;">${error.occurrenceCount}</td>
-                                <td style="padding: 8px; text-align: center; border-bottom: 1px solid #e5e7eb;">${error.severity}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            ` : '<p style="color: #10b981;">✅ No errors reported</p>'}
-        </div>
-    `;
-
-    await sendEmail({
-        to: adminEmail,
-        subject: `📊 Daily Error Report - ${date}`,
-        html,
+    console.warn('[Email] Daily error report email temporarily disabled:', {
+        date,
+        totalErrors,
+        criticalErrors,
+        highErrors
     });
 }
 
 /**
- * Send weekly performance report
+ * Send weekly performance report - STUB (disabled)
  */
 export async function sendWeeklyPerformanceReport({
     weekStart,
@@ -212,63 +79,16 @@ export async function sendWeeklyPerformanceReport({
     slowestPages,
     totalRequests,
 }: {
-    weekStart: string;
-    weekEnd: string;
+    weekStart: Date;
+    weekEnd: Date;
     avgLoadTime: number;
-    slowestPages: Array<{ url: string; avgLoadTime: number }>;
+    slowestPages: Array<{ path: string; avgLoadTime: number }>;
     totalRequests: number;
 }): Promise<void> {
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@eregi.co.kr';
-
-    const html = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2>📈 Weekly Performance Report</h2>
-            <p style="color: #6b7280;">${weekStart} - ${weekEnd}</p>
-
-            <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
-                <div style="display: flex; gap: 16px;">
-                    <div style="flex: 1; text-align: center;">
-                        <div style="font-size: 32px; font-weight: bold; color: ${avgLoadTime > 3000 ? '#dc2626' : avgLoadTime > 1000 ? '#f97316' : '#10b981'};">
-                            ${avgLoadTime.toFixed(0)}ms
-                        </div>
-                        <div style="font-size: 14px; color: #6b7280;">Avg Load Time</div>
-                    </div>
-                    <div style="flex: 1; text-align: center;">
-                        <div style="font-size: 32px; font-weight: bold; color: #6b7280;">
-                            ${totalRequests}
-                        </div>
-                        <div style="font-size: 14px; color: #6b7280;">Total Requests</div>
-                    </div>
-                </div>
-            </div>
-
-            ${slowestPages.length > 0 ? `
-                <h3>Slowest Pages</h3>
-                <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-                    <thead>
-                        <tr style="background: #f3f4f6;">
-                            <th style="padding: 8px; text-align: left; border-bottom: 2px solid #e5e7eb;">Page</th>
-                            <th style="padding: 8px; text-align: right; border-bottom: 2px solid #e5e7eb;">Avg Time</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${slowestPages.map(page => `
-                            <tr>
-                                <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${page.url}</td>
-                                <td style="padding: 8px; text-align: right; border-bottom: 1px solid #e5e7eb; font-weight: bold; color: ${page.avgLoadTime > 3000 ? '#dc2626' : '#6b7280'};">
-                                    ${page.avgLoadTime.toFixed(0)}ms
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            ` : '<p>No performance data available</p>'}
-        </div>
-    `;
-
-    await sendEmail({
-        to: adminEmail,
-        subject: `📈 Weekly Performance Report`,
-        html,
+    console.warn('[Email] Weekly performance report email temporarily disabled:', {
+        weekStart: weekStart.toISOString(),
+        weekEnd: weekEnd.toISOString(),
+        avgLoadTime,
+        totalRequests
     });
 }

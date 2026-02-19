@@ -81,13 +81,6 @@
         { "fieldPath": "isActive", "order": "ASCENDING" },
         { "fieldPath": "sortOrder", "order": "ASCENDING" }
       ]
-    },
-    {
-      "collectionGroup": "registration_options",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "registrationId", "order": "ASCENDING" }
-      ]
     }
   ],
   "fieldOverrides": []

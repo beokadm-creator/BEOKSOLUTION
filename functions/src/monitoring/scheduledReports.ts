@@ -1,6 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import { sendDailyErrorReport, sendWeeklyPerformanceReport } from '../utils/email';
+// Temporarily disabled: import { sendDailyErrorReport, sendWeeklyPerformanceReport } from '../utils/email';
 
 /**
  * Scheduled: Daily Error Report
@@ -70,16 +70,16 @@ export const dailyErrorReport = functions.pubsub
                     };
                 });
 
-            // Send email report
-            await sendDailyErrorReport({
-                date: dateStr,
-                totalErrors,
-                criticalErrors,
-                highErrors,
-                topErrors,
-            });
+            // Send email report - Temporarily disabled
+            // await sendDailyErrorReport({
+            //     date: dateStr,
+            //     totalErrors,
+            //     criticalErrors,
+            //     highErrors,
+            //     topErrors,
+            // });
 
-            functions.logger.log(`Daily error report sent for ${dateStr}`);
+            functions.logger.log(`Daily error report generated for ${dateStr} (email sending temporarily disabled)`);
             return null;
         } catch (error: unknown) {
             functions.logger.error('Failed to generate daily error report:', error);
@@ -153,16 +153,16 @@ export const weeklyPerformanceReport = functions.pubsub
             const weekEnd = dates[0];
             const weekStart = dates[dates.length - 1];
 
-            // Send email report
-            await sendWeeklyPerformanceReport({
-                weekStart,
-                weekEnd,
-                avgLoadTime,
-                slowestPages,
-                totalRequests: totalMetrics,
-            });
+            // Send email report - Temporarily disabled
+            // await sendWeeklyPerformanceReport({
+            //     weekStart,
+            //     weekEnd,
+            //     avgLoadTime,
+            //     slowestPages,
+            //     totalRequests: totalMetrics,
+            // });
 
-            functions.logger.log('Weekly performance report sent');
+            functions.logger.log('Weekly performance report generated (email sending temporarily disabled)');
             return null;
         } catch (error: unknown) {
             functions.logger.error('Failed to generate weekly performance report:', error);
