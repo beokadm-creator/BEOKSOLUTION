@@ -65,6 +65,18 @@ service cloud.firestore {
          allow read: if true;  // Public read access
          allow write: if request.auth != null && request.auth.token.email == 'aaron@beoksolution.com';  // Admin only write
       }
+
+      // Conference Options: Public read, admin write (NEW - for optional add-ons feature)
+      match /conference_options/{optionId} {
+         allow read: if true;  // Public read access (users need to see available options)
+         allow write: if request.auth != null && request.auth.token.email == 'aaron@beoksolution.com';  // Admin only write
+      }
+
+      // Registration Options: Owner-only access (NEW - for selected add-ons)
+      match /registrations/{userId}/registration_options/{regOptionId} {
+         allow read: if request.auth.uid == userId || request.auth.token.email == 'aaron@beoksolution.com';
+         allow write: if request.auth.uid == userId || request.auth.token.email == 'aaron@beoksolution.com';
+      }
     }
 
     // [FIX] Allow collection group queries for registrations (My Page issue)

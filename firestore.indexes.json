@@ -72,6 +72,22 @@
         { "fieldPath": "isPinned", "order": "DESCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "conference_options",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "conferenceId", "order": "ASCENDING" },
+        { "fieldPath": "isActive", "order": "ASCENDING" },
+        { "fieldPath": "sortOrder", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "registration_options",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "registrationId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

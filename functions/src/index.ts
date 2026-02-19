@@ -7,6 +7,7 @@ import { approveTossPayment, cancelTossPayment as cancelTossPaymentApi } from '.
 
 import { onRegistrationCreated, onExternalAttendeeCreated, validateBadgePrepToken, issueDigitalBadge, resendBadgePrepToken, generateBadgePrepToken, sendBadgeNotification } from './badge/index';
 import { migrateExternalAttendeeParticipations } from './migrations/migrateExternalAttendeeParticipations';
+import { migrateRegistrationsForOptions, migrateRegistrationsForOptionsCallable } from './migrations/migrateRegistrationsForOptions';
 import { monitorRegistrationIntegrity, monitorMemberCodeIntegrity } from './monitoring/dataIntegrity';
 import { dailyErrorReport, weeklyPerformanceReport } from './monitoring/scheduledReports';
 import { resolveDataIntegrityAlert } from './monitoring/resolveAlert';
@@ -25,6 +26,8 @@ export {
     resendBadgePrepToken,
     generateFirebaseAuthUserForExternalAttendee,
     migrateExternalAttendeeParticipations,
+    migrateRegistrationsForOptions,
+    migrateRegistrationsForOptionsCallable,
     monitorRegistrationIntegrity,
     monitorMemberCodeIntegrity,
     dailyErrorReport,
@@ -51,7 +54,7 @@ export const prepareNicePayment = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+    .https.onCall(async (data, _context) => {  
         const { amt, mid, key } = data;
 
         if (!amt || !mid || !key) {
@@ -74,9 +77,9 @@ export const confirmNicePayment = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+    .https.onCall(async (data, _context) => {  
         // [FIX-20250124-04] Force recompile by adding comment
-        const { tid, amt, mid, key, regId, confId, userData } = data;
+        const { tid, amt, mid, key, regId, confId, userData, baseAmount, optionsTotal, selectedOptions } = data;
 
         if (!tid || !amt || !mid || !key) {
             throw new functions.https.HttpsError('invalid-argument', 'Missing payment details');
@@ -124,7 +127,10 @@ export const confirmNicePayment = functions
                         paymentMethod: 'CARD',
                         paymentKey: tid,
                         orderId: result?.Moid || result?.moid || regId,
-                        amount: parseInt(amt, 10),
+                        amount: parseInt(amt, 10), // Total amount including base + options
+                        baseAmount: baseAmount || parseInt(amt, 10), // Base registration fee
+                        optionsTotal: optionsTotal || 0, // Sum of selected option prices
+                        options: selectedOptions || [], // Selected options details
                         tier: userData.tier || null,
                         categoryName: userData.categoryName || null,
                         memberVerificationData: null, // Will be populated if member verified
@@ -238,8 +244,8 @@ export const confirmTossPayment = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => { // eslint-disable-line @typescript-eslint/no-unused-vars
-        const { paymentKey, orderId, amount, regId, confId, secretKey, userData } = data;
+    .https.onCall(async (data, _context) => {  
+        const { paymentKey, orderId, amount, regId, confId, secretKey, userData, baseAmount, optionsTotal, selectedOptions } = data;
 
         if (!paymentKey || !orderId || !amount) {
             throw new functions.https.HttpsError('invalid-argument', 'Missing payment details (paymentKey, orderId, amount)');
@@ -323,7 +329,10 @@ export const confirmTossPayment = functions
                     paymentMethod: paymentMethod,
                     paymentKey: paymentKey,
                     orderId: orderId,
-                    amount: amount,
+                    amount: amount, // Total amount including base + options
+                    baseAmount: baseAmount || amount, // Base registration fee
+                    optionsTotal: optionsTotal || 0, // Sum of selected option prices
+                    options: selectedOptions || [], // Selected options details
                     tier: userData.tier || null,
                     categoryName: userData.categoryName || null,
                     memberVerificationData: null,
@@ -920,7 +929,7 @@ export const sendAuthCode = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+    .https.onCall(async (data, _context) => {  
         const { phone, code } = data;
 
         if (!phone || !code) {
@@ -1063,7 +1072,7 @@ export const checkEmailExists = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+    .https.onCall(async (data, _context) => {  
         const { email } = data;
         if (!email) return { exists: false };
 
@@ -1242,7 +1251,7 @@ const LINK_SECRET = process.env.LINK_SECRET || 'eregi_v2_secure_link_key_2026';
 
 export const verifyAccessLink = functions
     .runWith({ enforceAppCheck: false, ingressSettings: 'ALLOW_ALL' })
-    .https.onCall(async (data, _context) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+    .https.onCall(async (data, _context) => {  
         const { token } = data;
         if (!token) throw new functions.https.HttpsError('invalid-argument', 'Token required');
 
@@ -1313,7 +1322,7 @@ export const checkNonMemberEmailExists = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+    .https.onCall(async (data, _context) => {  
         const { email, confId } = data;
         if (!email || !confId) {
             throw new functions.https.HttpsError('invalid-argument', 'email and confId are required');
@@ -1400,7 +1409,7 @@ export const logError = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+    .https.onCall(async (data, _context) => {  
         const { errorId, errorData } = data;
 
         if (!errorId || !errorData) {
@@ -1496,7 +1505,7 @@ export const logPerformance = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+    .https.onCall(async (data, _context) => {  
         const { metricName, value, unit = 'ms', threshold, context: metricContext } = data;
 
         if (!metricName || value === undefined) {

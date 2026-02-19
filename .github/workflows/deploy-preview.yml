@@ -1,0 +1,147 @@
+name: Deploy Preview Channel
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - 'src/components/eregi/**'
+      - 'src/pages/RegistrationPage.tsx'
+      - 'src/hooks/usePricing.ts'
+      - 'src/hooks/useConferenceOptions.ts'
+      - 'src/types/schema.ts'
+      - 'src/contexts/FeatureFlagContext.tsx'
+      - 'functions/src/index.ts'
+      - 'functions/src/migrations/**'
+  workflow_dispatch:
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: |
+          cd functions && npm ci
+          npm ci
+      
+      - name: Lint check
+        run: npm run lint
+      
+      - name: Run tests
+        run: npm test
+        env:
+          CI: true
+      
+      - name: Build frontend
+        run: npm run build
+      
+      - name: Deploy to Firebase preview channel
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          CHANNEL_NAME="pr-$PR_NUMBER"
+          
+          # Deploy to preview channel
+          npx -y firebase-tools@latest hosting:channel:deploy $CHANNEL_NAME --expires 7d
+          
+          # Get preview URL
+          PREVIEW_URL=$(firebase hosting:channel:list | grep "pr-$PR_NUMBER" | awk '{print $2}')
+          
+          echo "Preview URL: $PREVIEW_URL"
+      
+      - name: Comment preview URL on PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.issue.number;
+            const previewUrl = process.env.PREVIEW_URL;
+            
+            // Check if comment already exists
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.name,
+              issue_number: prNumber,
+            });
+            
+            const botComment = comments.find(c => c.user.type === 'Bot' && c.body.includes('🔗 Preview:'));
+            
+            const commentBody = `## 🔗 Preview Deployment Successful!\n\n**Preview URL:** ${previewUrl}\n\n### What to test:\n- [ ] Registration page loads without errors\n- [ ] Add-on selector appears (if feature flag enabled)\n- [ ] Price calculation works correctly\n- [ ] Payment flow initiates with correct total amount\n\n### Notes:\n- This preview channel expires in 7 days\n-- Data is isolated (test environment)\n- Changes will be deployed to production after merge`;
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.name,
+                comment_id: botComment.id,
+                body: commentBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.name,
+                issue_number: prNumber,
+                body: commentBody,
+              });
+            }
+        env:
+          PREVIEW_URL: ${{ env.PREVIEW_URL }}
+      
+      - name: Upload preview URL as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-url
+          path: preview-url.txt
+        continue-on-error: true
+      
+      - name: Save preview URL to artifact
+        run: |
+          echo "$PREVIEW_URL" > preview-url.txt
+          
+      - name: Comment on PR with preview URL
+        if: always()
+        uses: actions/comment@v1
+        with:
+          body: |
+            ## 🔗 Preview Deployed Successfully!
+            
+            **Preview URL:** ${{ env.PREVIEW_URL }}
+            
+            ### 테스트 항목:
+            - [ ] 등록 페이지 오류 없이 로딩
+            - [ ] 추가 옵션 선택기 표시 (기능 플래그 활성화 시)
+            - [ ] 가격 계산 정확 작동
+            - [ ] 결제 흐름 시 올바른 총액 전달
+            
+            ### 주의사항:
+            - 프리뷰 채널은 7일 후 만료됩니다
+            - 테스트 환경이며 데이터는 격리됩니다
+            - 머지 후 production 배포 됨
+    
+    # Cancel previous preview channel on PR close
+  cancel-preview:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Delete preview channel
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          CHANNEL_NAME="pr-$PR_NUMBER"
+          
+          # Delete preview channel
+          npx -y firebase-tools@latest hosting:channel:delete $CHANNEL_NAME || echo "Channel not found, skipping..."
+          
+          echo "Preview channel deleted for PR #$PR_NUMBER"

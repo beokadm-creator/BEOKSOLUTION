@@ -4,6 +4,8 @@ import { useConference } from '../hooks/useConference';
 import { useAuth } from '../hooks/useAuth';
 import { useRegistration } from '../hooks/useRegistration';
 import { useUserStore } from '../store/userStore';
+import { useFeatureFlags } from '../contexts/FeatureFlagContext';
+import { usePricing } from '../hooks/usePricing';
 import { doc, setDoc, getDoc, Timestamp, getDocs, collection } from 'firebase/firestore';
 import { db, auth as firebaseAuth } from '../firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
@@ -16,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { CheckCircle2, Loader2, Save, CreditCard, ChevronLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import NicePaymentForm from '../components/payment/NicePaymentForm';
+import { AddonSelector } from '../components/eregi/AddonSelector';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
@@ -30,7 +33,7 @@ interface RegistrationPeriod {
     type: 'EARLY' | 'REGULAR' | 'ONSITE';
     startDate: Timestamp;
     endDate: Timestamp;
-    prices: Record<string, number>; // { [gradeId]: price }
+    totalPrices: Record<string, number>; // { [gradeId]: totalPrice }
 }
 
 interface RegistrationSettings {
@@ -91,7 +94,7 @@ export default function RegistrationPage() {
         memberExpiry?: string;
         memberVerification?: MemberVerificationData;
         memberVerificationData?: MemberVerificationData & { memberDocId?: string };
-        calculatedPrice?: number; // Pre-calculated price from modal
+        calculatedPrice?: number; // Pre-calculated totalPrice from modal
     } || {};
 
     // Params from Modal (State > SearchParams > sessionStorage fallback)
@@ -100,7 +103,7 @@ export default function RegistrationPage() {
     const paramMemberGrade = state.memberGrade || searchParams.get('memberGrade') || '';
     const paramMemberCode = state.memberCode || searchParams.get('memberCode') || '';
 
-    // Try to get calculated price - sessionStorage FIRST for reliability
+    // Try to get calculated totalPrice - sessionStorage FIRST for reliability
     let paramCalculatedPrice: number | undefined = undefined;
 
     try {
@@ -111,7 +114,7 @@ export default function RegistrationPage() {
             const parsed = JSON.parse(sessionData);
             if (typeof parsed.calculatedPrice === 'number') {
                 paramCalculatedPrice = parsed.calculatedPrice;
-                console.log('[RegistrationPage] Using calculated price from member verification sessionStorage:', paramCalculatedPrice);
+                console.log('[RegistrationPage] Using calculated totalPrice from member verification sessionStorage:', paramCalculatedPrice);
             }
         }
 
@@ -123,7 +126,7 @@ export default function RegistrationPage() {
                 const parsed = JSON.parse(nonMemberData);
                 if (typeof parsed.calculatedPrice === 'number') {
                     paramCalculatedPrice = parsed.calculatedPrice;
-                    console.log('[RegistrationPage] Using calculated price from non-member sessionStorage:', paramCalculatedPrice);
+                    console.log('[RegistrationPage] Using calculated totalPrice from non-member sessionStorage:', paramCalculatedPrice);
                 }
             }
         }
@@ -131,10 +134,10 @@ export default function RegistrationPage() {
         // Priority 3: Check location.state (may be lost during navigation)
         if (paramCalculatedPrice === undefined && location.state && typeof (location.state as { calculatedPrice?: number }).calculatedPrice === 'number') {
             paramCalculatedPrice = (location.state as { calculatedPrice?: number }).calculatedPrice;
-            console.log('[RegistrationPage] Using calculated price from location.state:', paramCalculatedPrice);
+            console.log('[RegistrationPage] Using calculated totalPrice from location.state:', paramCalculatedPrice);
         }
     } catch (e) {
-        console.warn('[RegistrationPage] Failed to read calculated price:', e);
+        console.warn('[RegistrationPage] Failed to read calculated totalPrice:', e);
     }
 
     useRegistration(confId || '', auth.user);
@@ -166,8 +169,13 @@ export default function RegistrationPage() {
 
     const [isInfoSaved, setIsInfoSaved] = useState(false);
     const [currentRegId, setCurrentRegId] = useState<string | null>(null);
-    const [price, setPrice] = useState(0);
+    const [basePrice, setBasePrice] = useState(0); // Base registration fee
     const [finalCategory, setFinalCategory] = useState('');
+
+    // Pricing hook for optional add-ons
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { totalPrice, optionsTotal, selectedOptions, setBasePrice: updateBasePrice } = usePricing(basePrice);
+    
     // [Fix-Step 156] selectedTier state to ensure grade/tier is saved
     const [selectedTier, setSelectedTier] = useState<string>('');
 
@@ -288,10 +296,10 @@ export default function RegistrationPage() {
 
     // Calculate Price based on Grade
     useEffect(() => {
-        // PRIORITY 1: Use pre-calculated price from modal if available
+        // PRIORITY 1: Use pre-calculated totalPrice from modal if available
         if (paramCalculatedPrice !== undefined && paramCalculatedPrice >= 0) {
-            console.log('[RegistrationPage] Using pre-calculated price from modal:', paramCalculatedPrice);
-            setPrice(paramCalculatedPrice);
+            console.log('[RegistrationPage] Using pre-calculated totalPrice from modal:', paramCalculatedPrice);
+            setBasePrice(paramCalculatedPrice);
 
             // Determine category name
             let categoryPrefix = 'Registration';
@@ -324,7 +332,7 @@ export default function RegistrationPage() {
                         targetGradeId = matched.code || matched.id;
                     }
                 }
-                if (!targetGradeId && activePeriod?.prices && activePeriod.prices[paramMemberGrade] !== undefined) {
+                if (!targetGradeId && activePeriod?.totalPrices && activePeriod.totalPrices[paramMemberGrade] !== undefined) {
                     targetGradeId = paramMemberGrade;
                 }
             }
@@ -368,7 +376,7 @@ export default function RegistrationPage() {
 
         if (!activePeriod) return;
 
-        // PRIORITY 2: Fall back to original calculation logic if no pre-calculated price
+        // PRIORITY 2: Fall back to original calculation logic if no pre-calculated totalPrice
         let targetGradeId = '';
 
         // 1. Try to use passed grade (from URL or State)
@@ -393,16 +401,16 @@ export default function RegistrationPage() {
 
                     return gId === normalizedServer || gCode === normalizedServer || gName === normalizedServer || gName.includes(normalizedServer);
                 });
-                // FIXED: Use grade.code (not Firestore doc ID) for price lookup
+                // FIXED: Use grade.code (not Firestore doc ID) for totalPrice lookup
                 if (matched) {
                     console.log('[Grade Match] Matched grade:', matched.code, 'from input:', paramMemberGrade);
                     targetGradeId = matched.code || matched.id;
                 }
             }
 
-            // B. If not found in grades, check if it's a direct price key (e.g. non-member types)
-            if (!targetGradeId && activePeriod.prices && activePeriod.prices[paramMemberGrade] !== undefined) {
-                console.log('[Grade Match] Using direct price key:', paramMemberGrade);
+            // B. If not found in grades, check if it's a direct totalPrice key (e.g. non-member types)
+            if (!targetGradeId && activePeriod.totalPrices && activePeriod.totalPrices[paramMemberGrade] !== undefined) {
+                console.log('[Grade Match] Using direct totalPrice key:', paramMemberGrade);
                 targetGradeId = paramMemberGrade;
             }
         }
@@ -416,7 +424,7 @@ export default function RegistrationPage() {
             });
             if (nonMember) {
                 targetGradeId = nonMember.code || nonMember.id;
-            } else if (activePeriod.prices && activePeriod.prices['Non-member'] !== undefined) {
+            } else if (activePeriod.totalPrices && activePeriod.totalPrices['Non-member'] !== undefined) {
                 // Direct fallback to 'Non-member' key
                 targetGradeId = 'Non-member';
             }
@@ -455,9 +463,9 @@ export default function RegistrationPage() {
                 }
             }
 
-            const p = activePeriod.prices[targetGradeId] ?? 0;
-            setPrice(p);
-            setPrice(p);
+            const p = activePeriod.totalPrices[targetGradeId] ?? 0;
+            setBasePrice(p);
+            setBasePrice(p);
             setFinalCategory(`${activePeriod.name.ko} - ${gradeName}`);
         }
 
@@ -483,27 +491,42 @@ export default function RegistrationPage() {
     }, [isInfoSaved, auth.user, tossClientKey, paymentProvider]);
 
     useEffect(() => {
-        if (paymentWidget && paymentMethodsWidgetRef.current && price >= 0) {
-            const amount = { value: price };
+        if (paymentWidget && paymentMethodsWidgetRef.current && totalPrice >= 0) {
+            const amount = { value: totalPrice };
 
             if (paymentMethodsInstanceRef.current) {
                 // Update existing widget amount
-                console.log('[PaymentWidget] Updating amount:', price);
+                console.log('[PaymentWidget] Updating amount:', totalPrice);
                 paymentMethodsInstanceRef.current.updateAmount(amount);
             } else {
                 // Initial Render
-                console.log('[PaymentWidget] Rendering methods with:', price);
+                console.log('[PaymentWidget] Rendering methods with:', totalPrice);
                 paymentMethodsInstanceRef.current = paymentWidget.renderPaymentMethods(
                     '#payment-widget',
                     amount,
                     { variantKey: 'DEFAULT' }
-                );
-            }
+    );
+}
+
+// Wrapper component for AddonSelector with feature flag protection
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function AddonSelectorWrapper({ conferenceId, language }: { conferenceId: string; language: 'ko' | 'en' }) {
+    const { isEnabled } = useFeatureFlags();
+    const addonsEnabled = isEnabled('optional_addons_enabled');
+    
+    // Don't render if feature flag is disabled
+    if (!addonsEnabled) {
+        return null;
+    }
+    
+    return <AddonSelector conferenceId={conferenceId} language={language} />;
+}
+
         }
 
         // paymentMethodsInstanceRef is a ref and should not be in dependencies
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [paymentWidget, price]);
+    }, [paymentWidget, totalPrice]);
 
     // Reset instance ref if widget changes
     useEffect(() => {
@@ -646,7 +669,7 @@ export default function RegistrationPage() {
                 conferenceId: confId,
                 status: 'PENDING',
                 paymentStatus: 'PENDING',
-                amount: price,
+                amount: totalPrice,
                 tier: selectedTier, // [Fix-Step 156] Include tier
                 categoryName: finalCategory,
                 orderId: orderId,
@@ -725,7 +748,7 @@ export default function RegistrationPage() {
             const confirmFn = httpsCallable(functions, 'confirmNicePayment');
             const result = await confirmFn({
                 tid: data.TxTid,
-                amt: price,
+                amt: totalPrice,
                 mid: tossClientKey,
                 key: nicePaySecret,
                 regId: currentRegId,
@@ -913,9 +936,14 @@ export default function RegistrationPage() {
                                 </Button>
                             </div>
                         )}
-                    </Card>
-
-                    {/* Step 2: Payment */}
+                     </Card>
+ 
+                     {/* Optional Add-ons - Feature Flag Protected */}
+                     {confId && (
+                         <AddonSelectorWrapper conferenceId={confId} language={language} />
+                     )}
+ 
+                     {/* Step 2: Payment */}
                     {isInfoSaved && (
                         <Card id="payment-section" className="shadow-lg border-blue-200 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <CardHeader>
@@ -929,17 +957,47 @@ export default function RegistrationPage() {
                                     {language === 'ko' ? '등록비를 결제하고 등록을 완료하세요.' : 'Complete payment to finish registration.'}
                                 </CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-6">
-                                <div className="bg-slate-50 p-6 rounded-xl border flex justify-between items-center">
-                                    <div>
-                                        <p className="text-sm text-gray-500">Registration Type</p>
-                                        <p className="font-bold text-lg text-slate-900">{finalCategory}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm text-gray-500">Amount</p>
-                                        <p className="text-2xl font-bold text-blue-600">₩{price.toLocaleString()}</p>
-                                    </div>
-                                </div>
+                             <CardContent className="space-y-6">
+                                 {/* Price Breakdown */}
+                                 <div className="bg-slate-50 p-6 rounded-xl border">
+                                     <div className="flex justify-between items-center mb-2">
+                                         <div>
+                                             <p className="text-sm text-gray-500">Registration Type</p>
+                                             <p className="font-bold text-lg text-slate-900">{finalCategory}</p>
+                                         </div>
+                                         <div className="text-right">
+                                             <p className="text-sm text-gray-500">Base Fee</p>
+                                             <p className="text-lg font-semibold text-slate-700">₩{basePrice.toLocaleString()}</p>
+                                         </div>
+                                     </div>
+                                     
+                                     {/* Options Total - only show if options selected */}
+                                     {optionsTotal > 0 && (
+                                         <div className="flex justify-between items-center py-2 border-t border-slate-200 mt-2">
+                                             <div className="text-sm text-gray-600">
+                                                 {language === 'ko' ? '추가 옵션' : 'Optional Add-ons'}
+                                                 <span className="ml-2 text-xs text-gray-400">
+                                                     ({selectedOptions.length} {selectedOptions.length === 1 ? (language === 'ko' ? '개' : 'item') : (language === 'ko' ? '개' : 'items')})
+                                                 </span>
+                                             </div>
+                                             <div className="text-right">
+                                                 <p className="text-sm text-gray-500">Options</p>
+                                                 <p className="text-lg font-semibold text-blue-600">+ ₩{optionsTotal.toLocaleString()}</p>
+                                             </div>
+                                         </div>
+                                     )}
+                                     
+                                     {/* Total */}
+                                     <div className="flex justify-between items-center py-3 border-t-2 border-slate-300 mt-2">
+                                             <div>
+                                                 <p className="text-sm font-medium text-slate-700">{language === 'ko' ? '총 결제 금액' : 'Total Amount'}</p>
+                                             </div>
+                                             <div className="text-right">
+                                                 <p className="text-2xl font-bold text-blue-600">₩{totalPrice.toLocaleString()}</p>
+                                             </div>
+                                         </div>
+                                 </div>
+
 
                                 {/* Payment Widget Area */}
                                 {paymentProvider === 'NICE' ? (
@@ -949,7 +1007,7 @@ export default function RegistrationPage() {
                                         </p>
                                         {nicePayActive && (
                                             <NicePaymentForm
-                                                amount={price}
+                                                amount={totalPrice}
                                                 buyerName={formData.name}
                                                 buyerEmail={formData.email}
                                                 buyerTel={formData.phone}
