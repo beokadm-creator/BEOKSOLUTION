@@ -49,6 +49,7 @@ import BadgeManagementPage from './pages/admin/BadgeManagementPage';
 import AdminRefundPage from './pages/admin/AdminRefundPage';
 import AbstractManagerPage from './pages/admin/AbstractManagerPage';
 import ExternalAttendeePage from './pages/admin/ExternalAttendeePage';
+import { OptionsManagementPage } from './pages/admin/OptionsManagementPage';
 import { NoticesManager } from './pages/admin/notices/NoticesManager';
 import SocietyLoginPage from './pages/SocietyLoginPage';
 import MembershipPaymentPage from './pages/MembershipPaymentPage';
@@ -128,6 +129,7 @@ const App: React.FC = () => {
                   <Route index element={<DashboardPage />} />
                   <Route path="settings" element={<ConferenceSettingsPage />} />
                   <Route path="settings/registration" element={<RegistrationSettingsPage />} />
+                  <Route path="settings/options" element={<OptionsManagementPage />} />
                   <Route path="attendance-settings" element={<AttendanceSettingsPage />} />
                   <Route path="statistics" element={<StatisticsPage />} />
                   <Route path="registrations" element={<RegistrationListPage />} />

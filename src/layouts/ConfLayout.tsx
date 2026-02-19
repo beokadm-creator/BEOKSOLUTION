@@ -6,7 +6,7 @@ import { useSubdomain } from '../hooks/useSubdomain';
 import { doc, getDoc, collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { LayoutDashboard, Globe, FileText, Users, Settings, QrCode, Monitor, CreditCard, LogOut, ArrowLeft, Printer, BarChart, UserPlus, Building2, Bell } from 'lucide-react';
+import { LayoutDashboard, Globe, FileText, Users, Settings, QrCode, Monitor, CreditCard, LogOut, ArrowLeft, Printer, BarChart, UserPlus, Building2, Bell, PlusCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/ui/button';
 
@@ -72,6 +72,7 @@ export default function ConfLayout() {
         { href: `/admin/conf/${cid}`, label: '대시보드', icon: LayoutDashboard },
         { href: `/admin/conf/${cid}/settings`, label: '행사 정보', icon: Globe },
         { href: `/admin/conf/${cid}/settings/registration`, label: '등록 설정', icon: CreditCard },
+        { href: `/admin/conf/${cid}/settings/options`, label: '추가 옵션 관리', icon: PlusCircle },
         { href: `/admin/conf/${cid}/sponsors`, label: '스폰서 관리', icon: Building2 },
         { href: `/admin/conf/${cid}/agenda`, label: '프로그램', icon: FileText },
         { href: `/admin/conf/${cid}/abstracts`, label: '초록 관리', icon: FileText },
