@@ -9,8 +9,7 @@
  * 실행: npx playwright test registration-guest.spec.ts
  */
 
-import { test, expect } from '@playwright/test';
-import path from 'path';
+import { test, expect, type Page } from '@playwright/test';
 
 // 테스트 설정
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
@@ -34,7 +33,7 @@ async function wait(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function fillBasicInfo(page, user: typeof testUser) {
+async function fillBasicInfo(page: Page, user: typeof testUser) {
   await page.getByPlaceholder('홍길동 / John Doe').fill(user.name);
   await page.getByPlaceholder('name@example.com').fill(user.email);
   await page.getByPlaceholder('010-1234-5678').fill(user.phone);
@@ -42,12 +41,12 @@ async function fillBasicInfo(page, user: typeof testUser) {
   await page.getByPlaceholder('비회원 신청 내역 조회시 사용할 비밀번호').fill(user.password);
 }
 
-async function agreeToAllTerms(page) {
+async function agreeToAllTerms(page: Page) {
   const allAgreeCheckbox = page.getByRole('checkbox', { name: /모든 약관|I agree to all/i });
   await allAgreeCheckbox.check();
 }
 
-async function goToStep(page, step: number) {
+async function goToStep(page: Page) {
   const nextButton = page.getByRole('button', { name: /다음|Next/i }).first();
   await nextButton.click();
   await page.waitForURL(new RegExp(`.*${TEST_CONF_SLUG}/register.*`));
@@ -238,12 +237,6 @@ test.describe('시나리오 2: 이탈 후 재등록 (세션 복구)', () => {
 
     // 검증: 새로운 빈 상태로 시작해야 함 (세션이 초기화됨)
     await wait(2000); // useNonMemberAuth가 완료될 때까지 대기
-
-    // 비회원 세션 확인 (null이어야 함)
-    const nonMemberSession = await page.evaluate(() => {
-      // RegistrationPage 내부 상태를 직접 확인할 수 없으므로 UI 상태로 확인
-      return null;
-    });
 
     // Step 0이 표시되어야 함 (약관 동의)
     await expect(page.getByText(/이용약관 동의|Terms of Service/)).toBeVisible();
@@ -527,7 +520,7 @@ test.describe('시나리오 3: 데이터 복구 (페이지 새로고침)', () =>
     expect(localStorageData).not.toBeNull();
 
     // 빈 데이터인지 확인 (모든 필드가 비어있음)
-    const hasData = Object.values(localStorageData.formData).some((v: any) => v && v.toString().trim() !== '');
+    const hasData = Object.values(localStorageData.formData).some((v: unknown) => v && v.toString().trim() !== '');
     expect(hasData).toBe(false); // 빈 데이터여야 함
 
     // 빈 데이터는 localStorage에서 제거됨
@@ -563,7 +556,7 @@ test.describe('시나리오 3: 데이터 복구 (페이지 새로고침)', () =>
 
     // Step 4 (완료)로 강제 이동 (결제는 별도 시나리오)
     await page.evaluate(() => {
-      (window as any).currentStep = 4;
+      (window as unknown & { currentStep?: number }).currentStep = 4;
     });
 
     // localStorage 데이터 정리 확인

@@ -191,6 +191,9 @@ const StandAloneBadgePage: React.FC = () => {
             clearInterval(refreshIntervalRef.current);
             refreshIntervalRef.current = null;
         }
+
+        // ui object excluded to prevent excessive re-runs - only ui?.issued is needed
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [status, ui?.issued]);
 
     if (msg && status !== "READY") return (

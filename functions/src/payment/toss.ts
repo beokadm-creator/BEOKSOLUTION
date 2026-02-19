@@ -27,9 +27,13 @@ export const approveTossPayment = async (paymentKey: string, orderId: string, am
         });
 
         return response.data;
-    } catch (error: any) {
-        console.error('Toss Payments Approval Error:', error.response?.data || error.message);
-        throw new Error(error.response?.data?.message || 'Payment Approval Failed');
+    } catch (error: unknown) {
+        const errorData = error && typeof error === 'object' && 'response' in error
+            ? (error as { response?: { data?: { message?: string;[key: string]: unknown } } }).response?.data
+            : undefined;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('Toss Payments Approval Error:', errorData || errorMessage);
+        throw new Error(errorData?.message || 'Payment Approval Failed');
     }
 };
 
@@ -51,8 +55,12 @@ export const cancelTossPayment = async (paymentKey: string, cancelReason: string
         });
 
         return response.data;
-    } catch (error: any) {
-        console.error('Toss Payments Cancel Error:', error.response?.data || error.message);
-        throw new Error(error.response?.data?.message || 'Payment Cancellation Failed');
+    } catch (error: unknown) {
+        const errorData = error && typeof error === 'object' && 'response' in error
+            ? (error as { response?: { data?: { message?: string;[key: string]: unknown } } }).response?.data
+            : undefined;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('Toss Payments Cancel Error:', errorData || errorMessage);
+        throw new Error(errorData?.message || 'Payment Cancellation Failed');
     }
 };

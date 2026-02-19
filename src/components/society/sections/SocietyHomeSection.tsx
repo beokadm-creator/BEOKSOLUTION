@@ -8,7 +8,7 @@ import { Society } from '../../../types/schema';
 interface SocietyHomeSectionProps {
   society: Society;
   language?: Language;
-  onRegisterClick?: (conference: any) => void;
+  onRegisterClick?: (conference: unknown) => void;
 }
 
 const SocietyHomeSection: React.FC<SocietyHomeSectionProps> = ({ society, language = 'ko' }) => {
@@ -16,7 +16,8 @@ const SocietyHomeSection: React.FC<SocietyHomeSectionProps> = ({ society, langua
     if (!text) return '';
     if (typeof text === 'string') return text;
     // Handle both index signature and known keys
-    return (text as any)[language] || (text as any).ko || '';
+    const key = language as keyof typeof text;
+    return text[key] || text.ko || '';
   };
 
   return (

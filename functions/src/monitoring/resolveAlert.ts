@@ -47,8 +47,9 @@ export const resolveDataIntegrityAlert = functions
                 success: true,
                 message: 'Alert marked as resolved'
             };
-        } catch (error: any) {
+        } catch (error: unknown) {
             functions.logger.error('[resolveDataIntegrityAlert] Failed:', error);
-            throw new functions.https.HttpsError('internal', error.message);
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+            throw new functions.https.HttpsError('internal', errorMessage);
         }
     });

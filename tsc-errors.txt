@@ -1,0 +1,56 @@
+src/diagnose-registration.ts(55,35): error TS18046: 'error' is of type 'unknown'.
+src/diagnose-registration.ts(94,35): error TS18046: 'error' is of type 'unknown'.
+src/diagnose-registration.ts(115,35): error TS18046: 'error' is of type 'unknown'.
+src/diagnose-registration.ts(136,35): error TS18046: 'error' is of type 'unknown'.
+src/diagnose-registration.ts(160,13): error TS2339: Property 'userId' does not exist on type 'unknown'.
+src/diagnose-registration.ts(160,21): error TS2339: Property 'conferenceSlug' does not exist on type 'unknown'.
+src/index.ts(61,62): error TS18046: 'error' is of type 'unknown'.
+src/index.ts(88,17): error TS18046: 'approvalResult' is of type 'unknown'.
+src/index.ts(88,57): error TS18046: 'approvalResult' is of type 'unknown'.
+src/index.ts(88,97): error TS18046: 'approvalResult' is of type 'unknown'.
+src/index.ts(128,50): error TS2339: Property 'Moid' does not exist on type '{}'.
+src/index.ts(128,74): error TS2339: Property 'moid' does not exist on type '{}'.
+src/index.ts(228,51): error TS18046: 'approvalResult' is of type 'unknown'.
+src/index.ts(228,83): error TS18046: 'approvalResult' is of type 'unknown'.
+src/index.ts(233,62): error TS18046: 'error' is of type 'unknown'.
+src/index.ts(295,56): error TS2339: Property 'method' does not exist on type '{}'.
+src/index.ts(413,62): error TS18046: 'error' is of type 'unknown'.
+src/index.ts(491,60): error TS2339: Property 'method' does not exist on type '{}'.
+src/index.ts(609,47): error TS18046: 'error' is of type 'unknown'.
+src/index.ts(675,29): error TS18046: 'cancelResult' is of type 'unknown'.
+src/index.ts(683,62): error TS18046: 'error' is of type 'unknown'.
+src/index.ts(706,62): error TS18046: 'error' is of type 'unknown'.
+src/index.ts(735,44): error TS18046: 'template' is of type 'unknown'.
+src/index.ts(755,62): error TS18046: 'error' is of type 'unknown'.
+src/index.ts(810,21): error TS18046: 'e' is of type 'unknown'.
+src/index.ts(835,77): error TS18046: 'claimError' is of type 'unknown'.
+src/index.ts(848,94): error TS18046: 'error' is of type 'unknown'.
+src/index.ts(895,62): error TS18046: 'error' is of type 'unknown'.
+src/index.ts(1016,62): error TS18046: 'e' is of type 'unknown'.
+src/index.ts(1078,17): error TS18046: 'error' is of type 'unknown'.
+src/index.ts(1081,62): error TS18046: 'error' is of type 'unknown'.
+src/index.ts(1188,62): error TS18046: 'error' is of type 'unknown'.
+src/index.ts(1231,76): error TS18046: 'e' is of type 'unknown'.
+src/index.ts(1296,62): error TS18046: 'e' is of type 'unknown'.
+src/index.ts(1327,22): error TS18046: 'db' is of type 'unknown'.
+src/index.ts(1336,9): error TS18046: 'data' is of type 'unknown'.
+src/index.ts(1337,61): error TS18046: 'data' is of type 'unknown'.
+src/index.ts(1341,41): error TS18046: 'data' is of type 'unknown'.
+src/index.ts(1422,38): error TS18046: 'currentData' is of type 'unknown'.
+src/index.ts(1433,62): error TS18046: 'e' is of type 'unknown'.
+src/index.ts(1493,62): error TS18046: 'e' is of type 'unknown'.
+src/monitoring/resolveAlert.ts(52,62): error TS18046: 'error' is of type 'unknown'.
+src/monitoring/scheduledReports.ts(65,30): error TS18046: 'item.error' is of type 'unknown'.
+src/monitoring/scheduledReports.ts(67,31): error TS18046: 'item.error' is of type 'unknown'.
+src/payment/nice.ts(56,50): error TS18046: 'error' is of type 'unknown'.
+src/payment/nice.ts(56,74): error TS18046: 'error' is of type 'unknown'.
+src/payment/toss.ts(24,56): error TS18046: 'error' is of type 'unknown'.
+src/payment/toss.ts(24,80): error TS18046: 'error' is of type 'unknown'.
+src/payment/toss.ts(25,25): error TS18046: 'error' is of type 'unknown'.
+src/payment/toss.ts(48,54): error TS18046: 'error' is of type 'unknown'.
+src/payment/toss.ts(48,78): error TS18046: 'error' is of type 'unknown'.
+src/payment/toss.ts(49,25): error TS18046: 'error' is of type 'unknown'.
+src/utils/aligo.ts(62,14): error TS18046: 'error' is of type 'unknown'.
+src/utils/aligo.ts(94,14): error TS18046: 'error' is of type 'unknown'.
+src/utils/aligo.ts(134,14): error TS18046: 'error' is of type 'unknown'.
+src/utils/aligo.ts(164,14): error TS18046: 'error' is of type 'unknown'.

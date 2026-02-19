@@ -12,7 +12,8 @@ const PresidentGreetingSection: React.FC<PresidentGreetingSectionProps> = ({ soc
     if (!text) return '';
     if (typeof text === 'string') return text;
     // Handle both index signature and known keys
-    return (text as any)[language] || (text as any).ko || '';
+    const key = language as keyof typeof text;
+    return text[key] || text.ko || '';
   };
 
   const greetingData = society.presidentGreeting;

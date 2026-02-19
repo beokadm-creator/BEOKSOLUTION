@@ -51,8 +51,9 @@ async function diagnoseUserRegistration(userId: string, conferenceSlug: string =
         if (!foundTarget) {
             console.log(`   ⚠️  ${conferenceSlug}에 대한 참여 기록을 찾을 수 없음`);
         }
-    } catch (error: any) {
-        console.error(`   ❌ 오류: ${error.message}`);
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(`   ❌ 오류: ${errorMessage}`);
     }
 
     // 2. Registrations 데이터 확인
@@ -90,8 +91,9 @@ async function diagnoseUserRegistration(userId: string, conferenceSlug: string =
                 console.log(`   >>> Badge 페이지가 이 레코드를 표시하지 않음`);
             }
         }
-    } catch (error: any) {
-        console.error(`   ❌ 오류: ${error.message}`);
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(`   ❌ 오류: ${errorMessage}`);
     }
 
     // 3. Conference 문서 확인
@@ -111,8 +113,9 @@ async function diagnoseUserRegistration(userId: string, conferenceSlug: string =
             console.log(`   ⚠️  컨퍼런스 문서를 찾을 수 없음: ${conferenceSlug}`);
             console.log(`   >>> slug가 올바르지 않을 수 있음`);
         }
-    } catch (error: any) {
-        console.error(`   ❌ 오류: ${error.message}`);
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(`   ❌ 오류: ${errorMessage}`);
     }
 
     // 4. User 문서 확인
@@ -132,8 +135,9 @@ async function diagnoseUserRegistration(userId: string, conferenceSlug: string =
         } else {
             console.log(`   ℹ️  User 문서가 없음 (비회원일 수 있음)`);
         }
-    } catch (error: any) {
-        console.error(`   ❌ 오류: ${error.message}`);
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(`   ❌ 오류: ${errorMessage}`);
     }
 
     // 5. 진단 결과 요약
@@ -156,8 +160,9 @@ async function diagnoseUserRegistration(userId: string, conferenceSlug: string =
 /**
  * Cloud Function으로 실행할 때
  */
-export const diagnoseRegistration = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
-    const { userId, conferenceSlug } = data;
+export const diagnoseRegistration = functions.https.onCall(async (data: unknown, context: functions.https.CallableContext) => {
+    const requestData = data as { userId?: string; conferenceSlug?: string };
+    const { userId, conferenceSlug } = requestData;
 
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', '인증이 필요합니다');
@@ -184,6 +189,7 @@ if (require.main === module) {
     const conferenceSlug = args[1] || 'kadd_2026spring';
 
     // Firebase Admin 초기화
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const serviceAccount = require('./service-account-key.json');
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount)

@@ -15,8 +15,8 @@ interface WideSpeakersPreviewProps {
 export const WideSpeakersPreview: React.FC<WideSpeakersPreviewProps> = ({ speakers, lang = 'ko' }) => {
     const [selectedSpeaker, setSelectedSpeaker] = useState<Speaker | null>(null);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const t = (val: any) => {
+     
+    const t = (val: unknown) => {
         if (!val) return '';
         if (typeof val === 'string') return val;
         return (lang === 'en' ? val.en : val.ko) || val.ko || '';

@@ -1,13 +1,68 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
+import { sendAlimTalk } from '../utils/nhnAlimTalk';
+
+// Local type definitions (aligned with schema.ts)
+interface Conference {
+  id: string;
+  conferenceId?: string;
+  societyId: string;
+  slug?: string;
+  title: { ko: string; en?: string };
+  dates?: {
+    start: admin.firestore.Timestamp;
+    end: admin.firestore.Timestamp;
+  };
+  venue?: {
+    name: { ko: string; en?: string } | string;
+  };
+}
+
+interface Registration {
+  name?: string;
+  email?: string;
+  phone?: string;
+  affiliation?: string;
+  organization?: string;
+  licenseNumber?: string;
+  userInfo?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    affiliation?: string;
+    licenseNumber?: string;
+  };
+  badgeIssued?: boolean;
+  badgeQr?: string | null;
+  attendanceStatus?: string;
+  currentZone?: string;
+  totalMinutes?: number;
+  receiptNumber?: string;
+  confirmationQr?: string;
+  userId?: string;
+  paymentStatus?: string;
+  status?: string;
+}
+
+interface ExternalAttendee extends Registration {
+  uid?: string;
+}
+
+interface AlimTalkButton {
+  name: string;
+  type: string;
+  linkMobile?: string;
+  linkPc?: string;
+  linkType?: string; // NHN uses linkType? No, it uses 'type'
+  // NHN specific fields might be needed mapping
+}
 
 /**
  * Generate a secure random token for badge prep
  */
-/**
- * Generate a secure random token for badge prep
- */
-export function generateBadgePrepToken(): string {
+function generateBadgePrepToken(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let token = 'TKN-';
   for (let i = 0; i < 32; i++) {
@@ -44,7 +99,7 @@ export const onRegistrationCreated = functions.firestore
 
       // Get conference end date for token expiry
       const confSnap = await db.collection('conferences').doc(confId).get();
-      const conference = confSnap.data();
+      const conference = confSnap.data() as Conference | undefined;
 
       // Set token expiry to conference end date + 1 day
       let expiresAt: admin.firestore.Timestamp;
@@ -84,7 +139,9 @@ export const onRegistrationCreated = functions.firestore
       });
 
       // Send notification
-      await sendBadgeNotification(db, conference, regId, regData, token);
+      if (conference) {
+        await sendBadgeNotification(db, conference, regId, regData, token);
+      }
 
       functions.logger.info(`[BadgeToken] Created token ${token} for ${regId}`);
 
@@ -98,14 +155,11 @@ export const onRegistrationCreated = functions.firestore
 /**
  * Helper: Send Badge Notification (AlimTalk)
  */
-/**
- * Helper: Send Badge Notification (AlimTalk)
- */
-export async function sendBadgeNotification(
+async function sendBadgeNotification(
   db: admin.firestore.Firestore,
-  conference: any,
+  conference: Conference,
   regId: string,
-  regData: any,
+  regData: Registration | ExternalAttendee,
   token: string
 ) {
   if (!conference.societyId) return;
@@ -125,8 +179,6 @@ export async function sendBadgeNotification(
 
       if (kakaoConfig && kakaoConfig.status === 'APPROVED' && kakaoConfig.kakaoTemplateCode) {
         // Prepare Data
-        const { format } = require('date-fns');
-        const { ko } = require('date-fns/locale');
 
         // Society Info
         const societySnap = await db.collection('societies').doc(conference.societyId).get();
@@ -171,33 +223,45 @@ export async function sendBadgeNotification(
 
         // Process Buttons (Replace URL variables)
         let buttons = kakaoConfig.buttons ? [...kakaoConfig.buttons] : [];
-        buttons = buttons.map((btn: any) => ({
+        buttons = buttons.map((btn: AlimTalkButton) => ({
           ...btn,
           linkMobile: btn.linkMobile?.replace('#{badgePrepUrl}', badgePrepUrl),
           linkPc: btn.linkPc?.replace('#{badgePrepUrl}', badgePrepUrl)
         }));
 
-        // Send
+
+        // Get Sender Key from Infrastructure Settings
+        const infraSnap = await db.doc(`societies/${conference.societyId}/settings/infrastructure`).get();
+        const infraData = infraSnap.data();
+        const senderKey = infraData?.notification?.alimTalk?.senderKey;
+
+        if (!senderKey) {
+          functions.logger.error(`[BadgeNotification] No Sender Key found for society ${conference.societyId}`);
+          return;
+        }
+
+        // Send (NHN AlimTalk)
         const recipientPhone = regData.phone || regData.userInfo?.phone;
         if (recipientPhone) {
-          // Remove hyphens, spaces, and non-numeric characters
-          const cleanPhone = recipientPhone.replace(/[^0-9]/g, '');
+          const cleanPhone = recipientPhone.replace(/-/g, '');
 
-          // NHN Cloud AlimTalk 발송
-          const { sendAlimTalk } = require('../services/notificationService');
+          // Map buttons to NHN format
+          const nhnButtons = buttons.map((btn: AlimTalkButton, index: number) => ({
+            ordering: index + 1,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            type: btn.type as any, // Type cast might be needed if types assume Aligo format
+            name: btn.name,
+            linkMo: btn.linkMobile,
+            linkPc: btn.linkPc
+          }));
 
-          await sendAlimTalk(
-            {
-              phone: cleanPhone,
-              templateCode: kakaoConfig.kakaoTemplateCode,
-              variables: {
-                ...variables,
-                message: content
-              },
-              buttons: buttons
-            },
-            conference.societyId  // societyId 전달
-          );
+          await sendAlimTalk({
+            senderKey,
+            templateCode: kakaoConfig.kakaoTemplateCode,
+            recipientNo: cleanPhone,
+            content: content,
+            buttons: nhnButtons.length > 0 ? nhnButtons : undefined
+          });
 
           functions.logger.info(`[BadgeNotification] AlimTalk sent to ${cleanPhone} for ${regId}`);
         }
@@ -219,7 +283,8 @@ export const validateBadgePrepToken = functions
     enforceAppCheck: false,
     ingressSettings: 'ALLOW_ALL'
   })
-  .https.onCall(async (data, context) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  .https.onCall(async (data, _context) => {
     const { confId, token } = data;
 
     if (!confId || !token) {
@@ -233,85 +298,6 @@ export const validateBadgePrepToken = functions
       const tokenSnap = await db.collection(`conferences/${confId}/badge_tokens`).doc(token).get();
 
       if (!tokenSnap.exists) {
-        // [LEGACY SUPPORT] Try to find token in registrations collection (Auto-migration)
-        functions.logger.info(`[BadgeToken] Token doc not found for ${token}, searching legacy fields...`);
-
-        let legacyRegSnap: admin.firestore.QueryDocumentSnapshot | null = null;
-
-
-        // 1. Check registrations
-        const regQuery = await db.collection(`conferences/${confId}/registrations`)
-          .where('badgePrepToken', '==', token)
-          .limit(1)
-          .get();
-
-        if (!regQuery.empty) {
-          legacyRegSnap = regQuery.docs[0];
-        } else {
-          // 2. Check external_attendees
-          const extQuery = await db.collection(`conferences/${confId}/external_attendees`)
-            .where('badgePrepToken', '==', token)
-            .limit(1)
-            .get();
-
-          if (!extQuery.empty) {
-            legacyRegSnap = extQuery.docs[0];
-
-          }
-        }
-
-        if (legacyRegSnap) {
-          // Found legacy token! Migrate it immediately.
-          const regData = legacyRegSnap.data();
-          const now = admin.firestore.Timestamp.now();
-
-          // Calculate expiry (Default 7 days from now as we don't know original issue time)
-          const expiresAt = admin.firestore.Timestamp.fromMillis(
-            now.toMillis() + (7 * 24 * 60 * 60 * 1000)
-          );
-
-          const newTokenData = {
-            token,
-            registrationId: legacyRegSnap.id,
-            conferenceId: confId,
-            userId: regData.userId || 'GUEST',
-            status: 'ACTIVE',
-            createdAt: now,
-            expiresAt,
-            migratedAt: now,
-            isLegacy: true
-          };
-
-          await db.collection(`conferences/${confId}/badge_tokens`).doc(token).set(newTokenData);
-          functions.logger.info(`[BadgeToken] Legacy token migrated for ${legacyRegSnap.id}`);
-
-          // Mock snapshot for downstream logic
-          // We need to reload or just construct object. 
-          // Simplest is to recursive call or just proceed. 
-          // Let's proceed by returning the match.
-
-          // Return result immediately to avoid complex flow control
-          return {
-            valid: true,
-            tokenStatus: 'ACTIVE',
-            registration: {
-              id: legacyRegSnap.id,
-              name: regData.name || regData.userInfo?.name,
-              email: regData.email || regData.userInfo?.email,
-              phone: regData.phone || regData.userInfo?.phone,
-              affiliation: regData.affiliation || regData.organization || regData.userInfo?.affiliation || '',
-              licenseNumber: regData.licenseNumber || regData.userInfo?.licenseNumber || '',
-              confirmationQr: regData.confirmationQr,
-              badgeQr: regData.badgeQr,
-              badgeIssued: !!regData.badgeIssued,
-              attendanceStatus: regData.attendanceStatus || 'OUTSIDE',
-              currentZone: regData.currentZone,
-              totalMinutes: regData.totalMinutes || 0,
-              receiptNumber: regData.receiptNumber
-            }
-          };
-        }
-
         return { valid: false, error: 'TOKEN_NOT_FOUND' };
       }
 
@@ -338,7 +324,7 @@ export const validateBadgePrepToken = functions
 
         // Get conference for expiry date
         const confSnap = await db.collection('conferences').doc(confId).get();
-        const conference = confSnap.data();
+        const conference = confSnap.data() as Conference | undefined;
 
         let newExpiresAt: admin.firestore.Timestamp;
         if (conference?.dates?.end) {
@@ -444,7 +430,8 @@ export const issueDigitalBadge = functions
     enforceAppCheck: false,
     ingressSettings: 'ALLOW_ALL'
   })
-  .https.onCall(async (data, context) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  .https.onCall(async (data, _context) => {
     const { confId, regId, issueOption } = data;
 
     if (!confId || !regId) {
@@ -521,7 +508,7 @@ export const resendBadgePrepToken = functions
     enforceAppCheck: false,
     ingressSettings: 'ALLOW_ALL'
   })
-  .https.onCall(async (data, context) => {
+  .https.onCall(async (data) => {
     const { confId, regId } = data;
 
     if (!confId || !regId) {
@@ -554,7 +541,7 @@ export const resendBadgePrepToken = functions
 
       // Get conference for expiry date
       const confSnap = await db.collection('conferences').doc(confId).get();
-      const conference = confSnap.data();
+      const conference = confSnap.data() as Conference | undefined;
 
       // Set token expiry to conference end date + 1 day
       let expiresAt: admin.firestore.Timestamp;
@@ -604,7 +591,9 @@ export const resendBadgePrepToken = functions
       });
 
       // Send AlimTalk
-      await sendBadgeNotification(db, conference, regId, regData, newToken);
+      if (conference) {
+        await sendBadgeNotification(db, conference, regId, regData, newToken);
+      }
 
       functions.logger.info(`[BadgeToken] New token ${newToken} reissued and sent for ${regId}`);
 
@@ -639,7 +628,7 @@ export const onExternalAttendeeCreated = functions.firestore
 
       // Get conference end date for token expiry
       const confSnap = await db.collection('conferences').doc(confId).get();
-      const conference = confSnap.data();
+      const conference = confSnap.data() as Conference | undefined;
 
       // Set token expiry
       let expiresAt: admin.firestore.Timestamp;
@@ -676,7 +665,9 @@ export const onExternalAttendeeCreated = functions.firestore
       // Send notification
       // Note: external_attendees has field 'organization' instead of 'userInfo.affiliation'
       // sendBadgeNotification already updated to handle both
-      await sendBadgeNotification(db, { ...conference, id: confId }, regId, regData, token);
+      if (conference) {
+        await sendBadgeNotification(db, { ...conference, id: confId }, regId, regData, token);
+      }
 
       functions.logger.info(`[BadgeToken-Ext] Created token ${token} and notified for ${regId}`);
 

@@ -11,6 +11,7 @@ import { sendDailyErrorReport, sendWeeklyPerformanceReport } from '../utils/emai
 export const dailyErrorReport = functions.pubsub
     .schedule('0 0 * * *') // Every day at midnight UTC (9 AM KST)
     .timeZone('Asia/Seoul')
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     .onRun(async (context) => {
         const db = admin.firestore();
 
@@ -35,7 +36,7 @@ export const dailyErrorReport = functions.pubsub
             let totalErrors = 0;
             let criticalErrors = 0;
             let highErrors = 0;
-            const errorCounts = new Map<string, { count: number; error: any }>();
+            const errorCounts = new Map<string, { count: number; error: unknown }>();
 
             snapshot.forEach((doc) => {
                 const error = doc.data();
@@ -60,11 +61,14 @@ export const dailyErrorReport = functions.pubsub
             const topErrors = Array.from(errorCounts.values())
                 .sort((a, b) => b.count - a.count)
                 .slice(0, 10) // Top 10 errors
-                .map((item) => ({
-                    message: item.error.message,
-                    occurrenceCount: item.count,
-                    severity: item.error.severity,
-                }));
+                .map((item) => {
+                    const err = item.error as { message?: string; severity?: string };
+                    return {
+                        message: err.message || 'Unknown error',
+                        occurrenceCount: item.count,
+                        severity: err.severity || 'UNKNOWN',
+                    };
+                });
 
             // Send email report
             await sendDailyErrorReport({
@@ -77,7 +81,7 @@ export const dailyErrorReport = functions.pubsub
 
             functions.logger.log(`Daily error report sent for ${dateStr}`);
             return null;
-        } catch (error: any) {
+        } catch (error: unknown) {
             functions.logger.error('Failed to generate daily error report:', error);
             throw error;
         }
@@ -92,7 +96,7 @@ export const dailyErrorReport = functions.pubsub
 export const weeklyPerformanceReport = functions.pubsub
     .schedule('0 0 * * 1') // Every Monday at midnight UTC (9 AM KST)
     .timeZone('Asia/Seoul')
-    .onRun(async (context) => {
+    .onRun(async () => {
         const db = admin.firestore();
 
         // Get last 7 days
@@ -160,7 +164,7 @@ export const weeklyPerformanceReport = functions.pubsub
 
             functions.logger.log('Weekly performance report sent');
             return null;
-        } catch (error: any) {
+        } catch (error: unknown) {
             functions.logger.error('Failed to generate weekly performance report:', error);
             throw error;
         }

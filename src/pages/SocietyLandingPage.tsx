@@ -154,12 +154,11 @@ const SocietyLandingPage: React.FC = () => {
         ? 'bg-gradient-to-b from-black/50 to-transparent border-b border-white/10'
         : 'bg-white/95 backdrop-blur-md shadow-lg border-b border-slate-100';
 
-    const textClass = useTransparentHeader ? 'text-white shadow-sm' : 'text-slate-800';
     const buttonGhostClass = useTransparentHeader
         ? 'text-white hover:bg-white/20'
         : 'text-slate-800 hover:bg-slate-100';
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     const logoContainerClass = useTransparentHeader
         ? 'brightness-0 invert drop-shadow-sm'
         : '';

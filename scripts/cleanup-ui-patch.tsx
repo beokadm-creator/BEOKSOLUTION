@@ -1,7 +1,10 @@
 // RegistrationListPage.tsx에 추가할 클린업 도구 UI 코드
 // 기존 버튼 영역 (라인 321-338)에 다음 코드를 추가하세요
+//
+// NOTE: This is a code snippet meant to be added INSIDE a React component.
+// The useState below should be placed at the top of the component function.
 
-const [isCleaning, setIsCleaning] = useState(false);
+// const [isCleaning, setIsCleaning] = useState(false);
 
 // 기존 버튼 영역에 추가
 <div className="ml-auto flex gap-2">

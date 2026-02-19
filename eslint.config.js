@@ -12,6 +12,8 @@ export default defineConfig([
     'src-old-91a3e3b',
     '*.patch.ts',
     '*.patch.tsx',
+    'scripts/*.patch.ts',
+    'scripts/**/*.patch.ts',
     'functions/lib',
   ]),
   {

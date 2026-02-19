@@ -56,7 +56,7 @@ export default function BatchExitPage() {
         scannerId: scannerId.trim() || undefined
       });
 
-      const data = response.data as any;
+      const data = response.data as { success: boolean; processedCount: number; timestamp: number };
 
       if (data.success) {
         setResult({
@@ -69,7 +69,7 @@ export default function BatchExitPage() {
         toast.error('Batch exit failed');
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Batch exit error:', error);
       toast.error(error.message || 'Failed to execute batch exit');
     } finally {
