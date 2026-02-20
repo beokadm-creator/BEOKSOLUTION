@@ -1,5 +1,13 @@
 {
   "projects": {
     "default": "eregi-8fc1e"
+  },
+  "targets": {
+    "eregi-8fc1e": {
+      "hosting": {
+        "live": ["eregi-8fc1e"],
+        "dev": ["eregi-8fc1e"]
+      }
+    }
   }
 }
