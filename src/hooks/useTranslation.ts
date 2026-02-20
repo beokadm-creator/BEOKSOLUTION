@@ -109,7 +109,7 @@ export const useTranslation = (slug: string) => {
     const params = new URLSearchParams(window.location.search);
     const langParam = params.get('lang');
     if (langParam && (langParam.toLowerCase() === 'en' || langParam.toLowerCase() === 'ko')) {
-        setLanguage(langParam.toLowerCase());
+      setLanguage(langParam.toLowerCase());
     }
   }, []);
 
@@ -186,32 +186,32 @@ export const useTranslation = (slug: string) => {
           // 개별 쿼리별 try-catch로 식별
           try {
             agendaSnap = await getDocs(agendasRef) as QuerySnapshot;
-          } catch {
+          } catch (e) {
             // Error silently ignored
           }
 
           try {
             speakerSnap = await getDocs(speakersRef) as QuerySnapshot;
-          } catch {
+          } catch (e) {
             // Error silently ignored
           }
 
           try {
             sponsorSnap = await getDocs(sponsorsRef) as QuerySnapshot;
-          } catch {
+          } catch (e) {
             // Error silently ignored
           }
 
           try {
             regSnap = await getDoc(regSettingsRef) as DocSnapshot;
-          } catch {
+          } catch (e) {
             // Error silently ignored
           }
 
           if (docData.societyId) {
             try {
               societySnap = await getDoc(doc(db, 'societies', docData.societyId as string)) as DocSnapshot;
-            } catch {
+            } catch (e) {
               societySnap = null;
             }
           }

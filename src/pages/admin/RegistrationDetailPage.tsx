@@ -14,14 +14,14 @@ interface ExtendedRegistration extends Registration {
     categoryName?: string;
     userOrg?: string;
     paymentKey?: string;
-    paidAt?: any; // Handles Date, Timestamp, string
+    paidAt?: { seconds: number; nanoseconds?: number } | Date | string;
     orderId?: string;
     paymentType?: string;
     method?: string;
     userInfo?: {
         licenseNumber?: string;
         grade?: string;
-        [key: string]: any;
+        [key: string]: unknown;
     };
     license?: string; // For explicit fallback
 }
@@ -93,8 +93,8 @@ const RegistrationDetailPage: React.FC = () => {
 
                     // [Fix] Map schema-defined userTier to tier if tier is missing
                     if (!flattened.tier && docData.userTier) {
-                        // @ts-ignore - Dynamic key injection
-                        flattened.tier = docData.userTier;
+                        // @ts-expect-error - Dynamic key injection from Firestore
+                        (flattened as Record<string, unknown>).tier = docData.userTier;
                     }
 
                     // [Fix] Fallback for licenseNumber
@@ -275,7 +275,7 @@ const RegistrationDetailPage: React.FC = () => {
 
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">면허번호 (License)</h3>
-                    <p className="text-lg">{data.licenseNumber || data.userInfo?.licenseNumber || data.userInfo?.licensenumber || (data as any).license || (data as any).formData?.licenseNumber || '-'}</p>
+                    <p className="text-lg">{data.licenseNumber || data.userInfo?.licenseNumber || data.userInfo?.licensenumber || (data as Record<string, unknown>).license || (data as Record<string, unknown>).formData?.licenseNumber || '-'}</p>
                 </div>
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">등록등급 (Grade)</h3>

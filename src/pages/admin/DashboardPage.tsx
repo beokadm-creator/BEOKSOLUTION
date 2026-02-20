@@ -12,8 +12,8 @@ interface RegistrationData {
     userId?: string;
     status: string;
     amount?: number;
-    createdAt?: any;
-    [key: string]: any;
+    createdAt?: { seconds: number; nanoseconds?: number } | Date;
+    [key: string]: unknown;
 }
 
 export default function DashboardPage() {

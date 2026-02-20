@@ -31,7 +31,9 @@ export const useCheckIn = (conferenceId: string) => {
                 try {
                     const parsed = JSON.parse(qrData);
                     if (parsed.type === 'CONFIRM' && parsed.regId) targetRegId = parsed.regId;
-                } catch { }
+                } catch {
+                    // JSON parse failed - not a JSON format, continue with original value
+                }
             }
 
             if (!targetRegId) throw new Error("유효하지 않은 QR 코드입니다.");
@@ -39,7 +41,7 @@ export const useCheckIn = (conferenceId: string) => {
             console.log('[useCheckIn] Scanning QR:', { qrData, targetRegId });
 
             // CRITICAL FIX: Try to find registration by document ID first
-            let regRef = doc(db, `conferences/${conferenceId}/registrations/${targetRegId}`);
+            const regRef = doc(db, `conferences/${conferenceId}/registrations/${targetRegId}`);
             let regSnap = await getDoc(regRef);
 
             // If not found by document ID, try to find by confirmationQr field

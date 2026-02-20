@@ -163,7 +163,7 @@ const ExternalAttendeePage: React.FC = () => {
 
             // Transaction for receipt number and document creation
             const configRef = doc(db, `conferences/${confId}/settings/receipt_config`);
-            let attendeeData = generateAttendeeData(formData, 'MANUAL_INDIVIDUAL');
+            const attendeeData = generateAttendeeData(formData, 'MANUAL_INDIVIDUAL');
             let assignedReceiptNumber = '';
 
             await runTransaction(db, async (transaction) => {
@@ -429,7 +429,7 @@ const ExternalAttendeePage: React.FC = () => {
             } else {
                 throw new Error('Failed to send notification');
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Notification resend failed:', error);
             toast.error(`발송 실패: ${error.message}`);
         } finally {
@@ -511,7 +511,7 @@ const ExternalAttendeePage: React.FC = () => {
             } else {
                 throw new Error(authResult.data.message);
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Account creation failed:', error);
             toast.error(`계정 생성 실패: ${error.message}`);
         } finally {

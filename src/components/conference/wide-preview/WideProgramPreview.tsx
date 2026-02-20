@@ -16,8 +16,8 @@ export const WideProgramPreview = ({ agendas, speakers = [], lang = 'ko' }: { ag
     const safeSpeakers = (speakers || []) as Speaker[];
 
     // Helper for localized text
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const t = (val: any) => {
+     
+    const t = (val: unknown) => {
         if (!val) return '';
         if (typeof val === 'string') return val;
         return (lang === 'en' ? val.en : val.ko) || val.ko || '';
@@ -58,8 +58,8 @@ export const WideProgramPreview = ({ agendas, speakers = [], lang = 'ko' }: { ag
         // Sort items by time within each group
         Object.keys(groups).forEach(key => {
             groups[key].sort((a, b) => {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const getSeconds = (val: any) => {
+                 
+                const getSeconds = (val: unknown) => {
                     if (!val) return 0;
                     if (val.seconds) return val.seconds;
                     if (val instanceof Date) return val.getTime() / 1000;
@@ -77,8 +77,8 @@ export const WideProgramPreview = ({ agendas, speakers = [], lang = 'ko' }: { ag
     const sortedDates = Object.keys(groupedAgendas).sort();
 
     // Helper to format time
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const formatTime = (val: any) => {
+     
+    const formatTime = (val: unknown) => {
         if (!val) return '';
         let date: Date;
         if (val instanceof Date) date = val;

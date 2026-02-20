@@ -2,7 +2,7 @@
  * Error Handler Utility
  *
  * 목적: 타입 안전한 에러 처리를 위한 헬퍼 함수
- * - `catch (error: any)` 패턴을 제거하기 위함
+ * - `catch (error: unknown)` 패턴을 제거하기 위함
  * - 모든 에러를 `unknown`으로 처리 후 타입 가드
  */
 

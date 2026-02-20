@@ -1,6 +1,6 @@
 import React from 'react';
 import { Conference } from '../../../types/schema';
-import { Calendar, MapPin, ChevronRight, Target, Trophy, Clock, ArrowRight } from 'lucide-react';
+import { Calendar, MapPin, ChevronRight, Trophy, Clock, ArrowRight } from 'lucide-react';
 import type { Language } from '../../../hooks/useLanguage';
 
 interface ConferenceListSectionProps {
@@ -23,7 +23,7 @@ const ConferenceListSection: React.FC<ConferenceListSectionProps> = ({
   activeConferences,
   upcomingConferences,
   pastConferences,
-  onRegisterClick,
+  // onRegisterClick prop received but handled internally by navigation
   getConferenceUrl,
   language = 'ko',
 }) => {

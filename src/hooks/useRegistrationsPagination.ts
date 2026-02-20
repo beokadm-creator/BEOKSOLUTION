@@ -188,6 +188,9 @@ export function useRegistrationsPagination({
         };
 
         loadData();
+
+        // lastVisible is intentionally excluded - it's updated during pagination and shouldn't trigger refetch
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [conferenceId, currentPage, itemsPerPage, searchQuery]);
 
     /**

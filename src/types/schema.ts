@@ -333,7 +333,9 @@ export interface Registration {
 
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
-  amount: number;
+  amount: number; // Total amount including base + options (unchanged for backward compatibility)
+  baseAmount: number; // Base registration fee only (NEW - for options feature)
+  optionsTotal: number; // Sum of selected option prices (NEW - for options feature)
   refundAmount: number;
   receiptNumber: string; // e.g., "2026-SP-001"
   userTier?: string; // Added snapshot of tier at registration time
@@ -894,3 +896,42 @@ export interface DataIntegrityAlert {
   resolvedAt?: Timestamp;
   resolvedBy?: string;
 }
+
+// ==========================================
+// 7. Optional Add-ons (NEW)
+// ==========================================
+
+/**
+ * Collection: `conferences/{confId}/conference_options/{optionId}`
+ * Optional add-ons available for a conference (e.g., lunch tickets, guidebooks)
+ */
+export interface ConferenceOption {
+  id: string;
+  conferenceId: string;
+  name: LocalizedText;
+  description?: LocalizedText;
+  price: number;
+  currency: string; // 'KRW' - for future international support
+  isActive: boolean;
+  maxQuantity?: number; // Optional: limit quantity per user
+  category?: string; // Optional: category for grouping (e.g., 'meal', 'material', 'event')
+  sortOrder: number; // Display order
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+/**
+ * Collection: `conferences/{confId}/registrations/{regId}/registration_options/{regOptionId}`
+ * Selected options for a specific registration (snapshot of prices at time of registration)
+ */
+export interface RegistrationOption {
+  id: string;
+  registrationId: string;
+  optionId: string; // Reference to conference_options document
+  optionName: LocalizedText; // Snapshot name (in case original option is deleted/renamed)
+  unitPrice: number; // Price per unit at time of registration (snapshot)
+  quantity: number; // Number of units selected
+  totalPrice: number; // quantity * unitPrice
+  createdAt: Timestamp;
+}
+

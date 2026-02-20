@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { collection, query, orderBy, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc, Timestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../../firebase';
 import { useAdminStore } from '../../store/adminStore';
@@ -51,77 +51,80 @@ export default function TemplatesPage() {
     const [kakaoTemplateCode, setKakaoTemplateCode] = useState('');
     const [kakaoStatus, setKakaoStatus] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
 
+
+
     // NHN Cloud Import State
-    const [isNHNImportOpen, setIsNHNImportOpen] = useState(false);
-    const [nhnTemplates, setNHNTemplates] = useState<any[]>([]);
-    const [loadingNHN, setLoadingNHN] = useState(false);
+    const [isNhnImportOpen, setIsNhnImportOpen] = useState(false);
+    const [nhnTemplates, setNhnTemplates] = useState<{ templateId: string; name: string; content?: string }[]>([]);
+    const [loadingNhn, setLoadingNhn] = useState(false);
+
+
 
     // Fetch NHN Cloud Templates
-    const handleFetchNHNTemplates = async () => {
-        setLoadingNHN(true);
+    const handleFetchNhnTemplates = async () => {
+        setLoadingNhn(true);
         try {
-            const getNHNTemplatesFn = httpsCallable(functions, 'getNHNTemplates');
-            // Must pass societyId
-            const result = await getNHNTemplatesFn({ societyId: targetSocietyId });
-            const data = result.data as any;
+            // Get senderKey from Infrastructure settings
+            const infraDoc = await getDoc(
+                doc(db, 'societies', targetSocietyId!, 'settings', 'infrastructure')
+            );
+            const senderKey = infraDoc.data()?.notification?.nhnAlimTalk?.senderKey;
 
-            if (data.success && data.templates) {
-                setNHNTemplates(data.templates);
-                setIsNHNImportOpen(true);
-            } else {
-                console.error("NHN API Error:", data);
-                if (data.error) {
-                    toast.error(`NHN Cloud 오류: ${data.error}`);
-                } else {
-                    toast.error("NHN Cloud 템플릿 목록을 불러오지 못했습니다.");
-                }
+            if (!senderKey) {
+                toast.error("NHN Cloud 발신 프로필 키가 설정되지 않았습니다.\nInfrastructure Settings에서 먼저 설정해주세요.");
+                setLoadingNhn(false);
+                return;
             }
-        } catch (error: any) {
+
+            const getNhnTemplatesFn = httpsCallable(functions, 'getNhnAlimTalkTemplates');
+            const result = await getNhnTemplatesFn({ senderKey });
+            const data = result.data as { success: boolean; data?: { templateListResponse?: { templates?: unknown[] } } };
+
+            if (data.success && data.data?.templateListResponse?.templates) {
+                const templates = data.data.templateListResponse.templates;
+
+                if (templates.length === 0) {
+                    toast.error("승인된 템플릿이 없습니다.\nNHN Cloud Console에서 템플릿을 등록하고 승인받아주세요.");
+                } else {
+                    setNhnTemplates(templates);
+                    setIsNhnImportOpen(true);
+                    toast.success(`${templates.length}개의 승인된 템플릿을 불러왔습니다.`);
+                }
+            } else {
+                toast.error("NHN Cloud 템플릿을 불러오지 못했습니다.");
+            }
+        } catch (error) {
             console.error("Failed to fetch NHN templates:", error);
-            toast.error(`템플릿 호출 오류: ${error.message || 'Unknown error'}`);
+            toast.error("NHN Cloud 템플릿 호출 중 오류가 발생했습니다.");
         } finally {
-            setLoadingNHN(false);
+            setLoadingNhn(false);
         }
     };
 
-    const handleSelectNHNTemplate = (tpl: any) => {
+
+
+    // Select NHN Cloud Template
+    const handleSelectNhnTemplate = (tpl: unknown) => {
         setKakaoContent(tpl.templateContent);
         setKakaoTemplateCode(tpl.templateCode);
 
-        // Parse buttons if any
-        if (tpl.buttons && tpl.buttons.length > 0) {
-            try {
-                const buttons = tpl.buttons;
-
-                if (Array.isArray(buttons)) {
-                    const mappedButtons = buttons.map((b: any) => ({
-                        name: b.name,
-                        type: b.linkType || 'WL',
-                        linkMobile: b.linkMo || '',
-                        linkPc: b.linkPc || ''
-                    }));
-                    setKakaoButtons(mappedButtons);
-                }
-            } catch (e) {
-                console.error("Error parsing buttons", e);
-                setKakaoButtons([]);
-            }
+        // Parse buttons
+        if (tpl.buttons && Array.isArray(tpl.buttons)) {
+            const mappedButtons = tpl.buttons.map((b: unknown) => ({
+                name: b.name,
+                type: b.linkType || 'WL',
+                linkMobile: b.linkMo || '',
+                linkPc: b.linkPc || ''
+            }));
+            setKakaoButtons(mappedButtons);
         } else {
             setKakaoButtons([]);
         }
 
-        // Auto-set status based on inspection status if available, else default to Approved
-        // NHN returns: status: 'TSC01'(REQ), 'TSC02'(INSP), 'TSC03'(APR), 'TSC04'(REJ) OR 'APPROVED', 'REJECTED'
-        const stat = tpl.status;
-        if (stat === 'APPROVED' || stat === 'TSC03') {
-            setKakaoStatus('APPROVED');
-        } else if (stat === 'REJECTED' || stat === 'TSC04') {
-            setKakaoStatus('REJECTED');
-        } else {
-            setKakaoStatus('PENDING');
-        }
+        // NHN Cloud returns only approved templates, so set to APPROVED
+        setKakaoStatus('APPROVED');
 
-        setIsNHNImportOpen(false);
+        setIsNhnImportOpen(false);
         toast.success("NHN Cloud 템플릿을 불러왔습니다.");
     };
 
@@ -664,8 +667,8 @@ export default function TemplatesPage() {
 
             {/* Template Edit Dialog */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="max-w-4xl max-h-[90vh] p-0 gap-0 bg-white rounded-2xl flex flex-col">
-                    <DialogHeader className="p-6 pb-4 border-b border-slate-100 bg-white flex-shrink-0">
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 bg-white rounded-2xl overflow-hidden block">
+                    <DialogHeader className="p-6 pb-4 border-b border-slate-100 bg-white sticky top-0 z-10">
                         <div className="flex items-center gap-3 mb-1">
                             <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
                                 {editingTemplate ? <Save className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
@@ -679,7 +682,7 @@ export default function TemplatesPage() {
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="p-6 space-y-8 overflow-y-auto flex-1">
+                    <div className="p-6 space-y-8">
                         {/* Basic Info Section */}
                         <section className="space-y-4">
                             <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
@@ -775,13 +778,14 @@ export default function TemplatesPage() {
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={handleFetchNHNTemplates}
-                                        disabled={loadingNHN}
-                                        className="h-7 text-xs border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100"
+                                        onClick={handleFetchNhnTemplates}
+                                        disabled={loadingNhn}
+                                        className="h-7 text-xs border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
                                     >
-                                        {loadingNHN ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : <Download className="w-3 h-3 mr-1" />}
-                                        NHN 템플릿 불러오기
+                                        {loadingNhn ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : <Download className="w-3 h-3 mr-1" />}
+                                        NHN Cloud 불러오기
                                     </Button>
+
                                     <Badge variant="outline" className="text-xs text-slate-400 font-normal">선택사항</Badge>
                                 </div>
                             </div>
@@ -917,7 +921,7 @@ export default function TemplatesPage() {
                         </section>
                     </div>
 
-                    <DialogFooter className="p-6 border-t border-slate-100 bg-slate-50 flex-shrink-0">
+                    <DialogFooter className="p-6 border-t border-slate-100 bg-slate-50 sticky bottom-0 z-10">
                         <Button variant="ghost" onClick={() => setIsDialogOpen(false)} className="mr-2">
                             취소
                         </Button>
@@ -929,12 +933,14 @@ export default function TemplatesPage() {
                 </DialogContent>
             </Dialog>
 
+
+
             {/* NHN Cloud Template Import Dialog */}
-            <Dialog open={isNHNImportOpen} onOpenChange={setIsNHNImportOpen}>
-                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto p-0 gap-0 bg-white rounded-2xl flex flex-col">
-                    <DialogHeader className="p-6 pb-4 border-b border-slate-100 bg-white flex-shrink-0">
+            <Dialog open={isNhnImportOpen} onOpenChange={setIsNhnImportOpen}>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto p-0 gap-0 bg-white rounded-2xl overflow-hidden block">
+                    <DialogHeader className="p-6 pb-4 border-b border-slate-100 bg-white sticky top-0 z-10">
                         <div className="flex items-center gap-3 mb-1">
-                            <div className="p-2 bg-amber-50 rounded-lg text-amber-600">
+                            <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
                                 <Download className="w-5 h-5" />
                             </div>
                             <DialogTitle className="text-xl font-bold text-slate-900">
@@ -942,41 +948,45 @@ export default function TemplatesPage() {
                             </DialogTitle>
                         </div>
                         <DialogDescription className="text-slate-500 ml-11">
-                            NHN Cloud에 등록된 알림톡 템플릿 목록입니다.
+                            NHN Cloud에 등록된 승인된 알림톡 템플릿 목록입니다.
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="p-6 overflow-y-auto flex-1">
+                    <div className="p-6">
                         <div className="space-y-4">
                             {nhnTemplates.length === 0 ? (
                                 <div className="text-center py-10 text-slate-500 font-medium">
                                     불러온 템플릿이 없습니다.
                                 </div>
                             ) : (
-                                nhnTemplates.map((tpl: any) => (
-                                    <Card key={tpl.templateCode} className="transition-all hover:bg-slate-50/50 cursor-pointer border-slate-100 group" onClick={() => handleSelectNHNTemplate(tpl)}>
+                                nhnTemplates.map((tpl: unknown) => (
+                                    <Card key={tpl.templateCode} className="transition-all hover:bg-slate-50/50 cursor-pointer border-slate-100 group" onClick={() => handleSelectNhnTemplate(tpl)}>
                                         <CardContent className="p-4">
                                             <div className="flex justify-between items-start mb-2">
                                                 <div>
-                                                    <h5 className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{tpl.templateName}</h5>
+                                                    <h5 className="font-bold text-slate-800 group-hover:text-emerald-600 transition-colors">{tpl.templateName}</h5>
                                                     <p className="text-xs text-slate-400 font-mono mt-0.5">{tpl.templateCode}</p>
                                                 </div>
-                                                <Badge className={
-                                                    (tpl.status === 'APPROVED' || tpl.status === 'TSC03') ? 'bg-emerald-500' :
-                                                        (tpl.status === 'REJECTED' || tpl.status === 'TSC04') ? 'bg-red-500' : 'bg-slate-500'
-                                                }>
-                                                    {tpl.statusName ||
-                                                        ((tpl.status === 'APPROVED' || tpl.status === 'TSC03') ? '승인' :
-                                                            (tpl.status === 'REJECTED' || tpl.status === 'TSC04') ? '반려' : '대기')}
+                                                <Badge className="bg-emerald-500">
+                                                    승인됨
                                                 </Badge>
                                             </div>
-                                            <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 mb-3 line-clamp-2">
+                                            <div className="bg-emerald-50/30 p-3 rounded-lg border border-emerald-100 mb-3 line-clamp-3">
                                                 <p className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed">
                                                     {tpl.templateContent}
                                                 </p>
                                             </div>
+                                            {tpl.buttons && tpl.buttons.length > 0 && (
+                                                <div className="flex flex-wrap gap-1.5 mb-3">
+                                                    {tpl.buttons.map((btn: unknown, idx: number) => (
+                                                        <Badge key={idx} variant="outline" className="text-[10px] bg-white text-slate-600 border-slate-200">
+                                                            🔘 {btn.name}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            )}
                                             <div className="flex justify-end">
-                                                <Button size="sm" variant="ghost" className="h-8 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 font-bold">
+                                                <Button size="sm" variant="ghost" className="h-8 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 font-bold">
                                                     선택하기
                                                 </Button>
                                             </div>

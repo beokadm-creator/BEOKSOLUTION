@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../../components/ui/card';
-import { LogOut, Plus, Building2, Calendar, Edit, Save, Users, Settings, Trash2, Key, ShieldCheck, Search, Filter, Activity, CheckCircle2, XCircle } from 'lucide-react';
+import { LogOut, Plus, Building2, Calendar, Edit, Save, Users, Settings, Trash2, Key, ShieldCheck, Search, Filter, Activity, CheckCircle2 } from 'lucide-react';
 import { auth, functions } from '../../firebase';
 import { httpsCallable } from 'firebase/functions';
 import { doc, updateDoc, getDocs, collection, getDoc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
@@ -89,7 +89,7 @@ const SuperAdminPage: React.FC = () => {
             await resolveAlertFunction({ alertPath });
             toast.success('알림이 해결되었습니다');
             refetchMonitoring(); // Refresh monitoring data
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('[resolveAlert] Failed:', error);
             toast.error('알림 해결 실패: ' + error.message);
         } finally {

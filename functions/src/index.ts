@@ -7,6 +7,7 @@ import { approveTossPayment, cancelTossPayment as cancelTossPaymentApi } from '.
 
 import { onRegistrationCreated, onExternalAttendeeCreated, validateBadgePrepToken, issueDigitalBadge, resendBadgePrepToken, generateBadgePrepToken, sendBadgeNotification } from './badge/index';
 import { migrateExternalAttendeeParticipations } from './migrations/migrateExternalAttendeeParticipations';
+import { migrateRegistrationsForOptions, migrateRegistrationsForOptionsCallable } from './migrations/migrateRegistrationsForOptions';
 import { monitorRegistrationIntegrity, monitorMemberCodeIntegrity } from './monitoring/dataIntegrity';
 import { dailyErrorReport, weeklyPerformanceReport } from './monitoring/scheduledReports';
 import { resolveDataIntegrityAlert } from './monitoring/resolveAlert';
@@ -25,6 +26,8 @@ export {
     resendBadgePrepToken,
     generateFirebaseAuthUserForExternalAttendee,
     migrateExternalAttendeeParticipations,
+    migrateRegistrationsForOptions,
+    migrateRegistrationsForOptionsCallable,
     monitorRegistrationIntegrity,
     monitorMemberCodeIntegrity,
     dailyErrorReport,
@@ -51,12 +54,7 @@ export const prepareNicePayment = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, context) => {
-        // Allow public access for registration? Or authenticated?
-        // Registration page might be accessed by Guest (Anonymously authenticated usually).
-        // Let's allow public for now, or check context.auth if anonymous auth is used.
-        // For safety, let's require at least some context or just open it as it generates a signature for a specific transaction.
-
+    .https.onCall(async (data, _context) => {  
         const { amt, mid, key } = data;
 
         if (!amt || !mid || !key) {
@@ -66,9 +64,10 @@ export const prepareNicePayment = functions
         try {
             const result = getNiceAuthParams(amt, mid, key);
             return result;
-        } catch (error: any) {
-            functions.logger.error("Error in prepareNicePayment:", error);
-            throw new functions.https.HttpsError('internal', error.message);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+            functions.logger.error("Error in prepareNicePayment:", errorMessage);
+            throw new functions.https.HttpsError('internal', errorMessage);
         }
     });
 
@@ -78,9 +77,9 @@ export const confirmNicePayment = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, context) => {
+    .https.onCall(async (data, _context) => {  
         // [FIX-20250124-04] Force recompile by adding comment
-        const { tid, amt, mid, key, regId, confId, userData } = data;
+        const { tid, amt, mid, key, regId, confId, userData, baseAmount, optionsTotal, selectedOptions } = data;
 
         if (!tid || !amt || !mid || !key) {
             throw new functions.https.HttpsError('invalid-argument', 'Missing payment details');
@@ -92,19 +91,11 @@ export const confirmNicePayment = functions
 
         try {
             // 1. Call NicePay API
-            const approvalResult = await approveNicePayment(tid, amt, mid, key) as any;
+            const approvalResult = await approveNicePayment(tid, amt, mid, key) as unknown;
+            const result = approvalResult as { ResultCode?: string; Moid?: string; moid?: string;[key: string]: unknown };
 
             // 2. Check Result
-            if (approvalResult.ResultCode === '3001' || approvalResult.ResultCode === '4100' || approvalResult.ResultCode === '4000') {
-                // Success Codes (3001: Card, 4100: Bank Transfer? Need to verify codes.
-                // Actually 3001 is common success for Credit Card.
-                // Let's assume success if ResultCode starts with 3 or 4 or is '0000' (some versions).
-                // Better: Check ResultCode documentation. For Web API, usually '3001' is success for Card.
-                // However, let's just return the result to client and let client decide, OR update DB here.
-                // Updating DB here is safer.
-
-                // [FIX-20250124-01] Create Registration document on successful payment (instead of updating)
-                // This ensures that only paid registrations are stored in the DB
+            if (result.ResultCode === '3001' || result.ResultCode === '4100' || result.ResultCode === '4000') {
                 if (regId && confId) {
                     const regRef = admin.firestore().collection(`conferences/${confId}/registrations`).doc(regId);
 
@@ -135,14 +126,17 @@ export const confirmNicePayment = functions
                         paymentStatus: 'PAID',
                         paymentMethod: 'CARD',
                         paymentKey: tid,
-                        orderId: approvalResult?.Moid || approvalResult?.moid || regId,
-                        amount: parseInt(amt, 10),
+                        orderId: result?.Moid || result?.moid || regId,
+                        amount: parseInt(amt, 10), // Total amount including base + options
+                        baseAmount: baseAmount || parseInt(amt, 10), // Base registration fee
+                        optionsTotal: optionsTotal || 0, // Sum of selected option prices
+                        options: selectedOptions || [], // Selected options details
                         tier: userData.tier || null,
                         categoryName: userData.categoryName || null,
                         memberVerificationData: null, // Will be populated if member verified
                         isAnonymous: userData.isAnonymous || false,
                         agreements: {}, // Will be populated from session data if needed
-                        paymentDetails: approvalResult,
+                        paymentDetails: result,
                         receiptNumber: `${dateStr}-${rand}`,
                         confirmationQr: `CONF-${regId}`,
                         badgeQr: null,
@@ -232,15 +226,15 @@ export const confirmNicePayment = functions
                     }
                 }
 
-                return { success: true, data: approvalResult };
+                return { success: true, data: result };
             } else {
                 // Failed
-                return { success: false, message: approvalResult.ResultMsg, code: approvalResult.ResultCode };
+                return { success: false, message: (result as { ResultMsg?: string }).ResultMsg, code: result.ResultCode };
             }
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             functions.logger.error("Error in confirmNicePayment:", error);
-            throw new functions.https.HttpsError('internal', error.message);
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
         }
     });
 
@@ -250,8 +244,8 @@ export const confirmTossPayment = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, context) => {
-        const { paymentKey, orderId, amount, regId, confId, secretKey, userData } = data;
+    .https.onCall(async (data, _context) => {  
+        const { paymentKey, orderId, amount, regId, confId, secretKey, userData, baseAmount, optionsTotal, selectedOptions } = data;
 
         if (!paymentKey || !orderId || !amount) {
             throw new functions.https.HttpsError('invalid-argument', 'Missing payment details (paymentKey, orderId, amount)');
@@ -335,7 +329,10 @@ export const confirmTossPayment = functions
                     paymentMethod: paymentMethod,
                     paymentKey: paymentKey,
                     orderId: orderId,
-                    amount: amount,
+                    amount: amount, // Total amount including base + options
+                    baseAmount: baseAmount || amount, // Base registration fee
+                    optionsTotal: optionsTotal || 0, // Sum of selected option prices
+                    options: selectedOptions || [], // Selected options details
                     tier: userData.tier || null,
                     categoryName: userData.categoryName || null,
                     memberVerificationData: null,
@@ -356,6 +353,7 @@ export const confirmTossPayment = functions
                 // [Security] Lock the Member Code & Log History -> ONLY IF PAID
                 // For Virtual Account, we do this when webhook confirms deposit (DONE).
                 if (status === 'PAID') {
+                    // [Security] Lock the Member Code & Log History
                     try {
                         // A. Lock Code
                         if (societyId && userData.memberVerificationData && userData.memberVerificationData.id) {
@@ -435,9 +433,9 @@ export const confirmTossPayment = functions
 
             return { success: true, data: approvalResult };
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             functions.logger.error("Error in confirmTossPayment:", error);
-            throw new functions.https.HttpsError('internal', error.message);
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
         }
     });
 
@@ -626,7 +624,7 @@ export const confirmTossPaymentHttp = functions
                                 // C. Log Participation History (users/{uid}/participations/{regId})
                                 await admin.firestore().collection('users').doc(userData.userId).collection('participations').doc(regId).set({
                                     conferenceId: confId,
-                                    conferenceName: '',
+                                    conferenceName: '', // Will be populated later if needed
                                     registrationId: regId,
                                     societyId: societyId || 'unknown',
                                     role: 'ATTENDEE',
@@ -639,6 +637,7 @@ export const confirmTossPaymentHttp = functions
                             }
                         } catch (postProcessError) {
                             functions.logger.error("Failed to post-process (Lock/History) for Toss Payment:", postProcessError);
+                            // Non-blocking
                         }
                     } else {
                         functions.logger.info(`[Virtual Account] Registration created in PENDING state for ${regId}. Waiting for deposit.`);
@@ -648,9 +647,10 @@ export const confirmTossPaymentHttp = functions
                 // Return success response
                 res.status(200).json({ success: true, data: approvalResult });
 
-            } catch (error: any) {
+            } catch (error: unknown) {
                 functions.logger.error("Error in confirmTossPaymentHttp:", error);
-                res.status(500).json({ error: error.message || 'Payment confirmation failed' });
+                const errorMessage = error instanceof Error ? error.message : 'Payment confirmation failed';
+                res.status(500).json({ error: errorMessage });
             }
         });
     });
@@ -698,10 +698,11 @@ export const cancelTossPayment = functions
 
             // 1. Call Toss API
             // Imported from ./payment/toss.ts (need to update import if not already done)
-            const cancelResult = await cancelTossPaymentApi(paymentKey, cancelReason, finalSecretKey) as any;
+            const cancelResult = await cancelTossPaymentApi(paymentKey, cancelReason, finalSecretKey) as unknown;
+            const result = cancelResult as { status?: string; totalAmount?: number;[key: string]: unknown };
 
             // 2. Update DB Status (Cancel)
-            if (regId) {
+            if (regId && (result.status === 'CANCELED' || result.status === 'PARTIAL_CANCELED')) {
                 const regRef = db.collection(`conferences/${confId}/registrations`).doc(regId);
                 await regRef.update({
                     status: 'CANCELED',
@@ -716,23 +717,23 @@ export const cancelTossPayment = functions
                     timestamp: admin.firestore.FieldValue.serverTimestamp(),
                     method: 'ADMIN_MANUAL_PG',
                     reason: cancelReason,
-                    amount: cancelResult.totalAmount // Optional: Check actual result structure
+                    amount: result.totalAmount // Optional: Check actual result structure
                 });
             }
 
             return { success: true, data: cancelResult };
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             functions.logger.error("Error in cancelTossPayment:", error);
-            throw new functions.https.HttpsError('internal', error.message);
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
         }
     });
 
 
-// 5. Get NHN Cloud AlimTalk Templates
-import { getTemplateList } from './utils/nhnCloud';
+// 6. Get NHN Cloud AlimTalk Templates
+import { getTemplates } from './utils/nhnAlimTalk';
 
-export const getNHNTemplates = functions
+export const getNhnAlimTalkTemplates = functions
     .runWith({
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
@@ -742,41 +743,39 @@ export const getNHNTemplates = functions
             throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
         }
 
-        const { societyId } = data;
-        if (!societyId) {
-            throw new functions.https.HttpsError('invalid-argument', 'societyId is required');
+        const { senderKey } = data;
+
+        if (!senderKey) {
+            throw new functions.https.HttpsError('invalid-argument', 'senderKey is required');
         }
 
         try {
-            // Get NHN Cloud config from Firestore
-            const infraSnap = await admin.firestore()
-                .collection('societies')
-                .doc(societyId)
-                .collection('settings')
-                .doc('infrastructure')
-                .get();
+            const result = await getTemplates(senderKey);
 
-            if (!infraSnap.exists) {
-                throw new Error('Infrastructure settings not found');
+            // Filter only APPROVED templates
+            if (result.success && result.data?.templateListResponse?.templates) {
+                const approvedTemplates = result.data.templateListResponse.templates.filter(
+                    (template: unknown) => (template as { templateStatus?: string }).templateStatus === 'APR'
+                );
+
+                functions.logger.info(`[NHN Templates] Total: ${result.data.templateListResponse.templates.length}, Approved: ${approvedTemplates.length}`);
+
+                return {
+                    success: true,
+                    data: {
+                        ...result.data,
+                        templateListResponse: {
+                            ...result.data.templateListResponse,
+                            templates: approvedTemplates
+                        }
+                    }
+                };
             }
-
-            const infraData = infraSnap.data();
-            const nhnConfig = infraData?.notification;
-
-            if (!nhnConfig?.appKey || !nhnConfig?.secretKey || !nhnConfig?.senderKey) {
-                throw new Error('NHN Cloud configuration is incomplete');
-            }
-
-            const result = await getTemplateList({
-                appKey: nhnConfig.appKey,
-                secretKey: nhnConfig.secretKey,
-                senderKey: nhnConfig.senderKey
-            });
 
             return result;
-        } catch (error: any) {
-            functions.logger.error("Error in getNHNTemplates:", error);
-            throw new functions.https.HttpsError('internal', error.message);
+        } catch (error: unknown) {
+            functions.logger.error("Error in getNhnAlimTalkTemplates:", error);
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
         }
     });
 
@@ -830,8 +829,8 @@ export const createSocietyAdminUser = functions
                     };
                 }
 
-            } catch (e: any) {
-                if (e.code === 'auth/user-not-found') {
+            } catch (e: unknown) {
+                if (typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === 'auth/user-not-found') {
                     // User does not exist -> Create
                     if (!password) {
                         throw new functions.https.HttpsError('invalid-argument', 'Password is required for new users.');
@@ -854,9 +853,10 @@ export const createSocietyAdminUser = functions
                 // Merge existing claims if any? For now, overwrite/add.
                 const currentClaims = userRecord.customClaims || {};
                 await admin.auth().setCustomUserClaims(userRecord.uid, { ...currentClaims, role: 'CONF_ADMIN', societyId });
-            } catch (claimError: any) {
-                functions.logger.error("Claim Error (IAM/Permission Issue?):", claimError);
-                warning = `User created/linked, but custom claims failed: ${claimError.message}`;
+            } catch (claimError: unknown) {
+                const claimErrorMessage = claimError instanceof Error ? claimError.message : String(claimError);
+                functions.logger.error("Claim Error (IAM/Permission Issue?):", claimErrorMessage);
+                warning = `User created/linked, but custom claims failed: ${claimErrorMessage}`;
             }
 
             // 5. Update Firestore
@@ -867,9 +867,10 @@ export const createSocietyAdminUser = functions
 
             return { success: true, uid: userRecord.uid, warning };
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             functions.logger.error("Error in createSocietyAdminUser:", error);
-            throw new functions.https.HttpsError('internal', `Failed to create/link admin: ${error.message}`, error);
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+            throw new functions.https.HttpsError('internal', `Failed to create/link admin: ${errorMessage}`, error);
         }
     });
 
@@ -914,9 +915,9 @@ export const removeSocietyAdminUser = functions
             }
 
             return { success: true };
-        } catch (error: any) {
+        } catch (error: unknown) {
             functions.logger.error("Error in removeSocietyAdminUser:", error);
-            throw new functions.https.HttpsError('internal', error.message);
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
         }
     });
 
@@ -928,7 +929,7 @@ export const sendAuthCode = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, context) => {
+    .https.onCall(async (data, _context) => {  
         const { phone, code } = data;
 
         if (!phone || !code) {
@@ -964,14 +965,39 @@ export const verifyMemberIdentity = functions
             const membersRef = admin.firestore().collection('societies').doc(societyId).collection('members');
 
             // Strategy: Check Name + (LicenseNumber OR Code)
-            // 1. Try License Number
-            let q = membersRef.where('name', '==', name).where('licenseNumber', '==', code);
-            let snap = await q.get();
+            // [FIX] Handle 2-character names with space (e.g., "김 결" vs "김결")
+            const checkMember = async (queryName: string, queryCode: string) => {
+                // 1. Try License Number
+                let q = membersRef.where('name', '==', queryName).where('licenseNumber', '==', queryCode);
+                let snap = await q.get();
 
+                if (snap.empty) {
+                    // 2. Try Code field
+                    q = membersRef.where('name', '==', queryName).where('code', '==', queryCode);
+                    snap = await q.get();
+                }
+                return snap;
+            };
+
+            // 1. Try Exact Match
+            let snap = await checkMember(name, code);
+
+            // 2. Try variations for 2-character names (common in legacy DBs)
             if (snap.empty) {
-                // 2. Try Code field
-                q = membersRef.where('name', '==', name).where('code', '==', code);
-                snap = await q.get();
+                const trimmedName = name.replace(/\s+/g, '');
+                
+                // Case A: User entered "김결", DB has "김 결"
+                if (trimmedName.length === 2) {
+                    const spacedName = `${trimmedName[0]} ${trimmedName[1]}`;
+                    if (spacedName !== name) {
+                        snap = await checkMember(spacedName, code);
+                    }
+                }
+
+                // Case B: User entered "김 결", DB has "김결"
+                if (snap.empty && name !== trimmedName) {
+                    snap = await checkMember(trimmedName, code);
+                }
             }
 
             if (!snap.empty) {
@@ -990,7 +1016,7 @@ export const verifyMemberIdentity = functions
                 if (member.expiryDate) {
                     let exp = member.expiryDate;
                     // Handle Firestore Timestamp or Date string
-                    if (exp.toDate) {
+                    if (typeof exp === 'object' && exp !== null && 'toDate' in exp && typeof exp.toDate === 'function') {
                         exp = exp.toDate();
                     } else if (typeof exp === 'string') {
                         exp = new Date(exp);
@@ -1035,9 +1061,9 @@ export const verifyMemberIdentity = functions
 
             return { success: false, message: "Member not found. Please check your name and license number." };
 
-        } catch (e: any) {
+        } catch (e: unknown) {
             functions.logger.error("Verify Member Error:", e);
-            throw new functions.https.HttpsError('internal', e.message);
+            const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
         }
     });
 
@@ -1046,7 +1072,7 @@ export const checkEmailExists = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, context) => {
+    .https.onCall(async (data, _context) => {  
         const { email } = data;
         if (!email) return { exists: false };
 
@@ -1055,17 +1081,18 @@ export const checkEmailExists = functions
             try {
                 await admin.auth().getUserByEmail(email);
                 return { exists: true };
-            } catch (authErr: any) {
-                if (authErr.code === 'auth/user-not-found') {
+            } catch (authErr: unknown) {
+                if (typeof authErr === 'object' && authErr !== null && 'code' in authErr && (authErr as { code: string }).code === 'auth/user-not-found') {
                     // 2. Check Firestore 'users' collection (Fallback)
                     const userSnap = await admin.firestore().collection('users').where('email', '==', email).limit(1).get();
                     return { exists: !userSnap.empty };
                 }
                 throw authErr;
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             functions.logger.error("Email Check Error:", e);
-            throw new functions.https.HttpsError('internal', e.message);
+            const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred';
+            throw new functions.https.HttpsError('internal', errorMessage);
         }
     });
 
@@ -1097,11 +1124,12 @@ export const deleteUserAccount = functions
         try {
             await admin.auth().deleteUser(uid);
             functions.logger.info(`Auth user ${uid} deleted.`);
-        } catch (error: any) {
-            if (error.code === 'auth/user-not-found') {
+        } catch (error: unknown) {
+            if (typeof error === 'object' && error !== null && 'code' in error && (error as { code: string }).code === 'auth/user-not-found') {
                 functions.logger.warn(`Auth user ${uid} already missing. Skipping.`);
             } else {
-                functions.logger.error(`Auth delete error: ${error.message}`);
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                functions.logger.error(`Auth delete error: ${errorMessage}`);
                 // Proceed to DB delete even if Auth delete fails
             }
         }
@@ -1110,7 +1138,7 @@ export const deleteUserAccount = functions
         try {
             await admin.firestore().collection('users').doc(uid).delete();
             functions.logger.info(`Firestore doc ${uid} deleted.`);
-        } catch (error: any) {
+        } catch (error: unknown) {
             functions.logger.error(`Firestore delete error: ${error}`);
             // Don't throw, just log. We want to return success to client to clear the list.
         }
@@ -1191,8 +1219,9 @@ export const mintCrossDomainToken = functions
                     const decodedToken = await admin.auth().verifyIdToken(data.idToken);
                     uid = decodedToken.uid;
                     functions.logger.info(`[Hydration] Verified ID Token for UID: ${uid}`);
-                } catch (verifyErr) {
-                    functions.logger.warn(`[Hydration] Invalid ID Token:`, verifyErr);
+                } catch (verifyErr: unknown) {
+                    const verifyErrorMessage = verifyErr instanceof Error ? verifyErr.message : String(verifyErr);
+                    functions.logger.warn(`[Hydration] Invalid ID Token:`, verifyErrorMessage);
                     throw new functions.https.HttpsError('unauthenticated', 'Invalid ID Token');
                 }
             } else {
@@ -1206,9 +1235,10 @@ export const mintCrossDomainToken = functions
 
             functions.logger.info(`[Mint Success] Custom token created for UID: ${uid}`);
             return { token: customToken };
-        } catch (error: any) {
+        } catch (error: unknown) {
             functions.logger.error("Mint Cross Domain Token Error:", error);
-            throw new functions.https.HttpsError('internal', error.message || 'Failed to mint custom token');
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+            throw new functions.https.HttpsError('internal', errorMessage);
         }
     });
 
@@ -1221,7 +1251,7 @@ const LINK_SECRET = process.env.LINK_SECRET || 'eregi_v2_secure_link_key_2026';
 
 export const verifyAccessLink = functions
     .runWith({ enforceAppCheck: false, ingressSettings: 'ALLOW_ALL' })
-    .https.onCall(async (data, context) => {
+    .https.onCall(async (data, _context) => {  
         const { token } = data;
         if (!token) throw new functions.https.HttpsError('invalid-argument', 'Token required');
 
@@ -1250,8 +1280,9 @@ export const verifyAccessLink = functions
             }
 
             return { valid: true, payload };
-        } catch (e: any) {
-            functions.logger.warn(`[Security] Token Verification Failed: ${e.message}`);
+        } catch (e: unknown) {
+            const errorMessage = e instanceof Error ? e.message : String(e);
+            functions.logger.warn(`[Security] Token Verification Failed: ${errorMessage}`);
             throw new functions.https.HttpsError('permission-denied', 'Invalid or expired token');
         }
     });
@@ -1291,7 +1322,7 @@ export const checkNonMemberEmailExists = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, context) => {
+    .https.onCall(async (data, _context) => {  
         const { email, confId } = data;
         if (!email || !confId) {
             throw new functions.https.HttpsError('invalid-argument', 'email and confId are required');
@@ -1314,9 +1345,9 @@ export const checkNonMemberEmailExists = functions
             }
 
             return { exists: false };
-        } catch (e: any) {
+        } catch (e: unknown) {
             functions.logger.error("Non-Member Email Check Error:", e);
-            throw new functions.https.HttpsError('internal', e.message);
+            const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
         }
     });
 
@@ -1346,7 +1377,7 @@ function shouldMonitor(): boolean {
 /**
  * Check if daily write limit has been reached
  */
-async function checkDailyWriteLimit(db: any, date: string): Promise<boolean> {
+async function checkDailyWriteLimit(db: admin.firestore.Firestore, date: string): Promise<boolean> {
     const statsRef = db.doc(`logs/stats/${date}`);
     const statsDoc = await statsRef.get();
 
@@ -1355,13 +1386,15 @@ async function checkDailyWriteLimit(db: any, date: string): Promise<boolean> {
         return false;
     }
 
-    const data = statsDoc.data() as any;
-    if (data.writeCount >= MAX_DAILY_WRITES) {
+    const data = statsDoc.data();
+    if (data && data.writeCount >= MAX_DAILY_WRITES) {
         functions.logger.warn(`Daily write limit reached: ${data.writeCount}`);
         return true;
     }
 
-    await statsRef.update({ writeCount: data.writeCount + 1, lastUpdated: admin.firestore.Timestamp.now() });
+    if (data) {
+        await statsRef.update({ writeCount: data.writeCount + 1, lastUpdated: admin.firestore.Timestamp.now() });
+    }
     return false;
 }
 
@@ -1376,7 +1409,7 @@ export const logError = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => {
+    .https.onCall(async (data, _context) => {  
         const { errorId, errorData } = data;
 
         if (!errorId || !errorData) {
@@ -1433,17 +1466,20 @@ export const logError = functions
                         });
                         await errorRef.update({ alertSent: true });
                         functions.logger.log(`[Alert] Critical error detected: ${errorId}`);
-                    } catch (emailError) {
-                        functions.logger.error('[Alert] Failed to send email:', emailError);
+                    } catch (emailError: unknown) {
+                        const emailErrorMessage = emailError instanceof Error ? emailError.message : String(emailError);
+                        functions.logger.error('[logError] Failed to send email alert:', emailErrorMessage);
                     }
                 }
             } else {
                 // Existing error - increment count
-                const currentData = errorDoc.data() as any;
-                await errorRef.update({
-                    lastSeenAt: now,
-                    occurrenceCount: currentData.occurrenceCount + 1,
-                });
+                const currentData = errorDoc.data();
+                if (currentData) {
+                    await errorRef.update({
+                        lastSeenAt: now,
+                        occurrenceCount: currentData.occurrenceCount + 1,
+                    });
+                }
             }
 
             return {
@@ -1451,9 +1487,10 @@ export const logError = functions
                 errorId,
                 isFirstOccurrence
             };
-        } catch (e: any) {
-            functions.logger.error("[logError] Error logging failed:", e);
-            throw new functions.https.HttpsError('internal', e.message);
+        } catch (e: unknown) {
+            const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred';
+            functions.logger.error("[logError] Error logging failed:", errorMessage);
+            throw new functions.https.HttpsError('internal', errorMessage);
         }
     });
 
@@ -1468,7 +1505,7 @@ export const logPerformance = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => {
+    .https.onCall(async (data, _context) => {  
         const { metricName, value, unit = 'ms', threshold, context: metricContext } = data;
 
         if (!metricName || value === undefined) {
@@ -1511,9 +1548,9 @@ export const logPerformance = functions
                 metricId,
                 isPoor
             };
-        } catch (e: any) {
+        } catch (e: unknown) {
             functions.logger.error("[logPerformance] Performance logging failed:", e);
-            throw new functions.https.HttpsError('internal', e.message);
+            const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
         }
     });
 
@@ -1719,6 +1756,23 @@ export const onTossWebhook = functions
                         updatedAt: admin.firestore.FieldValue.serverTimestamp()
                     });
                 }
+                res.status(200).json({ success: true });
+            } else if (status === 'EXPIRED') {
+                // Virtual Account Payment Window Expired
+                await regRef.update({
+                    status: 'EXPIRED',
+                    paymentStatus: 'CANCELED',
+                    expiredAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+
+                // Add Log
+                await regRef.collection('logs').add({
+                    type: 'PAYMENT_EXPIRED_WEBHOOK',
+                    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                    data: req.body
+                });
+
+                functions.logger.info(`[Toss Webhook] Registration ${regDoc.id} EXPIRED (Virtual Account)`);
                 res.status(200).json({ success: true });
             } else {
                 // Unknown status
