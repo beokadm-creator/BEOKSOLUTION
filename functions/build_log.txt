@@ -1,0 +1,15 @@
+
+> build
+> tsc
+
+src/index.ts(8,125): error TS2459: Module '"./badge/index"' declares 'generateBadgePrepToken' locally, but it is not exported.
+src/index.ts(8,149): error TS2459: Module '"./badge/index"' declares 'sendBadgeNotification' locally, but it is not exported.
+src/index.ts(9,55): error TS2307: Cannot find module './migrations/migrateExternalAttendeeParticipations' or its corresponding type declarations.
+src/index.ts(14,51): error TS2307: Cannot find module './health' or its corresponding type declarations.
+src/index.ts(15,62): error TS2307: Cannot find module './alimtalk/checkConfig' or its corresponding type declarations.
+src/index.ts(43,34): error TS2307: Cannot find module './alimtalk/sendTest' or its corresponding type declarations.
+src/index.ts(1561,56): error TS2307: Cannot find module './debug' or its corresponding type declarations.
+src/migrations/migrateRegistrationsForOptions.ts(23,20): error TS2345: Argument of type '(req: Request, res: Response<any>) => Promise<Response<any>>' is not assignable to parameter of type '(req: Request, resp: Response<any>) => void | Promise<void>'.
+  Type 'Promise<Response<any>>' is not assignable to type 'void | Promise<void>'.
+    Type 'Promise<Response<any>>' is not assignable to type 'Promise<void>'.
+      Type 'Response<any>' is not assignable to type 'void'.

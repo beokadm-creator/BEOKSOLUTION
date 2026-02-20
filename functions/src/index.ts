@@ -6,13 +6,14 @@ import { getNiceAuthParams, approveNicePayment } from './payment/nice';
 import { approveTossPayment, cancelTossPayment as cancelTossPaymentApi } from './payment/toss';
 
 import { onRegistrationCreated, onExternalAttendeeCreated, validateBadgePrepToken, issueDigitalBadge, resendBadgePrepToken, generateBadgePrepToken, sendBadgeNotification } from './badge/index';
-import { migrateExternalAttendeeParticipations } from './migrations/migrateExternalAttendeeParticipations';
+// import { migrateExternalAttendeeParticipations } from './migrations/migrateExternalAttendeeParticipations';
 import { migrateRegistrationsForOptions, migrateRegistrationsForOptionsCallable } from './migrations/migrateRegistrationsForOptions';
 import { monitorRegistrationIntegrity, monitorMemberCodeIntegrity } from './monitoring/dataIntegrity';
 import { dailyErrorReport, weeklyPerformanceReport } from './monitoring/scheduledReports';
 import { resolveDataIntegrityAlert } from './monitoring/resolveAlert';
-import { healthCheck, scheduledHealthCheck } from './health';
-import { checkAlimTalkConfig, checkAlimTalkConfigHttp } from './alimtalk/checkConfig';
+// import { healthCheck, scheduledHealthCheck } from './health';
+// import { checkAlimTalkConfig, checkAlimTalkConfigHttp } from './alimtalk/checkConfig';
+
 
 export const cors = corsLib({ origin: true });
 
@@ -25,7 +26,7 @@ export {
     issueDigitalBadge,
     resendBadgePrepToken,
     generateFirebaseAuthUserForExternalAttendee,
-    migrateExternalAttendeeParticipations,
+    // migrateExternalAttendeeParticipations,
     migrateRegistrationsForOptions,
     migrateRegistrationsForOptionsCallable,
     monitorRegistrationIntegrity,
@@ -33,14 +34,14 @@ export {
     dailyErrorReport,
     weeklyPerformanceReport,
     resolveDataIntegrityAlert,
-    healthCheck,
-    scheduledHealthCheck,
-    checkAlimTalkConfig,
-    checkAlimTalkConfigHttp,
-    sendAlimTalkTest
+    // healthCheck,
+    // scheduledHealthCheck,
+    // checkAlimTalkConfig,
+    // checkAlimTalkConfigHttp,
+    // sendAlimTalkTest
 };
 
-import { sendAlimTalkTest } from './alimtalk/sendTest';
+// import { sendAlimTalkTest } from './alimtalk/sendTest';
 
 import { generateFirebaseAuthUserForExternalAttendee } from './auth/external';
 
@@ -54,7 +55,7 @@ export const prepareNicePayment = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => {  
+    .https.onCall(async (data, _context) => {
         const { amt, mid, key } = data;
 
         if (!amt || !mid || !key) {
@@ -77,7 +78,7 @@ export const confirmNicePayment = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => {  
+    .https.onCall(async (data, _context) => {
         // [FIX-20250124-04] Force recompile by adding comment
         const { tid, amt, mid, key, regId, confId, userData, baseAmount, optionsTotal, selectedOptions } = data;
 
@@ -244,7 +245,7 @@ export const confirmTossPayment = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => {  
+    .https.onCall(async (data, _context) => {
         const { paymentKey, orderId, amount, regId, confId, secretKey, userData, baseAmount, optionsTotal, selectedOptions } = data;
 
         if (!paymentKey || !orderId || !amount) {
@@ -462,7 +463,7 @@ export const confirmTossPaymentHttp = functions
             }
 
             try {
-                const { paymentKey, orderId, amount, regId, confId, secretKey, userData } = req.body;
+                const { paymentKey, orderId, amount, regId, confId, secretKey, userData, baseAmount, optionsTotal, selectedOptions } = req.body;
 
                 if (!paymentKey || !orderId || !amount) {
                     res.status(400).json({ error: 'Missing payment details' });
@@ -548,6 +549,9 @@ export const confirmTossPaymentHttp = functions
                         paymentKey: paymentKey,
                         orderId: orderId,
                         amount: amount,
+                        baseAmount: baseAmount || amount,
+                        optionsTotal: optionsTotal || 0,
+                        options: selectedOptions || [],
                         tier: userData.tier || null,
                         categoryName: userData.categoryName || null,
                         memberVerificationData: null,
@@ -929,7 +933,7 @@ export const sendAuthCode = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => {  
+    .https.onCall(async (data, _context) => {
         const { phone, code } = data;
 
         if (!phone || !code) {
@@ -985,7 +989,7 @@ export const verifyMemberIdentity = functions
             // 2. Try variations for 2-character names (common in legacy DBs)
             if (snap.empty) {
                 const trimmedName = name.replace(/\s+/g, '');
-                
+
                 // Case A: User entered "김결", DB has "김 결"
                 if (trimmedName.length === 2) {
                     const spacedName = `${trimmedName[0]} ${trimmedName[1]}`;
@@ -1072,7 +1076,7 @@ export const checkEmailExists = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => {  
+    .https.onCall(async (data, _context) => {
         const { email } = data;
         if (!email) return { exists: false };
 
@@ -1251,7 +1255,7 @@ const LINK_SECRET = process.env.LINK_SECRET || 'eregi_v2_secure_link_key_2026';
 
 export const verifyAccessLink = functions
     .runWith({ enforceAppCheck: false, ingressSettings: 'ALLOW_ALL' })
-    .https.onCall(async (data, _context) => {  
+    .https.onCall(async (data, _context) => {
         const { token } = data;
         if (!token) throw new functions.https.HttpsError('invalid-argument', 'Token required');
 
@@ -1322,7 +1326,7 @@ export const checkNonMemberEmailExists = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => {  
+    .https.onCall(async (data, _context) => {
         const { email, confId } = data;
         if (!email || !confId) {
             throw new functions.https.HttpsError('invalid-argument', 'email and confId are required');
@@ -1409,7 +1413,7 @@ export const logError = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => {  
+    .https.onCall(async (data, _context) => {
         const { errorId, errorData } = data;
 
         if (!errorId || !errorData) {
@@ -1505,7 +1509,7 @@ export const logPerformance = functions
         enforceAppCheck: false,
         ingressSettings: 'ALLOW_ALL'
     })
-    .https.onCall(async (data, _context) => {  
+    .https.onCall(async (data, _context) => {
         const { metricName, value, unit = 'ms', threshold, context: metricContext } = data;
 
         if (!metricName || value === undefined) {
@@ -1555,7 +1559,7 @@ export const logPerformance = functions
     });
 
 // 7. Debug Tools
-export { debugNHNTemplate, sendTestAlimTalkHTTP } from './debug';
+// export { debugNHNTemplate, sendTestAlimTalkHTTP } from './debug';
 
 
 /**
@@ -1715,7 +1719,7 @@ export const onTossWebhook = functions
                         const updatedRegSnap = await regRef.get();
                         const updatedRegData = updatedRegSnap.data();
 
-                        await sendBadgeNotification(db, { ...conference, id: confId }, regDoc.id, updatedRegData, token);
+                        await sendBadgeNotification(db, { ...conference, id: confId } as any, regDoc.id, updatedRegData as any, token);
                         functions.logger.info("[Toss Webhook] AlimTalk Sent");
 
                     } catch (badgeError) {

@@ -62,7 +62,7 @@ interface AlimTalkButton {
 /**
  * Generate a secure random token for badge prep
  */
-function generateBadgePrepToken(): string {
+export function generateBadgePrepToken(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let token = 'TKN-';
   for (let i = 0; i < 32; i++) {
@@ -155,7 +155,7 @@ export const onRegistrationCreated = functions.firestore
 /**
  * Helper: Send Badge Notification (AlimTalk)
  */
-async function sendBadgeNotification(
+export async function sendBadgeNotification(
   db: admin.firestore.Firestore,
   conference: Conference,
   regId: string,

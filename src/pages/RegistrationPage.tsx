@@ -74,6 +74,20 @@ interface MemberVerificationData {
     expiry?: string;
 }
 
+
+// Wrapper component for AddonSelector with feature flag protection
+function AddonSelectorWrapper({ conferenceId, language }: { conferenceId: string; language: 'ko' | 'en' }) {
+    const { isEnabled } = useFeatureFlags();
+    const addonsEnabled = isEnabled('optional_addons_enabled');
+
+    // Don't render if feature flag is disabled
+    if (!addonsEnabled) {
+        return null;
+    }
+
+    return <AddonSelector conferenceId={conferenceId} language={language} />;
+}
+
 export default function RegistrationPage() {
     const { slug } = useParams<{ slug: string }>();
     const navigate = useNavigate();
@@ -154,7 +168,7 @@ export default function RegistrationPage() {
     const [nicePaySecret, setNicePaySecret] = useState('');
     const [paymentWidget, setPaymentWidget] = useState<PaymentWidgetInstance | null>(null);
     const paymentMethodsWidgetRef = useRef<HTMLDivElement>(null);
-    const paymentMethodsInstanceRef = useRefunknown>(null);
+    const paymentMethodsInstanceRef = useRef<any>(null);
 
     // State - Form
     const [formData, setFormData] = useState({
@@ -175,7 +189,7 @@ export default function RegistrationPage() {
     // Pricing hook for optional add-ons
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { totalPrice, optionsTotal, selectedOptions, setBasePrice: updateBasePrice } = usePricing(basePrice);
-    
+
     // [Fix-Step 156] selectedTier state to ensure grade/tier is saved
     const [selectedTier, setSelectedTier] = useState<string>('');
 
@@ -505,22 +519,10 @@ export default function RegistrationPage() {
                     '#payment-widget',
                     amount,
                     { variantKey: 'DEFAULT' }
-    );
-}
+                );
+            }
 
-// Wrapper component for AddonSelector with feature flag protection
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function AddonSelectorWrapper({ conferenceId, language }: { conferenceId: string; language: 'ko' | 'en' }) {
-    const { isEnabled } = useFeatureFlags();
-    const addonsEnabled = isEnabled('optional_addons_enabled');
-    
-    // Don't render if feature flag is disabled
-    if (!addonsEnabled) {
-        return null;
-    }
-    
-    return <AddonSelector conferenceId={conferenceId} language={language} />;
-}
+
 
         }
 
@@ -674,6 +676,16 @@ function AddonSelectorWrapper({ conferenceId, language }: { conferenceId: string
                 categoryName: finalCategory,
                 orderId: orderId,
                 licenseNumber: formData.licenseNumber, // [Fix-Step 156] Include licenseNumber at root
+                // [Fix-Option] Include selected options
+                baseAmount: basePrice,
+                optionsTotal: optionsTotal,
+                selectedOptions: selectedOptions.map(o => ({
+                    optionId: o.option.id,
+                    name: o.option.name,
+                    price: o.option.price,
+                    quantity: o.quantity,
+                    totalPrice: o.option.price * o.quantity
+                })),
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now()
             };
@@ -752,7 +764,17 @@ function AddonSelectorWrapper({ conferenceId, language }: { conferenceId: string
                 mid: tossClientKey,
                 key: nicePaySecret,
                 regId: currentRegId,
-                confId: confId
+                confId: confId,
+                // [Fix-Option] Include options for NicePay
+                baseAmount: basePrice,
+                optionsTotal: optionsTotal,
+                selectedOptions: selectedOptions.map(o => ({
+                    optionId: o.option.id,
+                    name: o.option.name,
+                    price: o.option.price,
+                    quantity: o.quantity,
+                    totalPrice: o.option.price * o.quantity
+                }))
             });
 
             const resData = result.data as { success: boolean; message?: string };
@@ -936,14 +958,14 @@ function AddonSelectorWrapper({ conferenceId, language }: { conferenceId: string
                                 </Button>
                             </div>
                         )}
-                     </Card>
- 
-                     {/* Optional Add-ons - Feature Flag Protected */}
-                     {confId && (
-                         <AddonSelectorWrapper conferenceId={confId} language={language} />
-                     )}
- 
-                     {/* Step 2: Payment */}
+                    </Card>
+
+                    {/* Optional Add-ons - Feature Flag Protected */}
+                    {confId && (
+                        <AddonSelectorWrapper conferenceId={confId} language={language} />
+                    )}
+
+                    {/* Step 2: Payment */}
                     {isInfoSaved && (
                         <Card id="payment-section" className="shadow-lg border-blue-200 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <CardHeader>
@@ -957,46 +979,46 @@ function AddonSelectorWrapper({ conferenceId, language }: { conferenceId: string
                                     {language === 'ko' ? '등록비를 결제하고 등록을 완료하세요.' : 'Complete payment to finish registration.'}
                                 </CardDescription>
                             </CardHeader>
-                             <CardContent className="space-y-6">
-                                 {/* Price Breakdown */}
-                                 <div className="bg-slate-50 p-6 rounded-xl border">
-                                     <div className="flex justify-between items-center mb-2">
-                                         <div>
-                                             <p className="text-sm text-gray-500">Registration Type</p>
-                                             <p className="font-bold text-lg text-slate-900">{finalCategory}</p>
-                                         </div>
-                                         <div className="text-right">
-                                             <p className="text-sm text-gray-500">Base Fee</p>
-                                             <p className="text-lg font-semibold text-slate-700">₩{basePrice.toLocaleString()}</p>
-                                         </div>
-                                     </div>
-                                     
-                                     {/* Options Total - only show if options selected */}
-                                     {optionsTotal > 0 && (
-                                         <div className="flex justify-between items-center py-2 border-t border-slate-200 mt-2">
-                                             <div className="text-sm text-gray-600">
-                                                 {language === 'ko' ? '추가 옵션' : 'Optional Add-ons'}
-                                                 <span className="ml-2 text-xs text-gray-400">
-                                                     ({selectedOptions.length} {selectedOptions.length === 1 ? (language === 'ko' ? '개' : 'item') : (language === 'ko' ? '개' : 'items')})
-                                                 </span>
-                                             </div>
-                                             <div className="text-right">
-                                                 <p className="text-sm text-gray-500">Options</p>
-                                                 <p className="text-lg font-semibold text-blue-600">+ ₩{optionsTotal.toLocaleString()}</p>
-                                             </div>
-                                         </div>
-                                     )}
-                                     
-                                     {/* Total */}
-                                     <div className="flex justify-between items-center py-3 border-t-2 border-slate-300 mt-2">
-                                             <div>
-                                                 <p className="text-sm font-medium text-slate-700">{language === 'ko' ? '총 결제 금액' : 'Total Amount'}</p>
-                                             </div>
-                                             <div className="text-right">
-                                                 <p className="text-2xl font-bold text-blue-600">₩{totalPrice.toLocaleString()}</p>
-                                             </div>
-                                         </div>
-                                 </div>
+                            <CardContent className="space-y-6">
+                                {/* Price Breakdown */}
+                                <div className="bg-slate-50 p-6 rounded-xl border">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <div>
+                                            <p className="text-sm text-gray-500">Registration Type</p>
+                                            <p className="font-bold text-lg text-slate-900">{finalCategory}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm text-gray-500">Base Fee</p>
+                                            <p className="text-lg font-semibold text-slate-700">₩{basePrice.toLocaleString()}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Options Total - only show if options selected */}
+                                    {optionsTotal > 0 && (
+                                        <div className="flex justify-between items-center py-2 border-t border-slate-200 mt-2">
+                                            <div className="text-sm text-gray-600">
+                                                {language === 'ko' ? '추가 옵션' : 'Optional Add-ons'}
+                                                <span className="ml-2 text-xs text-gray-400">
+                                                    ({selectedOptions.length} {selectedOptions.length === 1 ? (language === 'ko' ? '개' : 'item') : (language === 'ko' ? '개' : 'items')})
+                                                </span>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm text-gray-500">Options</p>
+                                                <p className="text-lg font-semibold text-blue-600">+ ₩{optionsTotal.toLocaleString()}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Total */}
+                                    <div className="flex justify-between items-center py-3 border-t-2 border-slate-300 mt-2">
+                                        <div>
+                                            <p className="text-sm font-medium text-slate-700">{language === 'ko' ? '총 결제 금액' : 'Total Amount'}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-2xl font-bold text-blue-600">₩{totalPrice.toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                </div>
 
 
                                 {/* Payment Widget Area */}
@@ -1072,7 +1094,7 @@ function AddonSelectorWrapper({ conferenceId, language }: { conferenceId: string
                         <DialogTitle>{language === 'ko' ? '환불규정' : 'Refund Policy'}</DialogTitle>
                     </DialogHeader>
                     <div className="mt-4 whitespace-pre-wrap text-sm text-slate-600 leading-relaxed">
-                        {regSettings?.refundPolicy || info?.refundPolicy ||
+                        {regSettings?.refundPolicy || (info as any)?.refundPolicy ||
                             "2026년 3월 5일 17시까지 전액 환불 이후 환불은 불가 합니다. 카드결제 : 승인취소 퀵계좌이체 등 : 시스템에서 계좌 환불 * 카드사 승인 사정에 따라 환불이 영업일 기준 5일 이상 발생할 수 있습니다. 자세한 사항은 사무국으로 문의주시기 바랍니다."}
                     </div>
                     <div className="mt-6 flex justify-end">

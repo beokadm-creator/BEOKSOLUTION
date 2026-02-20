@@ -24,14 +24,16 @@ export const migrateRegistrationsForOptions = functions
     // Security check (basic auth for migration endpoint)
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
     }
 
     const token = authHeader.split('Bearer ')[1];
     // In production, verify this is a valid admin token
     // For now, accept any non-empty token as basic protection
     if (!token) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
     }
 
     const db = admin.firestore();
@@ -93,11 +95,12 @@ export const migrateRegistrationsForOptions = functions
       };
 
       console.log('Migration complete:', result);
-      return res.status(200).json(result);
+      console.log('Migration complete:', result);
+      res.status(200).json(result);
 
     } catch (error) {
       console.error('Migration failed:', error);
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         totalProcessed,
