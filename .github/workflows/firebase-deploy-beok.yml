@@ -34,7 +34,7 @@ jobs:
         run: npm run lint
 
       - name: Run tests
-        run: npm test
+        run: npm test -- --watchAll=false
 
       - name: Build frontend
         run: npm run build
