@@ -5,6 +5,7 @@ import { ConfProvider } from '../contexts/ConfContext';
 import { useSubdomain } from '../hooks/useSubdomain';
 import { doc, getDoc, collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { db, auth } from '../firebase';
+import { Conference } from '../types/schema';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { LayoutDashboard, Globe, FileText, Users, Settings, QrCode, Monitor, CreditCard, LogOut, ArrowLeft, Printer, BarChart, UserPlus, Building2, Bell } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -14,7 +15,7 @@ export default function ConfLayout() {
     const { cid } = useParams<{ cid: string }>();
     const { subdomain } = useSubdomain();
 
-    const [conference, setConference] = useState<Record<string, unknown> | null>(null);
+    const [conference, setConference] = useState<Conference | null>(null);
     const [loading, setLoading] = useState(true);
     const location = useLocation();
     const [searchParams] = useSearchParams();
@@ -29,7 +30,7 @@ export default function ConfLayout() {
                 const docSnap = await getDoc(docRef);
 
                 if (docSnap.exists()) {
-                    const data = { id: docSnap.id, ...docSnap.data() };
+                    const data = { id: docSnap.id, ...docSnap.data() } as Conference;
                     // Security Check: Society ID Mismatch
                     if (subdomain && data.id.split('_')[0] !== subdomain) {
                         console.error('Society Mismatch');
@@ -44,7 +45,7 @@ export default function ConfLayout() {
 
                     if (!querySnapshot.empty) {
                         const docData = querySnapshot.docs[0];
-                        const data = { id: docData.id, ...docData.data() };
+                        const data = { id: docData.id, ...docData.data() } as Conference;
                         // Security Check: Society ID Mismatch
                         if (subdomain && data.id.split('_')[0] !== subdomain) {
                             console.error('Society Mismatch');
@@ -77,6 +78,7 @@ export default function ConfLayout() {
         { href: `/admin/conf/${cid}/abstracts`, label: '초록 관리', icon: FileText },
         { href: `/admin/conf/${cid}/notices`, label: '공지사항 관리', icon: Bell },
         { href: `/admin/conf/${cid}/registrations`, label: '등록자 관리', icon: Users },
+        { href: `/admin/conf/${cid}/options`, label: '옵션 관리', icon: Settings },
         { href: `/admin/conf/${cid}/external-attendees`, label: '외부 참석자', icon: UserPlus },
         { href: `/admin/conf/${cid}/infodesk`, label: '인포데스크', icon: Printer },
         { href: `/admin/conf/${cid}/gate`, label: '출입 게이트', icon: QrCode },

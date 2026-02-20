@@ -50,6 +50,7 @@ import AdminRefundPage from './pages/admin/AdminRefundPage';
 import AbstractManagerPage from './pages/admin/AbstractManagerPage';
 import ExternalAttendeePage from './pages/admin/ExternalAttendeePage';
 import { NoticesManager } from './pages/admin/notices/NoticesManager';
+import { OptionsManagementPage } from './pages/admin/OptionsManagementPage';
 import SocietyLoginPage from './pages/SocietyLoginPage';
 import MembershipPaymentPage from './pages/MembershipPaymentPage';
 import MembershipPaymentLayout from './layouts/MembershipPaymentLayout';
@@ -131,6 +132,8 @@ const App: React.FC = () => {
                   <Route path="attendance-settings" element={<AttendanceSettingsPage />} />
                   <Route path="statistics" element={<StatisticsPage />} />
                   <Route path="registrations" element={<RegistrationListPage />} />
+                  <Route path="options" element={<OptionsManagementPage />} />
+                  <Route path="registrations/:regId" element={<RegistrationDetailPage />} />
                   <Route path="registrations/:regId" element={<RegistrationDetailPage />} />
                   <Route path="abstracts" element={<AbstractManagerPage />} />
                   <Route path="notices" element={<NoticesManager />} />
