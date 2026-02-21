@@ -34,6 +34,7 @@ export interface RootRegistration {
         customerName?: string;
         dueDate?: string;
     };
+    options?: any[]; // Snapshot of selected options
 }
 
 interface UseRegistrationsPaginationParams {

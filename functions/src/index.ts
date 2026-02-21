@@ -815,7 +815,7 @@ export const createSocietyAdminUser = functions
         // But for simplicity, let's enforce password only if we are creating.
 
         let warning: string | null = null;
-        let userRecord;
+        let userRecord: admin.auth.UserRecord | undefined;
 
         try {
             // 3. Check if user exists
@@ -1787,5 +1787,57 @@ export const onTossWebhook = functions
         } catch (error: any) {
             functions.logger.error("[Toss Webhook] Internal Error:", error);
             res.status(500).json({ error: error.message });
+        }
+    });
+
+// --------------------------------------------------------------------------
+// HEALTH CHECK: System Status Endpoint (CORS Enabled)
+// --------------------------------------------------------------------------
+export const healthCheck = functions
+    .runWith({
+        enforceAppCheck: false,
+        ingressSettings: 'ALLOW_ALL'
+    })
+    .https.onRequest(async (req, res) => {
+        // Handle CORS preflight
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+        if (req.method === 'OPTIONS') {
+            res.status(204).send('');
+            return;
+        }
+
+        try {
+            // Check Firestore connectivity
+            const db = admin.firestore();
+            await db.doc('system/health').get();
+
+            const timestamp = new Date().toISOString();
+
+            // Basic health check
+            const healthStatus = {
+                status: 'healthy',
+                timestamp,
+                version: '1.0.0',
+                services: {
+                    firestore: 'connected',
+                    auth: 'available'
+                }
+            };
+
+            functions.logger.info('[HealthCheck] System healthy');
+            res.status(200).json(healthStatus);
+
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            functions.logger.error('[HealthCheck] System unhealthy:', errorMessage);
+
+            res.status(503).json({
+                status: 'unhealthy',
+                timestamp: new Date().toISOString(),
+                error: errorMessage
+            });
         }
     });

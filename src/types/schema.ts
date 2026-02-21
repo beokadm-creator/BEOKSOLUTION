@@ -336,6 +336,13 @@ export interface Registration {
   amount: number; // Total amount including base + options (unchanged for backward compatibility)
   baseAmount: number; // Base registration fee only (NEW - for options feature)
   optionsTotal: number; // Sum of selected option prices (NEW - for options feature)
+  selectedOptions?: {
+    optionId: string;
+    name: LocalizedText;
+    price: number;
+    quantity: number;
+    totalPrice: number;
+  }[]; // Selected options snapshot
   refundAmount: number;
   receiptNumber: string; // e.g., "2026-SP-001"
   userTier?: string; // Added snapshot of tier at registration time

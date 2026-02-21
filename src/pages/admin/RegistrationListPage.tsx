@@ -48,6 +48,7 @@ interface RootRegistration {
         customerName?: string;
         dueDate?: string;
     };
+    options?: any[]; // Added for options indicator
 }
 
 const statusToKorean = (status: string) => {
@@ -280,6 +281,7 @@ const RegistrationListPage: React.FC = () => {
             '면허번호': r.licenseNumber || '-',
             '등급': displayTier(r.tier),
             '결제금액': r.amount,
+            '선택옵션': r.options ? r.options.map(o => `${typeof o.name === 'string' ? o.name : o.name.ko}(${o.quantity})`).join(', ') : '-',
             '결제수단': r.paymentType || r.paymentMethod || r.method || '카드',
             '상태': statusToKorean(r.status),
             '등록일': r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000).toLocaleDateString() : '-'
@@ -374,7 +376,16 @@ const RegistrationListPage: React.FC = () => {
                                 <td className="p-4 text-sm text-gray-500">{r.userOrg || r.affiliation || '-'}</td>
                                 <td className="p-4 text-sm text-gray-500">{r.licenseNumber || '-'}</td>
                                 <td className="p-4 text-sm text-gray-500">{displayTier(r.tier)}</td>
-                                <td className="p-4 text-sm font-medium text-[#1b4d77]">{(r.amount || 0).toLocaleString()}원</td>
+                                <td className="p-4 text-sm font-medium text-[#1b4d77]">
+                                    <div>{(r.amount || 0).toLocaleString()}원</div>
+                                    {r.options && r.options.length > 0 && (
+                                        <div className="text-[10px] mt-1">
+                                            <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-bold">
+                                                + 옵션 ({r.options.length})
+                                            </span>
+                                        </div>
+                                    )}
+                                </td>
                                 <td className="p-4 text-sm text-gray-500">{r.paymentType || r.paymentMethod || r.method || '카드'}</td>
                                 <td className="p-4">
                                     <span className={`px-2 py-0.5 rounded text-xs font-bold border ${r.status === 'PAID' ? 'bg-green-50 text-green-700 border-green-100' :

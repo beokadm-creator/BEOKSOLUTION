@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import type { ConferenceOption } from '../types/schema';
 
 interface SelectedOption {
@@ -22,6 +22,11 @@ interface UsePricingResult {
 export const usePricing = (initialBasePrice: number = 0): UsePricingResult => {
   const [basePrice, setBasePrice] = useState<number>(initialBasePrice);
   const [selectedOptions, setSelectedOptions] = useState<SelectedOption[]>([]);
+
+  // Sync basePrice when initialBasePrice changes
+  // Use useEffect for side effects instead of useState callback
+  // [Fix] Removed useEffect that was resetting basePrice to initialBasePrice (0)
+  // [Fix] The consumer should use setBasePrice to update the base price.
 
   // Calculate total price from options
   const optionsTotal = useMemo(() => {

@@ -25,6 +25,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { WideFooterPreview } from '../components/conference/wide-preview/WideFooterPreview';
 import { toFirestoreUserData } from '../utils/userDataMapper';
+import type { ConferenceOption } from '../types/schema';
 
 // Dynamic Types based on DB
 interface RegistrationPeriod {
@@ -76,16 +77,38 @@ interface MemberVerificationData {
 
 
 // Wrapper component for AddonSelector with feature flag protection
-function AddonSelectorWrapper({ conferenceId, language }: { conferenceId: string; language: 'ko' | 'en' }) {
+function AddonSelectorWrapper({
+    conferenceId,
+    language,
+    toggleOption,
+    isOptionSelected,
+}: {
+    conferenceId: string;
+    language: 'ko' | 'en';
+    toggleOption: (option: ConferenceOption) => void;
+    isOptionSelected: (optionId: string) => boolean;
+}) {
     const { isEnabled } = useFeatureFlags();
     const addonsEnabled = isEnabled('optional_addons_enabled');
 
-    // Don't render if feature flag is disabled
-    if (!addonsEnabled) {
+    // DEV 환경이거나 URL 파라미터로 강제 활성화된 경우 허용
+    const isDev = window.location.hostname.includes('--dev-') ||
+        window.location.hostname === 'localhost' ||
+        new URLSearchParams(window.location.search).get('debug_addons') === 'true';
+
+    // Don't render if feature flag is disabled AND not in DEV mode
+    if (!addonsEnabled && !isDev) {
         return null;
     }
 
-    return <AddonSelector conferenceId={conferenceId} language={language} />;
+    return (
+        <AddonSelector
+            conferenceId={conferenceId}
+            language={language}
+            toggleOption={toggleOption}
+            isOptionSelected={isOptionSelected}
+        />
+    );
 }
 
 export default function RegistrationPage() {
@@ -183,12 +206,18 @@ export default function RegistrationPage() {
 
     const [isInfoSaved, setIsInfoSaved] = useState(false);
     const [currentRegId, setCurrentRegId] = useState<string | null>(null);
-    const [basePrice, setBasePrice] = useState(0); // Base registration fee
     const [finalCategory, setFinalCategory] = useState('');
 
     // Pricing hook for optional add-ons
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { totalPrice, optionsTotal, selectedOptions, setBasePrice: updateBasePrice } = usePricing(basePrice);
+    const {
+        basePrice,
+        totalPrice,
+        optionsTotal,
+        selectedOptions,
+        toggleOption,
+        isOptionSelected,
+        setBasePrice: updateBasePrice
+    } = usePricing(0);
 
     // [Fix-Step 156] selectedTier state to ensure grade/tier is saved
     const [selectedTier, setSelectedTier] = useState<string>('');
@@ -313,7 +342,7 @@ export default function RegistrationPage() {
         // PRIORITY 1: Use pre-calculated totalPrice from modal if available
         if (paramCalculatedPrice !== undefined && paramCalculatedPrice >= 0) {
             console.log('[RegistrationPage] Using pre-calculated totalPrice from modal:', paramCalculatedPrice);
-            setBasePrice(paramCalculatedPrice);
+            updateBasePrice(paramCalculatedPrice);
 
             // Determine category name
             let categoryPrefix = 'Registration';
@@ -468,8 +497,6 @@ export default function RegistrationPage() {
                         const ko = (dbGradeName as { ko?: string }).ko || '';
                         const en = (dbGradeName as { en?: string }).en || '';
                         gradeName = language === 'en' ? (en || ko) : (ko || en);
-                    } else if (dbGradeName) {
-                        gradeName = String(dbGradeName || '');
                     }
                 } else {
                     // Last resort: Show ID itself if no name found anywhere
@@ -478,8 +505,7 @@ export default function RegistrationPage() {
             }
 
             const p = activePeriod.totalPrices[targetGradeId] ?? 0;
-            setBasePrice(p);
-            setBasePrice(p);
+            updateBasePrice(p);
             setFinalCategory(`${activePeriod.name.ko} - ${gradeName}`);
         }
 
@@ -962,7 +988,12 @@ export default function RegistrationPage() {
 
                     {/* Optional Add-ons - Feature Flag Protected */}
                     {confId && (
-                        <AddonSelectorWrapper conferenceId={confId} language={language} />
+                        <AddonSelectorWrapper
+                            conferenceId={confId}
+                            language={language}
+                            toggleOption={toggleOption}
+                            isOptionSelected={isOptionSelected}
+                        />
                     )}
 
                     {/* Step 2: Payment */}
@@ -980,7 +1011,6 @@ export default function RegistrationPage() {
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-6">
-                                {/* Price Breakdown */}
                                 <div className="bg-slate-50 p-6 rounded-xl border">
                                     <div className="flex justify-between items-center mb-2">
                                         <div>
@@ -993,18 +1023,34 @@ export default function RegistrationPage() {
                                         </div>
                                     </div>
 
-                                    {/* Options Total - only show if options selected */}
+                                    {/* Options Details - New List */}
                                     {optionsTotal > 0 && (
-                                        <div className="flex justify-between items-center py-2 border-t border-slate-200 mt-2">
-                                            <div className="text-sm text-gray-600">
-                                                {language === 'ko' ? '추가 옵션' : 'Optional Add-ons'}
-                                                <span className="ml-2 text-xs text-gray-400">
-                                                    ({selectedOptions.length} {selectedOptions.length === 1 ? (language === 'ko' ? '개' : 'item') : (language === 'ko' ? '개' : 'items')})
+                                        <div className="space-y-2 py-3 border-t border-slate-200 mt-2">
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                                                {language === 'ko' ? '선택 옵션 상세' : 'Selected Options Breakdown'}
+                                            </p>
+                                            {selectedOptions.map((item, idx) => (
+                                                <div key={idx} className="flex justify-between items-start text-sm">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-slate-700 font-medium">
+                                                            {item.option.name[language] || item.option.name.ko}
+                                                        </span>
+                                                        <span className="text-[11px] text-slate-500">
+                                                            ₩{item.option.price.toLocaleString()} × {item.quantity}
+                                                        </span>
+                                                    </div>
+                                                    <span className="font-semibold text-slate-800">
+                                                        ₩{(item.option.price * item.quantity).toLocaleString()}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                            <div className="flex justify-between items-center pt-2 mt-1 border-t border-dashed border-slate-200">
+                                                <span className="text-xs font-bold text-blue-600">
+                                                    {language === 'ko' ? '옵션 합계' : 'Options Subtotal'}
                                                 </span>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-sm text-gray-500">Options</p>
-                                                <p className="text-lg font-semibold text-blue-600">+ ₩{optionsTotal.toLocaleString()}</p>
+                                                <span className="text-sm font-bold text-blue-600">
+                                                    + ₩{optionsTotal.toLocaleString()}
+                                                </span>
                                             </div>
                                         </div>
                                     )}

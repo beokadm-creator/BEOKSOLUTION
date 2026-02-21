@@ -8,7 +8,8 @@ import toast from 'react-hot-toast';
 import { Registration } from '../../types/schema';
 
 // Extended type for flattened data in UI
-interface ExtendedRegistration extends Registration {
+// Extended type for flattened data in UI
+interface ExtendedRegistration extends Omit<Registration, 'baseAmount' | 'optionsTotal' | 'selectedOptions'> {
     tier?: string;
     grade?: string;
     categoryName?: string;
@@ -24,6 +25,22 @@ interface ExtendedRegistration extends Registration {
         [key: string]: unknown;
     };
     license?: string; // For explicit fallback
+    baseAmount?: number;
+    optionsTotal?: number;
+    options?: Array<{
+        optionId: string;
+        name: { ko: string; en?: string } | string;
+        price: number;
+        quantity: number;
+        totalPrice: number;
+    }>;
+    selectedOptions?: Array<{
+        optionId: string;
+        name: { ko: string; en?: string } | string;
+        price: number;
+        quantity: number;
+        totalPrice: number;
+    }>;
 }
 
 const getConferenceIdByDomain = () => {
@@ -89,6 +106,15 @@ const RegistrationDetailPage: React.FC = () => {
                         if (!flattened.tier && docData.userInfo.grade) {
                             flattened.tier = docData.userInfo.grade;
                         }
+                    }
+
+                    // [Fix] Ensure optionsTotal is accurate by calculating from array if missing/zero
+                    const optionsList = flattened.options || flattened.selectedOptions || [];
+                    const calculatedOptionsTotal = optionsList.reduce((sum: number, opt: any) => sum + (opt.totalPrice || (opt.price * opt.quantity) || 0), 0);
+
+                    if (calculatedOptionsTotal > 0 && (!flattened.optionsTotal || flattened.optionsTotal === 0)) {
+                        console.log('[RegistrationDetailPage] Correcting optionsTotal from array:', calculatedOptionsTotal);
+                        flattened.optionsTotal = calculatedOptionsTotal;
                     }
 
                     // [Fix] Map schema-defined userTier to tier if tier is missing
@@ -275,7 +301,7 @@ const RegistrationDetailPage: React.FC = () => {
 
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">면허번호 (License)</h3>
-                    <p className="text-lg">{data.licenseNumber || data.userInfo?.licenseNumber || data.userInfo?.licensenumber || (data as Record<string, unknown>).license || (data as Record<string, unknown>).formData?.licenseNumber || '-'}</p>
+                    <p className="text-lg">{data.licenseNumber || data.userInfo?.licenseNumber || (data as any).userInfo?.licensenumber || (data as any).license || (data as any).formData?.licenseNumber || '-'}</p>
                 </div>
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">등록등급 (Grade)</h3>
@@ -291,6 +317,62 @@ const RegistrationDetailPage: React.FC = () => {
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">결제수단 (Payment)</h3>
                     <p className="text-lg">{paymentMethodToKorean(data.paymentMethod) || data.paymentType || data.method || '-'}</p>
+                </div>
+
+                <div className="col-span-2 border-t my-2"></div>
+
+                {/* Registration Fee Detail */}
+                <div className="col-span-2">
+                    <div className="flex justify-between items-center mb-3">
+                        <h3 className="text-sm font-bold text-gray-500">결제 상세 정보 (Payment Detail)</h3>
+                        {/* Diagnostic check: If amount is different from baseAmount but options list is empty */}
+                        {data.amount !== ((data.baseAmount !== undefined && data.baseAmount !== data.amount ? data.baseAmount : (data.amount - (data.optionsTotal || 0)))) &&
+                            !(data.options?.length || data.selectedOptions?.length) && (
+                                <span className="text-[10px] bg-red-50 text-red-500 px-2 py-1 rounded border border-red-100 font-bold animate-pulse">
+                                    [진단] {data.amount.toLocaleString()}원 중 {(data.amount - (data.baseAmount || data.amount)).toLocaleString()}원의 옵션 내역이 데이터베이스에서 누락되었습니다.
+                                </span>
+                            )}
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                        {/* Base Price */}
+                        {/* Base Price */}
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-gray-600">등록비 (Registration Fee)</span>
+                            <span className="font-medium">
+                                {(data.baseAmount !== undefined && data.baseAmount !== data.amount
+                                    ? data.baseAmount
+                                    : (data.amount - (data.optionsTotal || 0))).toLocaleString()}원
+                            </span>
+                        </div>
+
+                        {/* Options */}
+                        {((data.options && data.options.length > 0) || (data.selectedOptions && data.selectedOptions.length > 0)) && (
+                            <div className="space-y-2 pt-2 border-t border-gray-200">
+                                <p className="text-xs font-bold text-gray-400 uppercase">선택 옵션 (Selected Options)</p>
+                                {(data.options || data.selectedOptions || []).map((opt, idx) => (
+                                    <div key={idx} className="flex justify-between items-start text-sm">
+                                        <div className="flex flex-col">
+                                            <span className="text-gray-800 font-medium">
+                                                {typeof opt.name === 'string' ? opt.name : (opt.name.ko || opt.name.en || 'Option')}
+                                            </span>
+                                            <span className="text-xs text-gray-500">
+                                                {opt.price.toLocaleString()}원 × {opt.quantity}
+                                            </span>
+                                        </div>
+                                        <span className="font-medium">{(opt.totalPrice || (opt.price * opt.quantity)).toLocaleString()}원</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Total */}
+                        <div className="flex justify-between items-center pt-3 border-t-2 border-gray-200">
+                            <span className="font-bold text-gray-900">최종 결제 금액 (Total Amount)</span>
+                            <span className="text-xl font-bold text-blue-600">
+                                {Number(data.amount).toLocaleString()}원
+                            </span>
+                        </div>
+                    </div>
                 </div>
 
                 <div>
