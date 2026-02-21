@@ -89,7 +89,11 @@ function AddonSelectorWrapper({
     isOptionSelected: (optionId: string) => boolean;
 }) {
     const { isEnabled } = useFeatureFlags();
-    const addonsEnabled = isEnabled('optional_addons_enabled');
+    // [Fix] Enable for all in production if not explicitly disabled
+    // If the conference has no options, AddonSelector itself will return null.
+    // So we don't need to block it here with a feature flag if we want it live.
+    // const addonsEnabled = isEnabled('optional_addons_enabled');
+    const addonsEnabled = true;
 
     // DEV 환경이거나 URL 파라미터로 강제 활성화된 경우 허용
     const isDev = window.location.hostname.includes('--dev-') ||
@@ -884,7 +888,7 @@ export default function RegistrationPage() {
                             {/* 1. Email & Password (Guest Login / Create) */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200 mb-4">
                                 <div className="space-y-2">
-                                    <Label>Email <span className="text-red-500">*</span></Label>
+                                    <Label>{language === 'ko' ? '이메일' : 'Email'} <span className="text-red-500">*</span></Label>
                                     <Input
                                         type="email"
                                         value={formData.email}
@@ -900,7 +904,7 @@ export default function RegistrationPage() {
                                     <div className="space-y-2">
                                         <Label className="flex justify-between items-center">
                                             <span>
-                                                {language === 'ko' ? 'Password' : 'Password'} <span className="text-red-500">*</span>
+                                                {language === 'ko' ? '비밀번호' : 'Password'} <span className="text-red-500">*</span>
                                             </span>
                                             {/* Load Button for Guests */}
                                             <button
@@ -930,7 +934,7 @@ export default function RegistrationPage() {
                             {/* 2. Personal Info */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label>Name <span className="text-red-500">*</span></Label>
+                                    <Label>{language === 'ko' ? '이름' : 'Name'} <span className="text-red-500">*</span></Label>
                                     <Input
                                         value={formData.name}
                                         onChange={e => setFormData({ ...formData, name: e.target.value })}
@@ -940,7 +944,7 @@ export default function RegistrationPage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Affiliation <span className="text-red-500">*</span></Label>
+                                    <Label>{language === 'ko' ? '소속' : 'Affiliation'} <span className="text-red-500">*</span></Label>
                                     <Input
                                         value={formData.affiliation}
                                         onChange={e => setFormData({ ...formData, affiliation: e.target.value })}
@@ -950,7 +954,7 @@ export default function RegistrationPage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>License Number <span className="text-red-500">*</span></Label>
+                                    <Label>{language === 'ko' ? '면허번호' : 'License Number'} <span className="text-red-500">*</span></Label>
                                     <Input
                                         value={formData.licenseNumber}
                                         onChange={e => setFormData({ ...formData, licenseNumber: e.target.value })}
@@ -960,7 +964,7 @@ export default function RegistrationPage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Phone <span className="text-red-500">*</span></Label>
+                                    <Label>{language === 'ko' ? '연락처' : 'Phone'} <span className="text-red-500">*</span></Label>
                                     <Input
                                         value={formData.phone}
                                         onChange={e => setFormData({ ...formData, phone: e.target.value })}
@@ -1100,7 +1104,7 @@ export default function RegistrationPage() {
                                     {isProcessing ? (
                                         <>
                                             <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                                            Processing...
+                                            {language === 'ko' ? '결제 진행 중...' : 'Processing...'}
                                         </>
                                     ) : (
                                         <>
