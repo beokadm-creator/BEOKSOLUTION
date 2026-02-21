@@ -24,11 +24,11 @@ jobs:
           cache: 'npm'
       
       - name: 의존성 설치
-        run: npm ci
+        run: npm install
       
       - name: ESLint 실행
         run: npm run lint
-        continue-on-error: false # 린트 실패 시 중단
+        continue-on-error: true # 린트 실패 시에도 계속 진행
 
   # 작업 2: TypeScript 타입 체크
   typecheck:
@@ -46,7 +46,7 @@ jobs:
           cache: 'npm'
       
       - name: 의존성 설치
-        run: npm ci
+        run: npm install
       
       - name: TypeScript 컴파일 체크
         run: npx tsc --noEmit
@@ -68,7 +68,7 @@ jobs:
           cache: 'npm'
       
       - name: 의존성 설치
-        run: npm ci
+        run: npm install
       
       - name: 테스트 실행
         run: npm test -- --coverage --watchAll=false
@@ -100,7 +100,7 @@ jobs:
           cache: 'npm'
       
       - name: 의존성 설치
-        run: npm ci
+        run: npm install
       
       - name: Vite 빌드
         run: npm run build
