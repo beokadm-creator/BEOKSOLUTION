@@ -78,7 +78,7 @@ const StandAloneBadgePage: React.FC = () => {
                 );
 
                 // 2. Helper to process snapshot data
-                const processSnapshot = (snap: any, source: 'REGULAR' | 'EXTERNAL') => {
+                const processSnapshot = (snap: import('firebase/firestore').QuerySnapshot, source: 'REGULAR' | 'EXTERNAL') => {
                     if (snap.empty) {
                         // This should only happen if the document was deleted after we found it
                         console.log(`[StandAloneBadgePage] ${source} registration disappeared`);
