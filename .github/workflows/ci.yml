@@ -24,7 +24,7 @@ jobs:
           cache: 'npm'
       
       - name: 의존성 설치
-        run: npm ci
+        run: npm install
       
       - name: ESLint 실행
         run: npm run lint
@@ -46,7 +46,7 @@ jobs:
           cache: 'npm'
       
       - name: 의존성 설치
-        run: npm ci
+        run: npm install
       
       - name: TypeScript 컴파일 체크
         run: npx tsc --noEmit
@@ -68,7 +68,7 @@ jobs:
           cache: 'npm'
       
       - name: 의존성 설치
-        run: npm ci
+        run: npm install
       
       - name: 테스트 실행
         run: npm test -- --coverage --watchAll=false
@@ -100,7 +100,7 @@ jobs:
           cache: 'npm'
       
       - name: 의존성 설치
-        run: npm ci
+        run: npm install
       
       - name: Vite 빌드
         run: npm run build
