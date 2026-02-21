@@ -1,20 +1,31 @@
 # Voucher/Badge Scanning Fix - Deployment & Test Guide
 
-## 🚀 Deployment Instructions
+## 🚀 Deployment Instructions (Node 20 Standard)
 
-### Option 1: Deploy Only Badge Functions (Recommended)
+### ✅ Automated Deployment (Recommended)
+The system is configured to deploy automatically via GitHub Actions:
+1. **Push to `develop`**: Deploys frontend to DEV channel (`deploy-dev.yml`).
+2. **Push to `main`**: Deploys full stack (Hosting, Functions, Firestore) to Production (`firebase-deploy-beok.yml`).
+
+### ⚠️ Manual Deployment (Emergency Only)
+If manual deployment is required, ensure you are using **Node 20**.
+
+#### Option 1: Full Deployment
 ```bash
-firebase deploy --only functions:onRegistrationCreated,functions:issueDigitalBadge,functions:validateBadgePrepToken
+# Ensure Node 20
+node -v # Should be v20.x
+
+# Deploy everything
+firebase deploy --only hosting,functions,firestore
 ```
 
-### Option 2: Deploy All Functions
+#### Option 2: Deploy Specific Parts
 ```bash
-firebase deploy --only functions
-```
+# Hosting only
+firebase deploy --only hosting
 
-### Option 3: Full Deployment (Functions + Firestore Rules)
-```bash
-firebase deploy --only functions,firestore
+# Specific Functions
+firebase deploy --only functions:onRegistrationCreated
 ```
 
 ---

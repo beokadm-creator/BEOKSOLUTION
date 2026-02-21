@@ -25,13 +25,26 @@ This repository uses a **3-layer protection system** to prevent rollbacks and en
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
 │  LAYER 3: CI/CD Pipeline (AUTOMATED VALIDATION)               │
-│  - ESLint check (all files)                                  │
-│  - TypeScript compilation check                              │
-│  - Jest test suite (167 tests)                              │
-│  - Vite production build                                     │
-│  - File: .github/workflows/ci.yml                            │
+│  - Environment: Node 20 (MANDATORY)                          │
+│  - ESLint, TypeScript Check, Jest Tests (160+ tests)        │
+│  - Functions Build Validation (Critical for backend)         │
+│  - Files: .github/workflows/ci.yml, deploy-dev.yml           │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+## 🚀 CI/CD & DEPLOYMENT RULES (NODE 20)
+
+### 1. Node.js Version Policy
+- **Global Standard**: Node **20.x** must be used for all environments.
+- **Workflow Config**: `NODE_VERSION: '20'` in all `.github/workflows/*.yml`.
+- **Functions Runtime**: `"node": "20"` in `functions/package.json`.
+
+### 2. Workflow Structure
+- **Verification Flow**: `develop` or `feature/**` push triggers `ci.yml` and `deploy-dev.yml`.
+  - Includes **mandatory Functions build check** to catch backend errors early.
+- **Production Flow**: `main` push triggers `ci.yml` and `firebase-deploy-beok.yml`.
+  - Performs full deployment: Hosting + Functions + Firestore.
+- **Consolidation**: Legacy `deploy-live.yml` and `firebase-deploy.yml` have been removed to prevent duplicate deployments.
 
 ## 📋 MANDATORY PRE-WORK CHECKLIST
 
@@ -121,15 +134,17 @@ git push origin feature/your-description
 
 ### Step 7: Wait for CI/CD Validation
 ```bash
-# CI/CD pipeline runs AUTOMATICALLY:
-# ✅ ESLint (all files)
-# ✅ TypeScript check
-# ✅ Jest tests (167 tests)
-# ✅ Vite build
+# CI/CD pipeline runs AUTOMATICALLY on Node 20:
+# ✅ ci.yml: ESLint, TypeScript, Jest Tests
+# ✅ deploy-dev.yml: Frontend Build + Functions Build Check
 
 # Check GitHub Actions tab for results
 # Must see: ✅ "All checks have passed"
 ```
+
+### Step 8: Deploy to DEV (Automatic)
+- Merging to `develop` automatically deploys the frontend to the **Firebase Hosting Dev Channel**.
+- Validation of Functions build is performed but not deployed to live GCP in this step.
 
 ### Step 8: Request Review
 ```bash
@@ -154,14 +169,9 @@ git push origin feature/your-description
 # ✅ No merge conflicts
 
 # Click: "Merge pull request"
-# Options:
-# - "Create a merge commit" (recommended)
-# - "Squash and merge" (clean history)
-# - "Rebase and merge" (linear history)
-
-# GitHub will automatically:
-# - Merge feature branch into main
-# - Delete feature branch (if configured)
+# This will trigger the LIVE deployment workflow:
+# 🚀 firebase-deploy-beok.yml (Node 20)
+# - Deploys Hosting, Functions, and Firestore to Production.
 ```
 
 ### Step 10: Verify Deployment
