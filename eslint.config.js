@@ -13,6 +13,8 @@ export default defineConfig([
     '*.patch.ts',
     '*.patch.tsx',
     'functions/lib',
+    'node_modules_bak',
+    'functions/node_modules_bak',
   ]),
   {
     files: ['**/*.{ts,tsx}'],
