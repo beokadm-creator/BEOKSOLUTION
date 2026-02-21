@@ -14,21 +14,28 @@ export const useSociety = () => {
             const parts = host.split('.');
             let societyId = null;
 
-            if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') {
+            // ✅ 0순위: URL 파라미터 ?society=kadd (DEV 환경)
+            const params = new URLSearchParams(window.location.search);
+            const societyParam = params.get('society');
+            if (societyParam) {
+                societyId = societyParam;
+            }
+            // ✅ 1순위: sessionStorage에서 가져오기 (로그인 후 리다이렉트 시)
+            else if (sessionStorage.getItem('societyId')) {
+                societyId = sessionStorage.getItem('societyId');
+            }
+            // ✅ 2순위: 서브도메인 (kadd.eregi.co.kr)
+            else if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') {
                 societyId = parts[0];
-            } else if (host.includes('localhost') || host.includes('web.app')) {
-                 // Dev fallback or need a way to simulate
-                 // societyId = 'kap'; // Uncomment for dev testing
+            }
+            // ✅ 3순위: kadd로 시작하는 도메인
+            else if (host.startsWith('kadd.')) {
+                societyId = 'kadd';
             }
 
             if (!societyId) {
-                // Force check for 'kadd' if domain is kadd.eregi.co.kr (safety net)
-                if (host.startsWith('kadd.')) {
-                    societyId = 'kadd';
-                } else {
-                    setLoading(false);
-                    return;
-                }
+                setLoading(false);
+                return;
             }
 
             try {

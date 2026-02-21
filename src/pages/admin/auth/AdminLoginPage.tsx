@@ -17,6 +17,10 @@ const AdminLoginPage: React.FC = () => {
     const [error, setError] = useState('');
     const navigate = useNavigate();
 
+    // DEV 환경: society 파라미터 확인
+    const params = new URLSearchParams(window.location.search);
+    const societyParam = params.get('society');
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -40,11 +44,12 @@ const AdminLoginPage: React.FC = () => {
                 return; // Stop here
             }
 
-            // 3. LOGIC: Clean Redirect
+            // 3. LOGIC: Clean Redirect (society 파라미터에 따라 분기)
             toast.success("Welcome, Super Admin");
             // Wait a brief moment for auth state to propagate, then navigate
             setTimeout(() => {
-                navigate('/super', { replace: true });
+                const redirectPath = societyParam ? '/admin/society' : '/super';
+                navigate(redirectPath, { replace: true });
             }, 500);
 
         } catch (err) {

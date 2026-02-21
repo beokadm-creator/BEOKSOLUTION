@@ -512,7 +512,19 @@ const UserHubPage: React.FC = () => {
 
                             // JOIN 2: Society Name (Always fetch to ensure data integrity)
                             try {
-                                const socDoc = await getDoc(doc(db, 'societies', data.societyId));
+                                // [Fix-Step 512-D] Robust societyId parsing
+                                let societyId = data.societyId;
+                                if (!societyId || societyId === 'unknown') {
+                                    // Try to derive from slug (e.g. kap_2026spring -> kap)
+                                    const slug = forceString(data.slug || data.conferenceId || data.conferenceSlug);
+                                    if (slug && slug.includes('_')) {
+                                        societyId = slug.split('_')[0];
+                                    } else {
+                                        societyId = 'kadd'; // Final fallback
+                                    }
+                                }
+
+                                const socDoc = await getDoc(doc(db, 'societies', societyId));
                                 if (socDoc.exists()) {
                                     const socData = socDoc.data();
                                     // Society name can be: {ko: "...", en: "..."} or "string"
@@ -525,7 +537,7 @@ const UserHubPage: React.FC = () => {
                                         }
                                     }
                                 } else {
-                                    console.warn('[UserHub] Society document not found for ID:', data.societyId);
+                                    console.warn('[UserHub] Society document not found for ID:', societyId);
                                 }
                             } catch (socErr) {
                                 console.error('[UserHub] Society lookup failed:', socErr);
@@ -537,7 +549,7 @@ const UserHubPage: React.FC = () => {
                                 societyName: socName,
                                 earnedPoints: Number(data.earnedPoints || 0),
                                 slug: forceString(data.slug || data.conferenceId || data.conferenceSlug || confSlug),
-                                societyId: forceString(data.societyId === 'unknown' ? cData?.societyId || 'kadd' : data.societyId || cData?.societyId || 'kadd'),
+                                societyId: forceString(data.societyId === 'unknown' ? cData?.societyId || societyId || 'kadd' : data.societyId || cData?.societyId || societyId || 'kadd'),
                                 location: loc,
                                 dates: dates,
                                 paymentStatus: data.paymentStatus,
@@ -687,7 +699,8 @@ const UserHubPage: React.FC = () => {
                         // JOIN 2: Society Name (If missing)
                         if (!socName || socName === 'Unknown' || socName === '') {
                             try {
-                                const socDoc = await getDoc(doc(db, 'societies', data.societyId));
+                                const socId = data.societyId || (confSlug ? confSlug.split('_')[0] : 'kadd');
+                                const socDoc = await getDoc(doc(db, 'societies', socId));
                                 if (socDoc.exists()) {
                                     const socData = socDoc.data();
                                     // Society name can be: {ko: "...", en: "..."} or "string"

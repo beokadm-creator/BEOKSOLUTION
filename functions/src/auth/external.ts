@@ -18,7 +18,7 @@ export const generateFirebaseAuthUserForExternalAttendee = functions
             throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
         }
 
-        const { confId, externalId, password, email, name, phone, organization, licenseNumber } = data;
+        const { confId, externalId, password, email, name, phone, organization, licenseNumber, amount } = data;
 
         if (!confId || !externalId) {
             throw new functions.https.HttpsError('invalid-argument', 'Missing confId or externalId');
@@ -106,13 +106,18 @@ export const generateFirebaseAuthUserForExternalAttendee = functions
 
             // 4. Create Participation Record (For accessing the conference)
             // This is CRITICAL for "Normal Course Taking System"
+            const societyId = confId.split('_')[0] || 'unknown';
+            
             await db.collection('users').doc(uid).collection('participations').doc(externalId).set({
                 conferenceId: confId,
                 registrationId: externalId,
+                societyId: societyId,
                 role: 'ATTENDEE',
                 type: 'EXTERNAL',
                 registeredAt: admin.firestore.FieldValue.serverTimestamp(),
-                status: 'COMPLETED'
+                status: 'PAID', // Changed from COMPLETED to PAID to match UserHub logic
+                paymentStatus: 'PAID', // Explicitly set paymentStatus
+                amount: Number(amount) || 0 // Use passed amount or 0
             }, { merge: true });
 
             return { success: true, uid, message: isNew ? 'Created new account' : 'Linked existing account' };

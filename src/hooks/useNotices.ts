@@ -20,6 +20,7 @@ export function useNotices() {
   const conferenceData = useConference();
   const [notices, setNotices] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(() => !conferenceData?.id);
+  const [error] = useState<Error | null>(null);
 
   useEffect(() => {
     const hasConfId = !!conferenceData?.id;
@@ -55,6 +56,7 @@ export function useAllNotices() {
   // Use ConfContext if available (admin pages), otherwise use useConference (public pages)
   const confId = confContext?.confId || conferenceData?.id;
   const [loading, setLoading] = useState(() => !confId);
+  const [error] = useState<Error | null>(null);
 
   useEffect(() => {
     if (!confId) {
@@ -83,6 +85,7 @@ export function useNoticeCount() {
   const conferenceData = useConference();
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(() => !conferenceData?.id);
+  const [error] = useState<Error | null>(null);
 
   useEffect(() => {
     if (!conferenceData?.id) {
@@ -100,7 +103,7 @@ export function useNoticeCount() {
     return () => unsubscribe();
   }, [conferenceData?.id]);
 
-  return { count, loading };
+  return { count, loading, error };
 }
 
 /**

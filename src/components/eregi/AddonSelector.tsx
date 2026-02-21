@@ -1,29 +1,24 @@
 import React, { useState } from 'react';
 import { useConferenceOptions } from '@/hooks/useConferenceOptions';
-import { usePricing } from '@/hooks/usePricing';
+import type { ConferenceOption } from '@/types/schema';
 import { Card, CardContent } from '@/components/ui/card';
 import { HelpCircle, Info } from 'lucide-react';
 
 interface AddonSelectorProps {
   conferenceId: string;
   language: 'ko' | 'en';
-  onPriceChange?: (totalPrice: number) => void;
+  toggleOption: (option: ConferenceOption) => void;
+  isOptionSelected: (optionId: string) => boolean;
 }
 
-export function AddonSelector({ conferenceId, language, onPriceChange }: AddonSelectorProps) {
+export function AddonSelector({
+  conferenceId,
+  language,
+  toggleOption,
+  isOptionSelected,
+}: AddonSelectorProps) {
   const { options, loading } = useConferenceOptions(conferenceId);
-  const { toggleOption, isOptionSelected } = usePricing(0);
   const [tooltipOption, setTooltipOption] = useState<string | null>(null);
-
-  // Notify parent when selection changes
-  React.useEffect(() => {
-    if (onPriceChange) {
-      const total = options
-        .filter((opt) => isOptionSelected(opt.id))
-        .reduce((sum, opt) => sum + opt.price, 0);
-      onPriceChange(total);
-    }
-  }, [options, isOptionSelected, onPriceChange]);
 
   if (loading) {
     return (

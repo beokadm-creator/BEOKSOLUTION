@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { getAuth, onAuthStateChanged } from 'firebase/auth'; // RAW SDK
-import { getFirestore, collection, query, where, onSnapshot, orderBy, type Query } from 'firebase/firestore'; // RAW SDK
+import { getFirestore, collection, query, where, onSnapshot, orderBy, type Query, getDocs } from 'firebase/firestore'; // RAW SDK
 import { QRCodeSVG } from 'qrcode.react';
 import { useNavigate } from 'react-router-dom';
 import { SESSION_KEYS } from '../utils/cookie';
@@ -45,7 +45,13 @@ const StandAloneBadgePage: React.FC = () => {
         let unsubscribeDB: (() => void) | null = null; // Track DB subscription in outer scope
 
         // 1. Listen for Firebase Auth FIRST (for regular members)
-        const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+        const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+            // Clean up previous DB listener if user changes
+            if (unsubscribeDB) {
+                unsubscribeDB();
+                unsubscribeDB = null;
+            }
+
             if (user) {
                 // Firebase user authenticated - proceed to show badge
                 setStatus("LOADING");
@@ -55,62 +61,106 @@ const StandAloneBadgePage: React.FC = () => {
 
                 console.log('[StandAloneBadgePage] Firebase user authenticated, fetching badge:', { userId: user.uid, confId: confIdToUse });
 
-                // CRITICAL FIX: Query by userId field, NOT by document ID
-                // Registration doc ID is different from userId
-                // We need to query registrations where userId === user.uid
-                const q = query(
+                // STRATEGY: Try Regular Registrations FIRST, then External Attendees
+                
+                // 1. Define Queries
+                const qReg = query(
                     collection(db, 'conferences', confIdToUse, 'registrations'),
                     where('userId', '==', user.uid),
-                    where('paymentStatus', '==', 'PAID'),  // Only show PAID registrations
+                    where('paymentStatus', '==', 'PAID'),
                     orderBy('createdAt', 'desc')
                 );
 
-                // Store query for refresh
-                if (lastQueryRef) {
-                    lastQueryRef.current = q;
-                }
+                const qExt = query(
+                    collection(db, 'conferences', confIdToUse, 'external_attendees'),
+                    where('userId', '==', user.uid),
+                    where('paymentStatus', '==', 'PAID') // Admin created ones are PAID
+                );
 
-                unsubscribeDB = onSnapshot(q, (snap) => {
+                // 2. Helper to process snapshot data
+                const processSnapshot = (snap: any, source: 'REGULAR' | 'EXTERNAL') => {
                     if (snap.empty) {
-                        console.log('[StandAloneBadgePage] No PAID registration found for user');
+                        // This should only happen if the document was deleted after we found it
+                        console.log(`[StandAloneBadgePage] ${source} registration disappeared`);
                         setStatus("NO_DATA");
                         setMsg("등록 정보가 없습니다.");
-                    } else {
-                        // Get most recent registration (first one in query)
-                        const d = snap.docs[0].data();
-                        console.log('[StandAloneBadgePage] Registration found:', d);
-                        // EXTREME SAFETY: String() everything - prevent object rendering error
-                        const uiName = String(d.userName || d.userInfo?.name || 'No Name');
-                        const uiAff = String(d.affiliation || d.userAffiliation || d.userInfo?.affiliation || '-');
-                        const uiId = String(snap.docs[0].id);
-                        const uiIssued = !!d.badgeIssued || !!d.badgeQr;
-                        const uiZone = String(d.attendanceStatus === 'INSIDE' ? (d.currentZone || 'Inside') : 'OUTSIDE');
-                        const uiTime = String(d.totalMinutes || '0');
-                        const uiLicense = String(d.licenseNumber || d.userInfo?.licenseNumber || '-');
-                        const uiStatus = String(d.attendanceStatus || 'OUTSIDE');
-                        const uiBadgeQr = d.badgeQr || null;
-                        const uiReceiptNumber = String(d.receiptNumber || '');
-                        const uiSessionsCompleted = d.sessionsCompleted ? Number(d.sessionsCompleted) : undefined;
-                        const uiSessionsTotal = d.sessionsTotal ? Number(d.sessionsTotal) : undefined;
-                        console.log('[StandAloneBadgePage] Sanitized UI data:', { uiName, uiAff, uiId, uiIssued, uiZone, uiTime, uiLicense, uiStatus, uiBadgeQr, uiReceiptNumber });
-                        setUi({
-                            name: uiName,
-                            aff: uiAff,
-                            id: uiId,
-                            issued: uiIssued,
-                            zone: uiZone,
-                            time: uiTime,
-                            license: uiLicense,
-                            status: uiStatus,
-                            badgeQr: uiBadgeQr,
-                            receiptNumber: uiReceiptNumber,
-                            sessionsCompleted: uiSessionsCompleted,
-                            sessionsTotal: uiSessionsTotal
-                        });
-                        setStatus("READY");
-                        setMsg("");
+                        return;
                     }
-                });
+
+                    const d = snap.docs[0].data();
+                    console.log(`[StandAloneBadgePage] ${source} Registration found:`, d);
+                    
+                    // Common Field Mapping
+                    const uiName = String(d.userName || d.userInfo?.name || d.name || 'No Name'); // d.name for External
+                    const uiAff = String(d.affiliation || d.userAffiliation || d.userInfo?.affiliation || d.organization || '-'); // d.organization for External
+                    const uiId = String(snap.docs[0].id);
+                    // CRITICAL LOGIC CHANGE: 
+                    // For EXTERNAL attendees, badgeQr is pre-generated, so we MUST check badgeIssued flag.
+                    // For REGULAR attendees, we maintain legacy check (badgeQr existence) but prioritize badgeIssued if available.
+                    let uiIssued = false;
+                    if (source === 'EXTERNAL') {
+                        uiIssued = !!d.badgeIssued;
+                    } else {
+                        // Legacy support for regular registrations
+                        uiIssued = !!d.badgeIssued || !!d.badgeQr;
+                    }
+                    
+                    // External might not have attendanceStatus, default to OUTSIDE
+                    const uiZone = String(d.attendanceStatus === 'INSIDE' ? (d.currentZone || 'Inside') : 'OUTSIDE');
+                    const uiTime = String(d.totalMinutes || '0');
+                    const uiLicense = String(d.licenseNumber || d.userInfo?.licenseNumber || '-');
+                    const uiStatus = String(d.attendanceStatus || 'OUTSIDE');
+                    const uiBadgeQr = d.badgeQr || null;
+                    const uiReceiptNumber = String(d.receiptNumber || '');
+                    const uiSessionsCompleted = d.sessionsCompleted ? Number(d.sessionsCompleted) : undefined;
+                    const uiSessionsTotal = d.sessionsTotal ? Number(d.sessionsTotal) : undefined;
+
+                    setUi({
+                        name: uiName,
+                        aff: uiAff,
+                        id: uiId,
+                        issued: uiIssued,
+                        zone: uiZone,
+                        time: uiTime,
+                        license: uiLicense,
+                        status: uiStatus,
+                        badgeQr: uiBadgeQr,
+                        receiptNumber: uiReceiptNumber,
+                        sessionsCompleted: uiSessionsCompleted,
+                        sessionsTotal: uiSessionsTotal
+                    });
+                    setStatus("READY");
+                    setMsg("");
+                };
+
+                // 3. Execution
+                try {
+                    // Check Regular first
+                    const snapReg = await getDocs(qReg);
+                    if (!snapReg.empty) {
+                        console.log('[StandAloneBadgePage] Found in REGISTRATIONS');
+                        if (lastQueryRef) lastQueryRef.current = qReg;
+                        unsubscribeDB = onSnapshot(qReg, (snap) => processSnapshot(snap, 'REGULAR'));
+                    } else {
+                        // Check External
+                        const snapExt = await getDocs(qExt);
+                        if (!snapExt.empty) {
+                            console.log('[StandAloneBadgePage] Found in EXTERNAL_ATTENDEES');
+                            if (lastQueryRef) lastQueryRef.current = qExt;
+                            unsubscribeDB = onSnapshot(qExt, (snap) => processSnapshot(snap, 'EXTERNAL'));
+                        } else {
+                            // No data in either
+                            console.log('[StandAloneBadgePage] No PAID registration found in either collection');
+                            setStatus("NO_DATA");
+                            setMsg("등록 정보가 없습니다.");
+                        }
+                    }
+                } catch (err) {
+                    console.error('[StandAloneBadgePage] Error fetching badge data:', err);
+                    setStatus("NO_DATA");
+                    setMsg("데이터 로드 중 오류가 발생했습니다.");
+                }
+
             } else {
                 // No Firebase user - check for non-member session
                 const nonMemberSession = sessionStorage.getItem(SESSION_KEYS.NON_MEMBER);
@@ -162,7 +212,21 @@ const StandAloneBadgePage: React.FC = () => {
                 onSnapshot(lastQueryRef.current!, (snap) => {
                     if (!snap.empty) {
                         const d = snap.docs[0].data();
-                        const uiIssued = !!d.badgeIssued || !!d.badgeQr;
+                        
+                        // Apply same logic for refresh
+                        let uiIssued = false;
+                        // We need to know if it's EXTERNAL or REGULAR here too.
+                        // However, we don't have 'source' variable in this effect.
+                        // But we can infer it from the collection path in lastQueryRef, or check data structure.
+                        // External attendees usually have 'organization' field, Regular have 'affiliation'.
+                        // Or better, check if 'badgeIssued' is explicitly false but 'badgeQr' exists.
+                        
+                        if (d.registrationType?.startsWith('MANUAL') || d.organization) {
+                             uiIssued = !!d.badgeIssued;
+                        } else {
+                             uiIssued = !!d.badgeIssued || !!d.badgeQr;
+                        }
+
                         if (uiIssued) {
                             // Badge has been issued - update UI
                             setUi((prev) => ({

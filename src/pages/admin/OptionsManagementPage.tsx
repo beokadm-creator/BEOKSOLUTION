@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useConference } from '@/hooks/useConference';
+import { useConfContext } from '@/contexts/ConfContext';
 import { useConferenceOptions } from '@/hooks/useConferenceOptions';
 import type { ConferenceOption } from '@/types/schema';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import {
 import toast from 'react-hot-toast';
 
 export function OptionsManagementPage() {
-  const { id: confId, info } = useConference();
+  const { confId, conference } = useConfContext();
   const {
     options,
     loading,
@@ -25,7 +25,7 @@ export function OptionsManagementPage() {
     updateOption,
     deleteOption,
     toggleActive,
-  } = useConferenceOptions(confId || undefined);
+  } = useConferenceOptions(confId);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingOption, setEditingOption] = useState<ConferenceOption | null>(null);
@@ -120,7 +120,7 @@ export function OptionsManagementPage() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">추가 옵션 관리</h2>
           <p className="text-sm text-gray-600 mt-1">
-            {info?.title?.ko || '학술대회'}의 등록 시 선택 가능한 추가 옵션을 관리합니다.
+            {conference?.title?.ko || '학술대회'}의 등록 시 선택 가능한 추가 옵션을 관리합니다.
           </p>
         </div>
         <Button onClick={handleNewOption}>

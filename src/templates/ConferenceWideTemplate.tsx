@@ -109,6 +109,8 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
   }
 
   // 🚨 [진단 모드] 에러 발생 시 DebugScreen 출력
+  // error can be string (from useTranslation) or Error object (if changed)
+  // Ensure we handle both cases or simply check truthiness
   if (error || !config) {
     return <DebugScreen slug={slug} />;
   }

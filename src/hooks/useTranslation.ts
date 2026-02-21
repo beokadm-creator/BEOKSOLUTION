@@ -45,7 +45,9 @@ interface ConferenceData {
 const toDate = (val: TimestampLike | string | number | Date | undefined): Date | undefined => {
   if (!val) return undefined;
   if (val instanceof Date) return val;
-  if (typeof val.toDate === 'function') return val.toDate(); // Firestore Timestamp
+  if (typeof val === 'object' && val !== null && typeof (val as TimestampLike).toDate === 'function') {
+    return (val as TimestampLike).toDate!();
+  }
   if (typeof val === 'string' || typeof val === 'number') return new Date(val);
   return undefined;
 };
@@ -126,7 +128,16 @@ export const useTranslation = (slug: string) => {
         const hostname = window.location.hostname;
         const parts = hostname.split('.');
         let domainSocietyId: string | null = null;
-        if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') {
+
+        // DEV 환경: URL 쿼리 파라미터에서 society 가져오기
+        const urlParams = new URLSearchParams(window.location.search);
+        const societyParam = urlParams.get('society');
+        if (societyParam) {
+          domainSocietyId = societyParam;
+        }
+
+        // 프로덕션: 서브도메인에서 society 가져오기
+        if (!domainSocietyId && parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') {
           domainSocietyId = parts[0]; // e.g., 'kadd' from kadd.eregi.co.kr
         }
 
@@ -145,12 +156,26 @@ export const useTranslation = (slug: string) => {
           docData = { id: matchingDocs[0].id, ...matchingDocs[0].data() } as ConferenceData & { id: string };
           confId = docData.id as string;
         } else {
-          // Fallback: ID 직접 검색
+          // Fallback 1: slug를 ID로 직접 검색 (e.g., slug === document ID)
           const docRef = doc(db, 'conferences', slug);
           const docSnap = await getDoc(docRef);
 
           if (docSnap.exists()) {
             docData = { id: docSnap.id, ...docSnap.data() } as ConferenceData & { id: string };
+            confId = docSnap.id;
+          } else if (domainSocietyId) {
+            // Fallback 2: 'societyId_slug' 복합 ID 검색 (slug 필드가 없는 문서 대응)
+            // 예: domainSocietyId='kadd', slug='2026spring' -> 'kadd_2026spring'
+            const compositeId = `${domainSocietyId}_${slug}`;
+            console.log('[useTranslation] Trying composite ID fallback:', compositeId);
+            const compositeRef = doc(db, 'conferences', compositeId);
+            const compositeSnap = await getDoc(compositeRef);
+
+            if (compositeSnap.exists()) {
+              docData = { id: compositeSnap.id, ...compositeSnap.data() } as ConferenceData & { id: string };
+              confId = compositeSnap.id;
+              console.log('[useTranslation] Found via composite ID:', confId);
+            }
           }
         }
 

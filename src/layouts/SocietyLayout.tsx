@@ -12,15 +12,37 @@ import { LayoutDashboard, Settings, Users, Mail, ShieldCheck, LogOut, Building2,
 import { cn } from '../lib/utils';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
+// ✅ DEV 환경용 URL 파라미터 생성 함수
+const getDevParams = () => {
+  const params = new URLSearchParams(window.location.search);
+  const society = params.get('society');
+  const admin = params.get('admin');
+  
+  if (society || admin) {
+    const newParams = new URLSearchParams();
+    if (society) newParams.set('society', society);
+    if (admin) newParams.set('admin', admin);
+    return `?${newParams.toString()}`;
+  }
+  return '';
+};
+
 export default function SocietyLayout() {
   const { sid: paramSid, societyId: paramSocietyId } = useParams<{ sid: string; societyId: string }>();
   const { subdomain } = useSubdomain();
   
-  // Priority: subdomain > URL param (kadd.eregi.co.kr)
-  const sid = subdomain || paramSocietyId || paramSid;
+  // ✅ DEV 환경: URL 파라미터에서 society 가져오기
+  const params = new URLSearchParams(window.location.search);
+  const societyParam = params.get('society');
+  
+  // ✅ sessionStorage에서 societyId 가져오기 (로그인 후 리다이렉트 시)
+  const sessionSocietyId = sessionStorage.getItem('societyId');
+  
+  // Priority: URL param > sessionStorage > subdomain > URL path param
+  const sid = societyParam || sessionSocietyId || subdomain || paramSocietyId || paramSid;
   
   // Stabilize sid: only update when it changes (not on every render)
-  const [stableSid, setStableSid] = useState<string>(subdomain || paramSocietyId || paramSid || '');
+  const [stableSid, setStableSid] = useState<string>(societyParam || sessionSocietyId || subdomain || paramSocietyId || paramSid || '');
   
   useEffect(() => {
     if (sid && sid !== stableSid) {
@@ -76,22 +98,31 @@ export default function SocietyLayout() {
   if (loading) return <LoadingSpinner />;
   if (!sid) return <div>잠시만 기다려주세요...</div>;
   if (!society) return <div>Society Not Found</div>;
+  
+  // ✅ DEV 환경용 URL 파라미터
+  const devParams = getDevParams();
 
   const navItems = [
-    { href: getSocietyAdminPath(sid!, '', subdomain), label: '대시보드', icon: LayoutDashboard, key: 'dashboard' },
-    { href: getSocietyAdminPath(sid!, 'content', subdomain), label: '콘텐츠 관리', icon: Globe, key: 'content' },
-    { href: getSocietyAdminPath(sid!, 'infra', subdomain), label: '인프라 설정', icon: Settings, key: 'infra' },
-    { href: getSocietyAdminPath(sid!, 'identity', subdomain), label: '아이덴티티', icon: Building2, key: 'identity' },
-    { href: getSocietyAdminPath(sid!, 'members', subdomain), label: '회원 명단', icon: ShieldCheck, key: 'members' },
-    { href: getSocietyAdminPath(sid!, 'membership-fees', subdomain), label: '회비 설정', icon: CreditCard, key: 'membership-fees' },
-    { href: getSocietyAdminPath(sid!, 'templates', subdomain), label: '알림톡 템플릿', icon: Mail, key: 'templates' },
-    { href: getSocietyAdminPath(sid!, 'users', subdomain), label: '관리자 계정', icon: Users, key: 'users' },
+    { href: `/admin/society${devParams}`, label: '대시보드', icon: LayoutDashboard, key: 'dashboard' },
+    { href: `/admin/society/content${devParams}`, label: '콘텐츠 관리', icon: Globe, key: 'content' },
+    { href: `/admin/society/infra${devParams}`, label: '인프라 설정', icon: Settings, key: 'infra' },
+    { href: `/admin/society/identity${devParams}`, label: '아이덴티티', icon: Building2, key: 'identity' },
+    { href: `/admin/society/members${devParams}`, label: '회원 명단', icon: ShieldCheck, key: 'members' },
+    { href: `/admin/society/membership-fees${devParams}`, label: '회비 설정', icon: CreditCard, key: 'membership-fees' },
+    { href: `/admin/society/templates${devParams}`, label: '알림톡 템플릿', icon: Mail, key: 'templates' },
+    { href: `/admin/society/users${devParams}`, label: '관리자 계정', icon: Users, key: 'users' },
   ];
 
   return (
     <SocietyProvider value={{ societyId: sid!, society, features }}>
       <div className="flex h-screen bg-gray-100">
         <aside className="w-64 bg-[#001f3f] text-white flex flex-col border-r border-[#003366]">
+            {/* ✅ DEV 환경 표기 */}
+            {societyParam && (
+              <div className="bg-yellow-500 text-yellow-900 text-center py-2 text-sm font-bold">
+                ⚠️ DEV 환경 - 테스트용
+              </div>
+            )}
             <div className="h-16 flex items-center justify-center border-b border-[#003366] font-bold text-xl">
                 {society.name?.ko || society.name?.en || sid?.toUpperCase()} HQ
             </div>

@@ -55,11 +55,23 @@ export default function SocietyDashboardPage() {
     const [newEnd, setNewEnd] = useState('');
 
     const getSocietyId = () => {
+        // ✅ 0순위: adminStore에서 선택된 societyId
         if (selectedSocietyId) return selectedSocietyId;
+        
+        // ✅ 1순위: URL 파라미터 ?society=kadd (DEV 환경)
+        const params = new URLSearchParams(window.location.search);
+        const societyParam = params.get('society');
+        if (societyParam) return societyParam;
+        
+        // ✅ 2순위: sessionStorage (로그인 후 리다이렉트 시)
+        const sessionSocietyId = sessionStorage.getItem('societyId');
+        if (sessionSocietyId) return sessionSocietyId;
+        
+        // ✅ 3순위: 서브도메인 (kadd.eregi.co.kr)
         const hostname = window.location.hostname;
         const parts = hostname.split('.');
         if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') return parts[0];
-        if (hostname === 'localhost' || hostname === '127.0.0.1') return 'kap';
+        
         return null;
     };
 

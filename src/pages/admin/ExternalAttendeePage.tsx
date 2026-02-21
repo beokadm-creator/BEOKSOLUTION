@@ -12,10 +12,9 @@ import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { UserPlus, Upload, Download, FileText, Badge, CheckCircle2, Trash2, Loader2, Eye, EyeOff, Copy, MessageCircle } from 'lucide-react';
+import { UserPlus, Upload, Download, FileText, Badge, CheckCircle2, Trash2, Loader2, Eye, EyeOff, Copy, MessageCircle, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ExternalAttendee } from '../../types/schema';
-import ExternalAttendeeMigration from '../../components/admin/ExternalAttendeeMigration';
 
 const ExternalAttendeePage: React.FC = () => {
     const navigate = useNavigate();
@@ -721,6 +720,66 @@ const ExternalAttendeePage: React.FC = () => {
         }
     };
 
+    // Handle sync participations (fix for missing My Page entries)
+    const handleSyncParticipations = async () => {
+        if (!confirm(`등록된 모든 참석자(${externalAttendees.length}명)의 마이페이지 연동 정보를 갱신하시겠습니까?`)) return;
+        if (!confId) return;
+
+        setIsProcessing(true);
+        let successCount = 0;
+        let failCount = 0;
+
+        try {
+            const chunkSize = 5;
+            for (let i = 0; i < externalAttendees.length; i += chunkSize) {
+                const chunk = externalAttendees.slice(i, i + chunkSize);
+                setProgress(Math.round(((i + chunk.length) / externalAttendees.length) * 100));
+
+                await Promise.all(chunk.map(async (attendee) => {
+                    try {
+                        const passwordToUse = attendee.password || (attendee.phone ? attendee.phone.slice(-4) : '123456');
+                        const functions = getFunctions();
+                        const generateAuthUserFn = httpsCallable(functions, 'generateFirebaseAuthUserForExternalAttendee');
+                        
+                        // Always call to update participation doc
+                        const authResult = await generateAuthUserFn({
+                            confId,
+                            externalId: attendee.id,
+                            password: passwordToUse,
+                            email: attendee.email,
+                            name: attendee.name,
+                            phone: attendee.phone,
+                            organization: attendee.organization,
+                            licenseNumber: attendee.licenseNumber,
+                            amount: attendee.amount
+                        }) as { data: { success: boolean; uid: string; message: string } };
+
+                        if (authResult.data.success) {
+                            successCount++;
+                        } else {
+                            failCount++;
+                        }
+                    } catch (err) {
+                        console.error(`Failed sync for ${attendee.name}:`, err);
+                        failCount++;
+                    }
+                }));
+            }
+
+            if (failCount > 0) {
+                toast.error(`${successCount}명 동기화 완료, ${failCount}명 실패.`);
+            } else {
+                toast.success(`${successCount}명의 마이페이지 연동 정보가 갱신되었습니다.`);
+            }
+        } catch (error) {
+            console.error('Sync failed:', error);
+            toast.error('동기화 중 오류가 발생했습니다.');
+        } finally {
+            setIsProcessing(false);
+            setProgress(0);
+        }
+    };
+
     // Download CSV template
     const downloadTemplate = () => {
         const template = 'name,email,phone,organization,licenseNumber,amount,password\n홍길동,hong@example.com,010-1234-5678,서울대학교,12345,0,mypassword123';
@@ -965,6 +1024,33 @@ const ExternalAttendeePage: React.FC = () => {
                                     <Button
                                         variant="outline"
                                         size="sm"
+                                        onClick={handleSyncParticipations}
+                                        disabled={isProcessing}
+                                        className="mr-2 text-green-600 border-green-200 hover:bg-green-50 relative overflow-hidden"
+                                    >
+                                        <span className="relative z-10 flex items-center">
+                                            {isProcessing && progress > 0 ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                    동기화 {progress}%
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <RefreshCw className="w-4 h-4 mr-2" />
+                                                    마이페이지 연동
+                                                </>
+                                            )}
+                                        </span>
+                                        {isProcessing && progress > 0 && (
+                                            <div
+                                                className="absolute bottom-0 left-0 top-0 bg-green-100 transition-all duration-300"
+                                                style={{ width: `${progress}%`, zIndex: 0 }}
+                                            />
+                                        )}
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
                                         onClick={handleBatchCreateAccount}
                                         disabled={isProcessing}
                                         className="mr-2 text-blue-600 border-blue-200 hover:bg-blue-50 relative overflow-hidden"
@@ -1117,8 +1203,7 @@ const ExternalAttendeePage: React.FC = () => {
                     </TabsContent>
                 </Tabs>
 
-                {/* External Attendee Migration Tool */}
-                {confId && <ExternalAttendeeMigration confId={confId} />}
+                {/* External Attendee Migration Tool - REMOVED */}
             </div>
 
             {/* Voucher Modal */}

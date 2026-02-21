@@ -15,11 +15,16 @@ export default function ConfLayout() {
     const { cid } = useParams<{ cid: string }>();
     const { subdomain } = useSubdomain();
 
+    // DEV 환경에서 ?society 파라미터도 society ID로 인식
+    const societyFromParam = new URLSearchParams(window.location.search).get('society');
+    const effectiveSubdomain = subdomain || societyFromParam;
+
     const [conference, setConference] = useState<Conference | null>(null);
     const [loading, setLoading] = useState(true);
     const location = useLocation();
     const [searchParams] = useSearchParams();
     const isKioskMode = searchParams.get('mode') === 'kiosk';
+    const isDev = window.location.hostname.includes('dev') || window.location.hostname.includes('localhost');
 
     useEffect(() => {
         if (!cid) return;
@@ -32,8 +37,10 @@ export default function ConfLayout() {
                 if (docSnap.exists()) {
                     const data = { id: docSnap.id, ...docSnap.data() } as Conference;
                     // Security Check: Society ID Mismatch
-                    if (subdomain && data.id.split('_')[0] !== subdomain) {
-                        console.error('Society Mismatch');
+                    // Check both ID prefix and societyId field for compatibility
+                    const confSocietyId = data.societyId || data.id.split('_')[0];
+                    if (effectiveSubdomain && confSocietyId !== effectiveSubdomain) {
+                        console.error('Society Mismatch', { confSocietyId, effectiveSubdomain });
                         setConference(null);
                     } else {
                         setConference(data);
@@ -47,8 +54,9 @@ export default function ConfLayout() {
                         const docData = querySnapshot.docs[0];
                         const data = { id: docData.id, ...docData.data() } as Conference;
                         // Security Check: Society ID Mismatch
-                        if (subdomain && data.id.split('_')[0] !== subdomain) {
-                            console.error('Society Mismatch');
+                        const confSocietyId = data.societyId || data.id.split('_')[0];
+                        if (effectiveSubdomain && confSocietyId !== effectiveSubdomain) {
+                            console.error('Society Mismatch', { confSocietyId, effectiveSubdomain });
                             setConference(null);
                         } else {
                             setConference(data);
@@ -64,7 +72,7 @@ export default function ConfLayout() {
             }
         };
         fetchConf();
-    }, [cid, subdomain]);
+    }, [cid, effectiveSubdomain]);
 
     if (loading) return <LoadingSpinner />;
     if (!conference) return <div>Conference Not Found</div>;
@@ -99,6 +107,11 @@ export default function ConfLayout() {
                             <div className="w-full text-center truncate px-8">
                                 {conference.title?.ko || cid}
                             </div>
+                            {isDev && (
+                                <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] px-1 font-bold rounded-bl">
+                                    DEV
+                                </div>
+                            )}
                         </div>
                         <nav className="flex-1 p-4 space-y-1">
                             {/* Force render for all admins: No permission filter applied */}

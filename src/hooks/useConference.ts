@@ -1,8 +1,14 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { db } from '../firebase';
-import { ConferenceInfo, Page, Agenda, Speaker, Sponsor, RegistrationPeriod } from '../types/schema';
+import { ConferenceInfo, Page, Agenda, Speaker, Sponsor, RegistrationPeriod, Conference } from '../types/schema';
 import { useParams } from 'react-router-dom';
+
+// Conference route params can be either 'slug' or 'cid'
+type ConferenceParams = {
+    slug?: string;
+    cid?: string;
+};
 
 interface ConferenceData {
     isPlatform: boolean;
@@ -20,7 +26,7 @@ interface ConferenceData {
 }
 
 export const useConference = (targetId?: string) => {
-    const params = useParams<{ slug: string }>(); // React Router v6 params
+    const params = useParams<ConferenceParams>(); // React Router v7 params - supports both slug and cid
     const [data, setData] = useState<ConferenceData>({
         isPlatform: false,
         id: null,
@@ -35,7 +41,8 @@ export const useConference = (targetId?: string) => {
     });
 
     useEffect(() => {
-        const slug = targetId || params.slug?.toLowerCase();
+        // Support both 'slug' (from public routes) and 'cid' (from admin routes)
+        const slug = targetId || params.slug?.toLowerCase() || params.cid?.toLowerCase();
         console.log('[useConference] useEffect triggered, slug:', slug);
         let isMounted = true;
         const timeoutId = setTimeout(() => {
@@ -51,14 +58,16 @@ export const useConference = (targetId?: string) => {
         const fetchConferenceData = async () => {
             try {
                 const hostname = window.location.hostname;
+                const urlParams = new URLSearchParams(window.location.search);
+                const societyParam = urlParams.get('society');
 
                 // 1. Determine Environment
-                let societyId: string | null = null;
+                let societyId: string | null = societyParam; // 쿼리 파라미터에서 society 가져오기
                 let isPlatform = false;
 
                 // Dev overrides (e.g. localhost)
                 const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost');
-                const isFirebaseApp = hostname.includes('web.app') || hostname.includes('firebaseapp.com');
+                const isFirebaseApp = hostname.includes('.web.app') || hostname.includes('firebaseapp.com');
                 const parts = hostname.split('.');
 
                 console.log('[useConference] Environment detection:', {
@@ -67,22 +76,24 @@ export const useConference = (targetId?: string) => {
                     isFirebaseApp,
                     parts,
                     slug,
-                    societyId
+                    societyId,
+                    societyParam
                 });
 
                 if (isLocalhost || isFirebaseApp) {
                     // On Localhost/Platform, if there is a slug, we treat it as Conference Mode for testing.
                     if (slug && slug !== 'admin' && slug !== 'login') {
                         isPlatform = false;
-                        // societyId remains null here, we will query by slug only
+                        // societyId는 이미 societyParam으로 설정됨
                     } else {
                         isPlatform = true;
                     }
                 } else {
                     // Subdomain logic: kap.eregi.co.kr -> kap
-                    if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') {
+                    if (!societyId && parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') {
                         societyId = parts[0];
-                    } else {
+                    }
+                    if (!societyId) {
                         isPlatform = true;
                     }
                 }
@@ -359,7 +370,7 @@ export const useConference = (targetId?: string) => {
             isMounted = false;
             clearTimeout(timeoutId);
         };
-    }, [params.slug, targetId]);
+    }, [params.slug, params.cid, targetId]);
 
     return data;
 };

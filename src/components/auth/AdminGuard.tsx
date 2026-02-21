@@ -23,20 +23,40 @@ const AdminGuard: React.FC = () => {
   const isSuperAdmin = userEmail && SUPER_ADMINS.includes(userEmail);
 
   const currentSocietyId = useMemo(() => {
-    // ✅ 1순위: URL 파라미터 sid (/admin/society/:sid)
+    // ✅ 0순위: URL 파라미터 ?society=kadd (DEV 환경)
+    const params = new URLSearchParams(window.location.search);
+    const societyParam = params.get('society');
+    if (societyParam) return societyParam;
+    
+    // ✅ 1순위: sessionStorage (로그인 후 리다이렉트 시)
+    const sessionSocietyId = sessionStorage.getItem('societyId');
+    if (sessionSocietyId) return sessionSocietyId;
+    
+    // ✅ 2순위: URL 파라미터 sid (/admin/society/:sid)
     if (sid) return sid;
     
-    // ✅ 2순위: Subdomain (kadd.eregi.co.kr → kadd)
+    // ✅ 3순위: Subdomain (kadd.eregi.co.kr → kadd)
     if (subdomain) return subdomain;
     
-    // ✅ 3순위: cid에서 추출 (kap_2026spring → kap)
+    // ✅ 4순위: cid에서 추출 (kap_2026spring → kap)
     if (cid) {
         const parts = cid.split('_');
         if (parts.length >= 1) return parts[0];
     }
     
+    // ✅ 5순위: URL 경로 직접 파싱 (Fallback)
+    const path = location.pathname;
+    const societyMatch = path.match(/\/admin\/society\/([^/]+)/);
+    if (societyMatch) return societyMatch[1];
+
+    const confMatch = path.match(/\/admin\/conf\/([^/]+)/);
+    if (confMatch) {
+       const parts = confMatch[1].split('_');
+       if (parts.length >= 1) return parts[0];
+    }
+    
     return null;
-  }, [cid, sid, subdomain]);  // ✅ subdomain 추가
+  }, [cid, sid, subdomain, location.pathname]);  // ✅ subdomain, location.pathname 추가
 
   // 🔧 [FIX] Memoize auth param to prevent infinite loops
   const authParam = useMemo(() => searchParams.get('auth'), [searchParams]);
@@ -187,7 +207,11 @@ const AdminGuard: React.FC = () => {
       return <Outlet />;
     }
     
-    return <Navigate to="/admin/login" state={{ from: location }} replace />;
+    // DEV 환경: society 파라미터 유지하며 로그인 페이지로 리다이렉트
+    const params = new URLSearchParams(window.location.search);
+    const societyParam = params.get('society');
+    const loginPath = societyParam ? `/admin/login?society=${societyParam}` : '/admin/login';
+    return <Navigate to={loginPath} state={{ from: location }} replace />;
   }
 
   const isSocietyPath = location.pathname.startsWith('/admin/society');

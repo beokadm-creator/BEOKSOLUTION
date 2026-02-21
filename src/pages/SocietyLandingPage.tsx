@@ -36,7 +36,15 @@ const SocietyLandingPage: React.FC = () => {
 
     const { societyId: paramId } = useParams<{ societyId: string }>();
     const [societyId] = useState<string | null>(() => {
+        // 1순위: URL 파라미터 (?society=kadd) - DEV 환경용
+        const params = new URLSearchParams(window.location.search);
+        const societyParam = params.get('society');
+        if (societyParam) return societyParam.toLowerCase();
+        
+        // 2순위: 라우트 파라미터 (/:societyId)
         if (paramId) return paramId;
+        
+        // 3순위: 서브도메인 (kadd.eregi.co.kr)
         const host = window.location.hostname;
         const parts = host.split('.');
         if (parts.length >= 2 && parts[0] !== 'www' && parts[0] !== 'admin' && parts[0] !== 'eregi') {
@@ -128,10 +136,24 @@ const SocietyLandingPage: React.FC = () => {
 
     const getConferenceUrl = (conf: Conference, path: string = '') => {
         const host = window.location.hostname;
-        const base = (host === 'localhost' || host === '127.0.0.1' || host.startsWith(society.id))
-            ? `/${conf.slug}`
-            : `${window.location.protocol}//${society.id}.eregi.co.kr/${conf.slug}`;
-        return path ? `${base}/${path}` : base;
+        const isDev = host === 'localhost' || host === '127.0.0.1' || host.includes('.web.app') || host.includes('firebaseapp.com');
+        const societyParam = new URLSearchParams(window.location.search).get('society');
+        
+        let base: string;
+        if (isDev) {
+            // DEV 환경: 현재 호스트 유지, society 파라미터 유지
+            const suffix = societyParam ? `?society=${societyParam}` : '';
+            base = `/${conf.slug}${suffix}`;
+            if (path) base = `/${conf.slug}/${path}${suffix}`;
+        } else if (host.startsWith(society.id)) {
+            // 서브도메인 환경 (kadd.eregi.co.kr)
+            base = `/${conf.slug}`;
+        } else {
+            // 프로덕션: 서브도메인 URL 생성
+            base = `${window.location.protocol}//${society.id}.eregi.co.kr/${conf.slug}`;
+        }
+        
+        return path && !isDev ? `${base}/${path}` : base;
     };
 
     const handleRegisterClick = (conf: Conference) => {
