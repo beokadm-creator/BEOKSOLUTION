@@ -34,6 +34,14 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      # Functions 빌드 검증 (dev에서 오류 조기 발견)
+      - name: Build Firebase Functions (검증용)
+        run: |
+          cd functions
+          npm install
+          npm run build
+        continue-on-error: false
+
       - name: Deploy to DEV Channel
         if: github.ref == 'refs/heads/develop'
         run: |

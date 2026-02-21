@@ -1,19 +1,18 @@
-name: Deploy to Firebase (BEOKSOLUTION)
+name: Deploy to LIVE (Firebase)
 
 on:
   push:
     branches:
       - main
-      - production
   workflow_dispatch:
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
   CI: true
 
 jobs:
   build-and-deploy:
-    name: Build & Deploy to Firebase
+    name: Build & Deploy to Firebase LIVE
     runs-on: ubuntu-latest
 
     steps:
@@ -29,7 +28,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run lint
         run: npm run lint
@@ -45,10 +44,10 @@ jobs:
       - name: Build Firebase Functions
         run: |
           cd functions
-          npm install
+          npm ci
           npm run build
 
-      - name: Deploy to Firebase
+      - name: Deploy to Firebase (hosting + functions + firestore)
         uses: firebase/firebase-tools-actions@v2
         with:
           args: deploy --only hosting,functions,firestore
@@ -59,8 +58,8 @@ jobs:
         if: always()
         run: |
           if [ "${{ job.status }}" == "success" ]; then
-            echo "✅ Deployment to Firebase successful!"
+            echo "✅ LIVE 배포 성공! (hosting + functions + firestore)"
           else
-            echo "❌ Deployment failed!"
+            echo "❌ LIVE 배포 실패!"
             exit 1
           fi
