@@ -300,13 +300,6 @@ const UserHubPage: React.FC = () => {
                 window.location.href = `/auth?mode=login&returnUrl=${encodeURIComponent(window.location.pathname)}`;
                 return;
             }
-            console.log('[UserHub] User object from auth:', {
-                uid: user.uid || user.id,
-                name: user.name,
-                email: user.email,
-                displayName: (user as { displayName?: string }).displayName,
-                affiliations: user.affiliations
-            });
             logger.debug('UserHub', 'User object from auth', { uid: user.uid || user.id });
 
             // Wrap setState in a callback to avoid direct setState in effect
@@ -444,103 +437,77 @@ const UserHubPage: React.FC = () => {
                             return;
                         }
 
-                        const regPromises = snapshot.docs.map(async (docSnap): Promise<UserReg | null> => {
-                            const data = docSnap.data();
+                        // [PERF] Step 1: Extract unique confSlugs and societyIds to batch-fetch
+                        const participationData = snapshot.docs.map(docSnap => ({
+                            docSnap,
+                            data: docSnap.data(),
+                            confSlug: forceString(docSnap.data().slug || docSnap.data().conferenceId || docSnap.data().conferenceSlug)
+                        })).filter(p => !!p.confSlug);
 
-                            // [CRITICAL FIX] Safely extract slug without hardcoded fallback
-                            const confSlug = forceString(data.slug || data.conferenceId || data.conferenceSlug);
-                            if (!confSlug) {
-                                console.warn('[UserHub] Skipping registration with missing slug:', data);
-                                return null;
+                        const uniqueConfSlugs = [...new Set(participationData.map(p => p.confSlug))];
+                        const uniqueSocietyIds = [...new Set(participationData.map(p => {
+                            const d = p.data;
+                            let sid = d.societyId;
+                            if (!sid || sid === 'unknown') {
+                                sid = p.confSlug.includes('_') ? p.confSlug.split('_')[0] : 'kadd';
                             }
+                            return sid as string;
+                        }))];
+
+                        // [PERF] Step 2: Batch fetch all unique conferences and societies in parallel
+                        const [confDocs, societyDocs] = await Promise.all([
+                            Promise.all(uniqueConfSlugs.map(slug => getDoc(doc(db, 'conferences', slug)))),
+                            Promise.all(uniqueSocietyIds.map(sid => getDoc(doc(db, 'societies', sid))))
+                        ]);
+
+                        // [PERF] Step 3: Build lookup Maps (O(1) access)
+                        const confCache = new Map<string, Record<string, unknown>>();
+                        confDocs.forEach((snap, i) => {
+                            if (snap.exists()) confCache.set(uniqueConfSlugs[i], snap.data() as Record<string, unknown>);
+                        });
+
+                        const societyCache = new Map<string, Record<string, unknown>>();
+                        societyDocs.forEach((snap, i) => {
+                            if (snap.exists()) societyCache.set(uniqueSocietyIds[i], snap.data() as Record<string, unknown>);
+                        });
+
+                        // [PERF] Step 4: Map registrations using cached data (no more per-item Firestore calls)
+                        const loadedRegs: Array<UserReg | null> = participationData.map(({ docSnap, data, confSlug }) => {
+                            const cData = confCache.get(confSlug) as ({ societyId?: string;[key: string]: unknown }) | undefined;
+
                             let realTitle = forceString(data.conferenceName || confSlug);
                             let socName = forceString(data.societyName);
-                            let loc = "장소 정보 없음";
-                            let dates = "";
+                            let loc = '장소 정보 없음';
+                            let dates = '';
                             let receiptConfig: ReceiptConfig | undefined = undefined;
-                            let cData: { societyId?: string;[key: string]: unknown } | undefined = undefined;
 
-                            // JOIN 1: Conference Details
-                            try {
-                                // First get conference ID from conferences collection
-                                // [Fix-2026-01-23] Use direct doc access by ID instead of query
-                                // confSlug is already confId (e.g., 'kadd_2026spring')
-                                console.log('[UserHub] Fetching conference:', { slug: confSlug, hasSlug: !!data.slug });
-                                const confRef = doc(db, 'conferences', confSlug);
-                                const confSnap = await getDoc(confRef);
-                                console.log('[UserHub] Conference doc exists:', confSnap.exists());
-                                if (confSnap.exists()) {
-                                    cData = confSnap.data();
-                                    console.log('[UserHub] Conference data:', cData);
+                            if (cData) {
+                                realTitle = forceString(cData.title?.ko || cData.title?.en || cData.title || cData.slug);
 
-                                    // 🔧 [FIX] Handle multilingual title
-                                    realTitle = forceString(cData.title?.ko || cData.title?.en || cData.title || cData.slug);
+                                const dateStart = cData.dates?.start || cData.startDate || cData.dates?.startDate;
+                                const dateEnd = cData.dates?.end || cData.endDate;
+                                const s = dateStart ? (dateStart.toDate ? dateStart.toDate().toLocaleDateString('ko-KR') : forceString(dateStart)) : '';
+                                const e = dateEnd ? (dateEnd.toDate ? dateEnd.toDate().toLocaleDateString('ko-KR') : forceString(dateEnd)) : '';
+                                dates = s === e ? s : `${s} ~ ${e}`;
 
-                                    // Check for deprecated info/general but PREFER main doc
-                                    // Previously fetched info/general here, but it contained outdated info. 
-                                    // Now using main conference doc as single source of truth.
-
-                                    console.log('[UserHub] Using conference main doc for dates/venue');
-                                    console.log('[UserHub] Conference dates data:', cData.dates);
-
-                                    // Dates: Conference main doc has dates object
-                                    const dateStart = cData.dates?.start || cData.startDate || cData.dates?.startDate;
-                                    const dateEnd = cData.dates?.end || cData.endDate;
-
-                                    console.log('[UserHub] Parsed dates:', { dateStart, dateEnd });
-
-                                    const s = dateStart ? (dateStart.toDate ? dateStart.toDate().toLocaleDateString('ko-KR') : forceString(dateStart)) : '';
-                                    const e = dateEnd ? (dateEnd.toDate ? dateEnd.toDate().toLocaleDateString('ko-KR') : forceString(dateEnd)) : '';
-                                    dates = s === e ? s : `${s} ~ ${e}`;
-
-                                    console.log('[UserHub] Formatted dates:', dates);
-
-                                    // Venue: Try multiple fields
-                                    // Prioritize venue object structure
-                                    const venueName = cData.venue?.name || cData.venueName;
-                                    const venueAddress = cData.venue?.address || cData.venueAddress;
-
-                                    // Use forceString to handle {ko, en} objects
-                                    loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : '장소 정보 없음');
-
-                                    receiptConfig = cData.receipt;
-                                    console.log('[UserHub] Venue resolved:', { venueName, venueAddress, loc });
-                                }
-                            } catch (err) {
-                                logger.error('UserHub', `Conference lookup failed for slug: ${confSlug}`, err);
+                                const venueName = cData.venue?.name || cData.venueName;
+                                const venueAddress = cData.venue?.address || cData.venueAddress;
+                                loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : '장소 정보 없음');
+                                receiptConfig = cData.receipt as ReceiptConfig | undefined;
                             }
 
-                            // JOIN 2: Society Name (Always fetch to ensure data integrity)
-                            try {
-                                // [Fix-Step 512-D] Robust societyId parsing
-                                let societyId = data.societyId;
-                                if (!societyId || societyId === 'unknown') {
-                                    // Try to derive from slug (e.g. kap_2026spring -> kap)
-                                    const slug = forceString(data.slug || data.conferenceId || data.conferenceSlug);
-                                    if (slug && slug.includes('_')) {
-                                        societyId = slug.split('_')[0];
-                                    } else {
-                                        societyId = 'kadd'; // Final fallback
-                                    }
-                                }
+                            let societyId = data.societyId as string;
+                            if (!societyId || societyId === 'unknown') {
+                                societyId = confSlug.includes('_') ? confSlug.split('_')[0] : 'kadd';
+                            }
 
-                                const socDoc = await getDoc(doc(db, 'societies', societyId));
-                                if (socDoc.exists()) {
-                                    const socData = socDoc.data();
-                                    // Society name can be: {ko: "...", en: "..."} or "string"
-                                    if (socData.name) {
-                                        if (typeof socData.name === 'string') {
-                                            socName = socData.name;
-                                        } else if (socData.name.ko || socData.name.en) {
-                                            // Default to Korean, fallback to English
-                                            socName = socData.name.ko || socData.name.en || '';
-                                        }
-                                    }
-                                } else {
-                                    console.warn('[UserHub] Society document not found for ID:', societyId);
+                            const socData = societyCache.get(societyId);
+                            if (socData?.name) {
+                                if (typeof socData.name === 'string') {
+                                    socName = socData.name;
+                                } else if ((socData.name as Record<string, string>).ko || (socData.name as Record<string, string>).en) {
+                                    socName = (socData.name as Record<string, string>).ko || (socData.name as Record<string, string>).en || '';
                                 }
-                            } catch (socErr) {
-                                console.error('[UserHub] Society lookup failed:', socErr);
                             }
 
                             return {
@@ -551,27 +518,25 @@ const UserHubPage: React.FC = () => {
                                 slug: forceString(data.slug || data.conferenceId || data.conferenceSlug || confSlug),
                                 societyId: forceString(data.societyId === 'unknown' ? cData?.societyId || societyId || 'kadd' : data.societyId || cData?.societyId || societyId || 'kadd'),
                                 location: loc,
-                                dates: dates,
+                                dates,
                                 paymentStatus: data.paymentStatus,
                                 amount: data.amount,
                                 receiptNumber: data.id,
-                                names: data.names, // Ensure names is mapped if needed
+                                names: data.names,
                                 paymentDate: data.createdAt || data.updatedAt || data.registeredAt,
-                                receiptConfig: receiptConfig,
+                                receiptConfig,
                                 userName: data.userName || user.name || (user as { displayName?: string }).displayName,
                                 status: data.status,
                                 virtualAccount: data.virtualAccount
-                            };
+                            } as UserReg;
                         });
 
-                        const loadedRegs = await Promise.all(regPromises);
                         const validRegs = loadedRegs.filter((r) => r !== null) as UserReg[];
-                        console.log('[UserHub] Loaded registrations:', validRegs);
+                        logger.debug('UserHub', 'Batch-loaded registrations', { total: snapshot.size, valid: validRegs.length });
 
                         // [Fix] Advanced Deduplication & Filtering Strategy (Fallback)
                         const grouped = new Map<string, UserReg[]>();
                         validRegs.forEach(r => {
-                            console.log(`[UserHub] Fallback Reg: ${r.slug} | p=${r.paymentStatus} | s=${r.status} | date=${r.paymentDate} | id=${r.id}`);
                             if (!grouped.has(r.slug)) grouped.set(r.slug, []);
                             grouped.get(r.slug)!.push(r);
                         });
@@ -597,10 +562,7 @@ const UserHubPage: React.FC = () => {
                                     ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(s);
                             });
 
-                            if (hasCancel) {
-                                console.log(`[UserHub] Hiding conference ${slug} due to cancellation history`);
-                                return;
-                            }
+                            if (hasCancel) return;
 
                             // 3. Otherwise check latest registration
                             regs.sort((a, b) => {
@@ -626,7 +588,7 @@ const UserHubPage: React.FC = () => {
                                 pStatus === 'WAITING_FOR_DEPOSIT' || status === 'WAITING_FOR_DEPOSIT') {
                                 activeRegs.push(latest);
                             } else {
-                                console.log(`[UserHub] Hiding conference ${slug} due to invalid status: p=${pStatus}, s=${status}`);
+                                logger.debug('UserHub', `Hiding conference ${slug} - invalid status: p=${pStatus}, s=${status}`);
                             }
                         });
 
@@ -655,67 +617,68 @@ const UserHubPage: React.FC = () => {
 
             unsubscribe = onSnapshot(qReg, async (snapshot) => {
                 try {
-                    const regPromises = snapshot.docs.map(async (docSnap): Promise<UserReg | null> => {
-                        const data = docSnap.data();
+                    // [PERF] Batch fetch all unique conferences & societies in parallel
+                    const enrichedDocs = snapshot.docs.map(docSnap => ({
+                        docSnap,
+                        data: docSnap.data(),
+                        confSlug: forceString(docSnap.data().slug || docSnap.data().conferenceId || docSnap.data().conferenceSlug)
+                    })).filter(p => !!p.confSlug);
 
-                        // [CRITICAL FIX] Safely extract slug without hardcoded fallback
-                        const confSlug = forceString(data.slug || data.conferenceId || data.conferenceSlug);
-                        if (!confSlug) {
-                            console.warn('[UserHub] Skipping realtime registration with missing slug:', data);
-                            return null; // Will filter out later
-                        }
+                    const uniqueConfSlugs = [...new Set(enrichedDocs.map(p => p.confSlug))];
+                    const uniqueSocIds = [...new Set(enrichedDocs.map(p => {
+                        const d = p.data;
+                        let sid = d.societyId as string;
+                        if (!sid || sid === 'unknown') sid = p.confSlug.includes('_') ? p.confSlug.split('_')[0] : 'kadd';
+                        return sid;
+                    }))];
+
+                    const [confDocs, socDocs] = await Promise.all([
+                        Promise.all(uniqueConfSlugs.map(slug => getDoc(doc(db, 'conferences', slug)))),
+                        Promise.all(uniqueSocIds.map(sid => getDoc(doc(db, 'societies', sid))))
+                    ]);
+
+                    const confCache = new Map<string, Record<string, unknown>>();
+                    confDocs.forEach((snap, i) => { if (snap.exists()) confCache.set(uniqueConfSlugs[i], snap.data() as Record<string, unknown>); });
+
+                    const socCache = new Map<string, Record<string, unknown>>();
+                    socDocs.forEach((snap, i) => { if (snap.exists()) socCache.set(uniqueSocIds[i], snap.data() as Record<string, unknown>); });
+
+                    const validRegs: UserReg[] = enrichedDocs.map(({ docSnap, data, confSlug }) => {
+                        const cData = confCache.get(confSlug) as ({ societyId?: string;[key: string]: unknown }) | undefined;
+
                         let realTitle = forceString(data.conferenceName || confSlug);
                         let socName = forceString(data.societyName);
-                        let loc = "장소 정보 없음";
-                        let dates = "";
+                        let loc = '장소 정보 없음';
+                        let dates = '';
                         let receiptConfig: ReceiptConfig | undefined = undefined;
-                        let cData: { societyId?: string;[key: string]: unknown } | undefined = undefined;
 
-                        // JOIN 1: Conference Details
-                        try {
-                            const confQ = query(collection(db, 'conferences'), where('slug', '==', confSlug));
-                            const confSnap = await getDocs(confQ);
-                            if (!confSnap.empty) {
-                                cData = confSnap.docs[0].data();
-                                realTitle = forceString(cData.title?.ko || cData.title?.en || cData.title);
+                        if (cData) {
+                            realTitle = forceString(cData.title?.ko || cData.title?.en || cData.title);
+                            const venueName = cData.venue?.name || cData.venueName;
+                            const venueAddress = cData.venue?.address || cData.venueAddress;
+                            loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : '장소 정보 없음');
 
-                                // Logic aligned with fallback (non-realtime) block
-                                const venueName = cData.venue?.name || cData.venueName;
-                                const venueAddress = cData.venue?.address || cData.venueAddress;
-                                loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : forceString(cData.location || '장소 정보 없음'));
-
-                                const dateStart = cData.dates?.start || cData.startDate || cData.dates?.startDate;
-                                const dateEnd = cData.dates?.end || cData.endDate;
-
-                                const s = dateStart ? (dateStart.toDate ? dateStart.toDate().toLocaleDateString('ko-KR') : forceString(dateStart)) : '';
-                                const e = dateEnd ? (dateEnd.toDate ? dateEnd.toDate().toLocaleDateString('ko-KR') : forceString(dateEnd)) : '';
-                                dates = s === e ? s : `${s} ~ ${e}`;
-                                receiptConfig = cData.receipt;
-                            }
-                        } catch (err) {
-                            logger.error('UserHub', `Conference lookup failed for slug: ${confSlug}`, err);
+                            const dateStart = cData.dates?.start || cData.startDate || cData.dates?.startDate;
+                            const dateEnd = cData.dates?.end || cData.endDate;
+                            const s = dateStart ? (dateStart.toDate ? dateStart.toDate().toLocaleDateString('ko-KR') : forceString(dateStart)) : '';
+                            const e = dateEnd ? (dateEnd.toDate ? dateEnd.toDate().toLocaleDateString('ko-KR') : forceString(dateEnd)) : '';
+                            dates = s === e ? s : `${s} ~ ${e}`;
+                            receiptConfig = cData.receipt as ReceiptConfig | undefined;
                         }
 
-                        // JOIN 2: Society Name (If missing)
-                        if (!socName || socName === 'Unknown' || socName === '') {
-                            try {
-                                const socId = data.societyId || (confSlug ? confSlug.split('_')[0] : 'kadd');
-                                const socDoc = await getDoc(doc(db, 'societies', socId));
-                                if (socDoc.exists()) {
-                                    const socData = socDoc.data();
-                                    // Society name can be: {ko: "...", en: "..."} or "string"
-                                    if (socData.name) {
-                                        if (typeof socData.name === 'string') {
-                                            socName = socData.name;
-                                        } else if (socData.name.ko || socData.name.en) {
-                                            // Default to Korean, fallback to English
-                                            socName = socData.name.ko || socData.name.en || '';
-                                        }
-                                    }
+                        let societyId = data.societyId as string;
+                        if (!societyId || societyId === 'unknown') {
+                            societyId = confSlug.includes('_') ? confSlug.split('_')[0] : 'kadd';
+                        }
+
+                        const socData = socCache.get(societyId);
+                        if (!socName || socName === 'Unknown') {
+                            if (socData?.name) {
+                                if (typeof socData.name === 'string') {
+                                    socName = socData.name;
+                                } else if ((socData.name as Record<string, string>).ko || (socData.name as Record<string, string>).en) {
+                                    socName = (socData.name as Record<string, string>).ko || (socData.name as Record<string, string>).en || '';
                                 }
-                            } catch {
-                                // Silently handle society lookup failures
-                                logger.debug('UserHub', 'Society lookup failed, using fallback data');
                             }
                         }
 
@@ -725,28 +688,23 @@ const UserHubPage: React.FC = () => {
                             societyName: socName,
                             earnedPoints: Number(data.earnedPoints || 0),
                             slug: forceString(data.slug || data.conferenceId || data.conferenceSlug || confSlug),
-                            societyId: forceString(data.societyId === 'unknown' ? cData?.societyId || 'kadd' : data.societyId || cData?.societyId || 'kadd'),
+                            societyId: forceString(data.societyId === 'unknown' ? cData?.societyId || societyId || 'kadd' : data.societyId || cData?.societyId || societyId || 'kadd'),
                             location: loc,
-                            dates: dates,
+                            dates,
                             paymentStatus: data.paymentStatus,
                             amount: data.amount,
-                            receiptNumber: data.id, // Using orderId as receipt number
-                            receiptNumber: data.id, // Using orderId as receipt number
+                            receiptNumber: data.id,
                             paymentDate: data.createdAt || data.updatedAt || data.registeredAt,
-                            receiptConfig: receiptConfig,
+                            receiptConfig,
                             userName: data.userName || user.name || (user as { displayName?: string }).displayName,
                             status: data.status,
                             virtualAccount: data.virtualAccount
-                        };
+                        } as UserReg;
                     });
-
-                    const loadedRegs = await Promise.all(regPromises);
-                    const validRegs = loadedRegs.filter((r) => r !== null) as UserReg[];
 
                     // [Fix] Advanced Deduplication & Filtering Strategy (Realtime)
                     const grouped = new Map<string, UserReg[]>();
                     validRegs.forEach(r => {
-                        console.log(`[UserHub] Realtime Reg: ${r.slug} | p=${r.paymentStatus} | s=${r.status} | date=${r.paymentDate} | id=${r.id}`);
                         if (!grouped.has(r.slug)) grouped.set(r.slug, []);
                         grouped.get(r.slug)!.push(r);
                     });
@@ -772,10 +730,7 @@ const UserHubPage: React.FC = () => {
                                 ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(s);
                         });
 
-                        if (hasCancel) {
-                            console.log(`[UserHub] Hiding conference ${slug} due to cancellation history (Realtime)`);
-                            return;
-                        }
+                        if (hasCancel) return;
 
                         // 3. Otherwise check latest registration
                         regs.sort((a, b) => {
@@ -800,7 +755,7 @@ const UserHubPage: React.FC = () => {
                             pStatus === 'WAITING_FOR_DEPOSIT' || status === 'WAITING_FOR_DEPOSIT') {
                             activeRegs.push(latest);
                         } else {
-                            console.log(`[UserHub] Hiding conference ${slug} due to invalid status: p=${pStatus}, s=${status} (Realtime)`);
+                            logger.debug('UserHub', `Hiding conference ${slug} - invalid status: p=${pStatus}, s=${status}`);
                         }
                     });
                     setRegs(activeRegs);
