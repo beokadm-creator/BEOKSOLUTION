@@ -25,7 +25,15 @@ export const useSociety = () => {
                 societyId = sessionStorage.getItem('societyId');
             }
             // ✅ 2순위: 서브도메인 (kadd.eregi.co.kr)
-            else if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') {
+            // ⚠️ Firebase hosting 채널 URL (*.web.app, *.firebaseapp.com)은 제외
+            // e.g. eregi-8fc1e--dev-lr7jo34l.web.app → parts[0]이 채널ID이므로 무시
+            else if (
+                parts.length > 2 &&
+                parts[0] !== 'www' &&
+                parts[0] !== 'admin' &&
+                !host.endsWith('.web.app') &&
+                !host.endsWith('.firebaseapp.com')
+            ) {
                 societyId = parts[0];
             }
             // ✅ 3순위: kadd로 시작하는 도메인
