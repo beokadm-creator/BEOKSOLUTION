@@ -544,10 +544,14 @@ const UserHubPage: React.FC = () => {
                         const activeRegs: UserReg[] = [];
 
                         grouped.forEach((regs, slug) => {
-                            // 1. Check for ANY PAID registration -> Show PAID (User re-registered successfully)
+                            // 1. Check for ANY PAID/COMPLETED registration -> Show it (COMPLETED = legacy paid status)
+                            // schema.ts: paymentStatus: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED'
+                            // AbstractSubmissionPage, useAccessControl also treat COMPLETED === PAID
                             const paidReg = regs.find(r =>
                                 (r.paymentStatus || '').toUpperCase() === 'PAID' ||
-                                (r.status || '').toUpperCase() === 'PAID'
+                                (r.paymentStatus || '').toUpperCase() === 'COMPLETED' ||
+                                (r.status || '').toUpperCase() === 'PAID' ||
+                                (r.status || '').toUpperCase() === 'COMPLETED'
                             );
                             if (paidReg) {
                                 activeRegs.push(paidReg);
@@ -582,13 +586,12 @@ const UserHubPage: React.FC = () => {
                             const status = (latest.status || '').toUpperCase();
 
                             // WHITE-LIST STRATEGY: Only allow known valid unfinished statuses
-                            // If it is 'COMPLETED' but not caught by step 1 (PAID), it is invalid (zombie).
                             if (['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT'].includes(pStatus) ||
                                 ['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT'].includes(status) ||
                                 pStatus === 'WAITING_FOR_DEPOSIT' || status === 'WAITING_FOR_DEPOSIT') {
                                 activeRegs.push(latest);
                             } else {
-                                logger.debug('UserHub', `Hiding conference ${slug} - invalid status: p=${pStatus}, s=${status}`);
+                                logger.debug('UserHub', `Hiding conference ${slug} - status not in allowlist: p=${pStatus}, s=${status}`);
                             }
                         });
 
@@ -712,10 +715,12 @@ const UserHubPage: React.FC = () => {
                     const activeRegs: UserReg[] = [];
 
                     grouped.forEach((regs, slug) => {
-                        // 1. Check for ANY PAID registration -> Show PAID (User re-registered successfully)
+                        // 1. Check for ANY PAID/COMPLETED registration -> Show it (COMPLETED = legacy paid status)
                         const paidReg = regs.find(r =>
                             (r.paymentStatus || '').toUpperCase() === 'PAID' ||
-                            (r.status || '').toUpperCase() === 'PAID'
+                            (r.paymentStatus || '').toUpperCase() === 'COMPLETED' ||
+                            (r.status || '').toUpperCase() === 'PAID' ||
+                            (r.status || '').toUpperCase() === 'COMPLETED'
                         );
                         if (paidReg) {
                             activeRegs.push(paidReg);
@@ -755,7 +760,7 @@ const UserHubPage: React.FC = () => {
                             pStatus === 'WAITING_FOR_DEPOSIT' || status === 'WAITING_FOR_DEPOSIT') {
                             activeRegs.push(latest);
                         } else {
-                            logger.debug('UserHub', `Hiding conference ${slug} - invalid status: p=${pStatus}, s=${status}`);
+                            logger.debug('UserHub', `Hiding conference ${slug} - status not in allowlist: p=${pStatus}, s=${status}`);
                         }
                     });
                     setRegs(activeRegs);
