@@ -107,25 +107,27 @@ const AnimatedCounter = ({ value }: { value: number }) => {
     return <span>{count.toLocaleString()}</span>;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const formatDate = (date: any): string => {
-    try {
-        if (!date) return '-';
-        if (date instanceof Date) return date.toLocaleDateString('ko-KR');
-        // Check if toDate is actually a function before calling
-        if (date.toDate && typeof date.toDate === 'function') return date.toDate().toLocaleDateString('ko-KR');
-        if (date.seconds) return new Date(date.seconds * 1000).toLocaleDateString('ko-KR');
-        if (typeof date === 'string') {
-             const d = new Date(date);
-             // Check for invalid date
-             if (!isNaN(d.getTime())) return d.toLocaleDateString('ko-KR');
-             return date;
-        }
-        return String(date);
-    } catch (err) {
-        console.error('Date formatting error:', err, date);
-        return '-';
+// Safe date formatter that handles Firestore Timestamp, { seconds }, string, and Date
+const formatDate = (date: unknown): string => {
+    if (!date) return '-';
+    // Firestore Timestamp (has toDate method) - CHECK FIRST
+    if (typeof date === 'object' && date !== null && 'toDate' in date && typeof (date as { toDate: unknown }).toDate === 'function') {
+        return (date as { toDate: () => Date }).toDate().toLocaleDateString('ko-KR');
     }
+    // Firestore-like object with seconds
+    if (typeof date === 'object' && date !== null && 'seconds' in date) {
+        return new Date((date as { seconds: number }).seconds * 1000).toLocaleDateString('ko-KR');
+    }
+    // JavaScript Date - CHECK AFTER Firestore types
+    if (date instanceof Date) {
+        return date.toLocaleDateString('ko-KR');
+    }
+    // String or number
+    if (typeof date === 'string' || typeof date === 'number') {
+        const d = new Date(date);
+        return isNaN(d.getTime()) ? String(date) : d.toLocaleDateString('ko-KR');
+    }
+    return String(date);
 };
 
 const UserHubPage: React.FC = () => {
