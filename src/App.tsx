@@ -83,8 +83,11 @@ const App: React.FC = () => {
   const societyParam = params.get('society');
 
   // 0. ADMIN DOMAIN (또는 DEV 환경에서 ?admin=true 또는 /admin 경로) - 최우선 체크
-  if (hostname.includes('admin.eregi') || hostname.startsWith('admin.') || isAdminMode) {
-    const societyFromParam = params.get('society');
+  // 🚨 [Fix] subdomain이 있는 경우(/admin 붙인 경우)는 학회 어드민으로 간주하게 로직 보강
+  const isSuperAdminHost = hostname.includes('admin.eregi') || hostname.startsWith('admin.');
+
+  if (isSuperAdminHost || isAdminMode) {
+    const activeSocietyId = params.get('society') || subdomain;
 
     return (
       <GlobalErrorBoundary>
@@ -107,12 +110,12 @@ const App: React.FC = () => {
                 }}
               />
               <Routes>
-                <Route path="/login" element={societyFromParam ? <SocietyLoginPage /> : <AdminLoginPage />} />
-                <Route path="/admin/login" element={societyFromParam ? <SocietyLoginPage /> : <AdminLoginPage />} />
+                <Route path="/login" element={activeSocietyId ? <SocietyLoginPage societyId={activeSocietyId} /> : <AdminLoginPage />} />
+                <Route path="/admin/login" element={activeSocietyId ? <SocietyLoginPage societyId={activeSocietyId} /> : <AdminLoginPage />} />
 
                 <Route element={<AdminGuard />}>
-                  {/* 루트 경로 리다이렉트 - society 파라미터에 따라 분기 */}
-                  <Route path="/" element={<Navigate to={societyFromParam ? "/admin/society" : "/super"} replace />} />
+                  {/* 루트 경로 리다이렉트 - society 파라미터 또는 서브도메인에 따라 분기 */}
+                  <Route path="/" element={<Navigate to={activeSocietyId ? "/admin/society" : "/super"} replace />} />
 
                   {/* L0: Super Layout */}
                   <Route element={<SuperLayout />}>
@@ -169,7 +172,7 @@ const App: React.FC = () => {
                     <Route path="gate/zone/:zoneId" element={<GatePage />} />
                     <Route path="infodesk" element={<InfodeskPage />} />
                   </Route>
-                  <Route path="*" element={<Navigate to={societyFromParam ? `/admin/society` : "/super"} />} />
+                  <Route path="*" element={<Navigate to={activeSocietyId ? `/admin/society` : "/super"} />} />
                 </Route>
                 <Route path="*" element={<Navigate to="/login" />} />
               </Routes>
