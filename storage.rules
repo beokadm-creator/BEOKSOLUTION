@@ -2,9 +2,8 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     match /{allPaths=**} {
-      // EMERGENCY: Authentication check REMOVED.
-      // Allow anyone to upload. (We will secure this later)
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if request.auth != null;
     }
   }
 }
