@@ -49,6 +49,7 @@ interface UserReg {
     location: string;
     dates: string;
     paymentStatus?: string;
+    status?: string; // CANCELED, REFUNDED, REFUND_REQUESTED 등
     amount?: number;
     receiptNumber?: string;
     paymentDate?: any; // Timestamp or string
@@ -426,6 +427,7 @@ const UserHubPage: React.FC = () => {
                                 location: loc,
                                 dates: dates,
                                 paymentStatus: data.paymentStatus,
+                                status: data.status || data.paymentStatus, // CANCELED, REFUNDED 등
                                 amount: data.amount,
                                 receiptNumber: data.id,
                                 paymentDate: data.createdAt,
@@ -513,6 +515,7 @@ const UserHubPage: React.FC = () => {
                             location: loc,
                             dates: dates,
                             paymentStatus: data.paymentStatus,
+                            status: data.status || data.paymentStatus, // CANCELED, REFUNDED 등
                             amount: data.amount,
                             receiptNumber: data.id, // Using orderId as receipt number
                             paymentDate: data.createdAt,
@@ -931,7 +934,9 @@ const UserHubPage: React.FC = () => {
                                 </Button>
                             </div>
                         )}
-                        {regs.map(r => (
+                        {/* 취소된 등록 제외 */}
+                        {regs.filter(r => !['CANCELED', 'REFUNDED', 'REFUND_REQUESTED'].includes(r.status || '')).map(r => (
+
                             <div key={r.id} onClick={() => handleEventClick(r)} className="eregi-card cursor-pointer flex flex-col group animate-in fade-in slide-in-from-bottom-2 duration-500">
                                 <div className="flex flex-col mb-4">
                                     <div className="flex items-center text-sm text-[#24669e] font-bold mb-2">
