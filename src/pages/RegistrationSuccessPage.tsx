@@ -13,7 +13,9 @@ const RegistrationSuccessPage: React.FC = () => {
     const conference = useConference();
 
     // State for registration data
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [regData, setRegData] = React.useState<any>(null);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [loading, setLoading] = React.useState(true);
 
     // Determine targetSlug
@@ -65,6 +67,7 @@ const RegistrationSuccessPage: React.FC = () => {
         window.print();
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const isVirtualAccount = regData?.paymentMethod === 'VIRTUAL_ACCOUNT' || regData?.virtualAccount;
     const isPending = regData?.status === 'PENDING_PAYMENT' || regData?.paymentStatus === 'WAITING_FOR_DEPOSIT' || searchParams.get('status') === 'virtual_account';
 
@@ -138,8 +141,14 @@ const RegistrationSuccessPage: React.FC = () => {
                                             <div className="flex justify-between text-red-500">
                                                 <span className="font-medium">{language === 'ko' ? '입금기한' : 'Due Date'}</span>
                                                 <span className="font-bold">
-                                                    {new Date(regData.virtualAccount.dueDate).toLocaleString()}
-                                                </span>
+                                            {(() => {
+                                                try {
+                                                    return new Date(regData.virtualAccount.dueDate).toLocaleString();
+                                                } catch {
+                                                    return String(regData.virtualAccount.dueDate);
+                                                }
+                                            })()}
+                                        </span>
                                             </div>
                                         )}
                                     </div>
@@ -149,7 +158,15 @@ const RegistrationSuccessPage: React.FC = () => {
                             {!isPending && (
                                 <div className="flex justify-between items-center">
                                     <span className="text-gray-500 font-medium text-sm md:text-base">Date</span>
-                                    <span className="font-medium text-gray-900 text-base md:text-lg">{new Date().toLocaleDateString()}</span>
+                                    <span className="font-medium text-gray-900 text-base md:text-lg">
+                                        {(() => {
+                                            try {
+                                                return new Date().toLocaleDateString();
+                                            } catch {
+                                                return '-';
+                                            }
+                                        })()}
+                                    </span>
                                 </div>
                             )}
                         </div>

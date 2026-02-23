@@ -107,6 +107,27 @@ const AnimatedCounter = ({ value }: { value: number }) => {
     return <span>{count.toLocaleString()}</span>;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const formatDate = (date: any): string => {
+    try {
+        if (!date) return '-';
+        if (date instanceof Date) return date.toLocaleDateString('ko-KR');
+        // Check if toDate is actually a function before calling
+        if (date.toDate && typeof date.toDate === 'function') return date.toDate().toLocaleDateString('ko-KR');
+        if (date.seconds) return new Date(date.seconds * 1000).toLocaleDateString('ko-KR');
+        if (typeof date === 'string') {
+             const d = new Date(date);
+             // Check for invalid date
+             if (!isNaN(d.getTime())) return d.toLocaleDateString('ko-KR');
+             return date;
+        }
+        return String(date);
+    } catch (err) {
+        console.error('Date formatting error:', err, date);
+        return '-';
+    }
+};
+
 const UserHubPage: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -486,8 +507,8 @@ const UserHubPage: React.FC = () => {
 
                                 const dateStart = cData.dates?.start || cData.startDate || cData.dates?.startDate;
                                 const dateEnd = cData.dates?.end || cData.endDate;
-                                const s = dateStart ? (dateStart.toDate ? dateStart.toDate().toLocaleDateString('ko-KR') : forceString(dateStart)) : '';
-                                const e = dateEnd ? (dateEnd.toDate ? dateEnd.toDate().toLocaleDateString('ko-KR') : forceString(dateEnd)) : '';
+                                const s = dateStart ? formatDate(dateStart) : '';
+                                const e = dateEnd ? formatDate(dateEnd) : '';
                                 dates = s === e ? s : `${s} ~ ${e}`;
 
                                 const venueName = cData.venue?.name || cData.venueName;
@@ -933,13 +954,6 @@ const UserHubPage: React.FC = () => {
     const societyName = getSocietyName();
     const pageTitle = isMain ? "통합 마이페이지" : `${societyName} 마이페이지`;
 
-    const formatDate = (date: Timestamp | { seconds: number } | string | null | undefined): string => {
-        if (!date) return '-';
-        if ('toDate' in date && typeof date.toDate === 'function') return date.toDate().toLocaleDateString();
-        if ('seconds' in date) return new Date((date as { seconds: number }).seconds * 1000).toLocaleDateString();
-        return String(date);
-    };
-
     return (
         <div className="min-h-screen bg-gray-50 pb-20 pt-20">
             <EregiNavigation />
@@ -1369,7 +1383,7 @@ const UserHubPage: React.FC = () => {
                                     data={{
                                         registrationId: selectedReceiptReg.id,
                                         receiptNumber: selectedReceiptReg.receiptNumber || selectedReceiptReg.id,
-                                        paymentDate: selectedReceiptReg.paymentDate ? (selectedReceiptReg.paymentDate.toDate ? selectedReceiptReg.paymentDate.toDate().toLocaleDateString() : new Date().toLocaleDateString()) : new Date().toLocaleDateString(),
+                                        paymentDate: formatDate(selectedReceiptReg.paymentDate || new Date()),
                                         payerName: selectedReceiptReg.userName || 'Unknown',
                                         totalAmount: selectedReceiptReg.amount || 0,
                                         items: [
