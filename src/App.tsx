@@ -87,7 +87,24 @@ const App: React.FC = () => {
   const isSuperAdminHost = hostname.includes('admin.eregi') || hostname.startsWith('admin.');
 
   if (isSuperAdminHost || isAdminMode) {
-    const activeSocietyId = params.get('society') || subdomain;
+    // 🚨 [Fix] useSubdomain이 null을 반환하더라도(예: www 등으로 인해), 
+    // 관리자 모드에서는 호스트네임에서 학회 ID를 추출하여 리다이렉트를 방지해야 함.
+    // 이 로직은 오직 Admin 라우팅 내부에서만 동작하므로 일반 사용자에게는 영향 없음.
+    let effectiveSubdomain = subdomain;
+    if (!effectiveSubdomain && !hostname.includes('localhost') && !hostname.includes('admin.eregi')) {
+       const parts = hostname.split('.');
+       // www 제거 후 첫 번째 파트 확인
+       const cleanParts = parts[0] === 'www' ? parts.slice(1) : parts;
+       
+       if (cleanParts.length >= 3) {
+          const first = cleanParts[0];
+          if (first !== 'eregi' && first !== 'admin' && first !== 'web') {
+             effectiveSubdomain = first;
+          }
+       }
+    }
+
+    const activeSocietyId = params.get('society') || effectiveSubdomain;
 
     return (
       <GlobalErrorBoundary>

@@ -6,6 +6,29 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { useUserStore } from '../store/userStore';
 import { useConference } from '../hooks/useConference';
 
+// Safe date formatter for Firestore Timestamp, { seconds }, string, or Date
+const safeFormatDate = (val: unknown): string => {
+    if (!val) return '-';
+    // Firestore Timestamp (has toDate method)
+    if (typeof val === 'object' && val !== null && 'toDate' in val && typeof (val as { toDate: unknown }).toDate === 'function') {
+        return (val as { toDate: () => Date }).toDate().toLocaleString();
+    }
+    // Firestore-like object with seconds
+    if (typeof val === 'object' && val !== null && 'seconds' in val) {
+        return new Date((val as { seconds: number }).seconds * 1000).toLocaleString();
+    }
+    // JavaScript Date
+    if (val instanceof Date) {
+        return val.toLocaleString();
+    }
+    // String or number
+    if (typeof val === 'string' || typeof val === 'number') {
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? String(val) : d.toLocaleString();
+    }
+    return String(val);
+};
+
 const RegistrationSuccessPage: React.FC = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -13,7 +36,9 @@ const RegistrationSuccessPage: React.FC = () => {
     const conference = useConference();
 
     // State for registration data
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [regData, setRegData] = React.useState<any>(null);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [loading, setLoading] = React.useState(true);
 
     // Determine targetSlug
@@ -65,6 +90,7 @@ const RegistrationSuccessPage: React.FC = () => {
         window.print();
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const isVirtualAccount = regData?.paymentMethod === 'VIRTUAL_ACCOUNT' || regData?.virtualAccount;
     const isPending = regData?.status === 'PENDING_PAYMENT' || regData?.paymentStatus === 'WAITING_FOR_DEPOSIT' || searchParams.get('status') === 'virtual_account';
 
@@ -137,9 +163,7 @@ const RegistrationSuccessPage: React.FC = () => {
                                         {regData.virtualAccount.dueDate && (
                                             <div className="flex justify-between text-red-500">
                                                 <span className="font-medium">{language === 'ko' ? '입금기한' : 'Due Date'}</span>
-                                                <span className="font-bold">
-                                                    {new Date(regData.virtualAccount.dueDate).toLocaleString()}
-                                                </span>
+                                                <span className="font-bold">{safeFormatDate(regData.virtualAccount.dueDate)}</span>
                                             </div>
                                         )}
                                     </div>
