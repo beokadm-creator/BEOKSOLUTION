@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { doc, getDoc, getDocs, collection, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -23,167 +23,142 @@ export const clearTranslationCache = (slug?: string) => {
 };
 
 interface UseTranslationResult {
-    terms: unknown;
+    t: (obj: unknown) => string;
+    config: any; // Using any temporarily for backward compatibility with complex types
     loading: boolean;
     error: string | null;
+    currentLang: string;
+    setLanguage: (lang: string) => void;
+    confId: string | null;
+    urlSlug: string;
     refresh: () => void;
 }
 
 export const useTranslation = (slug: string): UseTranslationResult => {
-    const [terms, setTerms] = useState<unknown>(null);
+    const [config, setConfig] = useState<any>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    const [currentLang, setCurrentLang] = useState<string>(localStorage.getItem('preferredLanguage') || 'ko');
     const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
-    // Memoize URL search params to prevent unnecessary re-renders
-    const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
-
-    const refresh = () => {
-        setRefreshTrigger(prev => prev + 1);
+    const setLanguage = (lang: string) => {
+        setCurrentLang(lang);
+        localStorage.setItem('preferredLanguage', lang);
     };
+
+    const t = (obj: unknown) => {
+        if (!obj) return '';
+        if (typeof obj === 'string') return obj;
+        const localized = obj as Record<string, string>;
+        return localized[currentLang === 'en' ? 'en' : 'ko'] || localized.ko || localized.en || '';
+    };
+
+    const refresh = () => setRefreshTrigger(prev => prev + 1);
 
     useEffect(() => {
         if (!slug) return;
 
-        // ✅ OPTIMIZATION: Check cache first
-        const cacheKey = slug;
+        const cacheKey = `${slug}_${currentLang}`;
         const cached = translationCache.get(cacheKey);
         const now = Date.now();
 
         if (cached && (now - cached.timestamp < CACHE_TTL)) {
-            console.log('[useTranslation] ✅ Using cached translations for slug:', slug);
-            setTerms(cached.data);
+            setConfig(cached.data);
             setLoading(false);
-            setError(null);
             return;
         }
 
-        // ✅ OPTIMIZATION: Check if request is pending
         const pending = pendingTranslations.get(cacheKey);
         if (pending) {
-            console.log('[useTranslation] ⏳ Waiting for pending translation for slug:', slug);
             pending.then(data => {
-                setTerms(data);
-                setLoading(false);
-                setError(null);
-            }).catch(err => {
-                console.error('[useTranslation] Pending translation failed:', err);
-                setError(err.message);
+                setConfig(data);
                 setLoading(false);
             });
             return;
         }
 
         setLoading(true);
-        setError(null);
 
         const fetchPromise = (async () => {
             try {
-                let docData: Record<string, unknown> & { id?: string } | null = null;
-                let confId = slug;
-
-                // 🚨 [Fix] Determine societyId from hostname for domain-based filtering
-                const host = window.location.hostname;
-                const parts = host.split('.');
-
-                let domainSocietyId: string | null = null;
-
-                // DEV 환경: URL 쿼리 파라미터에서 society 가져오기
-                const urlParams = searchParams;
-                const societyParam = urlParams.get('society');
-                if (societyParam) {
-                    domainSocietyId = societyParam;
-                }
-
-                // 프로덕션: 서브도메인에서 society 가져오기
-                if (!domainSocietyId && parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') {
-                    domainSocietyId = parts[0]; // e.g., 'kadd' from kadd.eregi.co.kr
-                }
-
-                // 1. 메인 문서 Fetch (slug 필드 우선 - 더 유연한 매칭)
-                // 🚨 [Fix] Query by slug, then filter by societyId in memory (no index needed)
+                // 1. Find Conference Document
                 const q = query(collection(db, 'conferences'), where('slug', '==', slug));
                 const querySnap = await getDocs(q);
 
-                // Filter by societyId if on subdomain
-                const matchingDocs = querySnap.docs.filter(doc => {
-                    if (!domainSocietyId) return true; // No filter on main domain
-                    return doc.data().societyId === domainSocietyId;
-                });
-
-                if (matchingDocs.length > 0) {
-                    docData = { id: matchingDocs[0].id, ...matchingDocs[0].data() } as Record<string, unknown> & { id: string };
-                    confId = docData.id as string;
-                } else {
-                    // Fallback 1: slug를 ID로 직접 검색 (e.g., slug === document ID)
-                    const docRef = doc(db, 'conferences', slug);
-                    const docSnap = await getDoc(docRef);
-                    if (docSnap.exists()) {
-                        docData = { id: slug, ...docSnap.data() } as Record<string, unknown> & { id: string };
-                        confId = slug;
-                    }
+                let confDoc = querySnap.docs[0];
+                if (!confDoc) {
+                    const directDoc = await getDoc(doc(db, 'conferences', slug));
+                    if (directDoc.exists()) confDoc = directDoc;
                 }
 
-                if (!docData) {
-                    throw new Error(`Conference not found: ${slug}`);
-                }
+                if (!confDoc) throw new Error(`Conference not found: ${slug}`);
 
-                console.log('[useTranslation] Conference found. Fetching subcollections with confId:', confId);
+                const confId = confDoc.id;
+                const confData = confDoc.data();
+                const societyId = confData.societyId || confId.split('_')[0] || 'kadd';
 
-                // 2. Get terms (translations, agreements, etc.) from settings/identity
-                const identityDocRef = doc(db, 'conferences', confId, 'settings', 'identity');
-                const identitySnap = await getDoc(identityDocRef);
+                // 2. Parallel Fetch ALL required configurations
+                const [identitySnap, societySnap, visualSnap, infoSnap] = await Promise.all([
+                    getDoc(doc(db, 'conferences', confId, 'settings', 'identity')),
+                    getDoc(doc(db, 'societies', societyId)),
+                    getDoc(doc(db, 'conferences', confId, 'settings', 'visual')),
+                    getDoc(doc(db, 'conferences', confId, 'info', 'general'))
+                ]);
 
-                let termsData = null;
-                if (identitySnap.exists()) {
-                    termsData = identitySnap.data();
-                    console.log('[useTranslation] ✅ Successfully loaded terms from identity doc');
-                } else {
-                    console.warn('[useTranslation] ⚠️ No identity doc found for conference:', confId);
-                    // Fallback: Try fetching from terms subcollection
-                    try {
-                        const termsRef = collection(db, 'conferences', confId, 'terms');
-                        const termsSnap = await getDocs(termsRef);
-                        if (!termsSnap.empty) {
-                            termsData = {};
-                            termsSnap.forEach(doc => {
-                                termsData[doc.id] = doc.data();
-                            });
-                            console.log('[useTranslation] ✅ Loaded terms from terms subcollection');
-                        }
-                    } catch (err) {
-                        console.warn('[useTranslation] Failed to load terms from subcollection:', err);
-                    }
-                }
+                // 3. Parallel Fetch Sub-collections (Performance Boost)
+                const [pagesSnap, agendasSnap, speakersSnap, sponsorsSnap] = await Promise.all([
+                    getDocs(collection(db, 'conferences', confId, 'pages')),
+                    getDocs(collection(db, 'conferences', confId, 'agendas')),
+                    getDocs(collection(db, 'conferences', confId, 'speakers')),
+                    getDocs(collection(db, 'conferences', confId, 'sponsors'))
+                ]);
 
-                // ✅ OPTIMIZATION: Cache the result
-                translationCache.set(cacheKey, { data: termsData, timestamp: now });
+                const combinedConfig = {
+                    ...confData,
+                    id: confId,
+                    societyId,
+                    identity: identitySnap.exists() ? identitySnap.data() : null,
+                    society: societySnap.exists() ? societySnap.data() : null,
+                    visualAssets: visualSnap.exists() ? visualSnap.data() : null,
+                    info: infoSnap.exists() ? infoSnap.data() : null,
+                    pages: pagesSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                    agendas: agendasSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                    speakers: speakersSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                    sponsors: sponsorsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                };
+
+                translationCache.set(cacheKey, { data: combinedConfig, timestamp: now });
                 pendingTranslations.delete(cacheKey);
-
-                return termsData;
+                return combinedConfig;
 
             } catch (err: unknown) {
-                console.error('[useTranslation] Error loading translations:', err);
+                console.error('[useTranslation] Fetch error:', err);
                 throw err;
             }
         })();
 
-        // Register pending request
         pendingTranslations.set(cacheKey, fetchPromise);
 
-        fetchPromise
-            .then(data => {
-                setTerms(data);
-                setLoading(false);
-                setError(null);
-            })
-            .catch(err => {
-                console.error('[useTranslation] Failed to load translations:', err);
-                setError(err.message || 'Failed to load translations');
-                setLoading(false);
-            });
+        fetchPromise.then(data => {
+            setConfig(data);
+            setLoading(false);
+            setError(null);
+        }).catch(err => {
+            setError((err as Error).message || 'Unknown error');
+            setLoading(false);
+        });
 
-    }, [slug, refreshTrigger, searchParams]);
+    }, [slug, refreshTrigger, currentLang]);
 
-    return { terms, loading, error, refresh };
+    return {
+        t,
+        config,
+        loading,
+        error,
+        currentLang,
+        setLanguage,
+        confId: config?.id || null,
+        urlSlug: slug,
+        refresh
+    };
 };

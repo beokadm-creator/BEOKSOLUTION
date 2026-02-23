@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getApp } from 'firebase/app';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 
@@ -19,7 +19,9 @@ interface Props {
 
 export const ConferenceWideTemplate = ({ slug }: Props) => {
   const navigate = useNavigate();
-  const { t, config, loading, error, currentLang, setLanguage, confId, urlSlug } = useTranslation(slug);
+  const { t, config: rawConfig, loading, error, currentLang, setLanguage, confId, urlSlug } = useTranslation(slug);
+  const config = rawConfig as any;
+
 
   // Active section state for tabs
   const [activeSection, setActiveSection] = useState<string>('welcome');
@@ -31,39 +33,11 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
   const confIdToUse = confId || (slug && slug.includes('_') ? slug : undefined);
   const societyId = confIdToUse?.split('_')[0] || 'kadd';
 
-  // Terms Agreement Modal state
+  // Terms data is now included in useTranslation config
+  const terms = config?.identity;
+  const termsLoading = loading;
   const [showTermsModal, setShowTermsModal] = useState(false);
-  const [terms, setTerms] = useState<Record<string, unknown> | null>(null);
-  const [termsLoading, setTermsLoading] = useState(false);
 
-  // Fetch terms from Firestore
-  useEffect(() => {
-    const fetchTerms = async () => {
-      if (!config?.societyId) return;
-
-      setTermsLoading(true);
-      try {
-        const identityDocRef = doc(db, 'societies', config.societyId, 'settings', 'identity');
-        const docSnap = await getDoc(identityDocRef);
-
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          console.log('[ConferenceWideTemplate] Terms loaded:', Object.keys(data));
-          setTerms(data);
-        } else {
-          console.warn('[ConferenceWideTemplate] No terms document found');
-          setTerms(undefined);
-        }
-      } catch (e) {
-        console.error('[ConferenceWideTemplate] Failed to fetch terms:', e);
-        setTerms(undefined);
-      } finally {
-        setTermsLoading(false);
-      }
-    };
-
-    fetchTerms();
-  }, [config?.societyId]);
 
   // Handle terms agreement confirmation
   const handleTermsAgreementConfirm = () => {
@@ -168,11 +142,10 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
                     key={item.id}
                     type="button"
                     onClick={() => handleTabClick(item.id)}
-                    className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 sm:px-6 py-2 rounded-xl font-medium transition-all duration-200 min-w-[60px] sm:min-w-[100px] ${
-                      isActive
-                        ? 'text-blue-600 bg-blue-50'
-                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-                    }`}
+                    className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 sm:px-6 py-2 rounded-xl font-medium transition-all duration-200 min-w-[60px] sm:min-w-[100px] ${isActive
+                      ? 'text-blue-600 bg-blue-50'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                      }`}
                   >
                     <Icon className={`w-6 h-6 sm:w-5 sm:h-5 md:w-6 md:h-6 ${isActive ? 'text-blue-600' : ''}`} />
                     <span className="text-[10px] sm:text-sm md:text-base font-medium">
