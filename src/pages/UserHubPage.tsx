@@ -544,14 +544,12 @@ const UserHubPage: React.FC = () => {
                         const activeRegs: UserReg[] = [];
 
                         grouped.forEach((regs, slug) => {
-                            // 1. Check for ANY PAID/COMPLETED registration -> Show it (COMPLETED = legacy paid status)
-                            // schema.ts: paymentStatus: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED'
-                            // AbstractSubmissionPage, useAccessControl also treat COMPLETED === PAID
+                            // 1. Check for ANY PAID registration -> Show it
+                            // NOTE: In users/{uid}/participations, status=COMPLETED means
+                            // 'record created', NOT 'payment confirmed'. Only check PAID.
                             const paidReg = regs.find(r =>
                                 (r.paymentStatus || '').toUpperCase() === 'PAID' ||
-                                (r.paymentStatus || '').toUpperCase() === 'COMPLETED' ||
-                                (r.status || '').toUpperCase() === 'PAID' ||
-                                (r.status || '').toUpperCase() === 'COMPLETED'
+                                (r.status || '').toUpperCase() === 'PAID'
                             );
                             if (paidReg) {
                                 activeRegs.push(paidReg);
@@ -715,12 +713,11 @@ const UserHubPage: React.FC = () => {
                     const activeRegs: UserReg[] = [];
 
                     grouped.forEach((regs, slug) => {
-                        // 1. Check for ANY PAID/COMPLETED registration -> Show it (COMPLETED = legacy paid status)
+                        // 1. Check for ANY PAID registration -> Show it
+                        // NOTE: Only PAID is a confirmed payment status.
                         const paidReg = regs.find(r =>
                             (r.paymentStatus || '').toUpperCase() === 'PAID' ||
-                            (r.paymentStatus || '').toUpperCase() === 'COMPLETED' ||
-                            (r.status || '').toUpperCase() === 'PAID' ||
-                            (r.status || '').toUpperCase() === 'COMPLETED'
+                            (r.status || '').toUpperCase() === 'PAID'
                         );
                         if (paidReg) {
                             activeRegs.push(paidReg);
