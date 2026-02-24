@@ -1,3 +1,4 @@
+ 
 import axios from 'axios';
 
 // Platform-level Aligo credentials (hardcoded as requested)
@@ -21,7 +22,7 @@ export async function sendAlimTalk(
   templateCode: string,
   variables: { [key: string]: string },
   channelId: string
-): Promise<any> {
+): Promise<unknown> {
   try {
     // Prepare the complete data for Aligo API
     const formData = new URLSearchParams();
@@ -55,11 +56,12 @@ export async function sendAlimTalk(
       message: 'AlimTalk sent successfully'
     };
 
-  } catch (error: any) {
-    console.error('AlimTalk send error:', error);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('AlimTalk error:', err);
     return {
       success: false,
-      error: error.message || 'Unknown error occurred',
+      error: err.message || 'Unknown error occurred',
       channelId,
       recipient,
       templateCode
@@ -71,7 +73,7 @@ export async function sendAlimTalk(
  * Get remaining AlimTalk credits
  * @returns {Promise<Object>} - Credit information
  */
-export async function getAlimTalkRemain(): Promise<any> {
+export async function getAlimTalkRemain(): Promise<unknown> {
   try {
     const formData = new URLSearchParams();
     formData.append('apikey', ALIGO_CONFIG.apikey);
@@ -87,11 +89,12 @@ export async function getAlimTalkRemain(): Promise<any> {
       success: true,
       data: response.data
     };
-  } catch (error: any) {
-    console.error('Get AlimTalk remain error:', error);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Get AlimTalk remain error:', err);
     return {
       success: false,
-      error: error.message || 'Unknown error occurred'
+      error: err.message || 'Unknown error occurred'
     };
   }
 }
@@ -107,7 +110,7 @@ export async function getAlimTalkHistory(
   channelId: string,
   page: number = 1,
   limit: number = 50
-): Promise<any> {
+): Promise<unknown> {
   try {
     const formData = new URLSearchParams();
     formData.append('apikey', ALIGO_CONFIG.apikey);
@@ -127,11 +130,12 @@ export async function getAlimTalkHistory(
       success: true,
       data: response.data
     };
-  } catch (error: any) {
-    console.error('Get AlimTalk history error:', error);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Get AlimTalk history error:', err);
     return {
       success: false,
-      error: error.message || 'Unknown error occurred'
+      error: err.message || 'Unknown error occurred'
     };
   }
 }
@@ -140,7 +144,7 @@ export async function getAlimTalkHistory(
  * Get AlimTalk templates
  * @returns {Promise<Object>} - Template list
  */
-export async function getAlimTalkTemplates(): Promise<any> {
+export async function getAlimTalkTemplates(): Promise<unknown> {
   try {
     const formData = new URLSearchParams();
     formData.append('apikey', ALIGO_CONFIG.apikey);
@@ -157,11 +161,12 @@ export async function getAlimTalkTemplates(): Promise<any> {
       success: true,
       data: response.data
     };
-  } catch (error: any) {
-    console.error('Get AlimTalk templates error:', error);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Get AlimTalk templates error:', err);
     return {
       success: false,
-      error: error.message || 'Unknown error occurred'
+      error: err.message || 'Unknown error occurred'
     };
   }
 }
