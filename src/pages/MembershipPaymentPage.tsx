@@ -10,7 +10,7 @@ import toast from 'react-hot-toast';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { loadPaymentWidget, PaymentWidgetInstance } from '@tosspayments/payment-widget-sdk';
 import { v4 as uuidv4 } from 'uuid';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Circle } from 'lucide-react';
 
 // Types
 interface MembershipFeeTier {
@@ -156,11 +156,11 @@ export default function MembershipPaymentPage() {
                 console.log('[MembershipPaymentPage] User data loaded:', userData);
                 setUser({
                     id: userDoc.id || authUser.uid,
-                    name: userData.name || userData.userName || '',
-                    email: userData.email || authUser.email || '',
-                    licenseNumber: userData.licenseNumber || userData.code || '',
-                    code: userData.code || userData.licenseNumber || '',
-                    expiryDate: userData.expiryDate || undefined
+                    name: (userData.name as string) || (userData.userName as string) || '',
+                    email: (userData.email as string) || authUser.email || '',
+                    licenseNumber: (userData.licenseNumber as string) || (userData.code as string) || '',
+                    code: (userData.code as string) || (userData.licenseNumber as string) || '',
+                    expiryDate: (userData.expiryDate as string) || undefined
                 });
 
                 // 4. 회원등급별 금액 설정 로드
@@ -270,8 +270,25 @@ export default function MembershipPaymentPage() {
             console.log('[MembershipPaymentPage] Payment widget opened');
         } catch (error: unknown) {
             console.error("Payment error:", error);
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            toast.error(`결제 실패: ${message}`);
+
+            let errorMessage = '결제 시작 실패';
+
+            if (error && typeof error === 'object') {
+                const err = error as { code?: string; message?: string };
+                const rawMsg = err.message || '';
+
+                if (err.code === 'PAY_PROCESS_CANCELED' || rawMsg.includes('cancel')) {
+                    errorMessage = '결제가 취소되었습니다.';
+                } else if (rawMsg.toLowerCase().includes('phone') || rawMsg.toLowerCase().includes('tel') || rawMsg.includes('연락처') || rawMsg.includes('전화번호')) {
+                    errorMessage = '연락처 형식 오류: 010-1234-5678 형식으로 입력해주세요. (하이픈 포함 필수)';
+                } else if (rawMsg.toLowerCase().includes('network') || rawMsg.toLowerCase().includes('fetch')) {
+                    errorMessage = '네트워크 오류가 발생했습니다. 인터넷 연결을 확인 후 다시 시도해주세요.';
+                } else if (rawMsg) {
+                    errorMessage = `결제 오류: ${rawMsg}`;
+                }
+            }
+
+            toast.error(errorMessage, { duration: 6000 });
             setProcessing(false);
         }
     };
@@ -345,11 +362,10 @@ export default function MembershipPaymentPage() {
                             {feeTiers.map(tier => (
                                 <div
                                     key={tier.id}
-                                    className={`flex items-center justify-between p-4 border rounded-lg transition-all ${
-                                        selectedTier === tier.id
-                                            ? 'border-blue-500 bg-blue-50'
-                                            : 'border-gray-200 hover:bg-gray-50'
-                                    }`}
+                                    className={`flex items-center justify-between p-4 border rounded-lg transition-all ${selectedTier === tier.id
+                                        ? 'border-blue-500 bg-blue-50'
+                                        : 'border-gray-200 hover:bg-gray-50'
+                                        }`}
                                 >
                                     <div className="flex items-center gap-4 flex-1">
                                         <RadioGroupItem value={tier.id} id={tier.id} />
