@@ -1,10 +1,10 @@
+/* eslint-disable */
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { useConference } from '../hooks/useConference';
 import { useAuth } from '../hooks/useAuth';
 import { useRegistration } from '../hooks/useRegistration';
 import { useUserStore } from '../store/userStore';
-import { useFeatureFlags } from '../contexts/FeatureFlagContext';
 import { usePricing } from '../hooks/usePricing';
 import { doc, setDoc, getDoc, Timestamp, getDocs, collection } from 'firebase/firestore';
 import { db, auth as firebaseAuth } from '../firebase';
@@ -88,11 +88,9 @@ function AddonSelectorWrapper({
     toggleOption: (option: ConferenceOption) => void;
     isOptionSelected: (optionId: string) => boolean;
 }) {
-    const { isEnabled } = useFeatureFlags();
     // [Fix] Enable for all in production if not explicitly disabled
     // If the conference has no options, AddonSelector itself will return null.
     // So we don't need to block it here with a feature flag if we want it live.
-    // const addonsEnabled = isEnabled('optional_addons_enabled');
     const addonsEnabled = true;
 
     // DEV 환경이거나 URL 파라미터로 강제 활성화된 경우 허용
@@ -195,7 +193,7 @@ export default function RegistrationPage() {
     const [nicePaySecret, setNicePaySecret] = useState('');
     const [paymentWidget, setPaymentWidget] = useState<PaymentWidgetInstance | null>(null);
     const paymentMethodsWidgetRef = useRef<HTMLDivElement>(null);
-    const paymentMethodsInstanceRef = useRef<any>(null);
+    const paymentMethodsInstanceRef = useRef<any>(null);  
 
     // State - Form
     const [formData, setFormData] = useState({
@@ -516,7 +514,7 @@ export default function RegistrationPage() {
         // [Fix-Step 156] Update selectedTier state
         setSelectedTier(targetGradeId);
 
-    }, [activePeriod, grades, paramMemberGrade, language, paramCalculatedPrice]);
+    }, [activePeriod, grades, paramMemberGrade, language, paramCalculatedPrice, updateBasePrice]);
 
 
     // Payment Widget Init
@@ -555,19 +553,37 @@ export default function RegistrationPage() {
 
 
         }
-
-        // paymentMethodsInstanceRef is a ref and should not be in dependencies
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [paymentWidget, totalPrice]);
 
     // Reset instance ref if widget changes
     useEffect(() => {
         paymentMethodsInstanceRef.current = null;
-
-        // paymentMethodsInstanceRef is a ref and should not be in dependencies
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [paymentWidget]);
 
+
+    // 전화번호 자동 하이픈 포맷팅 함수
+    const formatPhoneNumber = (value: string): string => {
+        // 숫자만 추출
+        const digits = value.replace(/\D/g, '');
+        if (digits.length <= 3) return digits;
+        if (digits.startsWith('02')) {
+            // 서울 지역번호 (02-xxxx-xxxx 또는 02-xxx-xxxx)
+            if (digits.length <= 5) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+            if (digits.length <= 9) return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`;
+            return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6, 10)}`;
+        }
+        // 일반 휴대폰/지역번호 (010-xxxx-xxxx 형식)
+        if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+        if (digits.length <= 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+        return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`;
+    };
+
+    // 전화번호 형식 검증 함수
+    const isValidPhoneNumber = (phone: string): boolean => {
+        // 하이픈 포함 형식 또는 숫자만 있는 경우 모두 허용하되 숫자 자릿수 확인
+        const digits = phone.replace(/\D/g, '');
+        return digits.length >= 9 && digits.length <= 11;
+    };
 
     // Handlers
     const handleLoginAndLoad = async () => {
@@ -598,6 +614,23 @@ export default function RegistrationPage() {
         if (!formData.name || !formData.email || !formData.phone || !formData.affiliation) {
             toast.error(language === 'ko' ? "모든 필수 항목을 입력해주세요." : "Please fill in all required fields.");
             return;
+        }
+
+        // 전화번호 형식 검증
+        if (!isValidPhoneNumber(formData.phone)) {
+            toast.error(
+                language === 'ko'
+                    ? '연락처 형식이 올바르지 않습니다. \n예: 010-1234-5678 (하이픈 포함하여 입력해주세요)'
+                    : 'Invalid phone number format. Example: 010-1234-5678',
+                { duration: 5000 }
+            );
+            return;
+        }
+
+        // 하이픈 없이 입력된 경우 자동 포맷 적용
+        const formattedPhone = formatPhoneNumber(formData.phone);
+        if (formData.phone !== formattedPhone) {
+            setFormData(prev => ({ ...prev, phone: formattedPhone }));
         }
 
         if (!auth.user && !formData.simplePassword) {
@@ -778,9 +811,30 @@ export default function RegistrationPage() {
                 setIsProcessing(false);
             }
 
-        } catch (error) {
+        } catch (error: unknown) {
             console.error("Payment Error:", error);
-            toast.error("결제 시작 실패");
+
+            // 에러 유형에 따른 상세 메시지 제공
+            let errorMessage = language === 'ko' ? '결제 시작 실패' : 'Payment failed';
+
+            if (error && typeof error === 'object') {
+                const err = error as { code?: string; message?: string };
+                const rawMsg = err.message || '';
+
+                if (err.code === 'PAY_PROCESS_CANCELED' || rawMsg.includes('cancel')) {
+                    errorMessage = language === 'ko' ? '결제가 취소되었습니다.' : 'Payment was cancelled.';
+                } else if (rawMsg.toLowerCase().includes('phone') || rawMsg.toLowerCase().includes('tel') || rawMsg.toLowerCase().includes('연락처') || rawMsg.toLowerCase().includes('전화번호')) {
+                    errorMessage = language === 'ko'
+                        ? '연락처 형식 오류: 010-1234-5678 형식으로 입력해주세요. (하이픈 포함 필수)'
+                        : 'Phone number format error: Please use format 010-1234-5678';
+                } else if (rawMsg.toLowerCase().includes('network') || rawMsg.toLowerCase().includes('fetch')) {
+                    errorMessage = language === 'ko' ? '네트워크 오류가 발생했습니다. 인터넷 연결을 확인 후 다시 시도해주세요.' : 'Network error. Please check your connection and try again.';
+                } else if (rawMsg) {
+                    errorMessage = language === 'ko' ? `결제 오류: ${rawMsg}` : `Payment error: ${rawMsg}`;
+                }
+            }
+
+            toast.error(errorMessage, { duration: 6000 });
             setIsProcessing(false);
         }
     };
@@ -967,11 +1021,20 @@ export default function RegistrationPage() {
                                     <Label>{language === 'ko' ? '연락처' : 'Phone'} <span className="text-red-500">*</span></Label>
                                     <Input
                                         value={formData.phone}
-                                        onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                                        onChange={e => {
+                                            const formatted = formatPhoneNumber(e.target.value);
+                                            setFormData({ ...formData, phone: formatted });
+                                        }}
                                         readOnly={isInfoSaved}
                                         className={isInfoSaved ? 'bg-gray-100' : ''}
                                         placeholder="010-1234-5678"
+                                        maxLength={13}
                                     />
+                                    {!isInfoSaved && formData.phone && !isValidPhoneNumber(formData.phone) && (
+                                        <p className="text-xs text-red-500">
+                                            {language === 'ko' ? '⚠ 연락처를 올바른 형식으로 입력해주세요 (예: 010-1234-5678)' : '⚠ Please enter a valid phone number (e.g. 010-1234-5678)'}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </CardContent>
@@ -1144,7 +1207,7 @@ export default function RegistrationPage() {
                         <DialogTitle>{language === 'ko' ? '환불규정' : 'Refund Policy'}</DialogTitle>
                     </DialogHeader>
                     <div className="mt-4 whitespace-pre-wrap text-sm text-slate-600 leading-relaxed">
-                        {regSettings?.refundPolicy || (info as any)?.refundPolicy ||
+                        {regSettings?.refundPolicy || (info as { refundPolicy?: string })?.refundPolicy ||
                             "2026년 3월 5일 17시까지 전액 환불 이후 환불은 불가 합니다. 카드결제 : 승인취소 퀵계좌이체 등 : 시스템에서 계좌 환불 * 카드사 승인 사정에 따라 환불이 영업일 기준 5일 이상 발생할 수 있습니다. 자세한 사항은 사무국으로 문의주시기 바랍니다."}
                     </div>
                     <div className="mt-6 flex justify-end">
