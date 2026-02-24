@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatSafeDate, toSafeDate } from '../../../utils/date';
 
 type LocalizedString = { [lang: string]: string } | string;
 
@@ -27,8 +28,8 @@ export const WideTimeline: React.FC<WideTimelineProps> = ({ steps, lang }) => {
 
       {steps.map((step, idx) => {
         const today = new Date();
-        const start = step.start;
-        const end = step.end;
+        const start = toSafeDate(step.start);
+        const end = toSafeDate(step.end);
         const isActive = start && end && today >= start && today <= end;
         const isPast = end && today > end;
 
@@ -53,7 +54,7 @@ export const WideTimeline: React.FC<WideTimelineProps> = ({ steps, lang }) => {
               </p>
               {end && (
                 <p className="text-[10px] text-slate-400 mt-0.5">
-                  ~{end.toLocaleDateString()}
+                  ~{formatSafeDate(end)}
                 </p>
               )}
             </div>

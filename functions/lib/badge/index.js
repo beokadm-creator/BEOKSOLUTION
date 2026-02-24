@@ -178,7 +178,7 @@ async function sendBadgeNotification(db, conference, regId, regData, token) {
                 // Get Sender Key from Infrastructure Settings
                 const infraSnap = await db.doc(`societies/${conference.societyId}/settings/infrastructure`).get();
                 const infraData = infraSnap.data();
-                const senderKey = (_m = (_l = infraData === null || infraData === void 0 ? void 0 : infraData.notification) === null || _l === void 0 ? void 0 : _l.alimTalk) === null || _m === void 0 ? void 0 : _m.senderKey;
+                const senderKey = (_m = (_l = infraData === null || infraData === void 0 ? void 0 : infraData.notification) === null || _l === void 0 ? void 0 : _l.nhnAlimTalk) === null || _m === void 0 ? void 0 : _m.senderKey;
                 if (!senderKey) {
                     functions.logger.error(`[BadgeNotification] No Sender Key found for society ${conference.societyId}`);
                     return;

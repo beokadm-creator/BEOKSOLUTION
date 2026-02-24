@@ -5,6 +5,7 @@ import { useUserStore } from '../../store/userStore';
 import { useAuth } from '../../hooks/useAuth';
 import type { Notice, NoticePriority } from '../../types/schema';
 import { Button } from '../ui/button';
+import { toSafeDate } from '../../utils/date';
 
 interface NoticeModalProps {
   isOpen: boolean;
@@ -102,9 +103,10 @@ export const NoticeModal: React.FC<NoticeModalProps> = ({ isOpen, onClose }) => 
 
   const getTitle = (notice: Notice) => notice.title[language] || notice.title.ko || notice.title.en || '';
 
-  const formatDate = (timestamp: { toDate: () => Date }) => {
+  const formatDate = (timestamp: { toDate?: () => Date } | Date | string | number | null | undefined) => {
     try {
-      const date = timestamp.toDate();
+      const date = toSafeDate(timestamp);
+      if (!date) return '';
       return date.toLocaleDateString(language === 'ko' ? 'ko-KR' : 'en-US', {
         year: 'numeric',
         month: 'short',
@@ -189,9 +191,8 @@ export const NoticeModal: React.FC<NoticeModalProps> = ({ isOpen, onClose }) => 
                   return (
                     <div
                       key={notice.id}
-                      className={`group border rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl ${styles.border} ${
-                        isExpanded ? 'shadow-lg' : 'hover:border-opacity-60'
-                      }`}
+                      className={`group border rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl ${styles.border} ${isExpanded ? 'shadow-lg' : 'hover:border-opacity-60'
+                        }`}
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
                       {/* Notice Header */}
@@ -245,19 +246,19 @@ export const NoticeModal: React.FC<NoticeModalProps> = ({ isOpen, onClose }) => 
                         {/* Attachment indicators */}
                         {(notice.content.images && notice.content.images.length > 0 ||
                           notice.content.videos && notice.content.videos.length > 0) && (
-                          <div className="flex items-center gap-4 mt-3.5 text-sm text-slate-500 font-medium">
-                            {notice.content.images && notice.content.images.length > 0 && (
-                              <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 rounded-lg">
-                                🖼️ {notice.content.images.length} {language === 'ko' ? '장의 이미지' : 'images'}
-                              </span>
-                            )}
-                            {notice.content.videos && notice.content.videos.length > 0 && (
-                              <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 rounded-lg">
-                                🎥 {notice.content.videos.length} {language === 'ko' ? '개의 동영상' : 'videos'}
-                              </span>
-                            )}
-                          </div>
-                        )}
+                            <div className="flex items-center gap-4 mt-3.5 text-sm text-slate-500 font-medium">
+                              {notice.content.images && notice.content.images.length > 0 && (
+                                <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 rounded-lg">
+                                  🖼️ {notice.content.images.length} {language === 'ko' ? '장의 이미지' : 'images'}
+                                </span>
+                              )}
+                              {notice.content.videos && notice.content.videos.length > 0 && (
+                                <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 rounded-lg">
+                                  🎥 {notice.content.videos.length} {language === 'ko' ? '개의 동영상' : 'videos'}
+                                </span>
+                              )}
+                            </div>
+                          )}
                       </div>
 
                       {/* Expanded Content */}

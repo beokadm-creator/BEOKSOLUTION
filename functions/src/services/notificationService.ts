@@ -1,4 +1,4 @@
- 
+
 /**
  * Notification Service - NHN Cloud AlimTalk Integration
  * 
@@ -51,6 +51,10 @@ export interface IAlimTalkProvider {
 }
 
 
+// NHN Cloud 전역 설정 (프로젝트 단위 - 모든 학회 공통)
+const NHN_GLOBAL_APP_KEY = 'Ik6GEBC22p5Qliqk';
+const NHN_GLOBAL_SECRET_KEY = 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme';
+
 /**
  * NHN Cloud Provider 구현
  */
@@ -80,17 +84,22 @@ class NHNProvider implements IAlimTalkProvider {
             }
 
             const infraData = infraSnap.data();
-            const nhnConfig = infraData?.notification;
+            // 실제 Firestore 구조: notification.nhnAlimTalk.senderKey
+            const nhnConfig = infraData?.notification?.nhnAlimTalk;
 
-            if (!nhnConfig?.appKey || !nhnConfig?.secretKey || !nhnConfig?.senderKey) {
-                throw new Error('NHN Cloud configuration is incomplete');
+            if (!nhnConfig?.senderKey) {
+                throw new Error('NHN Cloud senderKey is not configured. Please set it in Infrastructure Settings.');
             }
 
-            // NHN Cloud API 호출
+            if (!nhnConfig?.enabled) {
+                throw new Error('NHN Cloud AlimTalk is not enabled. Please enable it in Infrastructure Settings.');
+            }
+
+            // NHN Cloud API 호출 (appKey/secretKey는 전역 상수 사용)
             const result = await nhnSendAlimTalk(
                 {
-                    appKey: nhnConfig.appKey,
-                    secretKey: nhnConfig.secretKey,
+                    appKey: NHN_GLOBAL_APP_KEY,
+                    secretKey: NHN_GLOBAL_SECRET_KEY,
                     senderKey: nhnConfig.senderKey,
                 },
                 {

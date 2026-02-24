@@ -735,7 +735,13 @@ export const cancelTossPayment = functions
 
 
 // 6. Get NHN Cloud AlimTalk Templates
-import { getTemplates } from './utils/nhnAlimTalk';
+import { getTemplateList } from './utils/nhnCloud';
+
+// NHN Cloud 전역 설정 (프로젝트 단위 - 모든 학회 공통)
+const NHN_GLOBAL_CONFIG = {
+    appKey: 'Ik6GEBC22p5Qliqk',
+    secretKey: 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme',
+};
 
 export const getNhnAlimTalkTemplates = functions
     .runWith({
@@ -754,29 +760,43 @@ export const getNhnAlimTalkTemplates = functions
         }
 
         try {
-            const result = await getTemplates(senderKey);
+            const config = {
+                appKey: NHN_GLOBAL_CONFIG.appKey,
+                secretKey: NHN_GLOBAL_CONFIG.secretKey,
+                senderKey: senderKey,
+            };
 
-            // Filter only APPROVED templates
-            if (result.success && result.data?.templateListResponse?.templates) {
-                const approvedTemplates = result.data.templateListResponse.templates.filter(
-                    (template: unknown) => (template as { templateStatus?: string }).templateStatus === 'APR'
-                );
+            functions.logger.info(`[NHN Templates] Fetching templates for senderKey: ${senderKey.substring(0, 8)}...`);
 
-                functions.logger.info(`[NHN Templates] Total: ${result.data.templateListResponse.templates.length}, Approved: ${approvedTemplates.length}`);
+            const result = await getTemplateList(config);
 
-                return {
-                    success: true,
-                    data: {
-                        ...result.data,
-                        templateListResponse: {
-                            ...result.data.templateListResponse,
-                            templates: approvedTemplates
-                        }
-                    }
-                };
+            functions.logger.info(`[NHN Templates] Raw result:`, JSON.stringify(result).substring(0, 500));
+
+            if (!result.success) {
+                functions.logger.error(`[NHN Templates] API call failed:`, result.error);
+                return result;
             }
 
-            return result;
+            // nhnCloud.ts returns: { success, templates: [], rawResponse }
+            // we need to map to the structure TemplatesPage expects:
+            // { success, data: { templateListResponse: { templates: [] } } }
+            const allTemplates: unknown[] = result.templates || [];
+
+            // Filter APPROVED templates (templateStatus === 'APR')
+            const approvedTemplates = allTemplates.filter(
+                (t: unknown) => (t as { templateStatus?: string }).templateStatus === 'APR'
+            );
+
+            functions.logger.info(`[NHN Templates] Total: ${allTemplates.length}, Approved: ${approvedTemplates.length}`);
+
+            return {
+                success: true,
+                data: {
+                    templateListResponse: {
+                        templates: approvedTemplates
+                    }
+                }
+            };
         } catch (error: unknown) {
             functions.logger.error("Error in getNhnAlimTalkTemplates:", error);
             const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);

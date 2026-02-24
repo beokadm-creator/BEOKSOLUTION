@@ -140,7 +140,7 @@ export const onRegistrationCreated = functions.firestore
 
       // Send notification
       if (conference) {
-        await sendBadgeNotification(db, conference, regId, regData, token);
+        await sendBadgeNotification(db, { ...conference, id: confId }, regId, regData, token);
       }
 
       functions.logger.info(`[BadgeToken] Created token ${token} for ${regId}`);
@@ -233,7 +233,7 @@ export async function sendBadgeNotification(
         // Get Sender Key from Infrastructure Settings
         const infraSnap = await db.doc(`societies/${conference.societyId}/settings/infrastructure`).get();
         const infraData = infraSnap.data();
-        const senderKey = infraData?.notification?.alimTalk?.senderKey;
+        const senderKey = infraData?.notification?.nhnAlimTalk?.senderKey;
 
         if (!senderKey) {
           functions.logger.error(`[BadgeNotification] No Sender Key found for society ${conference.societyId}`);

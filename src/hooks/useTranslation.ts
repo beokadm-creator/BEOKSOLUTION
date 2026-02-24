@@ -24,7 +24,7 @@ export const clearTranslationCache = (slug?: string) => {
 
 interface UseTranslationResult {
     t: (obj: unknown) => string;
-    config: any; // Using any temporarily for backward compatibility with complex types
+    config: unknown; // Using unknown for backward compatibility with complex types
     loading: boolean;
     error: string | null;
     currentLang: string;
@@ -35,7 +35,7 @@ interface UseTranslationResult {
 }
 
 export const useTranslation = (slug: string): UseTranslationResult => {
-    const [config, setConfig] = useState<any>(null);
+    const [config, setConfig] = useState<unknown>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [currentLang, setCurrentLang] = useState<string>(localStorage.getItem('preferredLanguage') || 'ko');
@@ -119,7 +119,9 @@ export const useTranslation = (slug: string): UseTranslationResult => {
                     societyId,
                     identity: identitySnap.exists() ? identitySnap.data() : null,
                     society: societySnap.exists() ? societySnap.data() : null,
-                    visualAssets: visualSnap.exists() ? visualSnap.data() : null,
+                    // Fallback: if settings/visual subcollection doesn't exist,
+                    // use visualAssets saved directly on the main conference document by ConferenceSettingsPage
+                    visualAssets: visualSnap.exists() ? visualSnap.data() : (confData.visualAssets ?? null),
                     info: infoSnap.exists() ? infoSnap.data() : null,
                     pages: pagesSnap.docs.map(d => ({ id: d.id, ...d.data() })),
                     agendas: agendasSnap.docs.map(d => ({ id: d.id, ...d.data() })),
@@ -157,7 +159,7 @@ export const useTranslation = (slug: string): UseTranslationResult => {
         error,
         currentLang,
         setLanguage,
-        confId: config?.id || null,
+        confId: (config as { id?: string } | null)?.id || null,
         urlSlug: slug,
         refresh
     };

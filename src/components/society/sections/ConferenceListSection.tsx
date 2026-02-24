@@ -3,6 +3,8 @@ import { Conference } from '../../../types/schema';
 import { Calendar, MapPin, ChevronRight, Trophy, Clock, ArrowRight } from 'lucide-react';
 import type { Language } from '../../../hooks/useLanguage';
 
+import { formatSafeDate } from '../../../utils/date';
+
 interface ConferenceListSectionProps {
   activeConferences: Conference[];
   upcomingConferences: Conference[];
@@ -14,9 +16,7 @@ interface ConferenceListSectionProps {
 
 // Format date helper function
 const formatDate = (ts: { seconds: number } | Date, language: Language = 'ko') => {
-  if (!ts) return 'TBA';
-  const date = new Date(ts.seconds * 1000);
-  return date.toLocaleDateString(language === 'ko' ? 'ko-KR' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  return formatSafeDate(ts, language === 'ko' ? 'ko-KR' : 'en-US');
 };
 
 const ConferenceListSection: React.FC<ConferenceListSectionProps> = ({
