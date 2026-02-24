@@ -40,6 +40,8 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendAlimTalk = exports.NotificationService = void 0;
 const functions = __importStar(require("firebase-functions"));
+const admin = __importStar(require("firebase-admin"));
+const nhnCloud_1 = require("../utils/nhnCloud");
 /**
  * NHN Cloud Provider 구현
  */
@@ -51,7 +53,6 @@ class NHNProvider {
         var _a;
         try {
             // Firestore에서 NHN Cloud 설정 가져오기
-            const admin = require('firebase-admin');
             const db = admin.firestore();
             if (!societyId) {
                 throw new Error('societyId is required for NHN Cloud AlimTalk');
@@ -71,8 +72,7 @@ class NHNProvider {
                 throw new Error('NHN Cloud configuration is incomplete');
             }
             // NHN Cloud API 호출
-            const { sendAlimTalk } = require('../utils/nhnCloud');
-            const result = await sendAlimTalk({
+            const result = await (0, nhnCloud_1.sendAlimTalk)({
                 appKey: nhnConfig.appKey,
                 secretKey: nhnConfig.secretKey,
                 senderKey: nhnConfig.senderKey,
@@ -99,12 +99,13 @@ class NHNProvider {
             }
         }
         catch (error) {
-            functions.logger.error('NHN send failed', error);
+            const err = error;
+            functions.logger.error('NHN send failed', err);
             return {
                 success: false,
-                error: error.message,
+                error: err.message,
                 provider: 'nhn',
-                rawResponse: (_a = error.response) === null || _a === void 0 ? void 0 : _a.data
+                rawResponse: (_a = err.response) === null || _a === void 0 ? void 0 : _a.data
             };
         }
     }

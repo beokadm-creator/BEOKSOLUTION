@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getSenderCategories = exports.getMessageList = exports.getMessageResult = exports.sendAlimTalk = exports.getTemplateDetail = exports.getTemplates = void 0;
+/* eslint-disable */
 const axios_1 = __importDefault(require("axios"));
 /**
  * NHN Cloud AlimTalk API Configuration

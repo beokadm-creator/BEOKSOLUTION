@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
+import { formatSafeDate } from '../../../utils/date';
 
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../../firebase';
@@ -63,11 +64,7 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
     return (lang === 'en' ? val.en : val.ko) || val.ko || '';
   };
 
-  const formatDate = (date: Date) => {
-    return date ? date.toLocaleDateString() : '';
-  };
-
-  const dates = period ? `${formatDate(period.start)} ~ ${formatDate(period.end)}` : '';
+  const dates = period ? `${formatSafeDate(period.start)} ~ ${formatSafeDate(period.end)}` : '';
 
   //1. URL에서 urlSlug 추출 (예: /2026spring/register 에서 '2026spring' 추출)
   // window.location.pathname을 사용하므로 클라이언트 사이드 렌더링에서만 유효함

@@ -1,0 +1,268 @@
+import { usePricing } from './usePricing';
+import type { ConferenceOption } from '../../types/schema';
+import { renderHook, act } from '@testing-library/react';
+import { Timestamp } from 'firebase/firestore';
+
+
+// Mock conference options
+const mockOptions: ConferenceOption[] = [
+  {
+    id: 'opt1',
+    conferenceId: 'test_conf',
+    name: { ko: '점심 식권', en: 'Lunch Ticket' },
+    description: { ko: '점심 식사 제공', en: 'Lunch included' },
+    price: 15000,
+    currency: 'KRW',
+    isActive: true,
+    maxQuantity: 1,
+    category: 'meal',
+    sortOrder: 1,
+    createdAt: Timestamp.fromMillis(1000000000),
+    updatedAt: Timestamp.fromMillis(1000000000),
+  },
+  {
+    id: 'opt2',
+    conferenceId: 'test_conf',
+    name: { ko: '가이드북', en: 'Guidebook' },
+    description: { ko: '컨프로그램 가이드북', en: 'Conference program guide' },
+    price: 5000,
+    currency: 'KRW',
+    isActive: true,
+    maxQuantity: 1,
+    category: 'material',
+    sortOrder: 2,
+    createdAt: Timestamp.fromMillis(1000000000),
+    updatedAt: Timestamp.fromMillis(1000000000),
+  },
+  {
+    id: 'opt3',
+    conferenceId: 'test_conf',
+    name: { ko: '웰컴 키트', en: 'Welcome Kit' },
+    price: 20000,
+    currency: 'KRW',
+    isActive: true,
+    sortOrder: 3,
+    createdAt: Timestamp.fromMillis(1000000000),
+    updatedAt: Timestamp.fromMillis(1000000000),
+  },
+];
+
+describe('usePricing', () => {
+  it('should initialize with zero state', () => {
+    const { result } = renderHook(() => usePricing());
+
+    expect(result.current.basePrice).toBe(0);
+    expect(result.current.totalPrice).toBe(0);
+    expect(result.current.optionsTotal).toBe(0);
+    expect(result.current.selectedOptions).toHaveLength(0);
+  });
+
+  it('should set base price correctly', () => {
+    const { result } = renderHook(() => usePricing());
+
+    act(() => {
+      result.current.setBasePrice(100000);
+    });
+
+    expect(result.current.basePrice).toBe(100000);
+    expect(result.current.totalPrice).toBe(100000);
+    expect(result.current.optionsTotal).toBe(0);
+  });
+
+  it('should add option and calculate total price correctly', () => {
+    const { result } = renderHook(() => usePricing(100000));
+
+    // Add first option
+    act(() => {
+      result.current.toggleOption(mockOptions[0]);
+    });
+
+    expect(result.current.selectedOptions).toHaveLength(1);
+    expect(result.current.selectedOptions[0].option.id).toBe('opt1');
+    expect(result.current.optionsTotal).toBe(15000);
+    expect(result.current.totalPrice).toBe(115000); // 100000 + 15000
+  });
+
+  it('should add multiple options and sum prices correctly', () => {
+    const { result } = renderHook(() => usePricing(100000));
+
+    act(() => {
+      result.current.toggleOption(mockOptions[0]); // 15000
+      result.current.toggleOption(mockOptions[1]); // 5000
+    });
+
+    expect(result.current.selectedOptions).toHaveLength(2);
+    expect(result.current.optionsTotal).toBe(20000); // 15000 + 5000
+    expect(result.current.totalPrice).toBe(120000); // 100000 + 20000
+  });
+
+  it('should remove option when toggled again', () => {
+    const { result } = renderHook(() => usePricing(100000));
+
+    // Add option
+    act(() => {
+      result.current.toggleOption(mockOptions[0]);
+    });
+
+    expect(result.current.selectedOptions).toHaveLength(1);
+    expect(result.current.optionsTotal).toBe(15000);
+
+    // Remove same option
+    act(() => {
+      result.current.toggleOption(mockOptions[0]);
+    });
+
+    expect(result.current.selectedOptions).toHaveLength(0);
+    expect(result.current.optionsTotal).toBe(0);
+    expect(result.current.totalPrice).toBe(100000);
+  });
+
+  it('should update base price and preserve options', () => {
+    const { result } = renderHook(() => usePricing(100000));
+
+    // Add option
+    act(() => {
+      result.current.toggleOption(mockOptions[0]);
+    });
+
+    expect(result.current.totalPrice).toBe(115000); // 100000 + 15000
+
+    // Update base price
+    act(() => {
+      result.current.setBasePrice(120000);
+    });
+
+    expect(result.current.basePrice).toBe(120000);
+    expect(result.current.totalPrice).toBe(135000); // 120000 + 15000
+    expect(result.current.optionsTotal).toBe(15000); // Options unchanged
+  });
+
+  it('should clear all options', () => {
+    const { result } = renderHook(() => usePricing(100000));
+
+    // Add multiple options
+    act(() => {
+      result.current.toggleOption(mockOptions[0]);
+      result.current.toggleOption(mockOptions[1]);
+      result.current.toggleOption(mockOptions[2]);
+    });
+
+    expect(result.current.selectedOptions).toHaveLength(3);
+    expect(result.current.optionsTotal).toBe(40000); // 15000 + 5000 + 20000
+
+    // Clear all
+    act(() => {
+      result.current.clearOptions();
+    });
+
+    expect(result.current.selectedOptions).toHaveLength(0);
+    expect(result.current.optionsTotal).toBe(0);
+    expect(result.current.totalPrice).toBe(100000);
+  });
+
+  it('should check if option is selected', () => {
+    const { result } = renderHook(() => usePricing(100000));
+
+    expect(result.current.isOptionSelected('opt1')).toBe(false);
+
+    act(() => {
+      result.current.toggleOption(mockOptions[0]);
+    });
+
+    expect(result.current.isOptionSelected('opt1')).toBe(true);
+    expect(result.current.isOptionSelected('opt2')).toBe(false);
+  });
+
+  it('should get option quantity (default 1)', () => {
+    const { result } = renderHook(() => usePricing(100000));
+
+    act(() => {
+      result.current.toggleOption(mockOptions[0]);
+    });
+
+    expect(result.current.getOptionQuantity('opt1')).toBe(1);
+    expect(result.current.getOptionQuantity('opt2')).toBe(0);
+  });
+
+  it('should update option quantity', () => {
+    const { result } = renderHook(() => usePricing(100000));
+
+    act(() => {
+      result.current.toggleOption(mockOptions[2]);
+    });
+
+    // Initial quantity is 1
+    expect(result.current.selectedOptions[0].quantity).toBe(1);
+    expect(result.current.optionsTotal).toBe(20000);
+
+    // Update to 2 (assuming maxQuantity allows)
+    const maxQty = mockOptions[2].maxQuantity || 1;
+    if (maxQty > 1) {
+      act(() => {
+        result.current.updateOptionQuantity('opt3', 2);
+      });
+
+      expect(result.current.selectedOptions[0].quantity).toBe(2);
+      expect(result.current.optionsTotal).toBe(40000); // 20000 * 2
+      expect(result.current.totalPrice).toBe(140000); // 100000 + 40000
+    }
+  });
+
+  it('should remove option when quantity set to 0', () => {
+    const { result } = renderHook(() => usePricing(100000));
+
+    act(() => {
+      result.current.toggleOption(mockOptions[0]);
+    });
+
+    expect(result.current.selectedOptions).toHaveLength(1);
+
+    // Set quantity to 0
+    act(() => {
+      result.current.updateOptionQuantity('opt1', 0);
+    });
+
+    expect(result.current.selectedOptions).toHaveLength(0);
+    expect(result.current.optionsTotal).toBe(0);
+  });
+
+  it('should respect maxQuantity constraint', () => {
+    const { result } = renderHook(() => usePricing(100000));
+
+    act(() => {
+      result.current.toggleOption(mockOptions[2]);
+    });
+
+    // Try to set quantity higher than max
+    const maxQty = mockOptions[2].maxQuantity || 1;
+    if (maxQty > 1) {
+      act(() => {
+        result.current.updateOptionQuantity('opt3', maxQty + 5);
+      });
+
+      // Should cap at maxQuantity
+      expect(result.current.selectedOptions[0].quantity).toBe(maxQty);
+    }
+  });
+
+  it('should calculate complex scenario correctly', () => {
+    // Scenario: Base 100,000 + Lunch(15,000) + Guidebook(5,000) + Welcome Kit(20,000)
+    const { result } = renderHook(() => usePricing(100000));
+
+    act(() => {
+      result.current.toggleOption(mockOptions[0]); // 15000
+      result.current.toggleOption(mockOptions[1]); // 5000
+      result.current.toggleOption(mockOptions[2]); // 20000
+    });
+
+    expect(result.current.selectedOptions).toHaveLength(3);
+    expect(result.current.optionsTotal).toBe(40000);
+    expect(result.current.totalPrice).toBe(140000); // 100000 + 40000
+
+    // Verify each option details
+    const optionIds = result.current.selectedOptions.map(item => item.option.id);
+    expect(optionIds).toContain('opt1');
+    expect(optionIds).toContain('opt2');
+    expect(optionIds).toContain('opt3');
+  });
+});

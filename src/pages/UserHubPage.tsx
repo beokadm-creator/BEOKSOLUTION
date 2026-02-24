@@ -135,6 +135,112 @@ const UserHubPage: React.FC = () => {
     // [Fix-Step 263] Use Hook
     const { verifyMember, loading: verifyLoading } = useMemberVerification();
 
+    // [MOVED UP] fetchUserData must be defined before the useEffect that calls it (TDZ fix)
+    const fetchUserData = useCallback(async (u: any) => {
+        const db = getFirestore();
+        setLoading(true);
+
+        let profileData = {
+            displayName: forceString(u.userName || u.name || u.displayName),
+            phoneNumber: forceString(u.phoneNumber || u.phone),
+            affiliation: forceString(u.affiliation || u.org || u.organization),
+            licenseNumber: forceString(u.licenseNumber || u.licenseId),
+            email: forceString(u.email)
+        };
+
+        logger.debug('UserHub', 'Starting profile load', { uid: u.uid });
+
+        try {
+            const userDocRef = doc(db, 'users', u.uid);
+            const userDocSnap = await getDoc(userDocRef);
+            const hasUserDoc = userDocSnap.exists();
+
+            if (hasUserDoc) {
+                const userData = userDocSnap.data();
+                logger.debug('UserHub', 'users/{uid} document found', { uid: u.uid });
+                profileData = {
+                    displayName: forceString(userData.userName || userData.name || profileData.displayName),
+                    phoneNumber: forceString(userData.phoneNumber || userData.phone || profileData.phoneNumber),
+                    affiliation: forceString(userData.affiliation || userData.org || userData.organization || profileData.affiliation),
+                    licenseNumber: forceString(userData.licenseNumber || userData.licenseId || profileData.licenseNumber),
+                    email: forceString(userData.email || profileData.email)
+                };
+            } else {
+                logger.debug('UserHub', 'users/{uid} document does not exist, checking participations');
+                try {
+                    const participationsRef = collection(db, `users/${u.uid}/participations`);
+                    const participationsSnap = await getDocs(participationsRef);
+
+                    logger.debug('UserHub', 'Participations query returned', { count: participationsSnap.size });
+                    if (!participationsSnap.empty) {
+                        const nonMemberParticipation = participationsSnap.docs[0].data();
+                        const confSlug = nonMemberParticipation.slug || nonMemberParticipation.conferenceId || nonMemberParticipation.conferenceSlug || 'kadd_2026spring';
+
+                        // [Non-member detection] users/{uid} doesn't exist but participations do
+                        setIsNonMemberOnly(true);
+                        setNonMemberConferenceSlug(confSlug);
+                        logger.debug('UserHub', 'Non-member detected', { uid: u.uid, hasParticipations: participationsSnap.size, confSlug });
+                        const firstParticipation = participationsSnap.docs[0].data();
+
+                        profileData = {
+                            displayName: forceString(firstParticipation.userName || firstParticipation.name || profileData.displayName),
+                            phoneNumber: forceString(firstParticipation.userPhone || firstParticipation.phone || profileData.phoneNumber),
+                            affiliation: forceString(firstParticipation.userOrg || firstParticipation.organization || firstParticipation.affiliation || profileData.affiliation),
+                            licenseNumber: forceString(firstParticipation.licenseNumber || profileData.licenseNumber),
+                            email: forceString(firstParticipation.userEmail || firstParticipation.email || profileData.email)
+                        };
+                    }
+                } catch (partErr) {
+                    logger.warn('UserHub', 'Could not get participation data', partErr);
+                }
+            }
+        } catch (docErr: any) {
+            logger.error('UserHub', 'Error accessing users/{uid}', { code: docErr.code, message: docErr.message });
+        }
+
+        logger.debug('UserHub', 'Final profile data', profileData);
+        setProfile(profileData);
+
+        try {
+            const snapSoc = await getDocs(collection(db, 'societies'));
+            setSocieties(snapSoc.docs.map(d => ({ id: d.id, ...d.data() })));
+        } catch (socErr) {
+            logger.error('UserHub', 'Societies fetch error', socErr);
+        }
+
+        try {
+            if (!u.uid) {
+                logger.warn('UserHub', 'User UID is null, skipping abstracts fetch');
+                setAbstracts([]);
+                return;
+            }
+
+            const submissionsRef = collectionGroup(db, 'submissions');
+            const q = query(submissionsRef, where('userId', '==', u.uid), orderBy('submittedAt', 'desc'));
+            const snap = await getDocs(q);
+
+            const userAbstracts = snap.docs.map(d => ({
+                id: d.id,
+                ...d.data()
+            }));
+
+            setAbstracts(userAbstracts);
+            logger.debug('UserHub', 'Abstracts fetched', { count: userAbstracts.length });
+        } catch (absErr: any) {
+            logger.error('UserHub', 'Abstracts fetch error', absErr);
+            if (absErr.message?.includes('index') || absErr.message?.includes('Index')) {
+                logger.warn('UserHub', 'Abstracts index is still building, showing empty state');
+                setAbstracts([]);
+                toast('초록 내역이 준비 중입니다. 잠시 후 새로고침해주세요.');
+            } else {
+                setAbstracts([]);
+                toast.error('초록 내역을 불러올 수 없습니다.');
+            }
+        }
+
+        setLoading(false);
+    }, []);
+
     // ZOMBIE KILLER: Force refresh when navigating back from history
     useEffect(() => {
         const handlePageShow = (event: PageTransitionEvent) => {
@@ -211,7 +317,7 @@ const UserHubPage: React.FC = () => {
                 });
             }
         }
-    }, [user, authLoading, fetchUserData, verifyMember]);
+    }, [user, authLoading, verifyMember]);
 
     // [Step 402] Real-time validation trigger
     const validateCurrentAffiliationRef = useRef<any>(null);
@@ -575,116 +681,7 @@ const UserHubPage: React.FC = () => {
         };
     }, [user]);
 
-    const fetchUserData = useCallback(async (u: any) => {
-        const db = getFirestore();
-        setLoading(true);
-
-        let profileData = {
-            displayName: forceString(u.userName || u.name || u.displayName),
-            phoneNumber: forceString(u.phoneNumber || u.phone),
-            affiliation: forceString(u.affiliation || u.org || u.organization),
-            licenseNumber: forceString(u.licenseNumber || u.licenseId),
-            email: forceString(u.email)
-        };
-
-        logger.debug('UserHub', 'Starting profile load', { uid: u.uid });
-
-        try {
-            const userDocRef = doc(db, 'users', u.uid);
-            const userDocSnap = await getDoc(userDocSnap);
-            const hasUserDoc = userDocSnap.exists();
-
-            if (hasUserDoc) {
-                const userData = userDocSnap.data();
-                logger.debug('UserHub', 'users/{uid} document found', { uid: u.uid });
-                profileData = {
-                    displayName: forceString(userData.userName || userData.name || profileData.displayName),
-                    phoneNumber: forceString(userData.phoneNumber || userData.phone || profileData.phoneNumber),
-                    affiliation: forceString(userData.affiliation || userData.org || userData.organization || profileData.affiliation),
-                    licenseNumber: forceString(userData.licenseNumber || userData.licenseId || profileData.licenseNumber),
-                    email: forceString(userData.email || profileData.email)
-                };
-            } else {
-                logger.debug('UserHub', 'users/{uid} document does not exist, checking participations');
-                try {
-                    const participationsRef = collection(db, `users/${u.uid}/participations`);
-                    const participationsSnap = await getDocs(participationsRef);
-
-                    logger.debug('UserHub', 'Participations query returned', { count: participationsSnap.size });
-                    if (!participationsSnap.empty) {
-                        const nonMemberParticipation = participationsSnap.docs[0].data();
-                        const confSlug = nonMemberParticipation.slug || nonMemberParticipation.conferenceId || nonMemberParticipation.conferenceSlug || 'kadd_2026spring';
-
-                        // [Non-member detection] users/{uid} doesn't exist but participations do
-                        setIsNonMemberOnly(true);
-                        setNonMemberConferenceSlug(confSlug);
-                        logger.debug('UserHub', 'Non-member detected', { uid: u.uid, hasParticipations: participationsSnap.size, confSlug });
-                        const firstParticipation = participationsSnap.docs[0].data();
-
-                        profileData = {
-                            displayName: forceString(firstParticipation.userName || firstParticipation.name || profileData.displayName),
-                            phoneNumber: forceString(firstParticipation.userPhone || firstParticipation.phone || profileData.phoneNumber),
-                            affiliation: forceString(firstParticipation.userOrg || firstParticipation.organization || firstParticipation.affiliation || profileData.affiliation),
-                            licenseNumber: forceString(firstParticipation.licenseNumber || profileData.licenseNumber),
-                            email: forceString(firstParticipation.userEmail || firstParticipation.email || profileData.email)
-                        };
-                    }
-                } catch (partErr) {
-                    logger.warn('UserHub', 'Could not get participation data', partErr);
-                }
-            }
-        } catch (docErr: any) {
-            logger.error('UserHub', 'Error accessing users/{uid}', { code: docErr.code, message: docErr.message });
-        }
-
-        logger.debug('UserHub', 'Final profile data', profileData);
-        setProfile(profileData);
-
-        try {
-            const snapSoc = await getDocs(collection(db, 'societies'));
-            setSocieties(snapSoc.docs.map(d => ({ id: d.id, ...d.data() })));
-        } catch (socErr) {
-            logger.error('UserHub', 'Societies fetch error', socErr);
-        }
-
-        try {
-            // [Fix] Re-enable abstracts fetching for mypage
-            // Query submissions across ALL conferences where user is submitter
-            // Use collectionGroup to search conferences/{confId}/submissions
-            // [Safety] Use parameter u instead of outer scope user to avoid null reference
-            if (!u.uid) {
-                logger.warn('UserHub', 'User UID is null, skipping abstracts fetch');
-                setAbstracts([]);
-                return;
-            }
-
-            const submissionsRef = collectionGroup(db, 'submissions');
-            const q = query(submissionsRef, where('userId', '==', u.uid), orderBy('submittedAt', 'desc'));
-            const snap = await getDocs(q);
-
-            const userAbstracts = snap.docs.map(d => ({
-                id: d.id,
-                ...d.data()
-            }));
-
-            setAbstracts(userAbstracts);
-            logger.debug('UserHub', 'Abstracts fetched', { count: userAbstracts.length });
-        } catch (absErr: any) {
-            logger.error('UserHub', 'Abstracts fetch error', absErr);
-            // 🔧 [FIX] Handle index building gracefully
-            if (absErr.message?.includes('index') || absErr.message?.includes('Index')) {
-                logger.warn('UserHub', 'Abstracts index is still building, showing empty state');
-                setAbstracts([]); // Show empty state without error
-                toast('초록 내역이 준비 중입니다. 잠시 후 새로고침해주세요.');
-            } else {
-                setAbstracts([]); // Failed fetch: show empty state
-                toast.error('초록 내역을 불러올 수 없습니다.');
-            }
-        }
-
-        setLoading(false);
-        // setSyncStatus('connected'); // Handled by realtime listener
-    }, []);
+    // [REMOVED - fetchUserData moved above to fix TDZ error]
 
     const handleEventClick = (r: UserReg) => {
         const currentHost = window.location.hostname;
@@ -867,7 +864,7 @@ const UserHubPage: React.FC = () => {
                     {/* 1. Conferences Card */}
                     <DataWidget
                         title="My Conferences"
-                        value={regs.length}
+                        value={regs.filter(r => r.paymentStatus === 'PAID').length}
                         icon={Calendar}
                         loading={loading}
                     />
@@ -919,7 +916,7 @@ const UserHubPage: React.FC = () => {
                                 ))}
                             </>
                         )}
-                        {!loading && regs.length === 0 && (
+                        {!loading && regs.filter(r => r.paymentStatus === 'PAID').length === 0 && (
                             <div className="flex flex-col items-center justify-center py-16 px-4 bg-white rounded-xl border-2 border-dashed border-gray-200 text-center">
                                 <div className="w-20 h-20 bg-blue-50 text-blue-200 rounded-full flex items-center justify-center mb-6">
                                     <Calendar className="w-10 h-10 text-blue-400" />
@@ -937,8 +934,8 @@ const UserHubPage: React.FC = () => {
                                 </Button>
                             </div>
                         )}
-                        {/* 취소된 등록 제외 */}
-                        {regs.filter(r => !['CANCELED', 'REFUNDED', 'REFUND_REQUESTED'].includes(r.status || '')).map(r => (
+                        {/* 필터: 결제 완료(PAID)된 등록만 표시 */}
+                        {regs.filter(r => r.paymentStatus === 'PAID').map(r => (
 
                             <div key={r.id} onClick={() => handleEventClick(r)} className="eregi-card cursor-pointer flex flex-col group animate-in fade-in slide-in-from-bottom-2 duration-500">
                                 <div className="flex flex-col mb-4">

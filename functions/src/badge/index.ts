@@ -233,7 +233,7 @@ export async function sendBadgeNotification(
         // Get Sender Key from Infrastructure Settings
         const infraSnap = await db.doc(`societies/${conference.societyId}/settings/infrastructure`).get();
         const infraData = infraSnap.data();
-        const senderKey = infraData?.notification?.alimTalk?.senderKey;
+        const senderKey = infraData?.notification?.nhnAlimTalk?.senderKey;
 
         if (!senderKey) {
           functions.logger.error(`[BadgeNotification] No Sender Key found for society ${conference.societyId}`);
