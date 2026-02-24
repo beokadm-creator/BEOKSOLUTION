@@ -159,7 +159,7 @@ export const useTranslation = (slug: string): UseTranslationResult => {
         error,
         currentLang,
         setLanguage,
-        confId: config?.id || null,
+        confId: (config as { id?: string } | null)?.id || null,
         urlSlug: slug,
         refresh
     };

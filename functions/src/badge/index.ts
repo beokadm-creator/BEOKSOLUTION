@@ -140,7 +140,7 @@ export const onRegistrationCreated = functions.firestore
 
       // Send notification
       if (conference) {
-        await sendBadgeNotification(db, conference, regId, regData, token);
+        await sendBadgeNotification(db, { ...conference, id: confId }, regId, regData, token);
       }
 
       functions.logger.info(`[BadgeToken] Created token ${token} for ${regId}`);
