@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { getRootCookie } from '../utils/cookie';
 import { db } from '../firebase';
+import { safeFormatDate } from '../utils/dateUtils';
 import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { ArrowRight, CheckCircle2, Calendar, MapPin } from 'lucide-react';
 
@@ -18,7 +19,7 @@ interface ConfSummary {
 
 const PlatformHome: React.FC = () => {
     const navigate = useNavigate();
-    const { auth } = useAuth('');
+    const { auth } = useAuth();
     const { user } = auth;
     const [activeConferences, setActiveConferences] = useState<ConfSummary[]>([]);
     const [loading, setLoading] = useState(true);
@@ -29,21 +30,21 @@ const PlatformHome: React.FC = () => {
                 // [Fix-Step 264] L3 Standard Fetch
                 // Fetch ALL conferences from root (Limit 50 to ensure KADD is found)
                 console.log("[PlatformHome] Fetching ALL conferences...");
-                
+
                 // Note: We avoid complex server-side filtering to prevent index errors on 'status'
                 // We fetch everything and filter in memory.
                 const q = query(
                     collection(db, 'conferences'),
                     limit(50)
                 );
-                
+
                 const snap = await getDocs(q);
                 console.log(`[PlatformHome] Found ${snap.size} conferences.`);
 
                 const list: ConfSummary[] = snap.docs.map(doc => {
                     const data = doc.data();
-                    const start = data.dates?.start?.seconds ? new Date(data.dates.start.seconds * 1000).toLocaleDateString() : 'TBD';
-                    
+                    const start = safeFormatDate(data.dates?.start);
+
                     // [Fix-Step 263] Normalize societyId
                     const rawSocId = data.societyId || 'kap';
                     const normalizedSocId = typeof rawSocId === 'string' ? rawSocId.toLowerCase() : 'kap';
@@ -61,10 +62,10 @@ const PlatformHome: React.FC = () => {
                         startDate: data.dates?.start?.seconds || 0
                     };
                 })
-                // Filter ACTIVE or PUBLIC (or just show all for now to verify KADD)
-                // The user said: "filter by status in JS"
-                .filter((c: ConfSummary) => c.status !== 'HIDDEN' && c.status !== 'ARCHIVED')
-                .sort((a: ConfSummary, b: ConfSummary) => (b.startDate || 0) - (a.startDate || 0)); // Newest first
+                    // Filter ACTIVE or PUBLIC (or just show all for now to verify KADD)
+                    // The user said: "filter by status in JS"
+                    .filter((c: ConfSummary) => c.status !== 'HIDDEN' && c.status !== 'ARCHIVED')
+                    .sort((a: ConfSummary, b: ConfSummary) => (b.startDate || 0) - (a.startDate || 0)); // Newest first
 
                 setActiveConferences(list);
             } catch (e) {

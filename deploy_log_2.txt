@@ -1,0 +1,67 @@
+
+[1m[37m===[39m Deploying to 'eregi-dev'...[22m
+
+[36m[1mi [22m[39m deploying [1mfunctions[22m
+Running command: npm --prefix "$RESOURCE_DIR" run build
+
+> build
+> tsc
+
+[32m[1m+ [22m[39m [32m[1mfunctions:[22m[39m Finished running [1mpredeploy[22m script.
+[36m[1mi  functions:[22m[39m preparing codebase [1mdefault[22m for deployment
+[36m[1mi  functions:[22m[39m ensuring required API [1mcloudfunctions.googleapis.com[22m is enabled...
+[36m[1mi  functions:[22m[39m ensuring required API [1mcloudbuild.googleapis.com[22m is enabled...
+[36m[1mi  artifactregistry:[22m[39m ensuring required API [1martifactregistry.googleapis.com[22m is enabled...
+[33m[1m!  functions:[22m[39m Runtime Node.js 20 will be deprecated on 2026-04-30 and will be decommissioned on 2026-10-30, after which you will not be able to deploy without upgrading. Consider upgrading now to avoid disruption. See https://cloud.google.com/functions/docs/runtime-support for full details on the lifecycle policy
+[33m[1m! [22m[39m [1m[33mfunctions: [39m[22mpackage.json indicates an outdated version of firebase-functions. Please upgrade using [1mnpm install --save firebase-functions@latest[22m in your functions directory.
+[33m[1m! [22m[39m [1m[33mfunctions: [39m[22mPlease note that there will be breaking changes when you upgrade.
+[36m[1mi  functions:[22m[39m Loading and analyzing source code for codebase default to determine what to deploy
+[36m[1mi  functions:[22m[39m You are using a version of firebase-functions SDK (4.9.0) that does not have support for the newest Firebase Extensions features. Please update firebase-functions SDK to >=5.1.0 to use them correctly
+Serving at port 8915
+
+[Email] EMAIL_USER or EMAIL_PASSWORD not set. Email functionality will be disabled.
+
+[36m[1mi  functions:[22m[39m preparing [1mfunctions[22m directory for uploading...
+[36m[1mi [22m[39m [36m[1mfunctions:[22m[39m packaged [1mC:\Users\whhol\Documents\trae_projects\eRegi\functions[22m (37.09 MB) for uploading
+[36m[1mi  functions:[22m[39m ensuring required API [1mcloudscheduler.googleapis.com[22m is enabled...
+[32m[1m+  functions:[22m[39m [1mfunctions[22m source uploaded successfully
+[36m[1mi  functions:[22m[39m Skipping the deploy of unchanged functions.
+[36m[1mi  functions:[22m[39m creating Node.js 20 (1st Gen) function [1mremoveSocietyAdminUser(us-central1)[22m...
+[32m[1m+ [22m[39m [1m[35mfunctions[onRegistrationCreated(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[onExternalAttendeeCreated(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[validateBadgePrepToken(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[issueDigitalBadge(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[resendBadgePrepToken(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[generateFirebaseAuthUserForExternalAttendee(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[monitorRegistrationIntegrity(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[monitorMemberCodeIntegrity(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[dailyErrorReport(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[weeklyPerformanceReport(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[resolveDataIntegrityAlert(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[prepareNicePayment(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[confirmNicePayment(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[confirmTossPayment(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[confirmTossPaymentHttp(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[cancelTossPayment(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[getNhnAlimTalkTemplates(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[createSocietyAdminUser(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[sendAuthCode(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[verifyMemberIdentity(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[checkEmailExists(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[deleteUserAccount(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[mintCrossDomainToken(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[verifyAccessLink(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[generateAccessLink(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[checkNonMemberEmailExists(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[logError(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[logPerformance(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[onTossWebhook(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[healthCheck(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[migrateRegistrationsForOptions(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[35mfunctions[migrateRegistrationsForOptionsCallable(us-central1)][39m[22m Skipped (No changes detected)
+[32m[1m+ [22m[39m [1m[32mfunctions[removeSocietyAdminUser(us-central1)][39m[22m Successful create operation.
+[33m[1m!  functions:[22m[39m No cleanup policy detected for repositories in us-central1. This may result in a small monthly bill as container images accumulate over time.
+[34m?[39m [1mHow many days do you want to keep container images before they're deleted?[22m [2m(1)[22m
+[1A[82G[1B
+[?25h
+[1m[31mError:[39m[22m An unexpected error has occurred.

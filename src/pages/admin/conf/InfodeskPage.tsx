@@ -7,6 +7,8 @@ import { CheckCircle, AlertCircle, Printer, X, Settings, Palette, Loader2 } from
 import { Button } from '../../../components/ui/button';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { useBixolon } from '../../../hooks/useBixolon';
+import { BadgeElement } from '../../../types/schema';
 
 // Types
 interface ScannerState {
@@ -36,41 +38,61 @@ const InfodeskPage: React.FC = () => {
     const { cid } = useParams<{ cid: string }>();
     const { selectedConferenceId } = useAdminStore();
     const [loading, setLoading] = useState(true);
-    
+    const { printBadge, error: printError } = useBixolon();
+
     // Config
     const [conferenceTitle, setConferenceTitle] = useState('');
     const [conferenceSubtitle, setConferenceSubtitle] = useState('');
-    
+
     // Info Desk Settings
     const [issueOption, setIssueOption] = useState<IssueOption['value']>('DIGITAL_PRINT');
-    
+
     // Design State
     const [showSettings, setShowSettings] = useState(false);
     const [design, setDesign] = useState<DesignConfig>(() => {
         const saved = localStorage.getItem('infodesk_design');
         return saved ? JSON.parse(saved) : { bgImage: null, textColor: '#000000', fontSize: 'normal' };
     });
-    
+
     // Scanner State
     const [scannerState, setScannerState] = useState<ScannerState>({
         status: 'IDLE',
         message: 'Ready to Scan',
         lastScanned: ''
     });
+
+    const [badgeLayout, setBadgeLayout] = useState<{ width: number; height: number; elements: BadgeElement[]; enableCutting?: boolean } | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const [inputValue, setInputValue] = useState('');
 
     // Load Data
     useEffect(() => {
-        if (!selectedConferenceId) return;
         const init = async () => {
+            const targetId = cid || selectedConferenceId;
+            if (!targetId) return;
+
             try {
                 // 1. Conf Info
-                const confRef = doc(db, 'conferences', selectedConferenceId);
+                const confRef = doc(db, 'conferences', targetId);
                 const confSnap = await getDoc(confRef);
                 if (confSnap.exists()) {
                     setConferenceTitle(confSnap.data().title?.ko || 'Conference');
                     setConferenceSubtitle(confSnap.data().subtitle || '');
+                }
+
+                // 2. Load Badge Layout from Settings [v356]
+                const layoutRef = doc(db, `conferences/${targetId}/settings`, 'badge_config');
+                const layoutSnap = await getDoc(layoutRef);
+                if (layoutSnap.exists()) {
+                    const data = layoutSnap.data();
+                    if (data.badgeLayoutEnabled) {
+                        setBadgeLayout({
+                            width: data.badgeLayout?.width || 800,
+                            height: data.badgeLayout?.height || 1200,
+                            elements: data.badgeLayout?.elements || [],
+                            enableCutting: data.badgeLayout?.enableCutting || false
+                        });
+                    }
                 }
             } catch (e) {
                 console.error(e);
@@ -80,7 +102,7 @@ const InfodeskPage: React.FC = () => {
             }
         };
         init();
-        
+
         // Load Unified Settings [v356]
         if (cid) {
             const saved = localStorage.getItem(`eregi_conf_${cid}_settings`);
@@ -105,7 +127,7 @@ const InfodeskPage: React.FC = () => {
         try {
             const saved = localStorage.getItem(key);
             const parsed = saved ? JSON.parse(saved) : {};
-            
+
             const newSettings = {
                 ...parsed,
                 infodesk: {
@@ -136,10 +158,15 @@ const InfodeskPage: React.FC = () => {
             const targetConferenceId = cid || selectedConferenceId;
             if (!targetConferenceId) throw new Error("Conference ID Missing");
 
-            // Extract registration ID from QR code (remove BADGE- prefix if exists)
-            let regId = code;
-            if (code.startsWith('BADGE-')) {
-                regId = code.replace('BADGE-', '');
+            // Safeguard: Check if Access QR (BADGE- prefix)
+            let regId = code.trim();
+            if (regId.startsWith('BADGE-')) {
+                throw new Error("이미 발급된 명찰(Access QR)입니다. 등록 교환권 QR을 스캔해 주세요.");
+            }
+
+            // Extract registration ID from QR code
+            if (regId.startsWith('VOUCHER-')) {
+                regId = regId.replace('VOUCHER-', '');
             }
 
             // Check if external attendee (EXT- prefix)
@@ -156,13 +183,23 @@ const InfodeskPage: React.FC = () => {
                 extSnap = { exists: () => false };
             }
 
-            let regData: { userName?: string; affiliation?: string; userEmail?: string; name?: string; organization?: string; status?: string; } | null = null;
+            let regData: { 
+                status?: string; 
+                name?: string; 
+                userName?: string; 
+                affiliation?: string; 
+                organization?: string; 
+                userEmail?: string;
+                userTier?: string;
+                amount?: number;
+                licenseNumber?: string;
+            } | null = null;
             let isExternal = false;
 
-            if (regSnap.exists && regSnap.exists()) {
+            if (regSnap.exists()) {
                 regData = regSnap.data();
                 isExternal = false;
-            } else if (extSnap.exists && extSnap.exists()) {
+            } else if (extSnap.exists()) {
                 regData = extSnap.data();
                 isExternal = true;
             } else {
@@ -173,15 +210,15 @@ const InfodeskPage: React.FC = () => {
                 throw new Error("Registration NOT PAID");
             }
 
-            const userName = isExternal ? (regData?.name || 'Unknown') : (regData?.userName || 'Unknown');
-            const userAffiliation = isExternal ? (regData?.organization || '') : (regData?.affiliation || regData?.userEmail || '');
+            const userName = isExternal ? (regData?.name || 'Unknown') : (regData?.userName || regData.name || 'Unknown');
+            const userAffiliation = isExternal ? (regData?.organization || '') : (regData?.affiliation || regData.organization || regData?.userEmail || '');
 
             // Logic: Issue Badge using Cloud Function (supports both regular and external attendees)
             const functions = getFunctions();
             const issueDigitalBadgeFn = httpsCallable(functions, 'issueDigitalBadge');
             const result = await issueDigitalBadgeFn({
                 confId: targetConferenceId,
-                regId: regId, // Use regId with prefix stripped
+                regId: regId,
                 issueOption: issueOption,
                 isExternalAttendee: isExternal
             }) as { data: { success: boolean; badgeQr: string } };
@@ -190,10 +227,41 @@ const InfodeskPage: React.FC = () => {
                 throw new Error("Failed to issue digital badge");
             }
 
-            // Trigger Print (Mock)
+            // Real Bixolon Printing
             if (issueOption !== 'DIGITAL_ONLY') {
-                // In real world, send to print server or local print agent
-                toast.success("Printing Requested...", { icon: '🖨️' });
+                try {
+                    toast.loading("Printing Label...", { id: 'printing' });
+
+                    // Fallback to default layout if not configured
+                    const activeLayout = badgeLayout || {
+                        width: 800,
+                        height: 1200,
+                        elements: [
+                            { x: 400, y: 150, fontSize: 6, isVisible: true, type: 'QR' } as BadgeElement,
+                            { x: 400, y: 450, fontSize: 4, isVisible: true, type: 'NAME' } as BadgeElement,
+                            { x: 400, y: 600, fontSize: 2, isVisible: true, type: 'ORG' } as BadgeElement
+                        ]
+                    };
+
+                    const printSuccess = await printBadge(activeLayout, {
+                        name: userName,
+                        org: userAffiliation,
+                        category: isExternal ? '' : (regData.userTier || ''),
+                        license: regData.licenseNumber || '',
+                        price: isExternal ? '' : `${regData.amount?.toLocaleString() || 0}원`,
+                        affiliation: isExternal ? '' : (regData.affiliation || ''), // Add affiliation field
+                        qrData: result.data.badgeQr
+                    });
+
+                    if (printSuccess) {
+                        toast.success("Badge Printed", { id: 'printing' });
+                    } else {
+                        toast.error(printError || "Print failed", { id: 'printing' });
+                    }
+                } catch (pe) {
+                    console.error("Print Error:", pe);
+                    toast.error("Printer connection error", { id: 'printing' });
+                }
             }
 
             // Success
@@ -208,11 +276,7 @@ const InfodeskPage: React.FC = () => {
         } catch (e) {
             console.error(e);
             const errorMessage = e instanceof Error ? e.message : 'Scan Failed';
-            setScannerState({
-                status: 'ERROR',
-                message: errorMessage,
-                lastScanned: code
-            });
+            setScannerState({ status: 'ERROR', message: errorMessage, lastScanned: code });
         }
 
         setTimeout(() => {
@@ -220,6 +284,7 @@ const InfodeskPage: React.FC = () => {
             setInputValue('');
         }, 3000); // 3s delay
     };
+
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
@@ -244,13 +309,13 @@ const InfodeskPage: React.FC = () => {
     if (loading) return <div>Loading Kiosk...</div>;
 
     return (
-        <div 
+        <div
             className="fixed inset-0 z-[99999] flex flex-col font-sans transition-colors duration-500 bg-white"
-            style={{ 
+            style={{
                 backgroundImage: design.bgImage ? `url(${design.bgImage})` : 'none',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
-                color: design.textColor 
+                color: design.textColor
             }}
         >
             {/* Top Admin Console */}
@@ -259,7 +324,7 @@ const InfodeskPage: React.FC = () => {
                     <span className="font-bold text-yellow-400 flex items-center gap-2">
                         <Printer className="w-4 h-4" /> INFO DESK
                     </span>
-                    
+
                     <div className="flex bg-gray-700 rounded p-1">
                         {[
                             { l: '디지털만', v: 'DIGITAL_ONLY' },
@@ -269,9 +334,8 @@ const InfodeskPage: React.FC = () => {
                             <button
                                 key={opt.v}
                                 onClick={() => setIssueOption(opt.v)}
-                                className={`px-3 py-1 rounded text-xs font-bold transition-colors ${
-                                    issueOption === opt.v ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'
-                                }`}
+                                className={`px-3 py-1 rounded text-xs font-bold transition-colors ${issueOption === opt.v ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'
+                                    }`}
                             >
                                 {opt.l}
                             </button>
@@ -295,7 +359,7 @@ const InfodeskPage: React.FC = () => {
                     <h3 className="font-bold mb-4 flex items-center gap-2">
                         <Settings className="w-4 h-4" /> Kiosk Design
                     </h3>
-                    
+
                     <div className="space-y-4">
                         <div>
                             <label className="text-xs font-bold text-gray-500 block mb-1">Background Image</label>
@@ -306,15 +370,15 @@ const InfodeskPage: React.FC = () => {
                                 </Button>
                             )}
                         </div>
-                        
+
                         <div>
                             <label className="text-xs font-bold text-gray-500 block mb-1">Text Color</label>
                             <div className="flex gap-2">
-                                <input 
-                                    type="color" 
-                                    value={design.textColor} 
+                                <input
+                                    type="color"
+                                    value={design.textColor}
                                     onChange={(e) => setDesign(prev => ({ ...prev, textColor: e.target.value }))}
-                                    className="h-8 w-16 p-0 border-0" 
+                                    className="h-8 w-16 p-0 border-0"
                                 />
                                 <div className="flex-1 flex gap-1">
                                     <button onClick={() => setDesign(prev => ({ ...prev, textColor: '#000000' }))} className="w-8 h-8 bg-black rounded-full border border-gray-200" />
@@ -328,7 +392,7 @@ const InfodeskPage: React.FC = () => {
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative mt-16">
-                
+
                 {/* Header */}
                 <div className="mb-12 drop-shadow-lg">
                     <h1 className="text-5xl md:text-7xl font-bold mb-4 tracking-tight" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
@@ -338,19 +402,18 @@ const InfodeskPage: React.FC = () => {
                 </div>
 
                 {/* Main Instruction Card */}
-                <div className={`p-10 rounded-3xl w-full max-w-3xl shadow-2xl backdrop-blur-sm border transition-all duration-500 ${
-                    design.bgImage ? 'bg-black/40 border-white/20 text-white' : 
-                    'bg-green-50 border-green-200 text-green-900'
-                }`}>
+                <div className={`p-10 rounded-3xl w-full max-w-3xl shadow-2xl backdrop-blur-sm border transition-all duration-500 ${design.bgImage ? 'bg-black/40 border-white/20 text-white' :
+                        'bg-green-50 border-green-200 text-green-900'
+                    }`}>
                     <h2 className="text-5xl font-black mb-6">
                         등록 확인 및 명찰 발급
                     </h2>
-                    
+
                     <p className="opacity-80 mb-8 text-2xl font-medium">
                         등록 교환권(QR)을 스캐너에 인식시켜주세요.
-                        <br/>(Please scan your Registration Voucher)
+                        <br />(Please scan your Registration Voucher)
                     </p>
-                    
+
                     <div className="animate-pulse mt-8">
                         <Printer className="w-16 h-16 mx-auto opacity-50" />
                     </div>
@@ -368,17 +431,16 @@ const InfodeskPage: React.FC = () => {
 
                 {/* Result Overlay (Success/Error) */}
                 {(scannerState.status === 'SUCCESS' || scannerState.status === 'ERROR') && (
-                    <div className={`absolute inset-0 z-[60000] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200 ${
-                        scannerState.status === 'SUCCESS' ? 'bg-green-600' : 'bg-red-600'
-                    } text-white`}>
+                    <div className={`absolute inset-0 z-[60000] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200 ${scannerState.status === 'SUCCESS' ? 'bg-green-600' : 'bg-red-600'
+                        } text-white`}>
                         {scannerState.status === 'SUCCESS' ? (
                             <CheckCircle className="w-40 h-40 mb-8 drop-shadow-lg" />
                         ) : (
                             <AlertCircle className="w-40 h-40 mb-8 drop-shadow-lg" />
                         )}
-                        
+
                         <h2 className="text-6xl font-black mb-4 drop-shadow-md">{scannerState.message}</h2>
-                        
+
                         {scannerState.userData && (
                             <div className="mt-12 text-center bg-white/10 p-12 rounded-3xl backdrop-blur-md border border-white/20 w-full max-w-4xl shadow-2xl">
                                 <div className="text-7xl font-black mb-6 tracking-tight">{scannerState.userData.name}</div>
@@ -395,7 +457,7 @@ const InfodeskPage: React.FC = () => {
                 )}
 
                 {/* Hidden Input */}
-                <input 
+                <input
                     ref={inputRef}
                     value={inputValue}
                     onChange={e => setInputValue(e.target.value)}

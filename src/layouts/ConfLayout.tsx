@@ -7,7 +7,7 @@ import { doc, getDoc, collection, getDocs, query, where, limit } from 'firebase/
 import { db, auth } from '../firebase';
 import { Conference } from '../types/schema';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { LayoutDashboard, Globe, FileText, Users, Settings, QrCode, Monitor, CreditCard, LogOut, ArrowLeft, Printer, BarChart, UserPlus, Building2, Bell } from 'lucide-react';
+import { LayoutDashboard, Globe, FileText, Users, Settings, QrCode, Monitor, CreditCard, LogOut, ArrowLeft, Printer, BarChart, UserPlus, Building2, Bell, IdCard } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/ui/button';
 
@@ -17,7 +17,15 @@ export default function ConfLayout() {
 
     // DEV 환경에서 ?society 파라미터도 society ID로 인식
     const societyFromParam = new URLSearchParams(window.location.search).get('society');
-    const effectiveSubdomain = subdomain || societyFromParam;
+    
+    // [Fix] In Dev/Hosting environment without subdomain, try to infer societyId from cid (slug)
+    // cid format: societyId_conferenceId (e.g., kadd_2026spring)
+    let inferredSocietyId: string | null = null;
+    if (!subdomain && !societyFromParam && cid && cid.includes('_')) {
+        inferredSocietyId = cid.split('_')[0];
+    }
+
+    const effectiveSubdomain = subdomain || societyFromParam || inferredSocietyId;
 
     const [conference, setConference] = useState<Conference | null>(null);
     const [loading, setLoading] = useState(true);
@@ -28,51 +36,94 @@ export default function ConfLayout() {
 
     useEffect(() => {
         if (!cid) return;
+        
+        let isMounted = true;
+
         const fetchConf = async () => {
             try {
-                // Step 1: Try fetching by ID first
-                const docRef = doc(db, 'conferences', cid);
-                const docSnap = await getDoc(docRef);
+                // Determine paths to try based on cid structure
+                // Case 1: cid is kadd_2026spring -> try conferences/kadd_2026spring (Root)
+                // Case 2: cid is kadd_2026spring -> try societies/kadd/conferences/2026spring (Nested)
+                // Case 3: cid is 2026spring -> try conferences/2026spring (Legacy Root)
+                // Case 4: cid is 2026spring -> try query slug=2026spring (Fallback)
 
-                if (docSnap.exists()) {
-                    const data = { id: docSnap.id, ...docSnap.data() } as Conference;
-                    // Security Check: Society ID Mismatch
-                    // Check both ID prefix and societyId field for compatibility
-                    const confSocietyId = data.societyId || data.id.split('_')[0];
-                    if (effectiveSubdomain && confSocietyId !== effectiveSubdomain) {
-                        console.error('Society Mismatch', { confSocietyId, effectiveSubdomain });
-                        setConference(null);
-                    } else {
-                        setConference(data);
+                let confData: Conference | null = null;
+                let found = false;
+
+                const pathsToTry = [];
+                
+                // Add Root Path (conferences/{cid})
+                pathsToTry.push({ path: `conferences/${cid}`, type: 'root' });
+
+                // Add Nested Path if cid contains '_' (societyId_slug)
+                if (cid && cid.includes('_')) {
+                    const [sid, slug] = cid.split('_');
+                    if (sid && slug) {
+                        pathsToTry.push({ path: `societies/${sid}/conferences/${slug}`, type: 'nested' });
                     }
-                } else {
-                    // Step 2: Fallback to slug search
+                }
+
+                // Try direct paths
+                for (const candidate of pathsToTry) {
+                    try {
+                        const docRef = doc(db, candidate.path);
+                        const docSnap = await getDoc(docRef);
+                        if (docSnap.exists()) {
+                            console.log(`[ConfLayout] Found conference at ${candidate.path}`);
+                            confData = { id: docSnap.id, ...docSnap.data() } as Conference;
+                            found = true;
+                            break;
+                        }
+                    } catch (e) {
+                        console.warn(`[ConfLayout] Error checking path ${candidate.path}`, e);
+                    }
+                }
+
+                // Fallback: Query by slug
+                if (!found) {
                     const q = query(collection(db, 'conferences'), where('slug', '==', cid), limit(1));
                     const querySnapshot = await getDocs(q);
-
                     if (!querySnapshot.empty) {
                         const docData = querySnapshot.docs[0];
-                        const data = { id: docData.id, ...docData.data() } as Conference;
-                        // Security Check: Society ID Mismatch
-                        const confSocietyId = data.societyId || data.id.split('_')[0];
-                        if (effectiveSubdomain && confSocietyId !== effectiveSubdomain) {
-                            console.error('Society Mismatch', { confSocietyId, effectiveSubdomain });
-                            setConference(null);
+                        confData = { id: docData.id, ...docData.data() } as Conference;
+                        found = true;
+                        console.log(`[ConfLayout] Found conference by slug query: ${cid}`);
+                    }
+                }
+
+                if (found && confData) {
+                    // Security Check: Society ID Mismatch
+                    const confSocietyId = confData.societyId || confData.id.split('_')[0];
+                    
+                    // Allow access if no effectiveSubdomain (e.g. dev environment or direct access)
+                    if (effectiveSubdomain && confSocietyId !== effectiveSubdomain) {
+                        console.error('Society Mismatch', { confSocietyId, effectiveSubdomain });
+                        // Don't block access in dev mode if mismatch occurs
+                        if (isDev) {
+                            console.warn('Allowing access despite mismatch in DEV mode');
+                            setConference(confData);
                         } else {
-                            setConference(data);
+                            setConference(null);
                         }
                     } else {
-                        console.error('Conference not found');
+                        setConference(confData);
                     }
+                } else {
+                    console.error('Conference not found');
+                    setConference(null);
                 }
             } catch (e) {
                 console.error(e);
             } finally {
-                setLoading(false);
+                if (isMounted) setLoading(false);
             }
         };
         fetchConf();
-    }, [cid, effectiveSubdomain]);
+
+        return () => {
+            isMounted = false;
+        };
+    }, [cid, effectiveSubdomain, isDev]);
 
     if (loading) return <LoadingSpinner />;
     if (!conference) return <div>Conference Not Found</div>;
@@ -86,6 +137,7 @@ export default function ConfLayout() {
         { href: `/admin/conf/${cid}/abstracts`, label: '초록 관리', icon: FileText },
         { href: `/admin/conf/${cid}/notices`, label: '공지사항 관리', icon: Bell },
         { href: `/admin/conf/${cid}/registrations`, label: '등록자 관리', icon: Users },
+        { href: `/admin/conf/${cid}/badge-management`, label: '명찰 관리', icon: IdCard },
         { href: `/admin/conf/${cid}/options`, label: '옵션 관리', icon: Settings },
         { href: `/admin/conf/${cid}/external-attendees`, label: '외부 참석자', icon: UserPlus },
         { href: `/admin/conf/${cid}/infodesk`, label: '인포데스크', icon: Printer },

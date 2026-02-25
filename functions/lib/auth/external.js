@@ -15,13 +15,23 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateFirebaseAuthUserForExternalAttendee = void 0;
 const functions = __importStar(require("firebase-functions"));
@@ -42,7 +52,7 @@ exports.generateFirebaseAuthUserForExternalAttendee = functions
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
-    const { confId, externalId, password, email, name, phone, organization, licenseNumber } = data;
+    const { confId, externalId, password, email, name, phone, organization, licenseNumber, amount } = data;
     if (!confId || !externalId) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing confId or externalId');
     }
@@ -105,7 +115,7 @@ exports.generateFirebaseAuthUserForExternalAttendee = functions
             affiliation: attendeeData.organization,
             organization: attendeeData.organization,
             licenseNumber: attendeeData.licenseNumber || '',
-            tier: 'EXTERNAL',
+            tier: 'EXTERNAL', // Special Tier
             isAnonymous: false,
             country: 'KR',
             authStatus: {
@@ -123,13 +133,17 @@ exports.generateFirebaseAuthUserForExternalAttendee = functions
         });
         // 4. Create Participation Record (For accessing the conference)
         // This is CRITICAL for "Normal Course Taking System"
+        const societyId = confId.split('_')[0] || 'unknown';
         await db.collection('users').doc(uid).collection('participations').doc(externalId).set({
             conferenceId: confId,
             registrationId: externalId,
+            societyId: societyId,
             role: 'ATTENDEE',
             type: 'EXTERNAL',
             registeredAt: admin.firestore.FieldValue.serverTimestamp(),
-            status: 'COMPLETED'
+            status: 'PAID', // Changed from COMPLETED to PAID to match UserHub logic
+            paymentStatus: 'PAID', // Explicitly set paymentStatus
+            amount: Number(amount) || 0 // Use passed amount or 0
         }, { merge: true });
         return { success: true, uid, message: isNew ? 'Created new account' : 'Linked existing account' };
     }

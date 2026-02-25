@@ -51,7 +51,7 @@ const PaymentSuccessHandler: React.FC = () => {
                 // Since we didn't save PENDING doc in Firestore, we must use session data.
                 const pendingDataStr = sessionStorage.getItem(`pending_reg_${orderId}`);
 
-                let regData: any = null;
+                let regData: unknown = null;
                 if (pendingDataStr) {
                     try {
                         regData = JSON.parse(pendingDataStr);

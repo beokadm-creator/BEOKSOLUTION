@@ -60,7 +60,7 @@ const AgendaManager: React.FC = () => {
         if (selectedAgendaId && confId) {
             const selected = agendas.find(a => a.id === selectedAgendaId);
             if (selected) {
-                // eslint-disable-next-line react-hooks/set-state-in-effect
+                 
                 setAgendaForm({ ...selected });
                  
                 setSessionType(selected.sessionType || '');

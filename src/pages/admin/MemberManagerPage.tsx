@@ -18,6 +18,7 @@ import {
 } from '../../components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Badge } from '../../components/ui/badge';
+import { safeFormatDate } from '../../utils/dateUtils';
 import {
     Plus,
     Trash2,
@@ -171,7 +172,7 @@ const MemberManagerPage: React.FC = () => {
         }
         try {
             const colRef = collection(db, 'societies', targetId, 'settings', 'grades', 'list');
-            
+
             // Check for duplicate ID (which is the code)
             const docRef = doc(colRef, newGradeCode);
             const docSnap = await getDoc(docRef);
@@ -262,48 +263,48 @@ const MemberManagerPage: React.FC = () => {
             toast.error('CSV 데이터가 비어 있습니다.');
             return;
         }
-        
+
         if (!newGrade) {
             toast.error('등급을 선택해주세요.');
             return;
         }
-        
+
         // CSV 파싱
         const lines = bulkData.trim().split('\n').filter(line => line.trim());
-        
+
         if (lines.length === 0) {
             toast.error('CSV 파일이 비어 있습니다.');
             return;
         }
-        
+
         const parsedData = [];
         const errors: string[] = [];
-        
+
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
             if (!line) continue;
-            
+
             // 파이프(|)로 분리
             const parts = line.split('|');
-            
+
             // 필드 수 검증 (NAME|CODE|GRADE|EXPIRY_DATE)
             if (parts.length !== 4) {
-                errors.push(`줄 ${i+1}: 형식이 올바르지 않습니다. (NAME|CODE|GRADE|EXPIRY_DATE)`);
+                errors.push(`줄 ${i + 1}: 형식이 올바르지 않습니다. (NAME|CODE|GRADE|EXPIRY_DATE)`);
                 continue;
             }
-            
+
             const [name, code, grade, expiryDate] = parts;
-            
+
             // 필수 필드 검증
             if (!name.trim() || !code.trim() || !grade.trim() || !expiryDate.trim()) {
-                errors.push(`줄 ${i+1}: 필수 필드가 누락되어 있습니다.`);
+                errors.push(`줄 ${i + 1}: 필수 필드가 누락되어 있습니다.`);
                 continue;
             }
-            
+
             // 날짜 형식 검증
             const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
             if (!dateRegex.test(expiryDate.trim())) {
-                errors.push(`줄 ${i+1}: 날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)`);
+                errors.push(`줄 ${i + 1}: 날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)`);
                 continue;
             }
 
@@ -314,23 +315,23 @@ const MemberManagerPage: React.FC = () => {
                 expiryDate: expiryDate.trim()
             });
         }
-        
+
         if (errors.length > 0) {
             toast.error(`CSV 파싱 오류:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n... 외 ${errors.length - 5}개 오류` : ''}`);
             return;
         }
-        
+
         if (parsedData.length === 0) {
             toast.error('파싱된 데이터가 없습니다.');
             return;
         }
-        
+
         try {
             // Firestore Batch 사용
             const batches: Promise<unknown>[] = [];
             let currentBatch = writeBatch(db);
             let batchCount = 0;
-            
+
             for (const member of parsedData) {
                 const newDocRef = doc(collection(db, `societies/${targetId}/members`));
                 currentBatch.set(newDocRef, {
@@ -344,7 +345,7 @@ const MemberManagerPage: React.FC = () => {
                     updatedAt: Timestamp.now()
                 });
                 batchCount++;
-                
+
                 // Firestore batch 제한 (500개)
                 if (batchCount >= 500) {
                     batches.push(currentBatch.commit());
@@ -352,13 +353,13 @@ const MemberManagerPage: React.FC = () => {
                     batchCount = 0;
                 }
             }
-            
+
             if (batchCount > 0) {
                 batches.push(currentBatch.commit());
             }
-            
+
             await Promise.all(batches);
-            
+
             toast.success(`${parsedData.length}명의 회원이 업로드되었습니다.`);
             setBulkData('');
             fetchMembers();
@@ -653,7 +654,7 @@ const MemberManagerPage: React.FC = () => {
                                         ) : (
                                             filteredMembers.map((member) => (
                                                 <TableRow key={member.id} className="group hover:bg-slate-50/50 transition-colors">
-                                                        <TableCell className="pl-6">
+                                                    <TableCell className="pl-6">
                                                         {!member.used && (
                                                             <div className="flex items-center">
                                                                 <input
@@ -683,7 +684,7 @@ const MemberManagerPage: React.FC = () => {
                                                         {member.usedBy || '-'}
                                                     </TableCell>
                                                     <TableCell className="text-xs text-slate-500">
-                                                        {member.usedAt ? new Date(member.usedAt.seconds * 1000).toLocaleDateString() : '-'}
+                                                        {safeFormatDate(member.usedAt)}
                                                     </TableCell>
                                                     <TableCell className="text-right pr-6">
                                                         <div className="flex justify-end items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
@@ -832,13 +833,13 @@ const MemberManagerPage: React.FC = () => {
                                     CSV 업로드 처리
                                 </Button>
                             </div>
-                            
+
                             <div className="p-6 bg-yellow-50 rounded-xl border border-yellow-200">
                                 <h4 className="font-bold text-yellow-800 mb-4">CSV 파일 형식 가이드</h4>
                                 <p className="text-sm text-slate-600 mb-4">
                                     CSV 형식: <code className="bg-white px-2 py-1 rounded border border-slate-200">NAME|CODE|GRADE|EXPIRY_DATE</code>
                                 </p>
-                                
+
                                 <div className="space-y-2">
                                     <p className="text-xs font-bold text-slate-400 uppercase">CSV 파일 예시</p>
                                     <div className="bg-white border border-slate-200 rounded-lg p-3 font-mono text-xs text-slate-600 space-y-1 shadow-sm">
@@ -847,10 +848,10 @@ const MemberManagerPage: React.FC = () => {
                                         <p>이영희|1003|준비회원|2026-03-31</p>
                                     </div>
                                 </div>
-                                
+
                                 <div className="pt-2">
                                     <p className="text-xs text-slate-400">
-                                        • 구분자: 파이프(|)<br/>
+                                        • 구분자: 파이프(|)<br />
                                         • 형식: 이름|코드|등급|유효기간(YYYY-MM-DD)
                                     </p>
                                 </div>
@@ -1012,7 +1013,7 @@ const MemberManagerPage: React.FC = () => {
                             <Label>이름</Label>
                             <Input
                                 value={editForm.name}
-                                onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                                 placeholder="홍길동"
                             />
                         </div>
@@ -1021,7 +1022,7 @@ const MemberManagerPage: React.FC = () => {
                             <Label>면허번호/코드</Label>
                             <Input
                                 value={editForm.code}
-                                onChange={(e) => setEditForm({...editForm, code: e.target.value})}
+                                onChange={(e) => setEditForm({ ...editForm, code: e.target.value })}
                                 placeholder="MEMBER001"
                                 className="font-mono"
                             />
@@ -1031,7 +1032,7 @@ const MemberManagerPage: React.FC = () => {
                             <Label>회원등급</Label>
                             <select
                                 value={editForm.grade}
-                                onChange={(e) => setEditForm({...editForm, grade: e.target.value})}
+                                onChange={(e) => setEditForm({ ...editForm, grade: e.target.value })}
                                 className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white transition-colors appearance-none cursor-pointer"
                             >
                                 <option value="">등급 선택...</option>
@@ -1047,7 +1048,7 @@ const MemberManagerPage: React.FC = () => {
                                 <Input
                                     type="date"
                                     value={editForm.expiryDate}
-                                    onChange={(e) => setEditForm({...editForm, expiryDate: e.target.value})}
+                                    onChange={(e) => setEditForm({ ...editForm, expiryDate: e.target.value })}
                                     className="h-11 bg-slate-50 border-slate-200 focus:bg-white transition-colors"
                                 />
                                 <Calendar className="absolute right-3 top-3 h-5 w-5 text-slate-400 pointer-events-none" />

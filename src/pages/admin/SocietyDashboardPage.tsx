@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { safeText } from '../../utils/safeText';
+import { safeFormatDate } from '../../utils/dateUtils';
 
 interface Conference {
     id: string;
@@ -57,21 +58,21 @@ export default function SocietyDashboardPage() {
     const getSocietyId = () => {
         // ✅ 0순위: adminStore에서 선택된 societyId
         if (selectedSocietyId) return selectedSocietyId;
-        
+
         // ✅ 1순위: URL 파라미터 ?society=kadd (DEV 환경)
         const params = new URLSearchParams(window.location.search);
         const societyParam = params.get('society');
         if (societyParam) return societyParam;
-        
+
         // ✅ 2순위: sessionStorage (로그인 후 리다이렉트 시)
         const sessionSocietyId = sessionStorage.getItem('societyId');
         if (sessionSocietyId) return sessionSocietyId;
-        
+
         // ✅ 3순위: 서브도메인 (kadd.eregi.co.kr)
         const hostname = window.location.hostname;
         const parts = hostname.split('.');
         if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') return parts[0];
-        
+
         return null;
     };
 
@@ -209,9 +210,9 @@ export default function SocietyDashboardPage() {
         navigate(`/admin/conf/${conf.id}`);
     };
 
-    const formatDate = (ts: { toDate: () => Date } | null) => {
-        if (!ts || !ts.toDate) return 'TBD';
-        return ts.toDate().toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' });
+    const formatDate = (ts: any) => {
+        if (!ts) return 'TBD';
+        return safeFormatDate(ts, 'ko-KR', { year: 'numeric', month: 'short', day: 'numeric' });
     };
 
     const getStatusBadge = (status: string) => {

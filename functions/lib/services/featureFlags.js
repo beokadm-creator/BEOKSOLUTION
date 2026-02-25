@@ -31,15 +31,29 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.clearFeatureFlagsCache = exports.initializeFeatureFlags = exports.updateFeatureFlags = exports.isFeatureEnabled = exports.getFeatureFlags = void 0;
+exports.getFeatureFlags = getFeatureFlags;
+exports.isFeatureEnabled = isFeatureEnabled;
+exports.updateFeatureFlags = updateFeatureFlags;
+exports.initializeFeatureFlags = initializeFeatureFlags;
+exports.clearFeatureFlagsCache = clearFeatureFlagsCache;
 const admin = __importStar(require("firebase-admin"));
 // 기본값 (안전한 설정)
 const DEFAULT_FLAGS = {
@@ -93,7 +107,6 @@ async function getFeatureFlags() {
         return DEFAULT_FLAGS;
     }
 }
-exports.getFeatureFlags = getFeatureFlags;
 /**
  * 특정 Feature Flag 확인
  */
@@ -102,7 +115,6 @@ async function isFeatureEnabled(flagName) {
     const flags = await getFeatureFlags();
     return (_a = flags[flagName]) !== null && _a !== void 0 ? _a : false;
 }
-exports.isFeatureEnabled = isFeatureEnabled;
 /**
  * Feature Flags 업데이트 (관리자용)
  */
@@ -122,7 +134,6 @@ async function updateFeatureFlags(updates) {
         throw error;
     }
 }
-exports.updateFeatureFlags = updateFeatureFlags;
 /**
  * Feature Flags 초기화 (최초 설정용)
  */
@@ -148,7 +159,6 @@ async function initializeFeatureFlags() {
         throw error;
     }
 }
-exports.initializeFeatureFlags = initializeFeatureFlags;
 /**
  * 캐시 무효화 (테스트용)
  */
@@ -156,5 +166,4 @@ function clearFeatureFlagsCache() {
     cachedFlags = null;
     cacheTimestamp = 0;
 }
-exports.clearFeatureFlagsCache = clearFeatureFlagsCache;
 //# sourceMappingURL=featureFlags.js.map

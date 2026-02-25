@@ -4,6 +4,7 @@ import { useConference } from '../../hooks/useConference';
 import { useAuth } from '../../hooks/useAuth';
 import { collection, getDoc, getDocs, doc, setDoc, updateDoc, Timestamp, addDoc, query, where, onSnapshot, runTransaction } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { safeFormatDate } from '../../utils/dateUtils';
 import { httpsCallable, getFunctions } from 'firebase/functions';
 import { v4 as uuidv4 } from 'uuid';
 import { Button } from '../../components/ui/button';
@@ -20,7 +21,7 @@ const ExternalAttendeePage: React.FC = () => {
     const navigate = useNavigate();
     const { cid } = useParams<{ cid: string }>();
     const { id: confId, info } = useConference(cid);
-    const { auth } = useAuth(confId || '');
+    const { auth } = useAuth();
 
     const [externalAttendees, setExternalAttendees] = useState<ExternalAttendee[]>([]);
     const [loading, setLoading] = useState(true);
@@ -211,7 +212,7 @@ const ExternalAttendeePage: React.FC = () => {
                     if (authResult.data.success) {
                         toast.success('회원 계정이 자동으로 생성되었습니다.');
                         // Update local state with new userId
-                        attendeeData.userId = authResult.data.uid;
+                        (attendeeData as any).userId = authResult.data.uid;
                     }
                 } catch (authError) {
                     console.error('Failed to auto-create auth user:', authError);
@@ -428,9 +429,9 @@ const ExternalAttendeePage: React.FC = () => {
             } else {
                 throw new Error('Failed to send notification');
             }
-        } catch (error: unknown) {
-            console.error('Notification resend failed:', error);
-            toast.error(`발송 실패: ${error.message}`);
+        } catch (error: any) {
+            console.error('Failed to delete attendee:', error);
+            toast.error(`Error: ${error.message || 'Unknown error'}`);
         } finally {
             setIsProcessing(false);
         }
@@ -601,9 +602,9 @@ const ExternalAttendeePage: React.FC = () => {
             setShowBadgeModal(true);
             setSelectedAttendee(attendee);
             toast.success('명찰이 발급되었습니다.');
-        } catch (error) {
-            console.error('Badge issue failed:', error);
-            toast.error('명찰 발급에 실패했습니다.');
+        } catch (err: any) {
+            console.error('Failed to Issue Badge:', err);
+            toast.error(err.message || 'Failed to issue badge');
         } finally {
             setIsProcessing(false);
         }
@@ -740,7 +741,7 @@ const ExternalAttendeePage: React.FC = () => {
                         const passwordToUse = attendee.password || (attendee.phone ? attendee.phone.slice(-4) : '123456');
                         const functions = getFunctions();
                         const generateAuthUserFn = httpsCallable(functions, 'generateFirebaseAuthUserForExternalAttendee');
-                        
+
                         // Always call to update participation doc
                         const authResult = await generateAuthUserFn({
                             confId,
@@ -1222,7 +1223,7 @@ const ExternalAttendeePage: React.FC = () => {
                                     <p><strong>성명:</strong> {selectedAttendee.name}</p>
                                     <p><strong>소속:</strong> {selectedAttendee.organization}</p>
                                     <p><strong>등록비:</strong> ₩{selectedAttendee.amount.toLocaleString()}</p>
-                                    <p><strong>등록일:</strong> {selectedAttendee.createdAt.toDate().toLocaleDateString('ko-KR')}</p>
+                                    <p><strong>등록일:</strong> {safeFormatDate(selectedAttendee.createdAt)}</p>
                                 </div>
                                 <div className="p-4 bg-gray-50 rounded">
                                     <p className="text-sm text-gray-600 mb-2">확인용 QR 코드</p>

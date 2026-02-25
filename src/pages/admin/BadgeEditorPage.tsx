@@ -18,7 +18,7 @@ const BadgeEditorPage: React.FC = () => {
 
     const [elements, setElements] = useState<BadgeElement[]>([]);
     const [canvasSize, setCanvasSize] = useState({ width: 400, height: 600 });
-    const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+    const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
     const [bgUrl, setBgUrl] = useState<string | undefined>(undefined);
 
     const previewData = {
@@ -47,7 +47,9 @@ const BadgeEditorPage: React.FC = () => {
         const newEls = [...elements];
         newEls[idx] = { ...newEls[idx], x: Math.round(data.x), y: Math.round(data.y) };
         setElements(newEls);
-        setSelectedIdx(idx);
+        if (!selectedIndices.includes(idx)) {
+            setSelectedIndices([idx]);
+        }
     };
 
     const updateElement = (idx: number, field: keyof BadgeElement, value: unknown) => {
@@ -60,19 +62,17 @@ const BadgeEditorPage: React.FC = () => {
         try {
             await saveBadgeLayout(canvasSize.width, canvasSize.height, elements, bgUrl);
             toast.success('명찰 레이아웃이 저장되었습니다! ✅');
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            const err = e as { code?: string; message?: string };
-            if (err?.code === 'permission-denied' || err?.message?.includes('Missing or insufficient permissions')) {
+            if (e?.code === 'permission-denied' || e?.message?.includes('Missing or insufficient permissions')) {
                 toast.error('저장 권한이 없습니다. 세션이 만료되었을 수 있습니다. 다시 로그인해주세요.', { duration: 5000 });
-                // 3초 후 로그인 페이지로 이동
                 setTimeout(() => {
                     const params = new URLSearchParams(window.location.search);
                     const society = params.get('society') || sessionStorage.getItem('societyId') || '';
                     window.location.href = society ? `/admin/login?society=${society}` : '/admin/login';
                 }, 3000);
             } else {
-                toast.error(`저장 실패: ${err?.message || '알 수 없는 오류'}`);
+                toast.error(`저장 실패: ${e?.message || '알 수 없는 오류'}`);
             }
         }
     };
@@ -86,8 +86,38 @@ const BadgeEditorPage: React.FC = () => {
             type,
             content: type === 'CUSTOM' ? 'New Text' : undefined
         };
-        setElements([...elements, newElement]);
-        setSelectedIdx(elements.length);
+        const newElements = [...elements, newElement];
+        setElements(newElements);
+        setSelectedIndices([newElements.length - 1]);
+    };
+
+    const handleSelect = (idx: number, e?: React.MouseEvent) => {
+        if (e && (e.shiftKey || e.ctrlKey || e.metaKey)) {
+            if (selectedIndices.includes(idx)) {
+                setSelectedIndices(selectedIndices.filter(i => i !== idx));
+            } else {
+                setSelectedIndices([...selectedIndices, idx]);
+            }
+        } else {
+            setSelectedIndices([idx]);
+        }
+    };
+
+    const alignCenter = () => {
+        if (selectedIndices.length === 0) return;
+        const newEls = [...elements];
+        selectedIndices.forEach(idx => {
+            const node = document.getElementById(`badge-el-${idx}`);
+            if (node) {
+                // getBoundingClientRect는 소수점 단위 너비까지 정확히 반환합니다.
+                const rect = node.getBoundingClientRect();
+                const nodeWidth = rect.width;
+                const newX = Math.round((canvasSize.width - nodeWidth) / 2);
+                newEls[idx] = { ...newEls[idx], x: newX };
+            }
+        });
+        setElements(newEls);
+        toast.success(`${selectedIndices.length}개 요소 중앙 정렬 완료`);
     };
 
     if (confLoading) return (
@@ -103,7 +133,7 @@ const BadgeEditorPage: React.FC = () => {
                 <div
                     className="relative bg-white shadow-2xl border border-slate-200"
                     style={{ width: canvasSize.width, height: canvasSize.height }}
-                    onClick={() => setSelectedIdx(null)}
+                    onClick={() => setSelectedIndices([])}
                 >
                     {/* Background Image Layer */}
                     {bgUrl && (
@@ -125,10 +155,10 @@ const BadgeEditorPage: React.FC = () => {
                                 key={idx}
                                 el={el}
                                 idx={idx}
-                                isSelected={selectedIdx === idx}
+                                isSelected={selectedIndices.includes(idx)}
                                 previewData={previewData}
                                 onDragStop={handleDragStop}
-                                onSelect={() => setSelectedIdx(idx)}
+                                onSelect={(e) => handleSelect(idx, e)}
                             />
                         )
                     ))}
@@ -171,6 +201,33 @@ const BadgeEditorPage: React.FC = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* 정렬 도구 추가 */}
+                    {selectedIndices.length > 0 && (
+                        <div className="space-y-4 pt-4 mt-4 border-t border-slate-100">
+                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">정렬 도구 ({selectedIndices.length})</h3>
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-10 text-xs flex gap-2 items-center justify-center bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                                    onClick={alignCenter}
+                                >
+                                    <Maximize className="w-4 h-4 rotate-90" />
+                                    가로 중앙 정렬
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-10 text-xs flex gap-2 items-center justify-center"
+                                    onClick={() => setSelectedIndices([])}
+                                >
+                                    선택 해제
+                                </Button>
+                            </div>
+                            <p className="text-[10px] text-slate-400 text-center italic">Tip: Shift + 클릭으로 다중 선택</p>
+                        </div>
+                    )}
 
                     <div className="space-y-4 pt-4 border-t border-slate-100">
                         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">배경 이미지</h3>
@@ -226,13 +283,13 @@ const BadgeEditorPage: React.FC = () => {
 
                 <div className="flex-1">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">속성 편집</h3>
-                    {selectedIdx !== null ? (
+                    {selectedIndices.length === 1 ? (
                         <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-6">
                             <div className="flex justify-between items-center">
-                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold tracking-wider">{elements[selectedIdx].type}</span>
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold tracking-wider">{elements[selectedIndices[0]].type}</span>
                                 <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50 h-8 font-medium text-xs" onClick={() => {
-                                    setElements(elements.filter((_, i) => i !== selectedIdx));
-                                    setSelectedIdx(null);
+                                    setElements(elements.filter((_, i) => i !== selectedIndices[0]));
+                                    setSelectedIndices([]);
                                 }}>
                                     <Trash2 className="w-3.5 h-3.5 mr-1" /> 삭제
                                 </Button>
@@ -244,8 +301,8 @@ const BadgeEditorPage: React.FC = () => {
                                     <input
                                         type="number"
                                         step="0.1"
-                                        value={toMm(elements[selectedIdx].x)}
-                                        onChange={e => updateElement(selectedIdx, 'x', toPx(e.target.value))}
+                                        value={toMm(elements[selectedIndices[0]].x)}
+                                        onChange={e => updateElement(selectedIndices[0], 'x', toPx(e.target.value))}
                                         className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none"
                                     />
                                 </div>
@@ -254,22 +311,22 @@ const BadgeEditorPage: React.FC = () => {
                                     <input
                                         type="number"
                                         step="0.1"
-                                        value={toMm(elements[selectedIdx].y)}
-                                        onChange={e => updateElement(selectedIdx, 'y', toPx(e.target.value))}
+                                        value={toMm(elements[selectedIndices[0]].y)}
+                                        onChange={e => updateElement(selectedIndices[0], 'y', toPx(e.target.value))}
                                         className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none"
                                     />
                                 </div>
                             </div>
 
-                            {elements[selectedIdx].type === 'IMAGE' ? (
+                            {elements[selectedIndices[0]].type === 'IMAGE' ? (
                                 <div className="space-y-4">
                                     <div className="space-y-1">
                                         <label className="text-[11px] font-medium text-slate-500 ml-1">크기 (Width, mm)</label>
                                         <input
                                             type="number"
                                             step="0.1"
-                                            value={toMm(elements[selectedIdx].fontSize)}
-                                            onChange={e => updateElement(selectedIdx, 'fontSize', toPx(e.target.value))}
+                                            value={toMm(elements[selectedIndices[0]].fontSize)}
+                                            onChange={e => updateElement(selectedIndices[0], 'fontSize', toPx(e.target.value))}
                                             className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none"
                                             placeholder="이미지 가로 크기"
                                         />
@@ -278,8 +335,8 @@ const BadgeEditorPage: React.FC = () => {
                                         <label className="text-[11px] font-medium text-slate-500 ml-1">이미지 업로드</label>
                                         <ImageUpload
                                             path={`conferences/${confId}/assets/badge`}
-                                            onUploadComplete={(url) => updateElement(selectedIdx, 'content', url)}
-                                            previewUrl={elements[selectedIdx].content}
+                                            onUploadComplete={(url) => updateElement(selectedIndices[0], 'content', url)}
+                                            previewUrl={elements[selectedIndices[0]].content}
                                             label=""
                                             className="mt-1"
                                         />
@@ -288,24 +345,30 @@ const BadgeEditorPage: React.FC = () => {
                             ) : (
                                 <div className="space-y-1">
                                     <label className="text-[11px] font-medium text-slate-500 ml-1">
-                                        {elements[selectedIdx].type === 'QR' ? 'QR 크기 (mm)' : '글자 크기 (mm)'}
+                                        {elements[selectedIndices[0]].type === 'QR' ? 'QR 크기 (mm)' : '글자 크기 (mm)'}
                                     </label>
                                     <input
                                         type="number"
                                         step="0.1"
-                                        value={toMm(elements[selectedIdx].fontSize)}
-                                        onChange={e => updateElement(selectedIdx, 'fontSize', toPx(e.target.value))}
+                                        value={toMm(elements[selectedIndices[0]].fontSize)}
+                                        onChange={e => updateElement(selectedIndices[0], 'fontSize', toPx(e.target.value))}
                                         className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none"
                                     />
                                 </div>
                             )}
 
-                            {elements[selectedIdx].type === 'CUSTOM' && (
+                            {elements[selectedIndices[0]].type === 'CUSTOM' && (
                                 <div className="space-y-1">
                                     <label className="text-[11px] font-medium text-slate-500 ml-1">내용</label>
-                                    <input type="text" value={elements[selectedIdx].content || ''} onChange={e => updateElement(selectedIdx, 'content', e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none" />
+                                    <input type="text" value={elements[selectedIndices[0]].content || ''} onChange={e => updateElement(selectedIndices[0], 'content', e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none" />
                                 </div>
                             )}
+                        </div>
+                    ) : selectedIndices.length > 1 ? (
+                        <div className="h-40 flex flex-col items-center justify-center border-2 border-dashed border-slate-100 rounded-2xl bg-blue-50/20">
+                            <Maximize className="w-8 h-8 text-blue-300 mb-2" />
+                            <p className="text-xs text-blue-500 font-medium">다중 선택 중 ({selectedIndices.length}개)</p>
+                            <p className="text-[10px] text-slate-400 mt-1">상단 정렬 도구를 사용하세요</p>
                         </div>
                     ) : (
                         <div className="h-40 flex flex-col items-center justify-center border-2 border-dashed border-slate-100 rounded-2xl bg-slate-50/50">
@@ -325,7 +388,7 @@ interface DraggableNodeProps {
     isSelected: boolean;
     previewData: Record<string, string>;
     onDragStop: (idx: number, e: unknown, data: { x: number; y: number }) => void;
-    onSelect: (idx: number) => void;
+    onSelect: (e: React.MouseEvent) => void;
 }
 
 const DraggableNode: React.FC<DraggableNodeProps> = ({ el, idx, isSelected, previewData, onDragStop, onSelect }) => {
@@ -353,7 +416,7 @@ const DraggableNode: React.FC<DraggableNodeProps> = ({ el, idx, isSelected, prev
             );
         }
         return (
-            <div style={{ fontSize: el.fontSize }} className="font-bold whitespace-nowrap px-1">
+            <div style={{ fontSize: el.fontSize }} className="font-bold whitespace-nowrap">
                 {previewData[el.type as keyof typeof previewData] || el.content || el.type}
             </div>
         );
@@ -364,16 +427,17 @@ const DraggableNode: React.FC<DraggableNodeProps> = ({ el, idx, isSelected, prev
             nodeRef={nodeRef}
             position={{ x: el.x, y: el.y }}
             onStop={(e, data) => onDragStop(idx, e, data)}
-            onStart={() => onSelect(idx)}
+            onStart={(e) => onSelect(e as React.MouseEvent)}
             bounds="parent"
         >
             <div
                 ref={nodeRef}
+                id={`badge-el-${idx}`}
                 className={`absolute cursor-move select-none transition-shadow ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50/20 z-10 shadow-lg' : 'hover:ring-1 hover:ring-slate-300'}`}
                 style={{ left: 0, top: 0 }}
                 onClick={(e) => {
                     e.stopPropagation();
-                    onSelect(idx);
+                    onSelect(e);
                 }}
             >
                 {renderContent()}

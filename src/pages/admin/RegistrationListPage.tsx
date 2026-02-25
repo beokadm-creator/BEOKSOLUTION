@@ -1,14 +1,19 @@
+import { useBixolon } from '../../hooks/useBixolon';
+// import { BadgeElement } from '../../types/schema';
 import React, { useState, useEffect, useMemo } from 'react';
 import { BadgeConfig } from '../../types/print';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useExcel } from '../../hooks/useExcel';
 import { useRegistrationsPagination } from '../../hooks/useRegistrationsPagination';
+import { useConference } from '../../hooks/useConference';
+import { convertBadgeLayoutToConfig } from '../../utils/badgeConverter';
 import toast from 'react-hot-toast';
-import { query, collection, getDocs, limit, doc, updateDoc, Timestamp, addDoc, where } from 'firebase/firestore';
+import { query, collection, getDocs, getDoc, limit, doc, updateDoc, Timestamp, addDoc, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Loader2, Printer, ChevronLeft, ChevronRight } from 'lucide-react';
 import { EregiButton } from '../../components/eregi/EregiForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { safeFormatDate } from '../../utils/dateUtils';
 import PrintHandler from '../../components/print/PrintHandler';
 import BadgeTemplate from '../../components/print/BadgeTemplate';
 import { kadd_2026 } from '../../data/conferences/kadd_2026.backup';
@@ -48,7 +53,7 @@ interface RootRegistration {
         customerName?: string;
         dueDate?: string;
     };
-    options?: any[]; // Added for options indicator
+    options?: Record<string, unknown>[]; // Added for options indicator
 }
 
 const statusToKorean = (status: string) => {
@@ -85,12 +90,23 @@ const RegistrationListPage: React.FC = () => {
     // [Fix-Step 150] Smart Slug Auto-Resolution (Manual)
     const [activeSlug, setActiveSlug] = useState<string | null>(slug || null);
     const [conferenceId, setConferenceId] = useState<string | null>(null);
+    const { info } = useConference(conferenceId || slug);
     const [status, setStatus] = useState<string>("Initializing...");
+
+    // Bixolon Hook
+    const { printBadge, printing: bixolonPrinting, error: bixolonError } = useBixolon();
 
     // Print Modal State
     const [selectedReg, setSelectedReg] = useState<RootRegistration | null>(null);
     const [showPrintModal, setShowPrintModal] = useState(false);
     const badgeRef = useRef<HTMLDivElement>(null);
+
+    const badgeConfig = useMemo(() => {
+        if (info?.badgeLayout && info.badgeLayout.elements.length > 0) {
+            return convertBadgeLayoutToConfig(info.badgeLayout);
+        }
+        return kadd_2026.badge as BadgeConfig;
+    }, [info]);
 
     // Use pagination hook (follows project convention: use hooks, not direct Firestore)
     const {
@@ -179,6 +195,81 @@ const RegistrationListPage: React.FC = () => {
         } catch (e: unknown) {
             console.error("Badge issue failed:", e);
             toast.error("처리 실패");
+        }
+    };
+
+    const handleBixolonPrint = async (e: React.MouseEvent, reg: RootRegistration) => {
+        e.stopPropagation();
+
+        if (bixolonPrinting) return;
+
+        // Use existing badgeQr or fallback to ID (Testing purpose)
+        const qrData = reg.badgeQr || reg.id;
+
+        toast.loading("라벨 프린터 전송 중...", { id: 'bixolon-print' });
+
+        try {
+            // [Fix] info.badgeLayout이 null일 수 있음 (useConference 캐시/타이밍 문제)
+            // settings/badge_config에서 직접 로드 훈에 info.badgeLayout fallback
+            let badgeLayout = info?.badgeLayout;
+
+            if (!badgeLayout && conferenceId) {
+                console.log('[Bixolon] info.badgeLayout is null, fetching from settings/badge_config...');
+                try {
+                    const cfgSnap = await getDoc(doc(db, `conferences/${conferenceId}/settings/badge_config`));
+                    if (cfgSnap.exists() && cfgSnap.data().badgeLayout) {
+                        badgeLayout = cfgSnap.data().badgeLayout;
+                        console.log('[Bixolon] 로드 성공: settings/badge_config.badgeLayout', badgeLayout);
+                    }
+                } catch (fetchErr) {
+                    console.error('[Bixolon] badge_config fetch failed:', fetchErr);
+                }
+            }
+
+            // info/general에도 없으면 훈체정는 conferenceId 없이 slug query
+            if (!badgeLayout && !conferenceId && slug) {
+                console.log('[Bixolon] conferenceId not set yet, fetching conference by slug...');
+                try {
+                    const q = query(collection(db, 'conferences'), where('slug', '==', slug));
+                    const snap = await getDocs(q);
+                    if (!snap.empty) {
+                        const cid = snap.docs[0].id;
+                        const cfgSnap = await getDoc(doc(db, `conferences/${cid}/settings/badge_config`));
+                        if (cfgSnap.exists() && cfgSnap.data().badgeLayout) {
+                            badgeLayout = cfgSnap.data().badgeLayout;
+                            console.log('[Bixolon] slug로 명찰 레이아웃 로드 성공:', cid);
+                        }
+                    }
+                } catch (fetchErr) {
+                    console.error('[Bixolon] slug-based badge_config fetch failed:', fetchErr);
+                }
+            }
+
+            if (!badgeLayout) {
+                toast.error("배지 레이아웃이 설정되지 않았습니다. 명찰 편집기에서 저장 후 다시 시도하세요.", { id: 'bixolon-print', duration: 5000 });
+                return;
+            }
+
+            const printSuccess = await printBadge(badgeLayout, {
+                name: reg.userName || '',
+                org: reg.userOrg || reg.affiliation || '',
+                category: displayTier(reg.tier),
+                license: reg.licenseNumber || '',
+                price: (reg.amount || 0).toLocaleString() + '원',
+                affiliation: reg.affiliation || '',
+                qrData: qrData
+            });
+
+            if (printSuccess) {
+                toast.success("라벨 출력 성공", { id: 'bixolon-print' });
+            } else {
+                // Show specific error if available
+                const errMsg = bixolonError || '라벨 출력 실패 - 프린터 에이전트 연결을 확인하세요 (ws://127.0.0.1:18082)';
+                toast.error(errMsg, { id: 'bixolon-print', duration: 6000 });
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error("프린터 오류 발생", { id: 'bixolon-print' });
         }
     };
 
@@ -284,7 +375,7 @@ const RegistrationListPage: React.FC = () => {
             '선택옵션': r.options ? r.options.map(o => `${typeof o.name === 'string' ? o.name : o.name.ko}(${o.quantity})`).join(', ') : '-',
             '결제수단': r.paymentType || r.paymentMethod || r.method || '카드',
             '상태': statusToKorean(r.status),
-            '등록일': r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000).toLocaleDateString() : '-'
+            '등록일': safeFormatDate(r.createdAt),
         }));
         exportToExcel(data, `Registrants_${activeSlug}_${new Date().toISOString().slice(0, 10)}`);
     };
@@ -421,9 +512,18 @@ const RegistrationListPage: React.FC = () => {
                                             onClick={(e) => handlePrintClick(e, r)}
                                             variant="secondary"
                                             className="px-2 py-1 text-xs h-auto bg-white border-slate-200 hover:bg-slate-50 text-slate-600"
-                                            title="인쇄"
+                                            title="웹 인쇄 (브라우저)"
                                         >
                                             <Printer size={14} />
+                                        </EregiButton>
+                                        <EregiButton
+                                            onClick={(e) => handleBixolonPrint(e, r)}
+                                            variant="secondary"
+                                            className="px-2 py-1 text-xs h-auto bg-blue-50 border-blue-200 hover:bg-blue-100 text-blue-700 font-bold"
+                                            title="라벨 출력 (Bixolon)"
+                                            disabled={bixolonPrinting}
+                                        >
+                                            Label
                                         </EregiButton>
                                     </div>
                                 </td>
@@ -530,20 +630,22 @@ const RegistrationListPage: React.FC = () => {
                         <DialogTitle>명찰 미리보기 (Badge Preview)</DialogTitle>
                     </DialogHeader>
                     <div className="flex flex-col items-center justify-center p-6 bg-gray-100 rounded-xl min-h-[400px]">
-                        {selectedReg && kadd_2026.badge && (
+                        {selectedReg && badgeConfig && (
                             <div ref={badgeRef} className="shadow-2xl">
                                 <BadgeTemplate
                                     data={{
                                         registrationId: selectedReg.id,
                                         name: selectedReg.userName || '',
                                         org: selectedReg.userOrg || selectedReg.affiliation || '',
-                                        category: displayTier(selectedReg.tier) || selectedReg.categoryName || '참가자'
+                                        category: displayTier(selectedReg.tier) || selectedReg.categoryName || '참가자',
+                                        LICENSE: selectedReg.licenseNumber || '',
+                                        PRICE: (selectedReg.amount || 0).toLocaleString() + '원'
                                     }}
-                                    config={kadd_2026.badge as BadgeConfig}
+                                    config={badgeConfig}
                                 />
                             </div>
                         )}
-                        {!kadd_2026.badge && <p className="text-red-500">배지 설정이 없습니다. (No Badge Config)</p>}
+                        {!badgeConfig && <p className="text-red-500">배지 설정이 없습니다. (No Badge Config)</p>}
                     </div>
                     <div className="flex justify-end gap-3 mt-4">
                         <EregiButton onClick={() => setShowPrintModal(false)} variant="secondary">

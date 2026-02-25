@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, limit } from 'firebase/firestore';
 import { db } from '../firebase';
+import { safeFormatDate } from '../utils/dateUtils';
 import {
     Users,
     Calendar,
@@ -69,9 +70,9 @@ const LandingPage: React.FC = () => {
         return title?.ko || 'Untitled Conference';
     };
 
-    const formatDate = (dateObj: unknown) => {
-        if (!dateObj || typeof dateObj !== 'object' || !('seconds' in dateObj)) return 'TBA';
-        return new Date((dateObj as { seconds: number }).seconds * 1000).toLocaleDateString('ko-KR', {
+    const formatDate = (dateObj: any) => {
+        if (!dateObj) return 'TBA';
+        return safeFormatDate(dateObj, 'ko-KR', {
             year: 'numeric',
             month: 'long',
             day: 'numeric'

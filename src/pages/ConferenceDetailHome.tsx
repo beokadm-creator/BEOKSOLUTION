@@ -1,43 +1,36 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { httpsCallable, getFunctions } from 'firebase/functions';
+import app from '../firebase';
 import { db } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { useUserStore } from '../store/userStore';
 import TermsAgreementModal from '../components/conference/TermsAgreementModal';
+import { safeFormatDate } from '../utils/dateUtils';
 
 // 1. SAFE DATE UTILITY (Outside component)
-const safeDate = (val: unknown): string => {
-  try {
-    if (!val) return '';
-    if (typeof val === 'string') return val;
-    if (typeof val === 'object' && val !== null) {
-      const dateVal = val as { toDate?: () => Date; seconds?: number };
-      if (dateVal.toDate && typeof dateVal.toDate === 'function') return dateVal.toDate().toLocaleDateString();
-      if (dateVal.seconds) return new Date(dateVal.seconds * 1000).toLocaleDateString();
-    }
-    return String(val);
-  } catch {
-    return 'Date Error';
-  }
-};
+const safeDate = (val: unknown): string => safeFormatDate(val);
 
 const ConferenceDetailHome: React.FC = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
 
   // Auth state (simplified - no member/non-member distinction)
-  const { auth } = useAuth('');
+  const { auth } = useAuth();
   const user = auth.user;
   const { language, setLanguage } = useUserStore();
 
   // Legal Agreement Modal state
   const [showAgreementModal, setShowAgreementModal] = useState(false);
   const [targetPath, setTargetPath] = useState('');
-  const [terms, setTerms] = useState<{ title?: string; content?: string; required?: boolean } | null>(null);
+  const [terms, setTerms] = useState<any>(null);
 
   // Registration state
   const [isRegistered, setIsRegistered] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
+  const [registrationData, setRegistrationData] = useState<any>(null);
+
 
   // Footer Info state
   const [footerInfo, setFooterInfo] = useState<{
@@ -50,8 +43,8 @@ const ConferenceDetailHome: React.FC = () => {
     emailNotice?: string;
   } | null>(null);
 
-    //2. INITIALIZE WITH DEFAULT DATA (Prevent White Screen)
-    const [conf, setConf] = useState({
+  //2. INITIALIZE WITH DEFAULT DATA (Prevent White Screen)
+  const [conf, setConf] = useState({
     title: "Loading Conference...",
     societyName: "e-Regi",
     location: "Loading...",
@@ -60,7 +53,7 @@ const ConferenceDetailHome: React.FC = () => {
     exists: false // Flag to track if real data is loaded
   });
 
-    useEffect(() => {
+  useEffect(() => {
     if (!slug) return;
     console.log("Fetching conference:", slug); // Debug Log
 

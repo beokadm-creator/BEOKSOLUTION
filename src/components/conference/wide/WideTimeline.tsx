@@ -1,4 +1,5 @@
 import React from 'react';
+import { safeFormatDate } from '../../../utils/dateUtils';
 
 type LocalizedString = { [lang: string]: string } | string;
 
@@ -34,26 +35,24 @@ export const WideTimeline: React.FC<WideTimelineProps> = ({ steps, lang }) => {
 
         return (
           <div key={idx} className="relative z-10 flex flex-col items-center">
-            <div 
-              className={`w-4 h-4 rounded-full border-2 transition-all duration-300 ${
-                isActive 
-                  ? 'bg-[var(--primary)] border-[var(--primary)] scale-125 ring-4 ring-blue-50' 
-                  : isPast 
-                    ? 'bg-slate-300 border-slate-300' 
-                    : 'bg-white border-slate-300'
-              }`}
+            <div
+              className={`w-4 h-4 rounded-full border-2 transition-all duration-300 ${isActive
+                ? 'bg-[var(--primary)] border-[var(--primary)] scale-125 ring-4 ring-blue-50'
+                : isPast
+                  ? 'bg-slate-300 border-slate-300'
+                  : 'bg-white border-slate-300'
+                }`}
             ></div>
             <div className="mt-3 text-center">
-              <p 
-                className={`text-xs font-bold ${
-                  isActive ? 'text-[var(--primary)]' : 'text-slate-400'
-                }`}
+              <p
+                className={`text-xs font-bold ${isActive ? 'text-[var(--primary)]' : 'text-slate-400'
+                  }`}
               >
                 {t(step.name)}
               </p>
               {end && (
                 <p className="text-[10px] text-slate-400 mt-0.5">
-                  ~{end.toLocaleDateString()}
+                  ~{safeFormatDate(end)}
                 </p>
               )}
             </div>

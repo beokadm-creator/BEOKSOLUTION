@@ -3,7 +3,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSenderCategories = exports.getMessageList = exports.getMessageResult = exports.sendAlimTalk = exports.getTemplateDetail = exports.getTemplates = void 0;
+exports.getTemplates = getTemplates;
+exports.getTemplateDetail = getTemplateDetail;
+exports.sendAlimTalk = sendAlimTalk;
+exports.getMessageResult = getMessageResult;
+exports.getMessageList = getMessageList;
+exports.getSenderCategories = getSenderCategories;
 const axios_1 = __importDefault(require("axios"));
 /**
  * NHN Cloud AlimTalk API Configuration
@@ -57,7 +62,6 @@ async function getTemplates(senderKey) {
         };
     }
 }
-exports.getTemplates = getTemplates;
 /**
  * 특정 템플릿 상세 조회
  * @param senderKey - 발신 프로필 키
@@ -83,7 +87,6 @@ async function getTemplateDetail(senderKey, templateCode) {
         };
     }
 }
-exports.getTemplateDetail = getTemplateDetail;
 async function sendAlimTalk(params) {
     try {
         const url = `${NHN_ALIMTALK_CONFIG.baseUrl}/alimtalk/v2.3/appkeys/${NHN_ALIMTALK_CONFIG.appKey}/messages`;
@@ -128,7 +131,6 @@ async function sendAlimTalk(params) {
         };
     }
 }
-exports.sendAlimTalk = sendAlimTalk;
 /**
  * 발송 결과 조회
  * @param requestId - 요청 ID (발송 시 받은 requestId)
@@ -155,7 +157,6 @@ async function getMessageResult(requestId) {
         };
     }
 }
-exports.getMessageResult = getMessageResult;
 async function getMessageList(params = {}) {
     try {
         const url = `${NHN_ALIMTALK_CONFIG.baseUrl}/alimtalk/v2.3/appkeys/${NHN_ALIMTALK_CONFIG.appKey}/messages`;
@@ -180,7 +181,6 @@ async function getMessageList(params = {}) {
         };
     }
 }
-exports.getMessageList = getMessageList;
 /**
  * 발신 프로필 카테고리 조회
  * @returns Promise<CategoryResponse>
@@ -204,7 +204,6 @@ async function getSenderCategories() {
         };
     }
 }
-exports.getSenderCategories = getSenderCategories;
 exports.default = {
     getTemplates,
     getTemplateDetail,

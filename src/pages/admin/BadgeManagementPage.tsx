@@ -10,9 +10,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/ta
 import { Loader2, Eye, Save, ArrowLeft, Link as LinkIcon, Download, Badge, Settings } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+import { useConference } from '../../hooks/useConference';
+import BadgeTemplate from '../../components/print/BadgeTemplate';
+import { convertBadgeLayoutToConfig } from '../../utils/badgeConverter';
+
 const BadgeManagementPage: React.FC = () => {
     const navigate = useNavigate();
     const { cid } = useParams<{ cid: string }>();
+    const { info } = useConference(cid);
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -274,32 +279,39 @@ const BadgeManagementPage: React.FC = () => {
                                 </CardContent>
                             </Card>
 
-                            {/* Print Badge Preview */}
+                    {/* Print Badge Preview */}
                             <Card>
                                 <CardHeader>
                                     <CardTitle>출력 명찰 미리보기</CardTitle>
                                     <CardDescription>
-                                        출력용 명찰이 어떻게 표시되는지 확인합니다.
+                                        출력용 명찰이 어떻게 표시되는지 확인합니다. (배경 이미지 및 레이아웃 반영)
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="bg-gray-50 rounded-xl p-4 max-w-sm mx-auto">
-                                        <div className="bg-white border-2 border-gray-300 rounded-xl p-4 text-center shadow-md">
-                                            <div className="w-20 h-20 bg-gray-200 rounded-full mx-auto mb-2 flex items-center justify-center">
-                                                <span className="text-xs text-gray-500">사진</span>
+                                    <div className="flex justify-center bg-gray-100 p-8 rounded-xl overflow-auto min-h-[400px] items-center">
+                                        {info?.badgeLayout ? (
+                                            <div className="shadow-2xl bg-white transform scale-75 origin-center">
+                                                <BadgeTemplate 
+                                                    data={{
+                                                        registrationId: 'PREVIEW-123',
+                                                        name: '홍길동',
+                                                        org: '서울대학교병원',
+                                                        category: '정회원',
+                                                        LICENSE: '12345',
+                                                        PRICE: '50,000원'
+                                                    }}
+                                                    config={convertBadgeLayoutToConfig(info.badgeLayout)}
+                                                />
                                             </div>
-                                            <h3 className="font-bold text-lg">홍길동</h3>
-                                            <p className="text-sm text-gray-600 mb-2">서울대학교</p>
-                                            <div className="text-xs text-gray-500">
-                                                <p>면허번호: 12345</p>
-                                                <p>참가자 유형: 정회원</p>
+                                        ) : (
+                                            <div className="text-gray-500 py-10 flex flex-col items-center">
+                                                <Settings className="w-12 h-12 mb-4 text-gray-300" />
+                                                <p>명찰 레이아웃 정보가 없습니다.</p>
+                                                <Button variant="link" onClick={() => navigate(`/admin/conf/${cid}/badge-editor`)}>
+                                                    명찰 편집기에서 설정하기
+                                                </Button>
                                             </div>
-                                            <div className="mt-3 pt-3 border-t">
-                                                <div className="w-24 h-24 bg-gray-100 mx-auto flex items-center justify-center text-xs text-gray-400">
-                                                    QR
-                                                </div>
-                                            </div>
-                                        </div>
+                                        )}
                                     </div>
                                 </CardContent>
                             </Card>

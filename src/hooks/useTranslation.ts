@@ -24,7 +24,7 @@ export const clearTranslationCache = (slug?: string) => {
 
 interface UseTranslationResult {
     t: (obj: unknown) => string;
-    config: any; // Using any temporarily for backward compatibility with complex types
+    config: unknown; // Using unknown for backward compatibility with complex types
     loading: boolean;
     error: string | null;
     currentLang: string;
@@ -35,7 +35,7 @@ interface UseTranslationResult {
 }
 
 export const useTranslation = (slug: string): UseTranslationResult => {
-    const [config, setConfig] = useState<any>(null);
+    const [config, setConfig] = useState<unknown>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [currentLang, setCurrentLang] = useState<string>(localStorage.getItem('preferredLanguage') || 'ko');
@@ -98,11 +98,12 @@ export const useTranslation = (slug: string): UseTranslationResult => {
                 const societyId = confData.societyId || confId.split('_')[0] || 'kadd';
 
                 // 2. Parallel Fetch ALL required configurations
-                const [identitySnap, societySnap, visualSnap, infoSnap] = await Promise.all([
+                const [identitySnap, societySnap, visualSnap, infoSnap, regSnap] = await Promise.all([
                     getDoc(doc(db, 'conferences', confId, 'settings', 'identity')),
                     getDoc(doc(db, 'societies', societyId)),
                     getDoc(doc(db, 'conferences', confId, 'settings', 'visual')),
-                    getDoc(doc(db, 'conferences', confId, 'info', 'general'))
+                    getDoc(doc(db, 'conferences', confId, 'info', 'general')),
+                    getDoc(doc(db, 'conferences', confId, 'settings', 'registration'))
                 ]);
 
                 // 3. Parallel Fetch Sub-collections (Performance Boost)
@@ -121,6 +122,7 @@ export const useTranslation = (slug: string): UseTranslationResult => {
                     society: societySnap.exists() ? societySnap.data() : null,
                     visualAssets: visualSnap.exists() ? visualSnap.data() : null,
                     info: infoSnap.exists() ? infoSnap.data() : null,
+                    pricing: regSnap.exists() ? (regSnap.data()?.periods || []) : [],
                     pages: pagesSnap.docs.map(d => ({ id: d.id, ...d.data() })),
                     agendas: agendasSnap.docs.map(d => ({ id: d.id, ...d.data() })),
                     speakers: speakersSnap.docs.map(d => ({ id: d.id, ...d.data() })),
@@ -157,7 +159,7 @@ export const useTranslation = (slug: string): UseTranslationResult => {
         error,
         currentLang,
         setLanguage,
-        confId: config?.id || null,
+        confId: (config as any)?.id || null,
         urlSlug: slug,
         refresh
     };

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Bixolon SDK Test</title>
+    <script src="bxlcommon.js"></script>
+    <script src="bxllabel.js"></script>
+</head>
+<body>
+    <h2>빅솔론 정품 SDK 테스트</h2>
+    <button onclick="testPrint()">1. 정답 JSON 생성 및 출력 테스트</button>
+
+    <script>
+        function testPrint() {
+            // 1. 라벨 아이디 초기화 [cite: 789]
+            setLabelId(1); 
+            
+            // 2. 버퍼 비우기 [cite: 813]
+            clearBuffer(); 
+            
+            // 3. 텍스트 및 QR 그리기 (한글 에러를 막기 위해 영문으로 테스트) [cite: 883, 1097]
+            drawDeviceFont("SDK TEST", 50, 50, "1", 2, 2, 0, 0, 0, 0); 
+            drawQRCode("12345", 50, 150, 1, "M", 4, 0); 
+            
+            // 4. 인쇄 버퍼 등록 [cite: 823]
+            printBuffer(); 
+            
+            // 5. ★ 핵심: SDK가 완벽하게 조립한 JSON 데이터를 꺼냅니다 
+            var pureJson = getLabelData(); 
+            console.log("★★ 에이전트가 원하는 정답 JSON ★★ : ", pureJson);
+            
+            // 6. 에이전트로 전송 (통신까지 성공하는지 확인) [cite: 159]
+            requestPrint("Printer1", pureJson, function(result) {
+                if(result === 0) alert("출력 성공! 이제 콘솔창의 JSON을 복사하세요.");
+                else alert("출력 실패. 에러 코드: " + result);
+            });
+        }
+    </script>
+</body>
+</html>

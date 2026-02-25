@@ -28,13 +28,14 @@ export interface RootRegistration {
     createdAt: Timestamp;
     badgeIssued?: boolean;
     badgeIssuedAt?: Timestamp;
+    badgeQr?: string; // Added for printing
     virtualAccount?: {
         bank: string;
         accountNumber: string;
         customerName?: string;
         dueDate?: string;
     };
-    options?: any[]; // Snapshot of selected options
+    options?: unknown[]; // Snapshot of selected options
 }
 
 interface UseRegistrationsPaginationParams {
@@ -155,6 +156,11 @@ export function useRegistrationsPagination({
                         else if (docData.userInfo?.licensenumber) flattened.licenseNumber = docData.userInfo.licensenumber;
                         // Check formData as last resort (some legacy data might be here)
                         else if (docData.formData?.licenseNumber) flattened.licenseNumber = docData.formData.licenseNumber;
+                    }
+
+                    // [Fix] Map badgeQr
+                    if (docData.badgeQr) {
+                        flattened.badgeQr = docData.badgeQr;
                     }
 
                     return flattened;

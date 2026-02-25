@@ -14,10 +14,10 @@ export interface BadgeConfig {
   };
   backgroundUrl: string;
   layout: {
-    name: BadgeLayoutItem;
-    org: BadgeLayoutItem;
-    category: BadgeLayoutItem;
-    [key: string]: BadgeLayoutItem; // Allow for other fields if needed
+    name?: BadgeLayoutItem;
+    org?: BadgeLayoutItem;
+    category?: BadgeLayoutItem;
+    [key: string]: BadgeLayoutItem | undefined; // Allow for other fields if needed
   };
   qr: {
     x: string;

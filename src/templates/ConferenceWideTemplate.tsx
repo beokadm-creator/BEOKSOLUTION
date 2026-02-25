@@ -20,7 +20,7 @@ interface Props {
 export const ConferenceWideTemplate = ({ slug }: Props) => {
   const navigate = useNavigate();
   const { t, config: rawConfig, loading, error, currentLang, setLanguage, confId, urlSlug } = useTranslation(slug);
-  const config = rawConfig as any;
+  const config = rawConfig as unknown;
 
 
   // Active section state for tabs

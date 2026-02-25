@@ -3,7 +3,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAlimTalkTemplates = exports.getAlimTalkHistory = exports.getAlimTalkRemain = exports.sendAlimTalk = void 0;
+exports.sendAlimTalk = sendAlimTalk;
+exports.getAlimTalkRemain = getAlimTalkRemain;
+exports.getAlimTalkHistory = getAlimTalkHistory;
+exports.getAlimTalkTemplates = getAlimTalkTemplates;
 const axios_1 = __importDefault(require("axios"));
 // Platform-level Aligo credentials (hardcoded as requested)
 const ALIGO_CONFIG = {
@@ -63,7 +66,6 @@ async function sendAlimTalk(recipient, templateCode, variables, channelId) {
         };
     }
 }
-exports.sendAlimTalk = sendAlimTalk;
 /**
  * Get remaining AlimTalk credits
  * @returns {Promise<Object>} - Credit information
@@ -91,7 +93,6 @@ async function getAlimTalkRemain() {
         };
     }
 }
-exports.getAlimTalkRemain = getAlimTalkRemain;
 /**
  * Get AlimTalk send history
  * @param {string} channelId - Kakao Channel ID
@@ -126,7 +127,6 @@ async function getAlimTalkHistory(channelId, page = 1, limit = 50) {
         };
     }
 }
-exports.getAlimTalkHistory = getAlimTalkHistory;
 /**
  * Get AlimTalk templates
  * @returns {Promise<Object>} - Template list
@@ -155,7 +155,6 @@ async function getAlimTalkTemplates() {
         };
     }
 }
-exports.getAlimTalkTemplates = getAlimTalkTemplates;
 exports.default = {
     sendAlimTalk,
     getAlimTalkRemain,

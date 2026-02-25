@@ -1,0 +1,10 @@
+{
+  "DASHBOARD_TITLE": "학술대회 관리자 대시보드",
+  "MENU": {
+    "ManageSocieties": "학회 관리",
+    "ManageConferences": "학술대회 관리",
+    "MemberManagement": "회원 관리",
+    "VerificationCodes": "인증 코드",
+    "PlatformSettings": "플랫폼 설정"
+  }
+}

@@ -9,6 +9,7 @@ import { EregiButton, EregiInput } from '../components/eregi/EregiForm';
 import { Badge } from '../components/ui/badge';
 import { cn } from '../lib/utils';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { safeFormatDate } from '../utils/dateUtils';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -110,7 +111,7 @@ const AbstractSubmissionPage: React.FC = () => {
         setAuthors(newAuthors);
     };
 
-    const handleEdit = (sub: unknown) => {
+    const handleEdit = (sub: any) => {
         setEditingId(sub.id);
         setTitleKo(sub.title?.ko || '');
         setTitleEn(sub.title?.en || '');
@@ -425,7 +426,7 @@ const AbstractSubmissionPage: React.FC = () => {
                                                 <div className="flex items-center gap-4 text-sm text-gray-500">
                                                     <span className="flex items-center gap-1">
                                                         <Calendar className="w-4 h-4" />
-                                                        {sub.submittedAt ? sub.submittedAt.toDate().toLocaleDateString() : '-'}
+                                                        {safeFormatDate(sub.submittedAt)}
                                                     </span>
                                                     {/* Authors Summary */}
                                                     {sub.authors && sub.authors.length > 0 && (

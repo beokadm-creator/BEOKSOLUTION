@@ -40,6 +40,18 @@ export const useSociety = () => {
             else if (host.startsWith('kadd.')) {
                 societyId = 'kadd';
             }
+            // ✅ 4순위: Admin URL Path에서 추출 (/admin/conf/:cid)
+            // 개발 환경에서 서브도메인이 없을 때 유용
+            else if (window.location.pathname.startsWith('/admin/conf/')) {
+                const pathParts = window.location.pathname.split('/');
+                // pathParts[0]='', pathParts[1]='admin', pathParts[2]='conf', pathParts[3]='kadd_2026spring'
+                if (pathParts.length > 3) {
+                    const cid = pathParts[3];
+                    if (cid.includes('_')) {
+                        societyId = cid.split('_')[0];
+                    }
+                }
+            }
 
             if (!societyId) {
                 setLoading(false);

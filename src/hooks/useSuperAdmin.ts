@@ -41,25 +41,37 @@ export const useSuperAdmin = () => {
         nameEn: string,
         adminEmail: string
     ) => {
+        console.log('[createSociety] Starting:', { id, nameKo, nameEn, adminEmail });
         setLoading(true);
         setError(null);
         try {
             const societyRef = doc(db, 'societies', id);
             const snap = await getDoc(societyRef);
-            if (snap.exists()) throw new Error("Society ID already exists");
+            console.log('[createSociety] Document exists check:', snap.exists());
+            if (snap.exists()) {
+                const error = "Society ID already exists";
+                console.error('[createSociety] Error:', error);
+                throw new Error(error);
+            }
 
-            await setDoc(societyRef, {
+            const dataToSet = {
                 id,
                 name: { ko: nameKo, en: nameEn },
                 adminEmails: [adminEmail],
                 createdAt: Timestamp.now()
-            });
+            };
+            console.log('[createSociety] Writing document:', dataToSet);
+            await setDoc(societyRef, dataToSet);
+            console.log('[createSociety] Document written successfully');
             
             await fetchSocieties(); // Refresh list
+            console.log('[createSociety] Societies fetched');
             setLoading(false);
             return true;
         } catch (err) {
+            console.error('[createSociety] Exception caught:', err);
             const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+            console.error('[createSociety] Error message:', errorMessage);
             setError(errorMessage);
             setLoading(false);
             return false;

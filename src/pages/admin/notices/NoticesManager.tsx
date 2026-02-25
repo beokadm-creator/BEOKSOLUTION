@@ -10,6 +10,7 @@ import RichTextEditor from '../../../components/ui/RichTextEditor';
 import ImageUpload from '../../../components/ui/ImageUpload';
 import toast from 'react-hot-toast';
 import { getStorage, ref, deleteObject } from 'firebase/storage';
+import { safeFormatDate } from '../../../utils/dateUtils';
 
 export const NoticesManager = () => {
   const { confId } = useConfContext();
@@ -166,10 +167,9 @@ export const NoticesManager = () => {
     setVideoUrls(newUrls);
   };
 
-  const formatDate = (timestamp: { toDate: () => Date }) => {
+  const formatDate = (timestamp: any) => {
     try {
-      const date = timestamp.toDate();
-      return date.toLocaleDateString(language === 'ko' ? 'ko-KR' : 'en-US', {
+      return safeFormatDate(timestamp, language === 'ko' ? 'ko-KR' : 'en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',

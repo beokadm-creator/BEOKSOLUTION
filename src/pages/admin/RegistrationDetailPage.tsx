@@ -110,7 +110,7 @@ const RegistrationDetailPage: React.FC = () => {
 
                     // [Fix] Ensure optionsTotal is accurate by calculating from array if missing/zero
                     const optionsList = flattened.options || flattened.selectedOptions || [];
-                    const calculatedOptionsTotal = optionsList.reduce((sum: number, opt: any) => sum + (opt.totalPrice || (opt.price * opt.quantity) || 0), 0);
+                    const calculatedOptionsTotal = optionsList.reduce((sum: number, opt: unknown) => sum + ((opt as Record<string, unknown>).totalPrice || ((opt as Record<string, unknown>).price as number | undefined) * ((opt as Record<string, unknown>).quantity as number | undefined) || 0), 0);
 
                     if (calculatedOptionsTotal > 0 && (!flattened.optionsTotal || flattened.optionsTotal === 0)) {
                         console.log('[RegistrationDetailPage] Correcting optionsTotal from array:', calculatedOptionsTotal);
@@ -301,7 +301,7 @@ const RegistrationDetailPage: React.FC = () => {
 
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">면허번호 (License)</h3>
-                    <p className="text-lg">{data.licenseNumber || data.userInfo?.licenseNumber || (data as any).userInfo?.licensenumber || (data as any).license || (data as any).formData?.licenseNumber || '-'}</p>
+                    <p className="text-lg">{data.licenseNumber || data.userInfo?.licenseNumber || (data as Record<string, unknown>).userInfo?.licensenumber || (data as Record<string, unknown>).license || (data as Record<string, unknown>).formData?.licenseNumber || '-'}</p>
                 </div>
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">등록등급 (Grade)</h3>

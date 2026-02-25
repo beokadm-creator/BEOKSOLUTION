@@ -15,18 +15,28 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onTossWebhook = exports.logPerformance = exports.logError = exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.confirmTossPaymentHttp = exports.confirmTossPayment = exports.confirmNicePayment = exports.prepareNicePayment = exports.resolveDataIntegrityAlert = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.cors = void 0;
+exports.healthCheck = exports.onTossWebhook = exports.logPerformance = exports.logError = exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.confirmTossPaymentHttp = exports.confirmTossPayment = exports.confirmNicePayment = exports.prepareNicePayment = exports.resolveDataIntegrityAlert = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.cors = void 0;
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -132,15 +142,15 @@ exports.confirmNicePayment = functions
                     paymentMethod: 'CARD',
                     paymentKey: tid,
                     orderId: (result === null || result === void 0 ? void 0 : result.Moid) || (result === null || result === void 0 ? void 0 : result.moid) || regId,
-                    amount: parseInt(amt, 10),
-                    baseAmount: baseAmount || parseInt(amt, 10),
-                    optionsTotal: optionsTotal || 0,
-                    options: selectedOptions || [],
+                    amount: parseInt(amt, 10), // Total amount including base + options
+                    baseAmount: baseAmount || parseInt(amt, 10), // Base registration fee
+                    optionsTotal: optionsTotal || 0, // Sum of selected option prices
+                    options: selectedOptions || [], // Selected options details
                     tier: userData.tier || null,
                     categoryName: userData.categoryName || null,
-                    memberVerificationData: null,
+                    memberVerificationData: null, // Will be populated if member verified
                     isAnonymous: userData.isAnonymous || false,
-                    agreements: {},
+                    agreements: {}, // Will be populated from session data if needed
                     paymentDetails: result,
                     receiptNumber: `${dateStr}-${rand}`,
                     confirmationQr: `CONF-${regId}`,
@@ -182,7 +192,7 @@ exports.confirmNicePayment = functions
                                 name: userData.name,
                                 phone: userData.phone,
                                 affiliation: userData.affiliation,
-                                organization: userData.affiliation,
+                                organization: userData.affiliation, // Standard field
                                 licenseNumber: userData.licenseNumber || '',
                                 tier: userData.tier || 'NON_MEMBER',
                                 isAnonymous: false,
@@ -213,7 +223,7 @@ exports.confirmNicePayment = functions
                         // Then log participation history
                         await admin.firestore().collection('users').doc(userData.userId).collection('participations').doc(regId).set({
                             conferenceId: confId,
-                            conferenceName: '',
+                            conferenceName: '', // Will be populated later if needed
                             registrationId: regId,
                             societyId: societyId || 'unknown',
                             role: 'ATTENDEE',
@@ -320,19 +330,19 @@ exports.confirmTossPayment = functions
                 paymentMethod: paymentMethod,
                 paymentKey: paymentKey,
                 orderId: orderId,
-                amount: amount,
-                baseAmount: baseAmount || amount,
-                optionsTotal: optionsTotal || 0,
-                options: selectedOptions || [],
+                amount: amount, // Total amount including base + options
+                baseAmount: baseAmount || amount, // Base registration fee
+                optionsTotal: optionsTotal || 0, // Sum of selected option prices
+                options: selectedOptions || [], // Selected options details
                 tier: userData.tier || null,
                 categoryName: userData.categoryName || null,
                 memberVerificationData: null,
                 isAnonymous: userData.isAnonymous || false,
                 agreementDetails: {},
                 paymentDetails: approvalResult,
-                virtualAccount: approvalResult.virtualAccount || null,
+                virtualAccount: approvalResult.virtualAccount || null, // Create Virtual Account Info
                 receiptNumber: `${dateStr}-${rand}`,
-                confirmationQr: regId,
+                confirmationQr: regId, // Use regId directly for InfoDesk scanning
                 badgeQr: null,
                 isCheckedIn: false,
                 checkInTime: null,
@@ -368,7 +378,7 @@ exports.confirmTossPayment = functions
                                 name: userData.name,
                                 phone: userData.phone,
                                 affiliation: userData.affiliation,
-                                organization: userData.affiliation,
+                                organization: userData.affiliation, // Standard field
                                 licenseNumber: userData.licenseNumber || '',
                                 tier: userData.tier || 'NON_MEMBER',
                                 isAnonymous: false,
@@ -399,7 +409,7 @@ exports.confirmTossPayment = functions
                         // C. Log Participation History (users/{uid}/participations/{regId})
                         await admin.firestore().collection('users').doc(userData.userId).collection('participations').doc(regId).set({
                             conferenceId: confId,
-                            conferenceName: '',
+                            conferenceName: '', // Will be populated later if needed
                             registrationId: regId,
                             societyId: societyId || 'unknown',
                             role: 'ATTENDEE',
@@ -533,7 +543,7 @@ exports.confirmTossPaymentHttp = functions
                     paymentDetails: approvalResult,
                     virtualAccount: approvalResult.virtualAccount || null,
                     receiptNumber: `${dateStr}-${rand}`,
-                    confirmationQr: regId,
+                    confirmationQr: regId, // Use regId directly for InfoDesk scanning
                     badgeQr: null,
                     isCheckedIn: false,
                     checkInTime: null,
@@ -567,7 +577,7 @@ exports.confirmTossPaymentHttp = functions
                                     name: userData.name,
                                     phone: userData.phone,
                                     affiliation: userData.affiliation,
-                                    organization: userData.affiliation,
+                                    organization: userData.affiliation, // Standard field
                                     licenseNumber: userData.licenseNumber || '',
                                     tier: userData.tier || 'NON_MEMBER',
                                     isAnonymous: false,
@@ -598,7 +608,7 @@ exports.confirmTossPaymentHttp = functions
                             // C. Log Participation History (users/{uid}/participations/{regId})
                             await admin.firestore().collection('users').doc(userData.userId).collection('participations').doc(regId).set({
                                 conferenceId: confId,
-                                conferenceName: '',
+                                conferenceName: '', // Will be populated later if needed
                                 registrationId: regId,
                                 societyId: societyId || 'unknown',
                                 role: 'ATTENDEE',
@@ -739,7 +749,7 @@ exports.getNhnAlimTalkTemplates = functions
 // --------------------------------------------------------------------------
 exports.createSocietyAdminUser = functions
     .runWith({
-    enforceAppCheck: false,
+    enforceAppCheck: false, // Disable AppCheck for debugging
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onCall(async (data, context) => {
@@ -968,14 +978,14 @@ exports.verifyMemberIdentity = functions
             return {
                 success: true,
                 grade: serverGrade,
-                isExpired: isExpired,
+                isExpired: isExpired, // ✅ [FIX] 만료 여부 플래그 추가
                 memberData: {
-                    id: memberDoc.id,
+                    id: memberDoc.id, // [Critical] Return Doc ID for Locking
                     name: member.name,
-                    grade: serverGrade,
-                    priceKey: priceKey,
+                    grade: serverGrade, // ✅ [FIX] 등급 정보 추가
+                    priceKey: priceKey, // ✅ [FIX] 정규화된 가격 키 추가
                     licenseNumber: member.licenseNumber || member.code,
-                    societyId: societyId,
+                    societyId: societyId, // Pass back for context
                     expiryDate: finalExpiry,
                     expiry: finalExpiry // 프론트가 찾는 필드 강제 주입
                 }
@@ -1507,7 +1517,7 @@ exports.onTossWebhook = functions
                     // Here we just ensure participation record is updated to COMPLETED.
                     await db.collection('users').doc(userId).collection('participations').doc(regDoc.id).set({
                         conferenceId: confId,
-                        conferenceName: '',
+                        conferenceName: '', // Optional
                         registrationId: regDoc.id,
                         societyId: societyId || 'unknown',
                         role: 'ATTENDEE',
@@ -1625,6 +1635,51 @@ exports.onTossWebhook = functions
     catch (error) {
         functions.logger.error("[Toss Webhook] Internal Error:", error);
         res.status(500).json({ error: error.message });
+    }
+});
+// --------------------------------------------------------------------------
+// HEALTH CHECK: System Status Endpoint (CORS Enabled)
+// --------------------------------------------------------------------------
+exports.healthCheck = functions
+    .runWith({
+    enforceAppCheck: false,
+    ingressSettings: 'ALLOW_ALL'
+})
+    .https.onRequest(async (req, res) => {
+    // Handle CORS preflight
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+        res.status(204).send('');
+        return;
+    }
+    try {
+        // Check Firestore connectivity
+        const db = admin.firestore();
+        await db.doc('system/health').get();
+        const timestamp = new Date().toISOString();
+        // Basic health check
+        const healthStatus = {
+            status: 'healthy',
+            timestamp,
+            version: '1.0.0',
+            services: {
+                firestore: 'connected',
+                auth: 'available'
+            }
+        };
+        functions.logger.info('[HealthCheck] System healthy');
+        res.status(200).json(healthStatus);
+    }
+    catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        functions.logger.error('[HealthCheck] System unhealthy:', errorMessage);
+        res.status(503).json({
+            status: 'unhealthy',
+            timestamp: new Date().toISOString(),
+            error: errorMessage
+        });
     }
 });
 //# sourceMappingURL=index.js.map

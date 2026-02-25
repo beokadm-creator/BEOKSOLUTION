@@ -2,6 +2,7 @@ import React from 'react';
 import { Bell, Megaphone } from 'lucide-react';
 import type { Language } from '../../../hooks/useLanguage';
 import { Society } from '../../../types/schema';
+import { safeFormatDate } from '../../../utils/dateUtils';
 
 interface NoticesSectionProps {
   society?: Society;
@@ -44,7 +45,7 @@ const NoticesSection: React.FC<NoticesSectionProps> = ({ society, language = 'ko
                         {notice.category}
                       </span>
                       <span className="text-slate-400 text-sm font-bold">
-                        {new Date(notice.date.seconds * 1000).toLocaleDateString(language === 'ko' ? 'ko-KR' : 'en-US')}
+                        {safeFormatDate(notice.date, language === 'ko' ? 'ko-KR' : 'en-US')}
                       </span>
                     </div>
                     <h3 className="text-lg font-bold text-slate-900 mb-2">{getLocalizedText(notice.title)}</h3>

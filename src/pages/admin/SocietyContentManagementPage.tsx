@@ -7,6 +7,7 @@ import { Save, Plus, Trash2, Languages, Image as ImageIcon, X } from 'lucide-rea
 import { Timestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import type { Language } from '../../hooks/useLanguage';
+import { safeFormatDate } from '../../utils/dateUtils';
 import RichTextEditor from '../../components/ui/RichTextEditor';
 
 const SocietyContentManagementPage: React.FC = () => {
@@ -26,7 +27,7 @@ const SocietyContentManagementPage: React.FC = () => {
   const [introEN, setIntroEN] = useState('');
 
   // Notice form
-  const [notices, setNotices] = useState<Array<{ titleKO: string; titleEN: string; contentKO: string; contentEN: string; date: string }>>([]);
+  const [notices, setNotices] = useState<any[]>([]);
   const [newNotice, setNewNotice] = useState({
     titleKO: '',
     titleEN: '',
@@ -58,7 +59,7 @@ const SocietyContentManagementPage: React.FC = () => {
           }
         }
       }
-      
+
       // Load introduction
       if (society.introduction) {
         setIntroKO(society.introduction.ko || '');
@@ -226,22 +227,20 @@ const SocietyContentManagementPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setPreviewLang('ko')}
-          className={`px-4 py-2 rounded-lg font-bold text-sm transition ${
-            previewLang === 'ko'
-              ? 'bg-blue-600 text-white'
-              : 'bg-white text-slate-600 hover:bg-slate-100'
-          }`}
+          className={`px-4 py-2 rounded-lg font-bold text-sm transition ${previewLang === 'ko'
+            ? 'bg-blue-600 text-white'
+            : 'bg-white text-slate-600 hover:bg-slate-100'
+            }`}
         >
           한국어 / KO
         </button>
         <button
           type="button"
           onClick={() => setPreviewLang('en')}
-          className={`px-4 py-2 rounded-lg font-bold text-sm transition ${
-            previewLang === 'en'
-              ? 'bg-blue-600 text-white'
-              : 'bg-white text-slate-600 hover:bg-slate-100'
-          }`}
+          className={`px-4 py-2 rounded-lg font-bold text-sm transition ${previewLang === 'en'
+            ? 'bg-blue-600 text-white'
+            : 'bg-white text-slate-600 hover:bg-slate-100'
+            }`}
         >
           English / EN
         </button>
@@ -412,7 +411,7 @@ const SocietyContentManagementPage: React.FC = () => {
       {/* Society Introduction Section */}
       <section className="bg-white rounded-2xl border border-slate-200 p-8">
         <h2 className="text-2xl font-black text-slate-900 mb-6">학회 소개 / Society Introduction</h2>
-        
+
         <div className="space-y-8">
           {/* Korean */}
           <div>
@@ -447,7 +446,7 @@ const SocietyContentManagementPage: React.FC = () => {
                 __html: previewLang === 'ko' ? introKO : introEN || introKO
               }}
             />
-             {!(previewLang === 'ko' ? introKO : introEN) && (
+            {!(previewLang === 'ko' ? introKO : introEN) && (
               <p className="text-slate-400 text-center py-8">
                 {previewLang === 'ko' ? '내용을 입력해주세요' : 'Please enter content'}
               </p>
@@ -568,9 +567,7 @@ const SocietyContentManagementPage: React.FC = () => {
                         {notice.category}
                       </span>
                       <span className="text-slate-400 text-sm">
-                        {notice.date?.seconds
-                          ? new Date(notice.date.seconds * 1000).toLocaleDateString('ko-KR')
-                          : ''}
+                        {safeFormatDate(notice.date, 'ko-KR')}
                       </span>
                     </div>
                     <h4 className="text-lg font-bold text-slate-900 mb-2">

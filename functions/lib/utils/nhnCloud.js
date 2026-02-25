@@ -3,7 +3,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateConfig = exports.getSendHistory = exports.getTemplate = exports.getTemplateList = exports.sendAlimTalk = void 0;
+exports.sendAlimTalk = sendAlimTalk;
+exports.getTemplateList = getTemplateList;
+exports.getTemplate = getTemplate;
+exports.getSendHistory = getSendHistory;
+exports.validateConfig = validateConfig;
 const axios_1 = __importDefault(require("axios"));
 /**
  * Send AlimTalk message via NHN Cloud
@@ -58,7 +62,6 @@ async function sendAlimTalk(config, params) {
         };
     }
 }
-exports.sendAlimTalk = sendAlimTalk;
 /**
  * Get AlimTalk template list
  */
@@ -106,7 +109,6 @@ async function getTemplateList(config) {
         };
     }
 }
-exports.getTemplateList = getTemplateList;
 /**
  * Get single AlimTalk template by code
  */
@@ -146,7 +148,6 @@ async function getTemplate(config, templateCode) {
         };
     }
 }
-exports.getTemplate = getTemplate;
 /**
  * Get AlimTalk send history
  */
@@ -181,7 +182,6 @@ async function getSendHistory(config, requestId) {
         };
     }
 }
-exports.getSendHistory = getSendHistory;
 /**
  * Validate NHN Cloud configuration
  */
@@ -201,7 +201,6 @@ async function validateConfig(config) {
         };
     }
 }
-exports.validateConfig = validateConfig;
 exports.default = {
     sendAlimTalk,
     getTemplateList,

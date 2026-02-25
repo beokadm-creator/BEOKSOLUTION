@@ -69,11 +69,11 @@ const SuperAdminPage: React.FC = () => {
     const [resolvingAlertId, setResolvingAlertId] = useState<string | null>(null);
 
     // Health Check state
-    const [healthCheckData, setHealthCheckData] = useState<any>(null);
+    const [healthCheckData, setHealthCheckData] = useState<unknown>(null);
     const [healthCheckLoading, setHealthCheckLoading] = useState(false);
 
     // AlimTalk Config Check state
-    const [alimTalkConfigData, setAlimTalkConfigData] = useState<any>(null);
+    const [alimTalkConfigData, setAlimTalkConfigData] = useState<unknown>(null);
     const [alimTalkConfigLoading, setAlimTalkConfigLoading] = useState(false);
     const [selectedSocietyForAlimTalk, setSelectedSocietyForAlimTalk] = useState<string>('');
 
@@ -111,7 +111,11 @@ const SuperAdminPage: React.FC = () => {
             } else {
                 toast.error('시스템 오류');
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
+            console.error('[fetchHealthCheck] Failed:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            toast.error('헬스체크 실패: ' + errorMessage);
+            setHealthCheckData({ status: 'unhealthy', error: errorMessage });
             console.error('[fetchHealthCheck] Failed:', error);
             toast.error('헬스체크 실패: ' + error.message);
             setHealthCheckData({ status: 'unhealthy', error: error.message });
@@ -138,7 +142,11 @@ const SuperAdminPage: React.FC = () => {
             } else {
                 toast.error(`알림톡 설정 오류: ${data.errors?.join(', ')}`);
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
+            console.error('[fetchAlimTalkConfig] Failed:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            toast.error('알림톡 설정 확인 실패: ' + errorMessage);
+            setAlimTalkConfigData({ success: false, error: errorMessage });
             console.error('[fetchAlimTalkConfig] Failed:', error);
             toast.error('알림톡 설정 확인 실패: ' + error.message);
             setAlimTalkConfigData({ success: false, error: error.message });
@@ -281,14 +289,12 @@ const SuperAdminPage: React.FC = () => {
         e.preventDefault();
         if (!socNameKo) return toast.error("사회명 (한글) 필수");
         if (!socAdmin) return toast.error("관리자 이메일 필수");
+        if (!socNameEn) return toast.error("사회명 (영어) 필수");
 
         const toastId = toast.loading("Creating society...");
+        const societyId = socNameEn.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); // Generate ID from English name
         try {
-            await createSociety({
-                name: { ko: socNameKo, en: socNameEn || undefined },
-                description: { ko: undefined },
-                adminEmails: [socAdmin]
-            });
+            await createSociety(societyId, socNameKo, socNameEn, socAdmin);
             toast.success("Society created.", { id: toastId });
             setSocNameKo('');
             setSocNameEn('');
@@ -1035,7 +1041,7 @@ const SuperAdminPage: React.FC = () => {
 
                                                     {healthCheckData.checks && (
                                                         <div className="space-y-2">
-                                                            {Object.entries(healthCheckData.checks).map(([key, check]: [string, any]) => (
+                                                            {Object.entries((healthCheckData as Record<string, unknown>).checks as Record<string, unknown>).map(([key, check]: [string, unknown]) => (
                                                                 <div key={key} className="flex items-center justify-between p-3 bg-[#2a2a2a] rounded-lg">
                                                                     <div className="flex items-center gap-2">
                                                                         {check.status === 'pass' ? <CheckCircle2 className="w-4 h-4 text-green-400" /> :

@@ -6,7 +6,8 @@
  * 실제 프로젝트에서는 이 코드를 참고하여 구현하세요.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendRegistrationConfirmation = exports.sendVerificationCode = void 0;
+exports.sendVerificationCode = sendVerificationCode;
+exports.sendRegistrationConfirmation = sendRegistrationConfirmation;
 const nhnAlimTalk_1 = require("./nhnAlimTalk");
 // ============================================
 // 1. 템플릿 목록 조회 예제
@@ -62,7 +63,7 @@ async function exampleSendBasicAlimTalk() {
     const params = {
         senderKey: 'YOUR_SENDER_KEY',
         templateCode: 'TEMPLATE001',
-        recipientNo: '01012345678',
+        recipientNo: '01012345678', // 하이픈 없이
         content: '안녕하세요. 인증번호는 123456입니다.', // 템플릿 내용과 정확히 일치해야 함
     };
     const result = await (0, nhnAlimTalk_1.sendAlimTalk)(params);
@@ -107,14 +108,14 @@ async function exampleSendAlimTalkWithButtons() {
         buttons: [
             {
                 ordering: 1,
-                type: 'WL',
+                type: 'WL', // WL: 웹링크
                 name: '홈페이지 바로가기',
-                linkMo: 'https://example.com',
+                linkMo: 'https://example.com', // 모바일 웹 링크
                 linkPc: 'https://example.com', // PC 웹 링크
             },
             {
                 ordering: 2,
-                type: 'AL',
+                type: 'AL', // AL: 앱링크
                 name: '앱에서 보기',
                 schemeIos: 'myapp://home',
                 schemeAndroid: 'myapp://home',
@@ -270,7 +271,7 @@ async function sendVerificationCode(phoneNumber, verificationCode, senderKey, te
     const params = {
         senderKey,
         templateCode,
-        recipientNo: phoneNumber.replace(/-/g, ''),
+        recipientNo: phoneNumber.replace(/-/g, ''), // 하이픈 제거
         content,
         // 대체 발송 설정 (알림톡 발송 실패 시 SMS로 발송)
         isResend: true,
@@ -294,7 +295,6 @@ async function sendVerificationCode(phoneNumber, verificationCode, senderKey, te
         };
     }
 }
-exports.sendVerificationCode = sendVerificationCode;
 // ============================================
 // 11. 실제 사용 예제: 행사 등록 완료 알림
 // ============================================
@@ -340,7 +340,6 @@ async function sendRegistrationConfirmation(phoneNumber, userName, eventName, ev
         };
     }
 }
-exports.sendRegistrationConfirmation = sendRegistrationConfirmation;
 // ============================================
 // 버튼 타입 설명
 // ============================================

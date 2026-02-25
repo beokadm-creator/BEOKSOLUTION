@@ -150,9 +150,17 @@ export const useConference = (targetId?: string) => {
 
                 if (isLocalhost || isFirebaseApp) {
                     // On Localhost/Platform, if there is a slug, we treat it as Conference Mode for testing.
+                    // IMPORTANT: If we are in /admin/conf/..., the slug is passed.
+                    // If we are in /admin/society, the slug might be undefined or different.
+                    // For safety, on Dev/Firebase hosting, we allow cross-society access or default to platform
+                    
                     if (slug && slug !== 'admin' && slug !== 'login') {
                         isPlatform = false;
                         // societyId is already set from societyParam if available
+                        // If not, try to extract from slug if it follows pattern society_conf
+                        if (!societyId && slug.includes('_')) {
+                            societyId = slug.split('_')[0];
+                        }
                     } else {
                         isPlatform = true;
                     }

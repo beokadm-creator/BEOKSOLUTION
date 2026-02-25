@@ -16,7 +16,7 @@ const PageEditor: React.FC = () => {
         if (selectedPageId) {
             const page = pages.find(p => p.id === selectedPageId);
             if (page) {
-                // eslint-disable-next-line react-hooks/set-state-in-effect
+                 
                 setSlug(page.slug);
                  
                 setTitle(page.title.ko);

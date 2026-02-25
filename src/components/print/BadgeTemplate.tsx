@@ -95,6 +95,44 @@ const BadgeTemplate: React.FC<BadgeTemplateProps> = ({ data, config }) => {
         </div>
       )}
 
+      {/* License Number Field */}
+      {layout.LICENSE && (
+        <div
+          style={{
+            position: 'absolute',
+            left: layout.LICENSE.align === 'center' ? '50%' : layout.LICENSE.x,
+            top: layout.LICENSE.y,
+            fontSize: layout.LICENSE.fontSize,
+            color: layout.LICENSE.color || '#000',
+            textAlign: layout.LICENSE.align || 'left',
+            fontWeight: layout.LICENSE.fontWeight || 'normal',
+            zIndex: 1,
+            transform: layout.LICENSE.align === 'center' ? 'translateX(-50%)' : 'none',
+          }}
+        >
+          {data.licenseNumber || data.LICENSE}
+        </div>
+      )}
+
+      {/* Price Field */}
+      {layout.PRICE && (
+        <div
+          style={{
+            position: 'absolute',
+            left: layout.PRICE.align === 'center' ? '50%' : layout.PRICE.x,
+            top: layout.PRICE.y,
+            fontSize: layout.PRICE.fontSize,
+            color: layout.PRICE.color || '#000',
+            textAlign: layout.PRICE.align || 'left',
+            fontWeight: layout.PRICE.fontWeight || 'normal',
+            zIndex: 1,
+            transform: layout.PRICE.align === 'center' ? 'translateX(-50%)' : 'none',
+          }}
+        >
+          {data.price || data.PRICE}
+        </div>
+      )}
+
       {/* QR Code */}
       {qr && (
         <div

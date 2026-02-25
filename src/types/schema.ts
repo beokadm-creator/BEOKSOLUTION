@@ -9,7 +9,7 @@ export interface LocalizedText {
   en?: string;
 }
 
-export type BadgeElementType = 'NAME' | 'ORG' | 'QR' | 'CUSTOM';
+export type BadgeElementType = 'NAME' | 'ORG' | 'QR' | 'CUSTOM' | 'CATEGORY' | 'LICENSE' | 'PRICE' | 'AFFILIATION' | 'IMAGE';
 
 export interface BadgeElement {
   x: number;
@@ -160,6 +160,7 @@ export interface ConferenceInfo {
     width: number;
     height: number;
     elements: BadgeElement[];
+    backgroundImageUrl?: string; // Background image for positioning/printing
   };
   receiptConfig: {
     issuerName: string;

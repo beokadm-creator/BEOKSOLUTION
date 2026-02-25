@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { doc, updateDoc, collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import { doc, updateDoc, collection, getDocs, query, where, Timestamp, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { BadgeElement, Registration } from '../types/schema';
+import { clearConferenceCache } from './useConference';
 
 // Mock Toss Cancel
 const mockCancelPayment = async (amount: number, paymentKey: string): Promise<boolean> => {
@@ -14,20 +15,57 @@ export const useAdmin = (conferenceId: string) => {
     const [error, setError] = useState<string | null>(null);
 
     // 1. Save Badge Layout
-    const saveBadgeLayout = async (width: number, height: number, elements: BadgeElement[]) => {
+    const saveBadgeLayout = async (width: number, height: number, elements: BadgeElement[], backgroundImageUrl?: string) => {
         setLoading(true);
         try {
+            // [Fix] Firestore는 undefined 값을 허용하지 않으므로 저장 전 제거
+            const sanitizeElements = (els: BadgeElement[]) =>
+                els.map(el => {
+                    const clean: Record<string, unknown> = {};
+                    for (const [k, v] of Object.entries(el)) {
+                        if (v !== undefined) clean[k] = v;
+                    }
+                    return clean;
+                });
+
+            const cleanElements = sanitizeElements(elements);
+
+            // [Fix] Save to BOTH locations for compatibility
+            // 1. Legacy Location: info/general (used by useConference for BadgeEditor)
+            // Use setDoc with merge: true to avoid "No document to update" error
             const infoRef = doc(db, `conferences/${conferenceId}/info/general`);
-            await updateDoc(infoRef, {
-                'badgeLayout.width': width,
-                'badgeLayout.height': height,
-                'badgeLayout.elements': elements
-            });
+            await setDoc(infoRef, {
+                badgeLayout: {
+                    width,
+                    height,
+                    elements: cleanElements,
+                    backgroundImageUrl: backgroundImageUrl ?? null
+                }
+            }, { merge: true });
+
+            // 2. New Location: settings/badge_config (used by InfodeskPage)
+            const settingsRef = doc(db, `conferences/${conferenceId}/settings/badge_config`);
+            await setDoc(settingsRef, {
+                badgeLayout: {
+                    width,
+                    height,
+                    elements: cleanElements,
+                    backgroundImageUrl: backgroundImageUrl ?? null,
+                    enableCutting: true // Default to true
+                },
+                badgeLayoutEnabled: true, // Enable by default when saving
+                updatedAt: Timestamp.now()
+            }, { merge: true });
+
+            // [Fix] Invalidate Cache to reflect changes immediately
+            clearConferenceCache();
+
             setLoading(false);
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Unknown error';
             setError(errorMessage);
             setLoading(false);
+            throw err; // Re-throw to allow component to handle success/failure
         }
     };
 
@@ -45,7 +83,7 @@ export const useAdmin = (conferenceId: string) => {
         try {
             // Get current reg to check payment details (mocking paymentKey retrieval)
             const regRef = doc(db, `conferences/${conferenceId}/registrations/${regId}`);
-            
+
             // Call API
             await mockCancelPayment(amount, 'mock_payment_key');
 

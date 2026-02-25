@@ -1,8 +1,7 @@
-/* eslint-disable */
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
-import { getFirestore, collection, query, where, getDocs, doc, serverTimestamp, getDoc, collectionGroup, orderBy, updateDoc, deleteDoc, onSnapshot, limit } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, collection, query, where, getDocs, doc, serverTimestamp, getDoc, collectionGroup, orderBy, updateDoc, deleteDoc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { useMemberVerification } from '../hooks/useMemberVerification';
 import { useAuth } from '../hooks/useAuth';
 import { useSociety } from '../hooks/useSociety';
@@ -10,30 +9,38 @@ import { functions } from '../firebase';
 import { getRootCookie } from '../utils/cookie';
 import { httpsCallable } from 'firebase/functions';
 import toast from 'react-hot-toast';
-import LoadingSpinner from '../components/common/LoadingSpinner';
-import EmptyState from '../components/common/EmptyState';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
-import { Calendar, FileText, QrCode, Award, Download, MessageSquare, LayoutDashboard, Printer } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '../components/ui/dialog';
-import { ABSTRACT_STATUS, getAbstractStatusLabel } from '@/constants/abstract';
+import { Calendar, FileText, QrCode, Printer, Award } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { ABSTRACT_STATUS } from '@/constants/abstract';
 import EregiNavigation from '../components/eregi/EregiNavigation';
 import DataWidget from '../components/eregi/DataWidget';
-import { EregiCard } from '@/components/eregi/EregiForm';
 import ReceiptTemplate from '../components/print/ReceiptTemplate';
 import PrintHandler from '../components/print/PrintHandler';
 import { ReceiptConfig } from '../types/print';
 import { logger } from '../utils/logger';
+import { CreditCard } from 'lucide-react';
+import { Submission, ConferenceUser } from '../types/schema';
+import { normalizeUserData } from '../utils/userDataMapper';
+import { safeFormatDate } from '../utils/dateUtils';
 
-// HELPER: Force String (Prevent Object Crash)
-const forceString = (val: any): string => {
+interface Stringable {
+    ko?: string;
+    en?: string;
+    name?: string | Stringable;
+    [key: string]: unknown;
+}
+
+const forceString = (val: unknown): string => {
     try {
         if (!val) return '';
         if (typeof val === 'string') return val;
-        if (typeof val === 'object') {
-            if (val.ko) return forceString(val.ko);
-            if (val.en) return forceString(val.en);
-            if (val.name) return forceString(val.name);
+        if (typeof val === 'object' && val !== null) {
+            const obj = val as Stringable;
+            if (obj.ko) return forceString(obj.ko);
+            if (obj.en) return forceString(obj.en);
+            if (obj.name) return forceString(obj.name);
             return '';
         }
         return String(val);
@@ -50,12 +57,27 @@ interface UserReg {
     location: string;
     dates: string;
     paymentStatus?: string;
-    status?: string; // CANCELED, REFUNDED, REFUND_REQUESTED 등
     amount?: number;
     receiptNumber?: string;
-    paymentDate?: any; // Timestamp or string
+    paymentDate?: Timestamp | Date | string;
     receiptConfig?: ReceiptConfig;
-    userName?: string; // Added for receipt
+    userName?: string;
+    status?: string; // Generic status field from Firestore (PAID, CANCELED, etc.)
+    virtualAccount?: {
+        bank: string;
+        accountNumber: string;
+        customerName?: string;
+        dueDate?: string;
+    };
+}
+
+interface Affiliation {
+    verified: boolean;
+    licenseNumber?: string;
+    memberId?: string;
+    grade?: string;
+    expiry?: string | Timestamp;
+    expiryDate?: string | Timestamp;
 }
 
 // [Step 512-Des] Visual Gratification: CountUp Animation
@@ -93,26 +115,20 @@ const UserHubPage: React.FC = () => {
     const { auth } = useAuth('');
     const { user, loading: authLoading } = auth;
     // Fetch society data for dynamic name display
-    const { society, loading: societyLoading } = useSociety();
+    const { society } = useSociety();
 
     const [loading, setLoading] = useState(true);
     // [Step 512-Des] Data Highway Feedback
     const [syncStatus, setSyncStatus] = useState<'connected' | 'syncing' | 'disconnected'>('syncing');
     const [activeTab, setActiveTab] = useState<'EVENTS' | 'CERTS' | 'PROFILE' | 'ABSTRACTS'>('EVENTS');
 
-    // Non-member detection state
-    const [isNonMemberOnly, setIsNonMemberOnly] = useState<boolean>(false);
-    const [nonMemberConferenceSlug, setNonMemberConferenceSlug] = useState<string>('');
-
     // Receipt Modal State
     const [selectedReceiptReg, setSelectedReceiptReg] = useState<UserReg | null>(null);
     const [showReceiptModal, setShowReceiptModal] = useState(false);
     const receiptRef = useRef<HTMLDivElement>(null);
 
-    // Data
     const [regs, setRegs] = useState<UserReg[]>([]);
-    const [abstracts, setAbstracts] = useState<any[]>([]);
-    const retryCount = useRef(0);
+    const [abstracts, setAbstracts] = useState<Submission[]>([]);
     const healingAttempted = useRef<{ [key: string]: boolean }>({});
     const realtimeRetryCount = useRef(0);
     const MAX_REALTIME_RETRIES = 3;
@@ -123,17 +139,149 @@ const UserHubPage: React.FC = () => {
     }, [authLoading]);
 
     const [totalPoints, setTotalPoints] = useState(0);
-    const [societies, setSocieties] = useState<any[]>([]);
+    const [societies, setSocieties] = useState<Array<{ id: string; name: string | { ko?: string; en?: string };[key: string]: unknown }>>([]);
 
     // Profile (Locked by default)
     const [profile, setProfile] = useState({ displayName: '', phoneNumber: '', affiliation: '', licenseNumber: '', email: '' });
 
     // Modal State
     const [showCertModal, setShowCertModal] = useState(false);
+    const [showVirtualAccountModal, setShowVirtualAccountModal] = useState(false);
     const [verifyForm, setVerifyForm] = useState({ societyId: "", name: "", code: "" });
     const [isSocLocked, setIsSocLocked] = useState(false);
+    // State for Virtual Account Modal
+    const [selectedVirtualAccountReg, setSelectedVirtualAccountReg] = useState<UserReg | null>(null);
     // [Fix-Step 263] Use Hook
     const { verifyMember, loading: verifyLoading } = useMemberVerification();
+    const verifyFormInitializedRef = useRef(false);
+
+    const fetchUserData = useCallback(async (u: ConferenceUser) => {
+        const db = getFirestore();
+        setLoading(true);
+
+        // Initial profile from auth user
+        let profileData = {
+            displayName: u.name,
+            phoneNumber: u.phone,
+            affiliation: u.organization,
+            licenseNumber: u.licenseNumber || '',
+            email: u.email
+        };
+
+        logger.debug('UserHub', 'Starting profile load', { uid: u.id });
+
+        try {
+            const userDocSnap = await getDoc(doc(db, 'users', u.id));
+            const hasUserDoc = userDocSnap.exists();
+
+            if (hasUserDoc) {
+                const rawData = userDocSnap.data();
+                logger.debug('UserHub', 'users/{uid} document found', { uid: u.id });
+
+                const normalized = normalizeUserData({ ...rawData, id: u.id });
+
+                profileData = {
+                    displayName: normalized.name || profileData.displayName,
+                    phoneNumber: normalized.phone || profileData.phoneNumber,
+                    affiliation: normalized.organization || profileData.affiliation,
+                    licenseNumber: normalized.licenseNumber || profileData.licenseNumber,
+                    email: normalized.email || profileData.email
+                };
+            } else {
+                logger.debug('UserHub', 'users/{uid} document does not exist, checking participations');
+                try {
+                    const participationsRef = collection(db, `users/${u.id}/participations`);
+                    const participationsSnap = await getDocs(participationsRef);
+
+                    logger.debug('UserHub', 'Participations query returned', { count: participationsSnap.size });
+                    if (!participationsSnap.empty) {
+                        const nonMemberParticipation = participationsSnap.docs[0].data();
+                        const confSlug = nonMemberParticipation.slug || nonMemberParticipation.conferenceId || nonMemberParticipation.conferenceSlug || 'kadd_2026spring';
+
+                        // [Non-member detection] users/{uid} doesn't exist but participations do
+                        logger.debug('UserHub', 'Non-member detected', { uid: u.id, hasParticipations: participationsSnap.size, confSlug });
+
+                        const normalizedPart = normalizeUserData(nonMemberParticipation);
+
+                        profileData = {
+                            displayName: normalizedPart.name || profileData.displayName,
+                            phoneNumber: normalizedPart.phone || profileData.phoneNumber,
+                            affiliation: normalizedPart.organization || profileData.affiliation,
+                            licenseNumber: normalizedPart.licenseNumber || profileData.licenseNumber,
+                            email: normalizedPart.email || profileData.email
+                        };
+                    }
+                } catch (partErr) {
+                    logger.warn('UserHub', 'Could not get participation data', partErr);
+                }
+            }
+        } catch (docErr) {
+            const errorCode = docErr instanceof Error && 'code' in docErr ? (docErr as { code?: string }).code : undefined;
+            const errorMessage = docErr instanceof Error ? docErr.message : String(docErr);
+            logger.error('UserHub', 'Error accessing users/{uid}', { code: errorCode, message: errorMessage });
+        }
+
+        logger.debug('UserHub', 'Final profile data', profileData);
+        setProfile(profileData);
+
+        try {
+            const snapSoc = await getDocs(collection(db, 'societies'));
+            setSocieties(snapSoc.docs.map(d => ({ id: d.id, ...d.data() })));
+        } catch (socErr) {
+            logger.error('UserHub', 'Societies fetch error', socErr);
+        }
+
+        try {
+            // [Fix] Re-enable abstracts fetching for mypage
+            // Query submissions across ALL conferences where user is submitter
+            // Use collectionGroup to search conferences/{confId}/submissions
+            // [Safety] Use parameter u instead of outer scope user to avoid null reference
+            if (!u.id) {
+                logger.warn('UserHub', 'User UID is null, skipping abstracts fetch');
+                setAbstracts([]);
+                setLoading(false);
+                return;
+            }
+
+            const submissionsRef = collectionGroup(db, 'submissions');
+            const q = query(submissionsRef, where('userId', '==', u.uid), orderBy('submittedAt', 'desc'));
+            const snap = await getDocs(q);
+
+            const userAbstracts = snap.docs.map(d => ({
+                id: d.id,
+                ...d.data()
+            }));
+
+            setAbstracts(userAbstracts);
+            logger.debug('UserHub', 'Abstracts fetched', { count: userAbstracts.length });
+        } catch (absErr) {
+            logger.error('UserHub', 'Abstracts fetch error', absErr);
+            const errorMsg = absErr instanceof Error ? absErr.message : String(absErr);
+            if (errorMsg?.includes('index') || errorMsg?.includes('Index')) {
+                logger.warn('UserHub', 'Abstracts index is still building, showing empty state');
+                setAbstracts([]);
+                toast('초록 내역이 준비 중입니다. 잠시 후 새로고침해주세요.');
+            } else {
+                setAbstracts([]);
+                toast.error('초록 내역을 불러올 수 없습니다.');
+            }
+        }
+
+        setLoading(false);
+        // setSyncStatus('connected'); // Handled by realtime listener
+    }, []);
+
+    // Initialize verifyForm with user name when user data changes
+
+    useLayoutEffect(() => {
+        if (!authLoading && user && !verifyFormInitializedRef.current) {
+            const initialName = forceString(user.name || (user as { displayName?: string }).displayName);
+            requestAnimationFrame(() => {
+                setVerifyForm(prev => ({ ...prev, name: initialName }));
+            });
+            verifyFormInitializedRef.current = true;
+        }
+    }, [user, authLoading]);
 
     // ZOMBIE KILLER: Force refresh when navigating back from history
     useEffect(() => {
@@ -146,30 +294,22 @@ const UserHubPage: React.FC = () => {
         return () => window.removeEventListener('pageshow', handlePageShow);
     }, []);
 
-    // [Fix-Step 350] Auth Sync
+
     useEffect(() => {
         if (!authLoading) {
             if (!user) {
-                // FORCE CLEAN REDIRECT IF NO SESSION
                 window.location.href = `/auth?mode=login&returnUrl=${encodeURIComponent(window.location.pathname)}`;
                 return;
             }
-            // User exists
-            console.log('[UserHub] User object from auth:', {
-                uid: user.uid || user.id,
-                name: user.name,
-                email: user.email,
-                displayName: (user as any).displayName,
-                affiliations: user.affiliations
-            });
             logger.debug('UserHub', 'User object from auth', { uid: user.uid || user.id });
-            setVerifyForm(prev => ({ ...prev, name: forceString(user.name || (user as any).displayName) }));
-            fetchUserData(user);
 
-            // [Self-Healing] Check if expiry is missing for verified affiliations
+            // Wrap setState in a callback to avoid direct setState in effect
+            requestAnimationFrame(() => {
+                fetchUserData(user);
+            });
+
             if (user.affiliations) {
-                Object.entries(user.affiliations).forEach(async ([socId, aff]: [string, any]) => {
-                    // [Step 393-D] Zero Tolerance Check: expiry OR expiryDate MUST exist
+                Object.entries(user.affiliations).forEach(async ([socId, aff]: [string, { verified?: boolean; expiry?: string; expiryDate?: string; licenseNumber?: string }]) => {
                     const hasExpiry = aff.expiry !== undefined || aff.expiryDate !== undefined;
 
                     if (aff.verified && !hasExpiry) {
@@ -188,13 +328,10 @@ const UserHubPage: React.FC = () => {
                                 // verifyMember will now save BOTH fields due to previous hook update
                                 const res = await verifyMember(
                                     socId,
-                                    user.name || (user as any).displayName,
+                                    user.name || (user as { displayName?: string }).displayName,
                                     aff.licenseNumber,
                                     true,
-                                    "",
-                                    undefined,
-                                    undefined,
-                                    undefined,
+                                    5,
                                     true // lockNow
                                 );
 
@@ -213,8 +350,7 @@ const UserHubPage: React.FC = () => {
         }
     }, [user, authLoading, fetchUserData, verifyMember]);
 
-    // [Step 402] Real-time validation trigger
-    const validateCurrentAffiliationRef = useRef<any>(null);
+    const validateCurrentAffiliationRef = useRef<(user: { uid: string; name?: string; displayName?: string; userName?: string; affiliations?: { [key: string]: { verified?: boolean; licenseNumber?: string; code?: string; memberId?: string } } }) => Promise<void> | null>(null);
 
     useEffect(() => {
         if (user && !authLoading && validateCurrentAffiliationRef.current) {
@@ -222,25 +358,24 @@ const UserHubPage: React.FC = () => {
         }
     }, [user, authLoading]);
 
-    const validateCurrentAffiliation = useCallback(async (u: any) => {
+    const validateCurrentAffiliation = useCallback(async (u: { uid: string; name?: string; displayName?: string; userName?: string; affiliations?: { [key: string]: { verified?: boolean; licenseNumber?: string; code?: string; memberId?: string } } }): Promise<void> => {
         if (!u.affiliations) return;
         const db = getFirestore();
 
         for (const [socId, aff] of Object.entries(u.affiliations)) {
-            const castAff = aff as any;
+            const castAff = aff as { verified?: boolean; licenseNumber?: string; code?: string; memberId?: string };
             if (castAff.verified) {
                 try {
                     const codeToUse = castAff.licenseNumber || castAff.code || castAff.memberId;
                     if (!codeToUse) continue;
 
                     const verifyFn = httpsCallable(functions, 'verifyMemberIdentity');
-                    // We use the cloud function to check if the member still exists and is valid
-                    const { data }: any = await verifyFn({
+                    const { data } = await verifyFn({
                         societyId: socId,
                         name: u.name || u.displayName || u.userName,
                         code: codeToUse,
                         lockNow: false
-                    });
+                    }) as { data: { success: boolean; message?: string } };
 
                     if (!data.success) {
                         logger.warn('UserHub', `Affiliation ${socId} invalid: ${data.message}. Revoking...`);
@@ -303,118 +438,76 @@ const UserHubPage: React.FC = () => {
                             return;
                         }
 
-                        let fallbackAff = '';
-                        const regPromises = snapshot.docs.map(async (docSnap) => {
-                            const data = docSnap.data();
-                            if (data.userAffiliation) fallbackAff = data.userAffiliation;
+                        // [PERF] Step 1: Extract unique confSlugs and societyIds to batch-fetch
+                        const participationData = snapshot.docs.map(docSnap => ({
+                            docSnap,
+                            data: docSnap.data(),
+                            confSlug: forceString(docSnap.data().slug || docSnap.data().conferenceId || docSnap.data().conferenceSlug)
+                        })).filter(p => !!p.confSlug);
 
-                            // [CRITICAL FIX] Safely extract slug with fallback
-                            const confSlug = forceString(data.slug || data.conferenceId || data.conferenceSlug || 'kadd_2026spring');
+                        const uniqueConfSlugs = [...new Set(participationData.map(p => p.confSlug))];
+                        const uniqueSocietyIds = [...new Set(participationData.map(p => {
+                            const d = p.data;
+                            let sid = d.societyId;
+                            if (!sid || sid === 'unknown') {
+                                sid = p.confSlug.includes('_') ? p.confSlug.split('_')[0] : 'kadd';
+                            }
+                            return sid as string;
+                        }))];
+
+                        // [PERF] Step 2: Batch fetch all unique conferences and societies in parallel
+                        const [confDocs, societyDocs] = await Promise.all([
+                            Promise.all(uniqueConfSlugs.map(slug => getDoc(doc(db, 'conferences', slug)))),
+                            Promise.all(uniqueSocietyIds.map(sid => getDoc(doc(db, 'societies', sid))))
+                        ]);
+
+                        // [PERF] Step 3: Build lookup Maps (O(1) access)
+                        const confCache = new Map<string, any>();
+                        confDocs.forEach((snap, i) => {
+                            if (snap.exists()) confCache.set(uniqueConfSlugs[i], snap.data());
+                        });
+
+                        const societyCache = new Map<string, any>();
+                        societyDocs.forEach((snap, i) => {
+                            if (snap.exists()) societyCache.set(uniqueSocietyIds[i], snap.data());
+                        });
+
+                        // [PERF] Step 4: Map registrations using cached data (no more per-item Firestore calls)
+                        const loadedRegs: Array<UserReg | null> = participationData.map(({ docSnap, data, confSlug }) => {
+                            const cData = confCache.get(confSlug) as ({ societyId?: string;[key: string]: unknown }) | undefined;
+
                             let realTitle = forceString(data.conferenceName || confSlug);
                             let socName = forceString(data.societyName);
-                            let loc = "장소 정보 없음";
-                            let dates = "";
+                            let loc = '장소 정보 없음';
+                            let dates = '';
                             let receiptConfig: ReceiptConfig | undefined = undefined;
 
-                            // JOIN 1: Conference Details
-                            try {
-                                // First get conference ID from conferences collection
-                                // [Fix-2026-01-23] Use direct doc access by ID instead of query
-                                // confSlug is already confId (e.g., 'kadd_2026spring')
-                                console.log('[UserHub] Fetching conference:', { slug: confSlug, hasSlug: !!data.slug });
-                                const confRef = doc(db, 'conferences', confSlug);
-                                const confSnap = await getDoc(confRef);
-                                console.log('[UserHub] Conference doc exists:', confSnap.exists());
-                                if (confSnap.exists()) {
-                                    const cData = confSnap.data();
-                                    const confId = confSnap.id;
-                                    console.log('[UserHub] Conference data:', cData);
+                            if (cData) {
+                                realTitle = forceString(cData.title?.ko || cData.title?.en || cData.title || cData.slug);
 
-                                    // 🔧 [FIX] Handle multilingual title
-                                    realTitle = forceString(cData.title?.ko || cData.title?.en || cData.title || cData.slug);
+                                const dateStart = cData.dates?.start || cData.startDate || cData.dates?.startDate;
+                                const dateEnd = cData.dates?.end || cData.endDate;
+                                const s = safeFormatDate(dateStart);
+                                const e = safeFormatDate(dateEnd);
+                                dates = s === e ? s : `${s} ~ ${e}`;
 
-                                    // Get venue and dates from info/general subdocument
-                                    try {
-                                        console.log('[UserHub] Fetching info/general from:', `conferences/${confId}/info/general`);
-                                        const infoDocRef = doc(db, `conferences/${confId}/info/general`);
-                                        const infoSnap = await getDoc(infoDocRef);
-                                        console.log('[UserHub] Info doc exists:', infoSnap.exists());
-                                        if (infoSnap.exists()) {
-                                            const iData = infoSnap.data();
-                                            console.log('[UserHub] Info doc data:', iData);
-
-                                            // venue can be in multiple formats:
-                                            // 1. venue.name (object: {ko: "...", en: "..."})
-                                            // 2. venueName (string)
-                                            // 3. venue (object with name/address)
-                                            const venueNameObj = iData.venue?.name || iData.venueName;
-                                            const venueName = venueNameObj
-                                                ? (typeof venueNameObj === 'string' ? venueNameObj : venueNameObj.ko || venueNameObj.en || '')
-                                                : '';
-                                            const venueAddress = iData.venue?.address || iData.venueAddress || '';
-
-                                            // Dates from dates field
-                                            const startDate = iData.dates?.start || iData.startDate;
-                                            const endDate = iData.dates?.end || iData.endDate;
-                                            console.log('[UserHub] Dates:', { startDate, endDate });
-
-                                            loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : '장소 정보 없음');
-
-                                            const s = startDate ? (startDate.toDate ? startDate.toDate().toLocaleDateString('ko-KR') : forceString(startDate)) : '';
-                                            const e = endDate ? (endDate.toDate ? endDate.toDate().toLocaleDateString('ko-KR') : forceString(endDate)) : '';
-                                            dates = s === e ? s : `${s} ~ ${e}`;
-                                            receiptConfig = iData.receiptConfig;
-
-                                            console.log('[UserHub] Venue resolved:', { venueName, venueAddress, loc, dates });
-                                        } else {
-                                            // Fallback to main conference document
-                                            console.log('[UserHub] Info doc not found, using conference main doc');
-                                            console.log('[UserHub] Conference dates data:', cData.dates);
-
-                                            // Dates: Conference main doc has dates object
-                                            const dateStart = cData.dates?.start || cData.startDate || cData.dates?.startDate;
-                                            const dateEnd = cData.dates?.end || cData.endDate;
-
-                                            console.log('[UserHub] Parsed dates:', { dateStart, dateEnd });
-
-                                            const s = dateStart ? (dateStart.toDate ? dateStart.toDate().toLocaleDateString('ko-KR') : forceString(dateStart)) : '';
-                                            const e = dateEnd ? (dateEnd.toDate ? dateEnd.toDate().toLocaleDateString('ko-KR') : forceString(dateEnd)) : '';
-                                            dates = s === e ? s : `${s} ~ ${e}`;
-
-                                            console.log('[UserHub] Formatted dates:', dates);
-
-                                            // Venue: Try multiple fields
-                                            const venueName = cData.venue?.name || cData.venueName || cData.venue?.name?.ko || cData.venue?.name?.en;
-                                            const venueAddress = cData.venue?.address || cData.venueAddress;
-
-                                            loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : '장소 정보 없음');
-
-                                            receiptConfig = cData.receipt;
-                                            console.log('[UserHub] Fallback venue resolved:', { venueName, venueAddress, loc });
-                                        }
-                                    } catch (infoErr) {
-                                        console.error('[UserHub] Info lookup failed:', infoErr);
-                                        logger.warn('UserHub', `Info lookup failed for ${confId}, using conference data`, infoErr);
-                                        // Fallback to main conference document
-                                        loc = forceString(cData.location || cData.venue?.name || cData.venue?.address || '장소 정보 없음');
-                                        const s = forceString(cData.dates?.start || cData.startDate);
-                                        const e = forceString(cData.dates?.end || cData.endDate);
-                                        dates = s === e ? s : `${s} ~ ${e}`;
-                                        receiptConfig = cData.receipt;
-                                    }
-                                }
-                            } catch (err) {
-                                logger.error('UserHub', `Conference lookup failed for slug: ${confSlug}`, err);
+                                const venueName = cData.venue?.name || cData.venueName;
+                                const venueAddress = cData.venue?.address || cData.venueAddress;
+                                loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : '장소 정보 없음');
+                                receiptConfig = cData.receipt as ReceiptConfig | undefined;
                             }
 
-                            // JOIN 2: Society Name (If missing)
-                            if (!socName || socName === 'Unknown') {
-                                try {
-                                    const socDoc = await getDoc(doc(db, 'societies', data.societyId));
-                                    if (socDoc.exists()) socName = forceString(socDoc.data().name);
-                                } catch (err) {
-                                    // Silently handle society lookup failures
-                                    console.debug('[UserHub] Society lookup failed, using fallback data');
+                            let societyId = data.societyId as string;
+                            if (!societyId || societyId === 'unknown') {
+                                societyId = confSlug.includes('_') ? confSlug.split('_')[0] : 'kadd';
+                            }
+
+                            const socData = societyCache.get(societyId);
+                            if (socData?.name) {
+                                if (typeof socData.name === 'string') {
+                                    socName = socData.name;
+                                } else if ((socData.name as Record<string, string>).ko || (socData.name as Record<string, string>).en) {
+                                    socName = (socData.name as Record<string, string>).ko || (socData.name as Record<string, string>).en || '';
                                 }
                             }
 
@@ -423,31 +516,92 @@ const UserHubPage: React.FC = () => {
                                 conferenceName: realTitle,
                                 societyName: socName,
                                 earnedPoints: Number(data.earnedPoints || 0),
-                                slug: forceString(data.slug),
-                                societyId: forceString(data.societyId || 'kadd'),
+                                slug: forceString(data.slug || data.conferenceId || data.conferenceSlug || confSlug),
+                                societyId: forceString(data.societyId === 'unknown' ? cData?.societyId || societyId || 'kadd' : data.societyId || cData?.societyId || societyId || 'kadd'),
                                 location: loc,
-                                dates: dates,
+                                dates,
                                 paymentStatus: data.paymentStatus,
-                                status: data.status || data.paymentStatus, // CANCELED, REFUNDED 등
                                 amount: data.amount,
                                 receiptNumber: data.id,
-                                paymentDate: data.createdAt,
-                                receiptConfig: receiptConfig,
-                                userName: data.userName || user.name || (user as any).displayName
-                            };
+                                names: data.names,
+                                paymentDate: data.createdAt || data.updatedAt || data.registeredAt,
+                                receiptConfig,
+                                userName: data.userName || user.name || (user as { displayName?: string }).displayName,
+                                status: data.status,
+                                virtualAccount: data.virtualAccount
+                            } as UserReg;
                         });
 
-                        const loadedRegs = await Promise.all(regPromises);
-                        console.log('[UserHub] Loaded registrations:', loadedRegs);
-                        console.log('[UserHub] Registration statuses:', loadedRegs.map(r => ({ id: r.id, name: r.conferenceName, status: r.status, paymentStatus: r.paymentStatus })));
-                        setRegs(loadedRegs);
-                        setRegs(loadedRegs);
-                        setTotalPoints(loadedRegs.reduce((acc, r) => acc + r.earnedPoints!, 0));
+                        const validRegs = loadedRegs.filter((r) => r !== null) as UserReg[];
+                        logger.debug('UserHub', 'Batch-loaded registrations', { total: snapshot.size, valid: validRegs.length });
+
+                        // [Fix] Advanced Deduplication & Filtering Strategy (Fallback)
+                        const grouped = new Map<string, UserReg[]>();
+                        validRegs.forEach(r => {
+                            if (!grouped.has(r.slug)) grouped.set(r.slug, []);
+                            grouped.get(r.slug)!.push(r);
+                        });
+
+                        const activeRegs: UserReg[] = [];
+
+                        grouped.forEach((regs, slug) => {
+                            // 1. Check for ANY PAID registration -> Show it
+                            // NOTE: In users/{uid}/participations, status=COMPLETED means
+                            // 'record created' and payment confirmed.
+                            const paidReg = regs.find(r =>
+                                (r.paymentStatus || '').toUpperCase() === 'PAID' ||
+                                (r.status || '').toUpperCase() === 'PAID' ||
+                                (r.status || '').toUpperCase() === 'COMPLETED'
+                            );
+                            if (paidReg) {
+                                activeRegs.push(paidReg);
+                                return;
+                            }
+
+                            // 2. Check for ANY CANCELED/REFUNDED -> Hide (User canceled)
+                            const hasCancel = regs.some(r => {
+                                const p = (r.paymentStatus || '').toUpperCase();
+                                const s = (r.status || '').toUpperCase();
+                                return ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(p) ||
+                                    ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(s);
+                            });
+
+                            if (hasCancel) return;
+
+                            // 3. Otherwise check latest registration
+                            regs.sort((a, b) => {
+                                const getTime = (d: any) => {
+                                    if (!d) return 0;
+                                    if (d.toMillis) return d.toMillis();
+                                    if (d.toDate) return d.toDate().getTime();
+                                    if (d instanceof Date) return d.getTime();
+                                    if (typeof d === 'string') return new Date(d).getTime();
+                                    return 0;
+                                };
+                                return getTime(b.paymentDate) - getTime(a.paymentDate);
+                            });
+
+                            const latest = regs[0];
+                            const pStatus = (latest.paymentStatus || '').toUpperCase();
+                            const status = (latest.status || '').toUpperCase();
+
+                            // WHITE-LIST STRATEGY: Only allow known valid unfinished statuses
+                            if (['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT', 'COMPLETED'].includes(pStatus) ||
+                                ['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT', 'COMPLETED'].includes(status) ||
+                                pStatus === 'WAITING_FOR_DEPOSIT' || status === 'WAITING_FOR_DEPOSIT') {
+                                activeRegs.push(latest);
+                            } else {
+                                logger.debug('UserHub', `Hiding conference ${slug} - status not in allowlist: p=${pStatus}, s=${status}`);
+                            }
+                        });
+
+                        setRegs(activeRegs);
+                        setTotalPoints(activeRegs.reduce((acc, r) => acc + (r.earnedPoints ?? 0), 0));
                         setSyncStatus('connected');
                         setLoading(false);
-                    } catch (err: any) {
+                    } catch (err) {
                         logger.error('UserHub', 'Fallback participation fetch error', err);
-                        if (err.message?.includes('insufficient permissions')) {
+                        if (err instanceof Error && err.message?.includes('insufficient permissions')) {
                             setRegs([]);
                             setSyncStatus('connected');
                         } else {
@@ -464,47 +618,70 @@ const UserHubPage: React.FC = () => {
 
             setSyncStatus('syncing');
 
-            unsubscribe = onSnapshot(qReg, async (snapshot: any) => {
-                // Success Handler
+            unsubscribe = onSnapshot(qReg, async (snapshot) => {
                 try {
-                    let fallbackAff = '';
-                    const regPromises = snapshot.docs.map(async (docSnap) => {
-                        const data = docSnap.data();
-                        if (data.userAffiliation) fallbackAff = data.userAffiliation;
+                    // [PERF] Batch fetch all unique conferences & societies in parallel
+                    const enrichedDocs = snapshot.docs.map(docSnap => ({
+                        docSnap,
+                        data: docSnap.data(),
+                        confSlug: forceString(docSnap.data().slug || docSnap.data().conferenceId || docSnap.data().conferenceSlug)
+                    })).filter(p => !!p.confSlug);
 
-                        // [CRITICAL FIX] Safely extract slug with fallback
-                        const confSlug = forceString(data.slug || data.conferenceId || data.conferenceSlug || 'kadd_2026spring');
+                    const uniqueConfSlugs = [...new Set(enrichedDocs.map(p => p.confSlug))];
+                    const uniqueSocIds = [...new Set(enrichedDocs.map(p => {
+                        const d = p.data;
+                        let sid = d.societyId as string;
+                        if (!sid || sid === 'unknown') sid = p.confSlug.includes('_') ? p.confSlug.split('_')[0] : 'kadd';
+                        return sid;
+                    }))];
+
+                    const [confDocs, socDocs] = await Promise.all([
+                        Promise.all(uniqueConfSlugs.map(slug => getDoc(doc(db, 'conferences', slug)))),
+                        Promise.all(uniqueSocIds.map(sid => getDoc(doc(db, 'societies', sid))))
+                    ]);
+
+                    const confCache = new Map<string, any>();
+                    confDocs.forEach((snap, i) => { if (snap.exists()) confCache.set(uniqueConfSlugs[i], snap.data()); });
+
+                    const socCache = new Map<string, any>();
+                    socDocs.forEach((snap, i) => { if (snap.exists()) socCache.set(uniqueSocIds[i], snap.data()); });
+
+                    const validRegs: UserReg[] = enrichedDocs.map(({ docSnap, data, confSlug }) => {
+                        const cData = confCache.get(confSlug) as ({ societyId?: string;[key: string]: unknown }) | undefined;
+
                         let realTitle = forceString(data.conferenceName || confSlug);
                         let socName = forceString(data.societyName);
-                        let loc = "장소 정보 없음";
-                        let dates = "";
+                        let loc = '장소 정보 없음';
+                        let dates = '';
                         let receiptConfig: ReceiptConfig | undefined = undefined;
 
-                        // JOIN 1: Conference Details
-                        try {
-                            const confQ = query(collection(db, 'conferences'), where('slug', '==', confSlug));
-                            const confSnap = await getDocs(confQ);
-                            if (!confSnap.empty) {
-                                const cData = confSnap.docs[0].data();
-                                realTitle = forceString(cData.title);
-                                loc = forceString(cData.location || cData.venue);
-                                const s = forceString(cData.dates?.start || cData.startDate);
-                                const e = forceString(cData.dates?.end || cData.endDate);
-                                dates = s === e ? s : `${s} ~ ${e}`;
-                                receiptConfig = cData.receipt;
-                            }
-                        } catch (err) {
-                            logger.error('UserHub', `Conference lookup failed for slug: ${confSlug}`, err);
+                        if (cData) {
+                            realTitle = forceString(cData.title?.ko || cData.title?.en || cData.title);
+                            const venueName = cData.venue?.name || cData.venueName;
+                            const venueAddress = cData.venue?.address || cData.venueAddress;
+                            loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : '장소 정보 없음');
+
+                            const dateStart = cData.dates?.start || cData.startDate || cData.dates?.startDate;
+                            const dateEnd = cData.dates?.end || cData.endDate;
+                            const s = safeFormatDate(dateStart);
+                            const e = safeFormatDate(dateEnd);
+                            dates = s === e ? s : `${s} ~ ${e}`;
+                            receiptConfig = cData.receipt as ReceiptConfig | undefined;
                         }
 
-                        // JOIN 2: Society Name (If missing)
+                        let societyId = data.societyId as string;
+                        if (!societyId || societyId === 'unknown') {
+                            societyId = confSlug.includes('_') ? confSlug.split('_')[0] : 'kadd';
+                        }
+
+                        const socData = socCache.get(societyId);
                         if (!socName || socName === 'Unknown') {
-                            try {
-                                const socDoc = await getDoc(doc(db, 'societies', data.societyId));
-                                if (socDoc.exists()) socName = forceString(socDoc.data().name);
-                            } catch (err) {
-                                // Silently handle society lookup failures
-                                logger.debug('UserHub', 'Society lookup failed, using fallback data');
+                            if (socData?.name) {
+                                if (typeof socData.name === 'string') {
+                                    socName = socData.name;
+                                } else if ((socData.name as Record<string, string>).ko || (socData.name as Record<string, string>).en) {
+                                    socName = (socData.name as Record<string, string>).ko || (socData.name as Record<string, string>).en || '';
+                                }
                             }
                         }
 
@@ -513,36 +690,96 @@ const UserHubPage: React.FC = () => {
                             conferenceName: realTitle,
                             societyName: socName,
                             earnedPoints: Number(data.earnedPoints || 0),
-                            slug: confSlug,
-                            societyId: forceString(data.societyId || 'kadd'),
+                            slug: forceString(data.slug || data.conferenceId || data.conferenceSlug || confSlug),
+                            societyId: forceString(data.societyId === 'unknown' ? cData?.societyId || societyId || 'kadd' : data.societyId || cData?.societyId || societyId || 'kadd'),
                             location: loc,
-                            dates: dates,
+                            dates,
                             paymentStatus: data.paymentStatus,
-                            status: data.status || data.paymentStatus, // CANCELED, REFUNDED 등
                             amount: data.amount,
-                            receiptNumber: data.id, // Using orderId as receipt number
-                            paymentDate: data.createdAt,
-                            receiptConfig: receiptConfig,
-                            userName: data.userName || user.name || (user as any).displayName
-                        };
+                            receiptNumber: data.id,
+                            paymentDate: data.createdAt || data.updatedAt || data.registeredAt,
+                            receiptConfig,
+                            userName: data.userName || user.name || (user as { displayName?: string }).displayName,
+                            status: data.status,
+                            virtualAccount: data.virtualAccount
+                        } as UserReg;
                     });
 
-                    const loadedRegs = await Promise.all(regPromises);
-                    setRegs(loadedRegs);
-                    setTotalPoints(loadedRegs.reduce((acc, r) => acc + r.earnedPoints!, 0));
+                    // [Fix] Advanced Deduplication & Filtering Strategy (Realtime)
+                    const grouped = new Map<string, UserReg[]>();
+                    validRegs.forEach(r => {
+                        if (!grouped.has(r.slug)) grouped.set(r.slug, []);
+                        grouped.get(r.slug)!.push(r);
+                    });
+
+                    const activeRegs: UserReg[] = [];
+
+                    grouped.forEach((regs, slug) => {
+                        // 1. Check for ANY PAID registration -> Show it
+                        // NOTE: COMPLETED in participations means registration confirmed.
+                        const paidReg = regs.find(r =>
+                            (r.paymentStatus || '').toUpperCase() === 'PAID' ||
+                            (r.status || '').toUpperCase() === 'PAID' ||
+                            (r.status || '').toUpperCase() === 'COMPLETED'
+                        );
+                        if (paidReg) {
+                            activeRegs.push(paidReg);
+                            return;
+                        }
+
+                        // 2. Check for ANY CANCELED/REFUNDED -> Hide (User canceled)
+                        const hasCancel = regs.some(r => {
+                            const p = (r.paymentStatus || '').toUpperCase();
+                            const s = (r.status || '').toUpperCase();
+                            return ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(p) ||
+                                ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(s);
+                        });
+
+                        if (hasCancel) return;
+
+                        // 3. Otherwise check latest registration
+                        regs.sort((a, b) => {
+                            const getTime = (d: any) => {
+                                if (!d) return 0;
+                                if (d.toMillis) return d.toMillis();
+                                if (d.toDate) return d.toDate().getTime();
+                                if (d instanceof Date) return d.getTime();
+                                if (typeof d === 'string') return new Date(d).getTime();
+                                return 0;
+                            };
+                            return getTime(b.paymentDate) - getTime(a.paymentDate);
+                        });
+
+                        const latest = regs[0];
+                        const pStatus = (latest.paymentStatus || '').toUpperCase();
+                        const status = (latest.status || '').toUpperCase();
+
+                        // WHITE-LIST STRATEGY: Only allow known valid unfinished statuses
+                        if (['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT', 'COMPLETED'].includes(pStatus) ||
+                            ['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT', 'COMPLETED'].includes(status) ||
+                            pStatus === 'WAITING_FOR_DEPOSIT' || status === 'WAITING_FOR_DEPOSIT') {
+                            activeRegs.push(latest);
+                        } else {
+                            logger.debug('UserHub', `Hiding conference ${slug} - status not in allowlist: p=${pStatus}, s=${status}`);
+                        }
+                    });
+                    setRegs(activeRegs);
+                    setTotalPoints(activeRegs.reduce((acc, r) => acc + (r.earnedPoints ?? 0), 0));
 
                     setSyncStatus('connected');
                 } catch (processError) {
                     logger.error('UserHub', 'Data processing error', processError);
                     setSyncStatus('disconnected');
                 }
-            }, (error: any) => {
+            }, (error) => {
                 logger.error('UserHub', 'Snapshot listener error', error);
                 setSyncStatus('disconnected');
 
-                // Check if this is an indexing error (permanent failure until index is created)
-                const isIndexingError = error.message?.includes('COLLECTION_GROUP_ASC index required') ||
-                    error.code === 'failed-precondition';
+                const errorMsg = error instanceof Error ? error.message : String(error);
+                const errorCode = (error as { code?: string }).code;
+
+                const isIndexingError = errorMsg?.includes('COLLECTION_GROUP_ASC index required') ||
+                    errorCode === 'failed-precondition';
 
                 if (isIndexingError) {
                     // For indexing errors, don't retry - indexes are being deployed
@@ -575,117 +812,6 @@ const UserHubPage: React.FC = () => {
         };
     }, [user]);
 
-    const fetchUserData = useCallback(async (u: any) => {
-        const db = getFirestore();
-        setLoading(true);
-
-        let profileData = {
-            displayName: forceString(u.userName || u.name || u.displayName),
-            phoneNumber: forceString(u.phoneNumber || u.phone),
-            affiliation: forceString(u.affiliation || u.org || u.organization),
-            licenseNumber: forceString(u.licenseNumber || u.licenseId),
-            email: forceString(u.email)
-        };
-
-        logger.debug('UserHub', 'Starting profile load', { uid: u.uid });
-
-        try {
-            const userDocRef = doc(db, 'users', u.uid);
-            const userDocSnap = await getDoc(userDocSnap);
-            const hasUserDoc = userDocSnap.exists();
-
-            if (hasUserDoc) {
-                const userData = userDocSnap.data();
-                logger.debug('UserHub', 'users/{uid} document found', { uid: u.uid });
-                profileData = {
-                    displayName: forceString(userData.userName || userData.name || profileData.displayName),
-                    phoneNumber: forceString(userData.phoneNumber || userData.phone || profileData.phoneNumber),
-                    affiliation: forceString(userData.affiliation || userData.org || userData.organization || profileData.affiliation),
-                    licenseNumber: forceString(userData.licenseNumber || userData.licenseId || profileData.licenseNumber),
-                    email: forceString(userData.email || profileData.email)
-                };
-            } else {
-                logger.debug('UserHub', 'users/{uid} document does not exist, checking participations');
-                try {
-                    const participationsRef = collection(db, `users/${u.uid}/participations`);
-                    const participationsSnap = await getDocs(participationsRef);
-
-                    logger.debug('UserHub', 'Participations query returned', { count: participationsSnap.size });
-                    if (!participationsSnap.empty) {
-                        const nonMemberParticipation = participationsSnap.docs[0].data();
-                        const confSlug = nonMemberParticipation.slug || nonMemberParticipation.conferenceId || nonMemberParticipation.conferenceSlug || 'kadd_2026spring';
-
-                        // [Non-member detection] users/{uid} doesn't exist but participations do
-                        setIsNonMemberOnly(true);
-                        setNonMemberConferenceSlug(confSlug);
-                        logger.debug('UserHub', 'Non-member detected', { uid: u.uid, hasParticipations: participationsSnap.size, confSlug });
-                        const firstParticipation = participationsSnap.docs[0].data();
-
-                        profileData = {
-                            displayName: forceString(firstParticipation.userName || firstParticipation.name || profileData.displayName),
-                            phoneNumber: forceString(firstParticipation.userPhone || firstParticipation.phone || profileData.phoneNumber),
-                            affiliation: forceString(firstParticipation.userOrg || firstParticipation.organization || firstParticipation.affiliation || profileData.affiliation),
-                            licenseNumber: forceString(firstParticipation.licenseNumber || profileData.licenseNumber),
-                            email: forceString(firstParticipation.userEmail || firstParticipation.email || profileData.email)
-                        };
-                    }
-                } catch (partErr) {
-                    logger.warn('UserHub', 'Could not get participation data', partErr);
-                }
-            }
-        } catch (docErr: any) {
-            logger.error('UserHub', 'Error accessing users/{uid}', { code: docErr.code, message: docErr.message });
-        }
-
-        logger.debug('UserHub', 'Final profile data', profileData);
-        setProfile(profileData);
-
-        try {
-            const snapSoc = await getDocs(collection(db, 'societies'));
-            setSocieties(snapSoc.docs.map(d => ({ id: d.id, ...d.data() })));
-        } catch (socErr) {
-            logger.error('UserHub', 'Societies fetch error', socErr);
-        }
-
-        try {
-            // [Fix] Re-enable abstracts fetching for mypage
-            // Query submissions across ALL conferences where user is submitter
-            // Use collectionGroup to search conferences/{confId}/submissions
-            // [Safety] Use parameter u instead of outer scope user to avoid null reference
-            if (!u.uid) {
-                logger.warn('UserHub', 'User UID is null, skipping abstracts fetch');
-                setAbstracts([]);
-                return;
-            }
-
-            const submissionsRef = collectionGroup(db, 'submissions');
-            const q = query(submissionsRef, where('userId', '==', u.uid), orderBy('submittedAt', 'desc'));
-            const snap = await getDocs(q);
-
-            const userAbstracts = snap.docs.map(d => ({
-                id: d.id,
-                ...d.data()
-            }));
-
-            setAbstracts(userAbstracts);
-            logger.debug('UserHub', 'Abstracts fetched', { count: userAbstracts.length });
-        } catch (absErr: any) {
-            logger.error('UserHub', 'Abstracts fetch error', absErr);
-            // 🔧 [FIX] Handle index building gracefully
-            if (absErr.message?.includes('index') || absErr.message?.includes('Index')) {
-                logger.warn('UserHub', 'Abstracts index is still building, showing empty state');
-                setAbstracts([]); // Show empty state without error
-                toast('초록 내역이 준비 중입니다. 잠시 후 새로고침해주세요.');
-            } else {
-                setAbstracts([]); // Failed fetch: show empty state
-                toast.error('초록 내역을 불러올 수 없습니다.');
-            }
-        }
-
-        setLoading(false);
-        // setSyncStatus('connected'); // Handled by realtime listener
-    }, []);
-
     const handleEventClick = (r: UserReg) => {
         const currentHost = window.location.hostname;
         const targetHost = `${r.societyId}.eregi.co.kr`;
@@ -699,8 +825,7 @@ const UserHubPage: React.FC = () => {
             // [Step 403-D] Pass token via URL for bulletproof session bridge
             const token = getRootCookie('eregi_session');
             const authUrl = `https://${targetHost}/auth?mode=login&returnUrl=${encodeURIComponent(cleanPath)}${token ? `&token=${token}` : ''}`;
-            // Navigate using effect to handle location change properly
-            window.location.href = authUrl;
+            window.location.replace(authUrl);
         }
     };
 
@@ -708,20 +833,21 @@ const UserHubPage: React.FC = () => {
     const handleQrClick = (e: React.MouseEvent, r: UserReg) => {
         e.stopPropagation(); // Prevent card click
         const currentHost = window.location.hostname;
-        const targetHost = `${r.societyId}.eregi.co.kr`;
+        // [CRITICAL FIX] Use societyId from registration, fallback to 'kadd' if 'unknown'
+        const safeSocietyId = r.societyId && r.societyId !== 'unknown' ? r.societyId : 'kadd';
+        const targetHost = `${safeSocietyId}.eregi.co.kr`;
 
         // [CRITICAL FIX] Safely extract slug with fallback
-        const badgeSlug = r.slug || 'kadd_2026spring';
+        const badgeSlug = r.slug && r.slug !== 'unknown' && r.slug !== '' ? r.slug : 'kadd_2026spring';
         const cleanPath = `/${badgeSlug}/badge`;
 
-        console.log('[UserHub] Badge click - Registration slug:', r.slug, 'Badge slug:', badgeSlug);
+        console.log('[UserHub] Badge click - Registration slug:', r.slug, 'Badge slug:', badgeSlug, 'Society ID:', safeSocietyId);
 
         // CRITICAL FIX: Check if user is already authenticated
         // If Firebase auth has a currentUser, redirect directly without auth page
         const authInstance = getAuth();
         if (authInstance.currentUser) {
-            // User is already logged in - direct navigation
-            window.location.href = `https://${targetHost}${cleanPath}`;
+            window.location.replace(`https://${targetHost}${cleanPath}`);
             return;
         }
 
@@ -730,7 +856,7 @@ const UserHubPage: React.FC = () => {
         } else {
             const token = getRootCookie('eregi_session');
             const authUrl = `https://${targetHost}/auth?mode=login&returnUrl=${encodeURIComponent(cleanPath)}${token ? `&token=${token}` : ''}`;
-            window.location.href = authUrl;
+            window.location.replace(authUrl);
         }
     };
 
@@ -747,11 +873,6 @@ const UserHubPage: React.FC = () => {
         }
         setSelectedReceiptReg(r);
         setShowReceiptModal(true);
-    };
-
-    const handleLogout = async () => {
-        await signOut(getAuth());
-        window.location.href = '/'; // Force refresh
     };
 
     const handleOpenModal = () => {
@@ -775,7 +896,7 @@ const UserHubPage: React.FC = () => {
 
         // Pass empty string for targetGradeId as we are just verifying membership here
         // [Fix-Step 357] Request Immediate Lock (lockNow: true)
-        const res = await verifyMember(societyId, name, code, true, "", undefined, undefined, undefined, true);
+        const res = await verifyMember(societyId, name, code, true, 5, true);
 
         if (res.success) {
             // [Fix-Step 350] Removed Legacy Cert Doc Creation. 
@@ -815,12 +936,8 @@ const UserHubPage: React.FC = () => {
     const societyName = getSocietyName();
     const pageTitle = isMain ? "통합 마이페이지" : `${societyName} 마이페이지`;
 
-    // [Fix-Step 357] Date Helper
-    const formatDate = (date: any) => {
-        if (!date) return '-';
-        if (date.toDate) return date.toDate().toLocaleDateString(); // Firestore Timestamp 
-        if (date.seconds) return new Date(date.seconds * 1000).toLocaleDateString(); // JSON 
-        return date; // String 
+    const formatDate = (date: any): string => {
+        return safeFormatDate(date, 'ko-KR');
     };
 
     return (
@@ -846,21 +963,9 @@ const UserHubPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* [Fix-Step 343] Guest Warning Banner */}
-                {(user as any)?.isAnonymous && (
-                    <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-6 rounded-r">
-                        <div className="flex">
-                            <div className="ml-3">
-                                <p className="text-sm text-amber-700 font-bold">
-                                    ⚠️ 현재 비회원(Guest) 상태입니다.
-                                </p>
-                                <p className="text-xs text-amber-600 mt-1">
-                                    이 브라우저에서만 접수 내역을 확인할 수 있습니다. 안전한 관리를 위해 정회원 전환을 권장합니다.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {/* [REMOVED] Guest Warning Banner - Anonymous registration deprecated
+                    See docs/ANONYMOUS_CLEANUP_ANALYSIS.md for details
+                    All users now have full accounts with email/password authentication */}
 
                 {/* INFO WIDGET GRID */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -894,12 +999,9 @@ const UserHubPage: React.FC = () => {
                 <div className="flex gap-4 border-b mb-6 overflow-x-auto no-scrollbar flex-nowrap min-w-0">
                     <button onClick={() => setActiveTab('EVENTS')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'EVENTS' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>등록학회</button>
                     <button onClick={() => setActiveTab('ABSTRACTS')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'ABSTRACTS' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>초록 내역</button>
-                    {!(user as any)?.isAnonymous && (
-                        <>
-                            <button onClick={() => setActiveTab('CERTS')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'CERTS' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>학회 인증</button>
-                            <button onClick={() => setActiveTab('PROFILE')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'PROFILE' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>내 정보</button>
-                        </>
-                    )}
+                    {/* [SIMPLIFIED] Anonymous check removed - all users have full accounts */}
+                    <button onClick={() => setActiveTab('CERTS')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'CERTS' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>학회 인증</button>
+                    <button onClick={() => setActiveTab('PROFILE')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'PROFILE' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>내 정보</button>
                 </div>
 
                 {/* 1. EVENTS (FIXED LINKS & TITLES) */}
@@ -937,9 +1039,7 @@ const UserHubPage: React.FC = () => {
                                 </Button>
                             </div>
                         )}
-                        {/* 취소된 등록 제외 */}
-                        {regs.filter(r => !['CANCELED', 'REFUNDED', 'REFUND_REQUESTED'].includes(r.status || '')).map(r => (
-
+                        {regs.map(r => (
                             <div key={r.id} onClick={() => handleEventClick(r)} className="eregi-card cursor-pointer flex flex-col group animate-in fade-in slide-in-from-bottom-2 duration-500">
                                 <div className="flex flex-col mb-4">
                                     <div className="flex items-center text-sm text-[#24669e] font-bold mb-2">
@@ -952,8 +1052,12 @@ const UserHubPage: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="mt-auto border-t border-slate-100 pt-4 flex items-center justify-between">
-                                    <span className={r.earnedPoints ? "bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold" : "bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-xs"}>
-                                        {r.earnedPoints ? `+${r.earnedPoints} pts` : '진행중'}
+                                    <span className={r.earnedPoints ? "bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold" :
+                                        (r.status === 'PENDING_PAYMENT' || r.paymentStatus === 'WAITING_FOR_DEPOSIT') ? "bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-xs font-bold border border-orange-100" :
+                                            "bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-xs"}>
+                                        {r.earnedPoints ? `+${r.earnedPoints} pts` :
+                                            (r.status === 'PENDING_PAYMENT' || r.paymentStatus === 'WAITING_FOR_DEPOSIT') ? '입금 대기 (가상계좌)' :
+                                                `[STATUS] ${r.paymentStatus || r.status}`}
                                     </span>
                                     <div className="flex gap-2">
                                         <Button
@@ -961,7 +1065,9 @@ const UserHubPage: React.FC = () => {
                                             variant="outline"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                navigate(`/${r.slug}/abstracts`);
+                                                const currentLang = searchParams.get('lang') || 'ko';
+                                                const safeSlug = r.slug && r.slug !== 'unknown' && r.slug !== '' ? r.slug : 'kadd_2026spring';
+                                                navigate(`/${safeSlug}/abstracts?lang=${currentLang}`);
                                             }}
                                             className="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs gap-1.5 shadow-sm border border-slate-200"
                                         >
@@ -983,6 +1089,20 @@ const UserHubPage: React.FC = () => {
                                                 className="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs gap-1.5 shadow-sm border border-slate-200"
                                             >
                                                 <Printer size={14} /> 영수증
+                                            </Button>
+                                        )}
+                                        {(r.status === 'PENDING_PAYMENT' || r.paymentStatus === 'WAITING_FOR_DEPOSIT') && r.virtualAccount && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedVirtualAccountReg(r);
+                                                    setShowVirtualAccountModal(true);
+                                                }}
+                                                className="bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold text-xs gap-1.5 shadow-sm border border-orange-200"
+                                            >
+                                                <CreditCard size={14} /> 계좌 확인
                                             </Button>
                                         )}
                                     </div>
@@ -1009,7 +1129,7 @@ const UserHubPage: React.FC = () => {
                             </>
                         )}
 
-                        {!loading && user?.affiliations && Object.entries(user.affiliations).map(([socId, aff]: [string, any]) => {
+                        {!loading && user?.affiliations && Object.entries(user.affiliations).map(([socId, aff]: [string, Affiliation]) => {
                             if (!aff.verified) return null;
 
                             const soc = societies.find(s => s.id === socId);
@@ -1038,6 +1158,10 @@ const UserHubPage: React.FC = () => {
                         })}
                         <button onClick={handleOpenModal} className="w-full py-4 bg-white border-2 border-dashed border-blue-300 text-blue-600 rounded-xl font-bold hover:bg-blue-50">
                             + 학회 정회원 인증 추가하기
+                        </button>
+                        <button onClick={() => navigate('/mypage/membership')} className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-bold hover:from-blue-700 hover:to-blue-800 shadow-md flex items-center justify-center gap-2">
+                            <CreditCard className="w-5 h-5" />
+                            학회 회비 납부
                         </button>
                     </div>
                 )}
@@ -1104,7 +1228,7 @@ const UserHubPage: React.FC = () => {
                                 </div>
                                 <div className="text-sm text-gray-500 flex flex-col gap-1 mt-2">
                                     <p>제출일: {formatDate(abs.submittedAt || abs.createdAt)}</p>
-                                    <p>저자: {abs.authors?.map((a: any) => a.name).join(', ') || '-'}</p>
+                                    <p>저자: {abs.authors?.map((a: { name: string; email: string; affiliation: string; isPresenter: boolean }) => a.name).join(', ') || '-'}</p>
 
                                     {/* [Step 405-D] Edit/Withdraw Buttons */}
                                     <div className="flex flex-col sm:flex-row gap-2 mt-4 w-full sm:w-auto">
@@ -1245,7 +1369,7 @@ const UserHubPage: React.FC = () => {
                                     data={{
                                         registrationId: selectedReceiptReg.id,
                                         receiptNumber: selectedReceiptReg.receiptNumber || selectedReceiptReg.id,
-                                        paymentDate: selectedReceiptReg.paymentDate ? (selectedReceiptReg.paymentDate.toDate ? selectedReceiptReg.paymentDate.toDate().toLocaleDateString() : new Date().toLocaleDateString()) : new Date().toLocaleDateString(),
+                                        paymentDate: safeFormatDate(selectedReceiptReg.paymentDate || new Date()),
                                         payerName: selectedReceiptReg.userName || 'Unknown',
                                         totalAmount: selectedReceiptReg.amount || 0,
                                         items: [
@@ -1270,6 +1394,54 @@ const UserHubPage: React.FC = () => {
                                 </Button>
                             }
                         />
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Virtual Account Modal */}
+            <Dialog open={showVirtualAccountModal} onOpenChange={setShowVirtualAccountModal}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>가상계좌 입금 정보</DialogTitle>
+                    </DialogHeader>
+                    {selectedVirtualAccountReg && selectedVirtualAccountReg.virtualAccount && (
+                        <div className="bg-white p-6 rounded-xl border border-orange-200 shadow-sm mt-2">
+                            <h3 className="text-lg font-bold text-orange-800 mb-4 border-b border-orange-100 pb-2">
+                                입금 계좌 안내
+                            </h3>
+                            <div className="space-y-3">
+                                <div className="flex justify-between">
+                                    <span className="text-gray-500">은행</span>
+                                    <span className="font-bold">{selectedVirtualAccountReg.virtualAccount.bank}</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                                    <span className="text-gray-500">계좌번호</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-lg text-blue-600">{selectedVirtualAccountReg.virtualAccount.accountNumber}</span>
+                                    </div>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-gray-500">예금주</span>
+                                    <span className="font-medium">{selectedVirtualAccountReg.virtualAccount.customerName || 'Toss Payments'}</span>
+                                </div>
+                                {selectedVirtualAccountReg.virtualAccount.dueDate && (
+                                    <div className="flex justify-between text-red-500 pt-2 border-t border-dashed border-gray-200 mt-2">
+                                        <span className="font-medium">입금기한</span>
+                                        <span className="font-bold">
+                                            {new Date(selectedVirtualAccountReg.virtualAccount.dueDate).toLocaleString()}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="mt-6 text-xs text-gray-400 text-center">
+                                ※ 입금 기한 내에 입금하지 않으시면 자동 취소됩니다.
+                            </div>
+                        </div>
+                    )}
+                    <div className="flex justify-center mt-4">
+                        <Button onClick={() => setShowVirtualAccountModal(false)} className="w-full bg-slate-900 text-white hover:bg-slate-800">
+                            확인
+                        </Button>
                     </div>
                 </DialogContent>
             </Dialog>
