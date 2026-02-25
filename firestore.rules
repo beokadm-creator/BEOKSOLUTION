@@ -36,8 +36,9 @@ service cloud.firestore {
       // All conference subcollections - open read access
       match /{document=**} {
         allow read: if true;
-        // Write restricted to super admin unless specifically overridden
-        allow write: if request.auth != null && request.auth.token.email == 'aaron@beoksolution.com';
+        // Write: 슈퍼어드민 또는 인증된 사용자 (학회 어드민 포함)
+        // [Fix] 학회 어드민이 배지 레이아웃, 설정 등을 저장할 수 있도록 허용
+        allow write: if request.auth != null;
       }
 
       // Registrations: Owner-only access for security (override from above)
