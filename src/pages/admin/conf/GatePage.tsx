@@ -175,11 +175,26 @@ const GatePage: React.FC = () => {
         setScannerState({ status: 'PROCESSING', message: 'Verifying...', lastScanned: code });
 
         try {
+            // Function to handle Hangul typos from Korean keyboard barcode scanners
+            const decodeKoreanTypo = (str: string) => {
+                const korToEng: Record<string, string> = {
+                    'ㅂ': 'q', 'ㅈ': 'w', 'ㄷ': 'e', 'ㄱ': 'r', 'ㅅ': 't', 'ㅛ': 'y', 'ㅕ': 'u', 'ㅑ': 'i', 'ㅐ': 'o', 'ㅔ': 'p',
+                    'ㅁ': 'a', 'ㄴ': 's', 'ㅇ': 'd', 'ㄹ': 'f', 'ㅎ': 'g', 'ㅗ': 'h', 'ㅓ': 'j', 'ㅏ': 'k', 'ㅣ': 'l',
+                    'ㅋ': 'z', 'ㅌ': 'x', 'ㅊ': 'c', 'ㅍ': 'v', 'ㅠ': 'b', 'ㅜ': 'n', 'ㅡ': 'm',
+                    'ㅃ': 'Q', 'ㅉ': 'W', 'ㄸ': 'E', 'ㄲ': 'R', 'ㅆ': 'T', 'ㅒ': 'O', 'ㅖ': 'P'
+                };
+                return str.split('').map(char => korToEng[char] || char).join('');
+            };
+
             // Extract registration ID from QR code (remove BADGE- prefix if exists)
-            let regId = code.trim(); // Remove whitespace just in case
-            if (regId.startsWith('BADGE-')) {
-                regId = regId.replace('BADGE-', '');
-            } else if (regId.startsWith('VOUCHER-')) {
+            // Scanner might output korean chars if PC keyboard is in Hangul mode.
+            let rawCode = decodeKoreanTypo(code).trim();
+            let regId = rawCode;
+
+            // Allow case-insensitive prefix match to be safer
+            if (rawCode.toUpperCase().startsWith('BADGE-')) {
+                regId = rawCode.substring(6);
+            } else if (rawCode.toUpperCase().startsWith('VOUCHER-')) {
                 throw new Error("등록 교환권입니다. 명찰(Badge) QR을 스캔해 주세요.");
             }
 
