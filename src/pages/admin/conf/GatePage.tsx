@@ -176,10 +176,10 @@ const GatePage: React.FC = () => {
 
         try {
             // Extract registration ID from QR code (remove BADGE- prefix if exists)
-            let regId = code;
-            if (code.startsWith('BADGE-')) {
-                regId = code.replace('BADGE-', '');
-            } else if (code.startsWith('VOUCHER-')) {
+            let regId = code.trim(); // Remove whitespace just in case
+            if (regId.startsWith('BADGE-')) {
+                regId = regId.replace('BADGE-', '');
+            } else if (regId.startsWith('VOUCHER-')) {
                 throw new Error("등록 교환권입니다. 명찰(Badge) QR을 스캔해 주세요.");
             }
 
