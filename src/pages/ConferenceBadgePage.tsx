@@ -7,17 +7,21 @@ import QRCode from 'react-qr-code';
 
 const ConferenceBadgePage: React.FC = () => {
   const { slug } = useParams();
-  const { auth } = useAuth('');
-  // Use a single simple state for UI to avoid sync issues
+  const { auth } = useAuth();
   const [uiData, setUiData] = useState<{
     status: string;
+    zone: string;
     name: string;
     aff: string;
     id: string;
     issued: boolean;
     qrValue: string;
     receiptNumber: string;
+    lastCheckIn: any;
+    baseMinutes: number;
   } | null>(null);
+  const [zones, setZones] = useState<any[]>([]);
+  const [liveMinutes, setLiveMinutes] = useState<number>(0);
   const [msg, setMsg] = useState("초기화 중...");
 
   useLayoutEffect(() => {
@@ -46,6 +50,28 @@ const ConferenceBadgePage: React.FC = () => {
       where('paymentStatus', '==', 'PAID'),  // CRITICAL: Only show PAID registrations
       orderBy('createdAt', 'desc') // Get most recent PAID registration
     );
+
+    // Fetch Zones for real-time break exclusion logic
+    import('firebase/firestore').then(async ({ doc, getDoc }) => {
+      try {
+        const rulesRef = doc(db, `conferences/${slug}/settings/attendance`);
+        const rulesSnap = await getDoc(rulesRef);
+        if (rulesSnap.exists()) {
+          const allRules = rulesSnap.data().rules || {};
+          let allZones: any[] = [];
+          Object.entries(allRules).forEach(([dateStr, rule]: [string, any]) => {
+            if (rule && rule.zones) {
+              rule.zones.forEach((z: any) => {
+                allZones.push({ ...z, ruleDate: dateStr });
+              });
+            }
+          });
+          setZones(allZones);
+        }
+      } catch (e) {
+        console.error('Failed to load rules for live calculation', e);
+      }
+    });
 
     const unsub = onSnapshot(q, (snap) => {
       console.log('[ConferenceBadgePage] Query result:', {
@@ -97,20 +123,68 @@ const ConferenceBadgePage: React.FC = () => {
         finalQrValue
       });
 
+      const baseMinutes = Number(docData.totalMinutes || 0);
+
       setUiData({
         status: String(docData.attendanceStatus || 'OUTSIDE'),
+        zone: String(docData.attendanceStatus === 'INSIDE' ? (docData.currentZone || 'Inside') : 'OUTSIDE'),
         name: String(docData.userName || docData.name || '이름 없음'),
         aff: String(docData.affiliation || docData.organization || docData.userAffiliation || docData.userInfo?.affiliation || '소속 없음'),
         id: String(regId || 'ERR'),
         issued: !!docData.badgeIssued,
         qrValue: finalQrValue,
-        receiptNumber: String(docData.receiptNumber || docData.orderId || '-')
+        receiptNumber: String(docData.receiptNumber || docData.orderId || '-'),
+        lastCheckIn: docData.lastCheckIn,
+        baseMinutes
       });
+      setLiveMinutes(baseMinutes);
       setMsg(""); // Clear msg
     });
 
     return () => unsub();
   }, [slug, auth.user]);
+
+  // Live Duration Ticker calculation
+  useLayoutEffect(() => {
+    if (!uiData) return;
+
+    const updateLiveMinutes = () => {
+      if (uiData.status !== 'INSIDE' || !uiData.lastCheckIn) {
+        setLiveMinutes(uiData.baseMinutes || 0);
+        return;
+      }
+
+      const now = new Date();
+      const start = uiData.lastCheckIn.toDate ? uiData.lastCheckIn.toDate() : new Date();
+      let durationMinutes = Math.floor((now.getTime() - start.getTime()) / 60000);
+      if (durationMinutes < 0) durationMinutes = 0;
+
+      const currentZoneId = uiData.zone;
+      const zoneRule = zones.find(z => z.id === currentZoneId);
+      let deduction = 0;
+
+      if (zoneRule && zoneRule.breaks && Array.isArray(zoneRule.breaks)) {
+        zoneRule.breaks.forEach((brk: any) => {
+          const localDateStr = zoneRule.ruleDate || start.getFullYear() + "-" + String(start.getMonth() + 1).padStart(2, '0') + "-" + String(start.getDate()).padStart(2, '0');
+          const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
+          const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
+          const overlapStart = Math.max(start.getTime(), breakStart.getTime());
+          const overlapEnd = Math.min(now.getTime(), breakEnd.getTime());
+          if (overlapEnd > overlapStart) {
+            const overlapMins = Math.floor((overlapEnd - overlapStart) / 60000);
+            deduction += overlapMins;
+          }
+        });
+      }
+
+      const activeMinutes = Math.max(0, durationMinutes - deduction);
+      setLiveMinutes((uiData.baseMinutes || 0) + activeMinutes);
+    };
+
+    updateLiveMinutes();
+    const timer = setInterval(updateLiveMinutes, 30000);
+    return () => clearInterval(timer);
+  }, [uiData, zones]);
 
   // Render - outside useEffect
   if (msg) return <div className="p-10 text-center font-bold text-gray-500 flex items-center justify-center min-h-screen">{msg}</div>;
@@ -136,9 +210,18 @@ const ConferenceBadgePage: React.FC = () => {
         <p className="text-lg text-gray-600 font-medium mb-6">{uiData.aff}</p>
 
         {uiData.issued && (
-          <div className={`mt-6 py-3 px-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 ${uiData.status === 'INSIDE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-            {uiData.status === 'INSIDE' ? '🟢 입장 중 (INSIDE)' : '🔴 퇴장 상태 (OUTSIDE)'}
-          </div>
+          <>
+            <div className={`mt-6 py-3 px-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 ${uiData.status === 'INSIDE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+              {uiData.status === 'INSIDE' ? '🟢 입장 중 (INSIDE)' : '🔴 퇴장 상태 (OUTSIDE)'}
+            </div>
+
+            {liveMinutes > 0 && (
+              <div className="mt-3 bg-purple-50 text-purple-700 rounded-xl py-2 px-4 flex justify-between items-center text-sm font-semibold border border-purple-100">
+                <span>총 수강 시간</span>
+                <span>{Math.floor(liveMinutes / 60)}시간 {liveMinutes % 60}분</span>
+              </div>
+            )}
+          </>
         )}
 
         {!uiData.issued && (

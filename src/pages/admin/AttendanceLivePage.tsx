@@ -74,6 +74,14 @@ const AttendanceLivePage: React.FC = () => {
     const [selectedRegForLog, setSelectedRegForLog] = useState<Registration | null>(null);
     const [logs, setLogs] = useState<LogEntry[]>([]);
 
+    // For live tracking
+    const [currentTime, setCurrentTime] = useState(new Date());
+
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 60000); // UI update every minute
+        return () => clearInterval(timer);
+    }, []);
+
     useEffect(() => {
         if (!cid) return;
         const fetchDates = async () => {
@@ -169,13 +177,13 @@ const AttendanceLivePage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-     
+
     }, [cid, selectedDate]);
 
     useEffect(() => {
         console.log('[AttendanceLive] useEffect triggered, cid:', cid, 'selectedDate:', selectedDate);
         refreshData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [cid, selectedDate]);
 
     const handleCheckIn = async (regId: string, zoneId: string) => {
@@ -231,8 +239,9 @@ const AttendanceLivePage: React.FC = () => {
 
             if (zoneRule && zoneRule.breaks) {
                 zoneRule.breaks.forEach(brk => {
-                    const breakStart = new Date(`${selectedDate}T${brk.start}:00`);
-                    const breakEnd = new Date(`${selectedDate}T${brk.end}:00`);
+                    const localDateStr = checkInTime.getFullYear() + "-" + String(checkInTime.getMonth() + 1).padStart(2, '0') + "-" + String(checkInTime.getDate()).padStart(2, '0');
+                    const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
+                    const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
                     const overlapStart = Math.max(checkInTime.getTime(), breakStart.getTime());
                     const overlapEnd = Math.min(now.getTime(), breakEnd.getTime());
                     if (overlapEnd > overlapStart) {
@@ -242,19 +251,19 @@ const AttendanceLivePage: React.FC = () => {
                 });
             }
 
-             const finalMinutes = Math.max(0, durationMinutes - deduction);
+            const finalMinutes = Math.max(0, durationMinutes - deduction);
             const regRef = doc(db, 'conferences', cid!, 'registrations', regId);
-            
+
             // 목표 설정: CUMULATIVE 모드면 전체 누적 목표, 아니면 날짜별 목표
             const goal = rules.completionMode === 'CUMULATIVE' && rules.cumulativeGoalMinutes
                 ? rules.cumulativeGoalMinutes
                 : (zoneRule?.goalMinutes && zoneRule.goalMinutes > 0)
                     ? zoneRule.goalMinutes
                     : rules.globalGoalMinutes;
-            
+
             const currentTotal = registrations.find(r => r.id === regId)?.totalMinutes || 0;
             const newTotal = currentTotal + finalMinutes;
-            
+
             // 완료 여부 판정: 누적 시간이 목표 이상인지
             const isCompleted = newTotal >= goal;
 
@@ -430,95 +439,133 @@ const AttendanceLivePage: React.FC = () => {
                             </div>
                         ) : (
                             <div className="divide-y divide-slate-100">
-                                {filteredRegistrations.map(r => (
-                                    <div key={r.id} className={cn(
-                                        "grid grid-cols-12 gap-4 px-6 py-4 items-center transition-colors hover:bg-slate-50/50",
-                                        r.attendanceStatus === 'INSIDE' && "bg-blue-50/30"
-                                    )}>
-                                        {/* User Info */}
-                                        <div className="col-span-3 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-bold text-slate-900 truncate">{r.userName}</span>
-                                                {r.isCompleted && (
-                                                    <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                                {filteredRegistrations.map(r => {
+                                    // Calculate live minutes if INSIDE
+                                    let displayTotal = r.totalMinutes;
+                                    let isLive = false;
+
+                                    if (r.attendanceStatus === 'INSIDE' && r.lastCheckIn) {
+                                        const checkInTime = r.lastCheckIn.toDate ? r.lastCheckIn.toDate() : new Date();
+                                        let diffMins = Math.floor((currentTime.getTime() - checkInTime.getTime()) / 60000);
+                                        if (diffMins < 0) diffMins = 0;
+
+                                        let liveDeduction = 0;
+                                        const rZoneRule = zones.find(z => z.id === r.currentZone);
+                                        if (rZoneRule && rZoneRule.breaks) {
+                                            rZoneRule.breaks.forEach(brk => {
+                                                const localDateStr = checkInTime.getFullYear() + "-" + String(checkInTime.getMonth() + 1).padStart(2, '0') + "-" + String(checkInTime.getDate()).padStart(2, '0');
+                                                const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
+                                                const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
+                                                const overlapStart = Math.max(checkInTime.getTime(), breakStart.getTime());
+                                                const overlapEnd = Math.min(currentTime.getTime(), breakEnd.getTime());
+                                                if (overlapEnd > overlapStart) {
+                                                    liveDeduction += Math.floor((overlapEnd - overlapStart) / 60000);
+                                                }
+                                            });
+                                        }
+
+                                        displayTotal = r.totalMinutes + Math.max(0, diffMins - liveDeduction);
+                                        isLive = true;
+                                    }
+
+                                    return (
+                                        <div key={r.id} className={cn(
+                                            "grid grid-cols-12 gap-4 px-6 py-4 items-center transition-colors hover:bg-slate-50/50",
+                                            r.attendanceStatus === 'INSIDE' && "bg-blue-50/30"
+                                        )}>
+                                            {/* User Info */}
+                                            <div className="col-span-3 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-slate-900 truncate">{r.userName}</span>
+                                                    {r.isCompleted && (
+                                                        <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                                                    )}
+                                                </div>
+                                                <div className="text-xs text-slate-500 truncate" title={r.affiliation || r.userEmail}>
+                                                    {r.affiliation || r.userEmail}
+                                                </div>
+                                            </div>
+
+                                            {/* Status */}
+                                            <div className="col-span-2 flex justify-center">
+                                                {r.attendanceStatus === 'INSIDE' ? (
+                                                    <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200 px-3 py-1 shadow-sm gap-1.5 animate-pulse">
+                                                        <LogIn className="w-3 h-3" /> INSIDE
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="outline" className="bg-slate-100 text-slate-500 border-slate-200 px-3 py-1 gap-1.5">
+                                                        <LogOut className="w-3 h-3" /> OUTSIDE
+                                                    </Badge>
                                                 )}
                                             </div>
-                                            <div className="text-xs text-slate-500 truncate" title={r.affiliation || r.userEmail}>
-                                                {r.affiliation || r.userEmail}
+
+                                            {/* Current Zone */}
+                                            <div className="col-span-2">
+                                                {r.currentZone ? (
+                                                    <div className="text-sm font-medium text-blue-700 flex items-center gap-1.5">
+                                                        <MapPin className="w-3.5 h-3.5" />
+                                                        {zones.find(z => z.id === r.currentZone)?.name || 'Unknown'}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-300 text-sm">-</span>
+                                                )}
                                             </div>
-                                        </div>
 
-                                        {/* Status */}
-                                        <div className="col-span-2 flex justify-center">
-                                            {r.attendanceStatus === 'INSIDE' ? (
-                                                <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200 px-3 py-1 shadow-sm gap-1.5 animate-pulse">
-                                                    <LogIn className="w-3 h-3" /> INSIDE
-                                                </Badge>
-                                            ) : (
-                                                <Badge variant="outline" className="bg-slate-100 text-slate-500 border-slate-200 px-3 py-1 gap-1.5">
-                                                    <LogOut className="w-3 h-3" /> OUTSIDE
-                                                </Badge>
-                                            )}
-                                        </div>
-
-                                        {/* Current Zone */}
-                                        <div className="col-span-2">
-                                            {r.currentZone ? (
-                                                <div className="text-sm font-medium text-blue-700 flex items-center gap-1.5">
-                                                    <MapPin className="w-3.5 h-3.5" />
-                                                    {zones.find(z => z.id === r.currentZone)?.name || 'Unknown'}
+                                            {/* Total Time */}
+                                            <div className="col-span-2 text-right px-4">
+                                                <div className={cn(
+                                                    "font-mono text-lg font-bold leading-none",
+                                                    isLive ? "text-purple-600" : "text-slate-800"
+                                                )}>
+                                                    {displayTotal}
                                                 </div>
-                                            ) : (
-                                                <span className="text-slate-300 text-sm">-</span>
-                                            )}
-                                        </div>
-
-                                        {/* Total Time */}
-                                        <div className="col-span-2 text-right px-4">
-                                            <div className="font-mono text-lg font-bold text-slate-800 leading-none">
-                                                {r.totalMinutes}
+                                                <div className={cn(
+                                                    "text-[10px] mt-0.5",
+                                                    isLive ? "text-purple-400 font-semibold" : "text-slate-400"
+                                                )}>
+                                                    {isLive ? 'LIVE MINUTES' : 'MINUTES'}
+                                                </div>
                                             </div>
-                                            <div className="text-[10px] text-slate-400 mt-0.5">MINUTES</div>
-                                        </div>
 
-                                        {/* Actions */}
-                                        <div className="col-span-3 flex justify-end items-center gap-2">
-                                            {r.attendanceStatus === 'INSIDE' ? (
+                                            {/* Actions */}
+                                            <div className="col-span-3 flex justify-end items-center gap-2">
+                                                {r.attendanceStatus === 'INSIDE' ? (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="destructive"
+                                                        onClick={() => handleCheckOut(r.id, r.currentZone, r.lastCheckIn)}
+                                                        className="h-8 px-4 shadow-sm"
+                                                    >
+                                                        <LogOut className="w-3.5 h-3.5 mr-1.5" /> 퇴장
+                                                    </Button>
+                                                ) : (
+                                                    <div className="flex gap-1.5 flex-wrap justify-end">
+                                                        {zones.map(z => (
+                                                            <Button
+                                                                key={z.id}
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => handleCheckIn(r.id, z.id)}
+                                                                className="h-8 text-xs border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800 hover:border-blue-300 flex-shrink-0"
+                                                            >
+                                                                {z.name}
+                                                            </Button>
+                                                        ))}
+                                                        {zones.length === 0 && <span className="text-xs text-red-300">No Zone</span>}
+                                                    </div>
+                                                )}
                                                 <Button
+                                                    variant="ghost"
                                                     size="sm"
-                                                    variant="destructive"
-                                                    onClick={() => handleCheckOut(r.id, r.currentZone, r.lastCheckIn)}
-                                                    className="h-8 px-4 shadow-sm"
+                                                    className="h-8 w-8 text-slate-400 hover:text-slate-600 rounded-full"
+                                                    onClick={() => openLogs(r)}
                                                 >
-                                                    <LogOut className="w-3.5 h-3.5 mr-1.5" /> 퇴장
+                                                    <FileText className="w-4 h-4" />
                                                 </Button>
-                                            ) : (
-                                                <div className="flex gap-1.5 flex-wrap justify-end">
-                                                    {zones.map(z => (
-                                                        <Button
-                                                            key={z.id}
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => handleCheckIn(r.id, z.id)}
-                                                            className="h-8 text-xs border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800 hover:border-blue-300 flex-shrink-0"
-                                                        >
-                                                            {z.name}
-                                                        </Button>
-                                                    ))}
-                                                    {zones.length === 0 && <span className="text-xs text-red-300">No Zone</span>}
-                                                </div>
-                                            )}
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-8 w-8 text-slate-400 hover:text-slate-600 rounded-full"
-                                                onClick={() => openLogs(r)}
-                                            >
-                                                <FileText className="w-4 h-4" />
-                                            </Button>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

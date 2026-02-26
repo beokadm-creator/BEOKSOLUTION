@@ -30,9 +30,18 @@ const GatePage: React.FC = () => {
     const { cid } = useParams<{ cid: string }>();
     const { selectedConferenceId, selectedConferenceSlug } = useAdminStore();
     const [loading, setLoading] = useState(true);
-    
+
     // Config
-    const [zones, setZones] = useState<Array<{ id: string; name: string; start: string; end: string; goalMinutes: number; autoCheckout: boolean; breaks: Array<{ label: string; start: string; end: string }>; points: number }>>([]);
+    const [zones, setZones] = useState<Array<{
+        id: string; name: string; start: string; end: string;
+        goalMinutes: number; autoCheckout: boolean;
+        breaks: Array<{ label: string; start: string; end: string }>;
+        points: number;
+        ruleDate: string;
+        globalGoalMinutes: number;
+        completionMode: 'DAILY_SEPARATE' | 'CUMULATIVE';
+        cumulativeGoalMinutes: number;
+    }>>([]);
     const [selectedZoneId, setSelectedZoneId] = useState<string>('');
     const [mode, setMode] = useState<'ENTER_ONLY' | 'EXIT_ONLY' | 'AUTO'>('ENTER_ONLY');
     const [conferenceTitle, setConferenceTitle] = useState('');
@@ -45,7 +54,7 @@ const GatePage: React.FC = () => {
         const saved = localStorage.getItem('kiosk_design');
         return saved ? JSON.parse(saved) : { bgImage: null, textColor: '#000000', fontSize: 'normal' };
     });
-    
+
     // Scanner State
     const [scannerState, setScannerState] = useState<ScannerState>({
         status: 'IDLE',
@@ -73,17 +82,25 @@ const GatePage: React.FC = () => {
                 const rulesSnap = await getDoc(rulesRef);
                 if (rulesSnap.exists()) {
                     const allRules = rulesSnap.data().rules || {};
-                    let allZones: Array<{ id: string; name: string; start: string; end: string; goalMinutes: number; autoCheckout: boolean; breaks: Array<{ label: string; start: string; end: string }>; points: number }> = [];
-                    Object.values(allRules).forEach((rule) => {
+                    let allZones: Array<any> = [];
+                    Object.entries(allRules).forEach(([dateStr, rule]: [string, any]) => {
                         if (rule.zones) {
-                            allZones = [...allZones, ...rule.zones];
+                            rule.zones.forEach((z: any) => {
+                                allZones.push({
+                                    ...z,
+                                    ruleDate: dateStr,
+                                    globalGoalMinutes: rule.globalGoalMinutes || 240,
+                                    completionMode: rule.completionMode || 'DAILY_SEPARATE',
+                                    cumulativeGoalMinutes: rule.cumulativeGoalMinutes || 0
+                                });
+                            });
                         }
                     });
-                    
+
                     // Deduplicate by ID
                     const uniqueZones = Array.from(new Map(allZones.map(item => [item.id, item])).values());
                     setZones(uniqueZones);
-                    
+
                     // Load Unified Settings [v356]
                     let savedZoneId = '';
                     if (cid) {
@@ -114,7 +131,7 @@ const GatePage: React.FC = () => {
             }
         };
         init();
-        
+
         setTimeout(() => inputRef.current?.focus(), 500);
     }, [selectedConferenceId, cid]);
 
@@ -125,7 +142,7 @@ const GatePage: React.FC = () => {
         try {
             const saved = localStorage.getItem(key);
             const parsed = saved ? JSON.parse(saved) : {};
-            
+
             const newSettings = {
                 ...parsed,
                 gate: {
@@ -167,7 +184,7 @@ const GatePage: React.FC = () => {
             // Check if external attendee (EXT- prefix)
             const isExternalAttendee = regId.startsWith('EXT-');
 
-            let regData: Registration | { name?: string; affiliation?: string; paymentStatus?: string };
+            let regData: any;
             let userName: string;
             let userAffiliation: string;
             let currentStatus: string;
@@ -216,12 +233,13 @@ const GatePage: React.FC = () => {
 
             // 2. Logic Switch
             let action = '';
+            const currentTotalMinutes = typeof (regData as any).totalMinutes === 'number' ? (regData as any).totalMinutes : 0;
 
             if (mode === 'ENTER_ONLY') {
                 if (currentStatus === 'INSIDE') {
                     if (currentZone === selectedZoneId) throw new Error(`${userName} Already Inside`);
                     // Auto-Switch
-                    await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee);
+                    await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee, currentTotalMinutes);
                     await performCheckIn(regId, selectedZoneId, isExternalAttendee);
                     action = 'Switched & Checked In';
                 } else {
@@ -231,17 +249,17 @@ const GatePage: React.FC = () => {
             }
             else if (mode === 'EXIT_ONLY') {
                 if (currentStatus !== 'INSIDE') throw new Error(`${userName} Not Entered`);
-                await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee);
+                await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee, currentTotalMinutes);
                 action = '퇴장 완료 (Checked Out)';
             }
             else if (mode === 'AUTO') {
                 if (currentStatus === 'INSIDE') {
                     if (currentZone !== selectedZoneId) {
-                        await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee);
+                        await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee, currentTotalMinutes);
                         await performCheckIn(regId, selectedZoneId, isExternalAttendee);
                         action = 'Zone Switched';
                     } else {
-                        await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee);
+                        await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee, currentTotalMinutes);
                         action = '퇴장 완료 (Checked Out)';
                     }
                 } else {
@@ -288,21 +306,22 @@ const GatePage: React.FC = () => {
         });
     };
 
-    const performCheckOut = async (id: string, zoneId: string, lastIn: { toDate: () => Date } | null | undefined, isExternal: boolean = false) => {
+    const performCheckOut = async (id: string, zoneId: string | null, lastIn: { toDate: () => Date } | null | undefined, isExternal: boolean = false, currentTotalMinutes: number = 0) => {
         if (!selectedConferenceId) return;
         const collectionPath = isExternal ? 'external_attendees' : 'registrations';
         const now = new Date();
         const start = lastIn?.toDate() || now;
         const diffMins = Math.floor((now.getTime() - start.getTime()) / 60000);
-        
+
         // 휴게 시간 차감 로직 추가
         const zoneRule = zones.find(z => z.id === zoneId);
         let deduction = 0;
         if (zoneRule && zoneRule.breaks && zoneRule.breaks.length > 0) {
             zoneRule.breaks.forEach(brk => {
-                // selectedDate를 사용하여 휴게 시간 계산
-                const breakStart = new Date(`${selectedDate}T${brk.start}:00`);
-                const breakEnd = new Date(`${selectedDate}T${brk.end}:00`);
+                // Use zoneRule.ruleDate instead of stale selectedDate state hook, fallback to actual start local date
+                const localDateStr = zoneRule.ruleDate || start.getFullYear() + "-" + String(start.getMonth() + 1).padStart(2, '0') + "-" + String(start.getDate()).padStart(2, '0');
+                const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
+                const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
                 const overlapStart = Math.max(start.getTime(), breakStart.getTime());
                 const overlapEnd = Math.min(now.getTime(), breakEnd.getTime());
                 if (overlapEnd > overlapStart) {
@@ -311,17 +330,41 @@ const GatePage: React.FC = () => {
                 }
             });
         }
-        
+
         const finalMinutes = Math.max(0, diffMins - deduction); // 휴게 시간 차감 후 저장
-        
-        await updateDoc(doc(db, `conferences/${selectedConferenceId}/${collectionPath}/${id}`), {
+        const newTotal = currentTotalMinutes + finalMinutes;
+
+        // "수강완료" 판정 (Goal check)
+        let isCompleted = false;
+        if (zoneRule) {
+            const goal = zoneRule.completionMode === 'CUMULATIVE' && zoneRule.cumulativeGoalMinutes
+                ? zoneRule.cumulativeGoalMinutes
+                : (zoneRule.goalMinutes && zoneRule.goalMinutes > 0)
+                    ? zoneRule.goalMinutes
+                    : (zoneRule.globalGoalMinutes || 0);
+
+            if (goal > 0 && newTotal >= goal) {
+                isCompleted = true;
+            }
+        }
+
+        // Only update isCompleted if it's evaluated to true, to avoid overriding previously completed status. 
+        // If it was already completed but now evaluated to false (e.g., config changes), maybe it's fine to rely on what live page does, but let's be safe and always update it if completed. Let's just update the value to what we computed, as live page does.
+        const updatePayload: any = {
             attendanceStatus: 'OUTSIDE',
             currentZone: null,
             totalMinutes: increment(finalMinutes), // 휴게 시간 차감된 값
             lastCheckOut: Timestamp.now()
-        });
+        };
+        // Always set isCompleted if goal allows evaluation
+        if (zoneRule) {
+            updatePayload.isCompleted = isCompleted;
+        }
+
+        await updateDoc(doc(db, `conferences/${selectedConferenceId}/${collectionPath}/${id}`), updatePayload);
+
         await addDoc(collection(db, `conferences/${selectedConferenceId}/${collectionPath}/${id}/logs`), {
-            type: 'EXIT', zoneId, timestamp: Timestamp.now(), method: 'KIOSK', rawDuration: diffMins, deduction, recognizedMinutes: finalMinutes
+            type: 'EXIT', zoneId, timestamp: Timestamp.now(), method: 'KIOSK', rawDuration: diffMins, deduction, recognizedMinutes: finalMinutes, evaluatedCompleted: isCompleted, accumulatedTotal: newTotal
         });
     };
 
@@ -356,35 +399,34 @@ const GatePage: React.FC = () => {
     const activeZoneName = zones.find(z => z.id === selectedZoneId)?.name || 'No Zone Selected';
 
     return (
-        <div 
+        <div
             className="fixed inset-0 z-[99999] flex flex-col font-sans transition-colors duration-500 bg-white"
-            style={{ 
+            style={{
                 backgroundImage: design.bgImage ? `url(${design.bgImage})` : 'none',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
-                color: design.textColor 
+                color: design.textColor
             }}
         >
             {/* Top Admin Console (Always on top, semi-transparent) */}
             <div className="fixed top-0 left-0 right-0 bg-black/80 text-white p-3 z-[10000] flex justify-between items-center backdrop-blur-md shadow-lg">
                 <div className="flex items-center gap-4">
-                    <select 
-                        value={selectedZoneId} 
+                    <select
+                        value={selectedZoneId}
                         onChange={e => setSelectedZoneId(e.target.value)}
                         className="bg-gray-700 border-none text-white text-sm p-2 rounded w-48"
                     >
                         {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
                         {zones.length === 0 && <option>No Zones Found</option>}
                     </select>
-                    
+
                     <div className="flex bg-gray-700 rounded p-1">
                         {(['ENTER_ONLY', 'EXIT_ONLY', 'AUTO'] as const).map(m => (
                             <button
                                 key={m}
                                 onClick={() => setMode(m)}
-                                className={`px-3 py-1 rounded text-xs font-bold transition-colors ${
-                                    mode === m ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
-                                }`}
+                                className={`px-3 py-1 rounded text-xs font-bold transition-colors ${mode === m ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
+                                    }`}
                             >
                                 {m === 'ENTER_ONLY' ? 'IN' : m === 'EXIT_ONLY' ? 'OUT' : 'AUTO'}
                             </button>
@@ -408,7 +450,7 @@ const GatePage: React.FC = () => {
                     <h3 className="font-bold mb-4 flex items-center gap-2">
                         <Settings className="w-4 h-4" /> Kiosk Design
                     </h3>
-                    
+
                     <div className="space-y-4">
                         <div>
                             <label className="text-xs font-bold text-gray-500 block mb-1">Background Image</label>
@@ -419,15 +461,15 @@ const GatePage: React.FC = () => {
                                 </Button>
                             )}
                         </div>
-                        
+
                         <div>
                             <label className="text-xs font-bold text-gray-500 block mb-1">Text Color</label>
                             <div className="flex gap-2">
-                                <input 
-                                    type="color" 
-                                    value={design.textColor} 
+                                <input
+                                    type="color"
+                                    value={design.textColor}
                                     onChange={(e) => setDesign(prev => ({ ...prev, textColor: e.target.value }))}
-                                    className="h-8 w-16 p-0 border-0" 
+                                    className="h-8 w-16 p-0 border-0"
                                 />
                                 <div className="flex-1 flex gap-1">
                                     <button onClick={() => setDesign(prev => ({ ...prev, textColor: '#000000' }))} className="w-8 h-8 bg-black rounded-full border border-gray-200" />
@@ -441,14 +483,14 @@ const GatePage: React.FC = () => {
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative mt-16">
-                
+
                 {/* Header */}
                 <div className="mb-12 drop-shadow-lg">
                     <h1 className="text-5xl md:text-7xl font-bold mb-4 tracking-tight" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
                         {conferenceTitle}
                     </h1>
                     <p className="text-2xl md:text-3xl opacity-90 font-light">{conferenceSubtitle}</p>
-                    
+
                     {/* Zone Badge */}
                     <div className="mt-6 inline-block bg-white/20 backdrop-blur-md border border-white/30 px-6 py-2 rounded-full text-xl font-bold shadow-sm">
                         📍 {activeZoneName}
@@ -456,23 +498,22 @@ const GatePage: React.FC = () => {
                 </div>
 
                 {/* Main Instruction Card */}
-                <div className={`p-10 rounded-3xl w-full max-w-3xl shadow-2xl backdrop-blur-sm border transition-all duration-500 ${
-                    design.bgImage ? 'bg-black/40 border-white/20 text-white' : 
+                <div className={`p-10 rounded-3xl w-full max-w-3xl shadow-2xl backdrop-blur-sm border transition-all duration-500 ${design.bgImage ? 'bg-black/40 border-white/20 text-white' :
                     mode === 'ENTER_ONLY' ? 'bg-blue-50 border-blue-200 text-blue-900' :
-                    mode === 'EXIT_ONLY' ? 'bg-red-50 border-red-200 text-red-900' :
-                    'bg-purple-50 border-purple-200 text-purple-900'
-                }`}>
+                        mode === 'EXIT_ONLY' ? 'bg-red-50 border-red-200 text-red-900' :
+                            'bg-purple-50 border-purple-200 text-purple-900'
+                    }`}>
                     <h2 className="text-5xl font-black mb-6">
                         {mode === 'ENTER_ONLY' && '입장 모드 (CHECK-IN)'}
                         {mode === 'EXIT_ONLY' && '퇴장 모드 (CHECK-OUT)'}
                         {mode === 'AUTO' && '자동 모드 (AUTO)'}
                     </h2>
-                    
+
                     <p className="opacity-80 mb-8 text-2xl font-medium">
                         명찰의 QR코드를 스캐너에 인식시켜주세요.
-                        <br/>(Please scan your QR code)
+                        <br />(Please scan your QR code)
                     </p>
-                    
+
                     <div className="animate-pulse mt-8">
                         <ArrowLeft className="w-12 h-12 mx-auto rotate-[-90deg] opacity-50" />
                     </div>
@@ -490,17 +531,16 @@ const GatePage: React.FC = () => {
 
                 {/* Result Overlay (Success/Error) */}
                 {(scannerState.status === 'SUCCESS' || scannerState.status === 'ERROR') && (
-                    <div className={`absolute inset-0 z-[60000] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200 ${
-                        scannerState.status === 'SUCCESS' ? getModeColor() : 'bg-red-600'
-                    } text-white`}>
+                    <div className={`absolute inset-0 z-[60000] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200 ${scannerState.status === 'SUCCESS' ? getModeColor() : 'bg-red-600'
+                        } text-white`}>
                         {scannerState.status === 'SUCCESS' ? (
                             <CheckCircle className="w-40 h-40 mb-8 drop-shadow-lg" />
                         ) : (
                             <AlertCircle className="w-40 h-40 mb-8 drop-shadow-lg" />
                         )}
-                        
+
                         <h2 className="text-6xl font-black mb-4 drop-shadow-md">{scannerState.message}</h2>
-                        
+
                         {scannerState.userData && (
                             <div className="mt-12 text-center bg-white/10 p-12 rounded-3xl backdrop-blur-md border border-white/20 w-full max-w-4xl shadow-2xl">
                                 <div className="text-7xl font-black mb-6 tracking-tight">{scannerState.userData.name}</div>
@@ -517,7 +557,7 @@ const GatePage: React.FC = () => {
                 )}
 
                 {/* Hidden Input */}
-                <input 
+                <input
                     ref={inputRef}
                     value={inputValue}
                     onChange={e => setInputValue(e.target.value)}

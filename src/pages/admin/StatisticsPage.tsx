@@ -36,13 +36,15 @@ interface ZoneRule {
 interface DailyRule {
     date: string;
     globalGoalMinutes: number;
+    completionMode?: 'DAILY_SEPARATE' | 'CUMULATIVE';
+    cumulativeGoalMinutes?: number;
     zones: ZoneRule[];
 }
 
 const StatisticsPage: React.FC = () => {
     const { selectedConferenceId } = useAdminStore();
     const { registrations, loading: regLoading } = useRegistrations(selectedConferenceId || '');
-    
+
     const [logs, setLogs] = useState<AccessLog[]>([]);
     const [rules, setRules] = useState<Record<string, DailyRule>>({});
     const [dates, setDates] = useState<string[]>([]);
@@ -91,12 +93,14 @@ const StatisticsPage: React.FC = () => {
 
         const currentRule = rules[selectedDate];
         const globalGoal = currentRule.globalGoalMinutes;
-        
+
         // Filter logs for the selected date
         // Note: AccessLog timestamp is UTC. Convert to KST for date matching.
         const dayStartKST = new Date(`${selectedDate}T00:00:00+09:00`);
         const dayEndKST = new Date(`${selectedDate}T23:59:59+09:00`);
-        
+        const now = new Date();
+        const effectiveSessionEnd = new Date(Math.min(now.getTime(), dayEndKST.getTime()));
+
         const dayLogs = logs.filter(log => {
             const t = log.timestamp.toDate();
             return t >= dayStartKST && t <= dayEndKST;
@@ -145,7 +149,7 @@ const StatisticsPage: React.FC = () => {
             currentRule.zones.forEach(zone => {
                 const zLogs = zoneLogs[zone.id];
                 if (zLogs) {
-                    const minutes = calculateStayTime(zLogs, zone.breaks, dayEndKST);
+                    const minutes = calculateStayTime(zLogs, zone.breaks, effectiveSessionEnd);
                     stat.zones[zone.id] = minutes;
                     total += minutes;
                 }
@@ -157,29 +161,31 @@ const StatisticsPage: React.FC = () => {
             // Let's assume strict zone matching for now.
 
             stat.totalMinutes = total;
-            stat.isCompliant = total >= globalGoal;
+
+            const reg = registrations.find(r => r.userId === stat.userId);
+            if (currentRule.completionMode === 'CUMULATIVE') {
+                stat.isCompliant = (reg as any)?.isCompleted || false;
+            } else {
+                stat.isCompliant = total >= globalGoal;
+            }
         });
 
         // Aggregates
         const totalUsers = registrations.length;
         const activeUsers = Object.values(userStats).filter(u => u.totalMinutes > 0).length;
-        
-        // [Fixed] Use isCheckedIn and paymentStatus instead of non-existent isCompleted field
-        const compliantUsers = registrations.filter(r => {
-            const isCheckedIn = r.isCheckedIn === true;
-            const isPaid = r.paymentStatus === 'PAID';
-            return isCheckedIn && isPaid;
-        }).length;
-        
+
+        // [Fixed] Count compliant users correctly based on the updated logic evaluating goal vs exact minutes
+        const compliantUsers = Object.values(userStats).filter(u => u.isCompliant).length;
+
         const complianceRate = totalUsers > 0 ? (compliantUsers / totalUsers) * 100 : 0;
-        const avgStayTime = activeUsers > 0 
-            ? Object.values(userStats).reduce((acc, u) => acc + u.totalMinutes, 0) / activeUsers 
+        const avgStayTime = activeUsers > 0
+            ? Object.values(userStats).reduce((acc, u) => acc + u.totalMinutes, 0) / activeUsers
             : 0;
 
         // Zone Stats
         const zoneStats = currentRule.zones.map(z => {
             const visitedUsers = Object.values(userStats).filter(u => (u.zones[z.id] || 0) > 0).length;
-            const avgTime = visitedUsers > 0 
+            const avgTime = visitedUsers > 0
                 ? Object.values(userStats).reduce((acc, u) => acc + (u.zones[z.id] || 0), 0) / visitedUsers
                 : 0;
             return {
@@ -191,7 +197,7 @@ const StatisticsPage: React.FC = () => {
 
         // Pie chart data (fix: prevent negative values)
         const incompleteUsers = Math.max(0, activeUsers - compliantUsers);
-        
+
         return {
             userStats: Object.values(userStats),
             totalUsers,
@@ -208,7 +214,7 @@ const StatisticsPage: React.FC = () => {
 
     const handleExportExcel = () => {
         if (!stats) return;
-        
+
         try {
             const data = stats.userStats.map(u => ({
                 Name: u.userName,
@@ -342,7 +348,7 @@ const StatisticsPage: React.FC = () => {
                                     </ResponsiveContainer>
                                 </CardContent>
                             </Card>
-                            
+
                             <Card>
                                 <CardHeader>
                                     <CardTitle>Hourly Traffic (Estimate)</CardTitle>
@@ -384,7 +390,7 @@ const StatisticsPage: React.FC = () => {
                                 </Card>
                             ))}
                         </div>
-                        
+
                         <Card>
                             <CardHeader>
                                 <CardTitle>Zone Comparison</CardTitle>
@@ -429,33 +435,33 @@ const StatisticsPage: React.FC = () => {
                                         {stats.userStats
                                             .sort((a, b) => b.totalMinutes - a.totalMinutes)
                                             .map((user) => (
-                                            <TableRow key={user.userId}>
-                                                <TableCell className="font-medium">{user.userName}</TableCell>
-                                                <TableCell>
-                                                    {user.isCompliant ? (
-                                                        <Badge className="bg-green-500 hover:bg-green-600">
-                                                            <CheckCircle className="w-3 h-3 mr-1" /> Completed
-                                                        </Badge>
-                                                    ) : (
-                                                        <Badge variant="outline" className="text-gray-500">
-                                                            Incomplete
-                                                        </Badge>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right font-bold text-lg">
-                                                    {Math.floor(user.totalMinutes)}m
-                                                </TableCell>
-                                                {stats.zoneStats.map(z => (
-                                                    <TableCell key={z.id} className="text-right hidden md:table-cell">
-                                                        {Math.floor(user.zones[z.id] || 0)}m
+                                                <TableRow key={user.userId}>
+                                                    <TableCell className="font-medium">{user.userName}</TableCell>
+                                                    <TableCell>
+                                                        {user.isCompliant ? (
+                                                            <Badge className="bg-green-500 hover:bg-green-600">
+                                                                <CheckCircle className="w-3 h-3 mr-1" /> Completed
+                                                            </Badge>
+                                                        ) : (
+                                                            <Badge variant="outline" className="text-gray-500">
+                                                                Incomplete
+                                                            </Badge>
+                                                        )}
                                                     </TableCell>
-                                                ))}
-                                                <TableCell className="text-center">
-                                                    {/* Expandable details could go here */}
-                                                    <span className="text-xs text-gray-400">{user.logs.length} logs</span>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
+                                                    <TableCell className="text-right font-bold text-lg">
+                                                        {Math.floor(user.totalMinutes)}m
+                                                    </TableCell>
+                                                    {stats.zoneStats.map(z => (
+                                                        <TableCell key={z.id} className="text-right hidden md:table-cell">
+                                                            {Math.floor(user.zones[z.id] || 0)}m
+                                                        </TableCell>
+                                                    ))}
+                                                    <TableCell className="text-center">
+                                                        {/* Expandable details could go here */}
+                                                        <span className="text-xs text-gray-400">{user.logs.length} logs</span>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
                                     </TableBody>
                                 </Table>
                             </CardContent>

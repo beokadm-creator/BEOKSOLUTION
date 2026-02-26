@@ -13,10 +13,13 @@ const StandAloneBadgePage: React.FC = () => {
     const { slug } = useParams();
     const navigate = useNavigate();
     const [status, setStatus] = useState("INIT"); // INIT, LOADING, READY, NO_AUTH, NO_DATA, REDIRECTING
-    const [ui, setUi] = useState<{ name: string, aff: string, id: string, issued: boolean, zone: string, time: string, license: string, status: string, badgeQr: string | null, receiptNumber?: string, sessionsCompleted?: number, sessionsTotal?: number } | null>(null);
+    const [ui, setUi] = useState<{ name: string, aff: string, id: string, issued: boolean, zone: string, time: string, license: string, status: string, badgeQr: string | null, receiptNumber?: string, sessionsCompleted?: number, sessionsTotal?: number, lastCheckIn?: any, baseMinutes?: number } | null>(null);
+    const [zones, setZones] = useState<any[]>([]);
+    const [liveMinutes, setLiveMinutes] = useState<number>(0);
+    const [badgeConfig, setBadgeConfig] = useState<any>(null);
     const [msg, setMsg] = useState("초기화 중...");
     const [refreshing, setRefreshing] = useState(false);
-    const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const lastQueryRef = useRef<Query | null>(null);
 
     // Helper to determine correct confId
@@ -62,7 +65,7 @@ const StandAloneBadgePage: React.FC = () => {
                 console.log('[StandAloneBadgePage] Firebase user authenticated, fetching badge:', { userId: user.uid, confId: confIdToUse });
 
                 // STRATEGY: Try Regular Registrations FIRST, then External Attendees
-                
+
                 // 1. Define Queries
                 const qReg = query(
                     collection(db, 'conferences', confIdToUse, 'registrations'),
@@ -77,6 +80,38 @@ const StandAloneBadgePage: React.FC = () => {
                     where('paymentStatus', '==', 'PAID') // Admin created ones are PAID
                 );
 
+                // Fetch Zones for real-time break exclusion logic and Badge Config
+                import('firebase/firestore').then(async ({ doc, getDoc }) => {
+                    try {
+                        const rulesRef = doc(db, `conferences/${confIdToUse}/settings/attendance`);
+                        const configRef = doc(db, `conferences/${confIdToUse}/settings/badge_config`);
+
+                        const [rulesSnap, configSnap] = await Promise.all([
+                            getDoc(rulesRef),
+                            getDoc(configRef)
+                        ]);
+
+                        if (rulesSnap.exists()) {
+                            const allRules = rulesSnap.data().rules || {};
+                            let allZones: any[] = [];
+                            Object.entries(allRules).forEach(([dateStr, rule]: [string, any]) => {
+                                if (rule && rule.zones) {
+                                    rule.zones.forEach((z: any) => {
+                                        allZones.push({ ...z, ruleDate: dateStr });
+                                    });
+                                }
+                            });
+                            setZones(allZones);
+                        }
+
+                        if (configSnap.exists()) {
+                            setBadgeConfig(configSnap.data());
+                        }
+                    } catch (e) {
+                        console.error('Failed to load rules and badge config', e);
+                    }
+                });
+
                 // 2. Helper to process snapshot data
                 const processSnapshot = (snap: import('firebase/firestore').QuerySnapshot, source: 'REGULAR' | 'EXTERNAL') => {
                     if (snap.empty) {
@@ -89,7 +124,7 @@ const StandAloneBadgePage: React.FC = () => {
 
                     const d = snap.docs[0].data();
                     console.log(`[StandAloneBadgePage] ${source} Registration found:`, d);
-                    
+
                     // Common Field Mapping
                     const uiName = String(d.userName || d.userInfo?.name || d.name || 'No Name'); // d.name for External
                     const uiAff = String(d.affiliation || d.userAffiliation || d.userInfo?.affiliation || d.organization || '-'); // d.organization for External
@@ -104,7 +139,7 @@ const StandAloneBadgePage: React.FC = () => {
                         // Legacy support for regular registrations
                         uiIssued = !!d.badgeIssued || !!d.badgeQr;
                     }
-                    
+
                     // External might not have attendanceStatus, default to OUTSIDE
                     const uiZone = String(d.attendanceStatus === 'INSIDE' ? (d.currentZone || 'Inside') : 'OUTSIDE');
                     const uiTime = String(d.totalMinutes || '0');
@@ -114,6 +149,8 @@ const StandAloneBadgePage: React.FC = () => {
                     const uiReceiptNumber = String(d.receiptNumber || '');
                     const uiSessionsCompleted = d.sessionsCompleted ? Number(d.sessionsCompleted) : undefined;
                     const uiSessionsTotal = d.sessionsTotal ? Number(d.sessionsTotal) : undefined;
+                    const lastCheckIn = d.lastCheckIn;
+                    const baseMinutes = Number(d.totalMinutes || 0);
 
                     setUi({
                         name: uiName,
@@ -127,8 +164,11 @@ const StandAloneBadgePage: React.FC = () => {
                         badgeQr: uiBadgeQr,
                         receiptNumber: uiReceiptNumber,
                         sessionsCompleted: uiSessionsCompleted,
-                        sessionsTotal: uiSessionsTotal
+                        sessionsTotal: uiSessionsTotal,
+                        lastCheckIn,
+                        baseMinutes
                     });
+                    setLiveMinutes(baseMinutes); // Will be recalculated by the interval if inside
                     setStatus("READY");
                     setMsg("");
                 };
@@ -212,7 +252,7 @@ const StandAloneBadgePage: React.FC = () => {
                 onSnapshot(lastQueryRef.current!, (snap) => {
                     if (!snap.empty) {
                         const d = snap.docs[0].data();
-                        
+
                         // Apply same logic for refresh
                         let uiIssued = false;
                         // We need to know if it's EXTERNAL or REGULAR here too.
@@ -220,11 +260,11 @@ const StandAloneBadgePage: React.FC = () => {
                         // But we can infer it from the collection path in lastQueryRef, or check data structure.
                         // External attendees usually have 'organization' field, Regular have 'affiliation'.
                         // Or better, check if 'badgeIssued' is explicitly false but 'badgeQr' exists.
-                        
+
                         if (d.registrationType?.startsWith('MANUAL') || d.organization) {
-                             uiIssued = !!d.badgeIssued;
+                            uiIssued = !!d.badgeIssued;
                         } else {
-                             uiIssued = !!d.badgeIssued || !!d.badgeQr;
+                            uiIssued = !!d.badgeIssued || !!d.badgeQr;
                         }
 
                         if (uiIssued) {
@@ -259,6 +299,52 @@ const StandAloneBadgePage: React.FC = () => {
         // ui object excluded to prevent excessive re-runs - only ui?.issued is needed
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [status, ui?.issued]);
+
+    // Live Duration Ticker calculation
+    useEffect(() => {
+        if (!ui || status !== 'READY') return;
+
+        const updateLiveMinutes = () => {
+            if (ui.status !== 'INSIDE' || !ui.lastCheckIn) {
+                setLiveMinutes(ui.baseMinutes || 0);
+                return;
+            }
+
+            const now = new Date();
+            const start = ui.lastCheckIn.toDate ? ui.lastCheckIn.toDate() : new Date();
+            let durationMinutes = Math.floor((now.getTime() - start.getTime()) / 60000);
+            if (durationMinutes < 0) durationMinutes = 0;
+
+            const currentZoneId = ui.zone; // Might be zone name instead of ID if mapped poorly above, but uiZone usually gets currentZone ID or name? Wait, uiZone = d.currentZone || 'Inside'.
+            // d.currentZone is the zone ID.
+            const zoneRule = zones.find(z => z.id === currentZoneId);
+            let deduction = 0;
+
+            if (zoneRule && zoneRule.breaks && Array.isArray(zoneRule.breaks)) {
+                zoneRule.breaks.forEach((brk: any) => {
+                    const localDateStr = zoneRule.ruleDate || start.getFullYear() + "-" + String(start.getMonth() + 1).padStart(2, '0') + "-" + String(start.getDate()).padStart(2, '0');
+                    const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
+                    const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
+                    const overlapStart = Math.max(start.getTime(), breakStart.getTime());
+                    const overlapEnd = Math.min(now.getTime(), breakEnd.getTime());
+                    if (overlapEnd > overlapStart) {
+                        const overlapMins = Math.floor((overlapEnd - overlapStart) / 60000);
+                        deduction += overlapMins;
+                    }
+                });
+            }
+
+            const activeMinutes = Math.max(0, durationMinutes - deduction);
+            setLiveMinutes((ui.baseMinutes || 0) + activeMinutes);
+        };
+
+        // Run immediately
+        updateLiveMinutes();
+
+        // Then run every 30 seconds
+        const timer = setInterval(updateLiveMinutes, 30000);
+        return () => clearInterval(timer);
+    }, [ui, status, zones]);
 
     if (msg && status !== "READY") return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center font-sans">
@@ -495,12 +581,15 @@ const StandAloneBadgePage: React.FC = () => {
                                     </div>
                                 )}
 
-                                {ui.time && parseInt(ui.time) > 0 && (
+                                {liveMinutes > 0 && (
                                     <div className="bg-purple-50/50 border border-purple-100 rounded-xl py-3 px-4 flex justify-between items-center">
-                                        <p className="text-xs text-purple-600 font-bold">총 체류 시간</p>
+                                        <div className="flex flex-col">
+                                            <p className="text-xs text-purple-600 font-bold">인정 수강 시간 (실시간)</p>
+                                            {ui.status === 'INSIDE' && <p className="text-[10px] text-purple-400">현재 수강 시간 포함</p>}
+                                        </div>
                                         <p className="text-sm font-black text-purple-800 flex items-center gap-1">
                                             <Clock className="w-3 h-3 text-purple-500" />
-                                            {Math.floor(parseInt(ui.time) / 60)}시간 {parseInt(ui.time) % 60}분
+                                            {Math.floor(liveMinutes / 60)}시간 {liveMinutes % 60}분
                                         </p>
                                     </div>
                                 )}
@@ -532,34 +621,56 @@ const StandAloneBadgePage: React.FC = () => {
 
                             {/* Materials Tab */}
                             <TabsContent value="materials" className="mt-2 p-1 space-y-2">
-                                <a
-                                    href={`https://${hostname}/${slug}/materials`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center p-4 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-xl transition-all group"
-                                >
-                                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-blue-200 transition-colors">
-                                        <Download className="w-5 h-5 text-blue-600" />
-                                    </div>
-                                    <div className="text-left">
-                                        <p className="text-sm font-bold text-gray-900">강의 자료실</p>
-                                        <p className="text-xs text-gray-500">발표자료 다운로드</p>
-                                    </div>
-                                </a>
-                                <a
-                                    href={`https://${hostname}/${slug}/abstracts`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center p-4 bg-white hover:bg-purple-50 border border-gray-200 hover:border-purple-200 rounded-xl transition-all group"
-                                >
-                                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-purple-200 transition-colors">
-                                        <FileText className="w-5 h-5 text-purple-600" />
-                                    </div>
-                                    <div className="text-left">
-                                        <p className="text-sm font-bold text-gray-900">초록집 (Abstract)</p>
-                                        <p className="text-xs text-gray-500">학술대회 초록 모음</p>
-                                    </div>
-                                </a>
+                                {badgeConfig?.materialsUrls && badgeConfig.materialsUrls.length > 0 ? (
+                                    badgeConfig.materialsUrls.map((mat: any, idx: number) => (
+                                        <a
+                                            key={idx}
+                                            href={mat.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center p-4 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-xl transition-all group"
+                                        >
+                                            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-blue-200 transition-colors">
+                                                <Download className="w-5 h-5 text-blue-600" />
+                                            </div>
+                                            <div className="text-left">
+                                                <p className="text-sm font-bold text-gray-900">{mat.name}</p>
+                                                <p className="text-xs text-gray-500">자료실 이동</p>
+                                            </div>
+                                        </a>
+                                    ))
+                                ) : (
+                                    <>
+                                        <a
+                                            href={`https://${hostname}/${slug}/materials`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center p-4 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-xl transition-all group"
+                                        >
+                                            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-blue-200 transition-colors">
+                                                <Download className="w-5 h-5 text-blue-600" />
+                                            </div>
+                                            <div className="text-left">
+                                                <p className="text-sm font-bold text-gray-900">강의 자료실</p>
+                                                <p className="text-xs text-gray-500">발표자료 다운로드</p>
+                                            </div>
+                                        </a>
+                                        <a
+                                            href={`https://${hostname}/${slug}/abstracts`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center p-4 bg-white hover:bg-purple-50 border border-gray-200 hover:border-purple-200 rounded-xl transition-all group"
+                                        >
+                                            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-purple-200 transition-colors">
+                                                <FileText className="w-5 h-5 text-purple-600" />
+                                            </div>
+                                            <div className="text-left">
+                                                <p className="text-sm font-bold text-gray-900">초록집 (Abstract)</p>
+                                                <p className="text-xs text-gray-500">학술대회 초록 모음</p>
+                                            </div>
+                                        </a>
+                                    </>
+                                )}
                             </TabsContent>
 
                             {/* Program Tab */}
@@ -582,11 +693,24 @@ const StandAloneBadgePage: React.FC = () => {
 
                             {/* Translation Tab */}
                             <TabsContent value="translation" className="mt-2 p-1">
-                                <div className="bg-gray-50 rounded-2xl py-12 px-4 border border-dashed border-gray-300 text-center">
-                                    <Languages className="w-10 h-10 text-gray-300 mx-auto mb-4" />
-                                    <p className="text-sm text-gray-900 font-bold mb-1">실시간 번역 서비스</p>
-                                    <p className="text-xs text-gray-500">현재 준비 중입니다</p>
-                                </div>
+                                {badgeConfig?.translationUrl ? (
+                                    <a href={badgeConfig.translationUrl} target="_blank" rel="noopener noreferrer" className="block w-full">
+                                        <div className="bg-blue-50 rounded-2xl py-12 px-4 border border-blue-200 text-center hover:bg-blue-100 transition-colors cursor-pointer shadow-sm">
+                                            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 relative overflow-hidden">
+                                                <Languages className="w-8 h-8 relative z-10" />
+                                                <span className="absolute inset-0 bg-blue-400 opacity-20 animate-ping rounded-full" />
+                                            </div>
+                                            <p className="text-sm text-blue-900 font-bold mb-1">실시간 번역 서비스 연결</p>
+                                            <p className="text-xs text-blue-600">클릭하면 번역 서비스로 이동합니다</p>
+                                        </div>
+                                    </a>
+                                ) : (
+                                    <div className="bg-gray-50 rounded-2xl py-12 px-4 border border-dashed border-gray-300 text-center">
+                                        <Languages className="w-10 h-10 text-gray-300 mx-auto mb-4" />
+                                        <p className="text-sm text-gray-900 font-bold mb-1">실시간 번역 서비스</p>
+                                        <p className="text-xs text-gray-500">현재 준비 중입니다</p>
+                                    </div>
+                                )}
                             </TabsContent>
                         </Tabs>
                     </div>
