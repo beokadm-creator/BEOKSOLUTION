@@ -204,11 +204,11 @@ const InfodeskPage: React.FC = () => {
                 regData = extSnap.data();
                 isExternal = true;
             } else {
-                throw new Error("Invalid Registration Code");
+                throw new Error("등록되지 않은 명찰이거나 잘못된 QR코드입니다.");
             }
 
             if (!isExternal && regData.status !== 'PAID' && regData.paymentStatus !== 'PAID') {
-                throw new Error("Registration NOT PAID");
+                throw new Error("결제가 완료되지 않은 명찰입니다.");
             }
 
             const userName = isExternal ? (regData?.name || 'Unknown') : (regData?.userName || regData.name || 'Unknown');
@@ -225,13 +225,13 @@ const InfodeskPage: React.FC = () => {
             }) as { data: { success: boolean; badgeQr: string } };
 
             if (!result.data.success) {
-                throw new Error("Failed to issue digital badge");
+                throw new Error("명찰 발급에 실패했습니다. 다시 시도해주세요.");
             }
 
             // Real Bixolon Printing
             if (issueOption !== 'DIGITAL_ONLY') {
                 try {
-                    toast.loading("Printing Label...", { id: 'printing' });
+                    toast.loading("라벨을 출력 중입니다...", { id: 'printing' });
 
                     // Fallback to default layout if not configured
                     const activeLayout = badgeLayout || {
@@ -255,13 +255,13 @@ const InfodeskPage: React.FC = () => {
                     });
 
                     if (printSuccess) {
-                        toast.success("Badge Printed", { id: 'printing' });
+                        toast.success("라벨 출력이 완료되었습니다.", { id: 'printing' });
                     } else {
-                        toast.error(printError || "Print failed", { id: 'printing' });
+                        toast.error(printError || "라벨 출력에 실패했습니다.", { id: 'printing' });
                     }
                 } catch (pe) {
                     console.error("Print Error:", pe);
-                    toast.error("Printer connection error", { id: 'printing' });
+                    toast.error("프린터 연결 오류가 발생했습니다.", { id: 'printing' });
                 }
             }
 

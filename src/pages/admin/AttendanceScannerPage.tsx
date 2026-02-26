@@ -158,7 +158,7 @@ const AttendanceScannerPage: React.FC = () => {
             // === END NEW ===
 
             if (regData.status !== 'PAID' && regData.paymentStatus !== 'PAID') {
-                throw new Error("Registration NOT PAID");
+                throw new Error("결제가 완료되지 않은 명찰입니다.");
             }
 
             const regId = regDoc.id; // Use registration ID from query result
@@ -174,7 +174,7 @@ const AttendanceScannerPage: React.FC = () => {
 
             if (mode === 'ENTER_ONLY') {
                 if (currentStatus === 'INSIDE') {
-                    if (currentZone === selectedZoneId) throw new Error(`${userName} Already Inside`);
+                    if (currentZone === selectedZoneId) throw new Error(`${userName}님은 이미 입장 상태입니다.`);
                     // Auto-Switch
                     await performCheckOut(regId, currentZone, regData.lastCheckIn, currentTotalMinutes);
                     await performCheckIn(regId, selectedZoneId);
@@ -185,7 +185,7 @@ const AttendanceScannerPage: React.FC = () => {
                 }
             }
             else if (mode === 'EXIT_ONLY') {
-                if (currentStatus !== 'INSIDE') throw new Error(`${userName} Not Entered`);
+                if (currentStatus !== 'INSIDE') throw new Error(`${userName}님은 입장 기록이 없습니다.`);
                 await performCheckOut(regId, currentZone, regData.lastCheckIn, currentTotalMinutes);
                 action = '퇴장 완료 (Checked Out)';
             }

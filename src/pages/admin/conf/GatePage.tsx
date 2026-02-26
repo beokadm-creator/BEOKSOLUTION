@@ -198,12 +198,12 @@ const GatePage: React.FC = () => {
                 const extSnap = await getDoc(extRef);
 
                 if (!extSnap.exists()) {
-                    throw new Error("Invalid Registration Code");
+                    throw new Error("등록되지 않은 명찰이거나 잘못된 QR코드입니다.");
                 }
 
                 regData = extSnap.data();
                 if (regData.status !== 'PAID' && regData.paymentStatus !== 'PAID') {
-                    throw new Error("Registration NOT PAID");
+                    throw new Error("결제가 완료되지 않은 명찰입니다.");
                 }
 
                 userName = regData.name || 'Unknown';
@@ -216,12 +216,12 @@ const GatePage: React.FC = () => {
                 const regSnap = await getDoc(regRef);
 
                 if (!regSnap.exists()) {
-                    throw new Error("Invalid Registration Code");
+                    throw new Error("등록되지 않은 명찰이거나 잘못된 QR코드입니다.");
                 }
 
                 regData = regSnap.data();
                 if (regData.status !== 'PAID' && regData.paymentStatus !== 'PAID') {
-                    throw new Error("Registration NOT PAID");
+                    throw new Error("결제가 완료되지 않은 명찰입니다.");
                 }
                 // Removed strict redundant slug check as we already queried the specific conference subcollection.
                 // Depending on data import methods, old registrations might lack the slug field.
@@ -238,7 +238,7 @@ const GatePage: React.FC = () => {
 
             if (mode === 'ENTER_ONLY') {
                 if (currentStatus === 'INSIDE') {
-                    if (currentZone === selectedZoneId) throw new Error(`${userName} Already Inside`);
+                    if (currentZone === selectedZoneId) throw new Error(`${userName}님은 이미 입장 상태입니다.`);
                     // Auto-Switch
                     await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee, currentTotalMinutes);
                     await performCheckIn(regId, selectedZoneId, isExternalAttendee);
@@ -249,7 +249,7 @@ const GatePage: React.FC = () => {
                 }
             }
             else if (mode === 'EXIT_ONLY') {
-                if (currentStatus !== 'INSIDE') throw new Error(`${userName} Not Entered`);
+                if (currentStatus !== 'INSIDE') throw new Error(`${userName}님은 입장 기록이 없습니다.`);
                 await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee, currentTotalMinutes);
                 action = '퇴장 완료 (Checked Out)';
             }
