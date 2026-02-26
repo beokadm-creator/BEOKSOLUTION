@@ -223,9 +223,8 @@ const GatePage: React.FC = () => {
                 if (regData.status !== 'PAID' && regData.paymentStatus !== 'PAID') {
                     throw new Error("Registration NOT PAID");
                 }
-                if (regData.slug !== selectedConferenceSlug) {
-                    throw new Error("Wrong Conference");
-                }
+                // Removed strict redundant slug check as we already queried the specific conference subcollection.
+                // Depending on data import methods, old registrations might lack the slug field.
 
                 userName = regData.userName || 'Unknown';
                 userAffiliation = regData.affiliation || regData.userEmail || '';
