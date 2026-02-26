@@ -157,7 +157,7 @@ const AttendanceScannerPage: React.FC = () => {
             }
             // === END NEW ===
 
-            if (regData.status !== 'PAID') {
+            if (regData.status !== 'PAID' && regData.paymentStatus !== 'PAID') {
                 throw new Error("Registration NOT PAID");
             }
 

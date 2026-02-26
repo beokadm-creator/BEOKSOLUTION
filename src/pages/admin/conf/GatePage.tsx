@@ -89,7 +89,7 @@ const GatePage: React.FC = () => {
                                 allZones.push({
                                     ...z,
                                     ruleDate: dateStr,
-                                    globalGoalMinutes: rule.globalGoalMinutes || 240,
+                                    globalGoalMinutes: rule.globalGoalMinutes ?? 0,
                                     completionMode: rule.completionMode || 'DAILY_SEPARATE',
                                     cumulativeGoalMinutes: rule.cumulativeGoalMinutes || 0
                                 });
@@ -179,6 +179,8 @@ const GatePage: React.FC = () => {
             let regId = code;
             if (code.startsWith('BADGE-')) {
                 regId = code.replace('BADGE-', '');
+            } else if (code.startsWith('VOUCHER-')) {
+                throw new Error("등록 교환권입니다. 명찰(Badge) QR을 스캔해 주세요.");
             }
 
             // Check if external attendee (EXT- prefix)
@@ -200,7 +202,7 @@ const GatePage: React.FC = () => {
                 }
 
                 regData = extSnap.data();
-                if (regData.paymentStatus !== 'PAID') {
+                if (regData.status !== 'PAID' && regData.paymentStatus !== 'PAID') {
                     throw new Error("Registration NOT PAID");
                 }
 
@@ -218,7 +220,7 @@ const GatePage: React.FC = () => {
                 }
 
                 regData = regSnap.data();
-                if (regData.status !== 'PAID') {
+                if (regData.status !== 'PAID' && regData.paymentStatus !== 'PAID') {
                     throw new Error("Registration NOT PAID");
                 }
                 if (regData.slug !== selectedConferenceSlug) {

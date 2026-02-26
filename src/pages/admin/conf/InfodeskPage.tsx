@@ -183,12 +183,13 @@ const InfodeskPage: React.FC = () => {
                 extSnap = { exists: () => false };
             }
 
-            let regData: { 
-                status?: string; 
-                name?: string; 
-                userName?: string; 
-                affiliation?: string; 
-                organization?: string; 
+            let regData: {
+                status?: string;
+                paymentStatus?: string;
+                name?: string;
+                userName?: string;
+                affiliation?: string;
+                organization?: string;
                 userEmail?: string;
                 userTier?: string;
                 amount?: number;
@@ -206,7 +207,7 @@ const InfodeskPage: React.FC = () => {
                 throw new Error("Invalid Registration Code");
             }
 
-            if (!isExternal && regData.status !== 'PAID') {
+            if (!isExternal && regData.status !== 'PAID' && regData.paymentStatus !== 'PAID') {
                 throw new Error("Registration NOT PAID");
             }
 
@@ -333,7 +334,7 @@ const InfodeskPage: React.FC = () => {
                         ].map(opt => (
                             <button
                                 key={opt.v}
-                                onClick={() => setIssueOption(opt.v)}
+                                onClick={() => setIssueOption(opt.v as IssueOption['value'])}
                                 className={`px-3 py-1 rounded text-xs font-bold transition-colors ${issueOption === opt.v ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'
                                     }`}
                             >
@@ -403,7 +404,7 @@ const InfodeskPage: React.FC = () => {
 
                 {/* Main Instruction Card */}
                 <div className={`p-10 rounded-3xl w-full max-w-3xl shadow-2xl backdrop-blur-sm border transition-all duration-500 ${design.bgImage ? 'bg-black/40 border-white/20 text-white' :
-                        'bg-green-50 border-green-200 text-green-900'
+                    'bg-green-50 border-green-200 text-green-900'
                     }`}>
                     <h2 className="text-5xl font-black mb-6">
                         등록 확인 및 명찰 발급
