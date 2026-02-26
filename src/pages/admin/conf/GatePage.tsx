@@ -327,24 +327,39 @@ const GatePage: React.FC = () => {
         const collectionPath = isExternal ? 'external_attendees' : 'registrations';
         const now = new Date();
         const start = lastIn?.toDate() || now;
-        const diffMins = Math.floor((now.getTime() - start.getTime()) / 60000);
-
-        // 휴게 시간 차감 로직 추가
+        let boundedStart = start;
+        let boundedEnd = now;
         const zoneRule = zones.find(z => z.id === zoneId);
         let deduction = 0;
-        if (zoneRule && zoneRule.breaks && zoneRule.breaks.length > 0) {
-            zoneRule.breaks.forEach(brk => {
-                // Use zoneRule.ruleDate instead of stale selectedDate state hook, fallback to actual start local date
-                const localDateStr = zoneRule.ruleDate || start.getFullYear() + "-" + String(start.getMonth() + 1).padStart(2, '0') + "-" + String(start.getDate()).padStart(2, '0');
-                const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
-                const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
-                const overlapStart = Math.max(start.getTime(), breakStart.getTime());
-                const overlapEnd = Math.min(now.getTime(), breakEnd.getTime());
-                if (overlapEnd > overlapStart) {
-                    const overlapMins = Math.floor((overlapEnd - overlapStart) / 60000);
-                    deduction += overlapMins;
-                }
-            });
+        let diffMins = 0;
+
+        // 수강 시작/종료 시간 내로 제한 (bounded start and end)
+        if (zoneRule && zoneRule.start && zoneRule.end) {
+            const localDateStr = zoneRule.ruleDate || start.getFullYear() + "-" + String(start.getMonth() + 1).padStart(2, '0') + "-" + String(start.getDate()).padStart(2, '0');
+            const sessionStart = new Date(`${localDateStr}T${zoneRule.start}:00`);
+            const sessionEnd = new Date(`${localDateStr}T${zoneRule.end}:00`);
+
+            boundedStart = new Date(Math.max(start.getTime(), sessionStart.getTime()));
+            boundedEnd = new Date(Math.min(now.getTime(), sessionEnd.getTime()));
+        }
+
+        if (boundedEnd > boundedStart) {
+            diffMins = Math.floor((boundedEnd.getTime() - boundedStart.getTime()) / 60000);
+
+            // 휴게 시간 차감 로직 추가
+            if (zoneRule && zoneRule.breaks && zoneRule.breaks.length > 0) {
+                zoneRule.breaks.forEach(brk => {
+                    const localDateStr = zoneRule.ruleDate || start.getFullYear() + "-" + String(start.getMonth() + 1).padStart(2, '0') + "-" + String(start.getDate()).padStart(2, '0');
+                    const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
+                    const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
+                    const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());
+                    const overlapEnd = Math.min(boundedEnd.getTime(), breakEnd.getTime());
+                    if (overlapEnd > overlapStart) {
+                        const overlapMins = Math.floor((overlapEnd - overlapStart) / 60000);
+                        deduction += overlapMins;
+                    }
+                });
+            }
         }
 
         const finalMinutes = Math.max(0, diffMins - deduction); // 휴게 시간 차감 후 저장

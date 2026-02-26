@@ -229,11 +229,11 @@ export default function TemplatesPage() {
 
         switch (preset) {
             case 'custom': url = ''; break;
-            case 'qr': url = `${domain}/my-qr/`; break;
-            case 'badge': url = `${domain}/my-badge/`; break;
+            case 'qr': url = `#{digitalBadgeQrUrl}`; break;
+            case 'badge': url = `#{digitalBadgeQrUrl}`; break;
             case 'landing': url = domain; break;
-            case 'badge-prep': url = `${domain}/badge-prep/`; break;      // 배지 수령 전 QR 페이지
-            case 'digital-badge': url = `${domain}/my-badge/`; break;  // 디지털 명찰 QR URL
+            case 'badge-prep': url = `#{badgePrepUrl}`; break;      // 배지 수령 전 QR 페이지
+            case 'digital-badge': url = `#{digitalBadgeQrUrl}`; break;  // 디지털 명찰 QR URL
         }
 
         const updated = [...kakaoButtons];

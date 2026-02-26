@@ -2,9 +2,10 @@ import { AccessLog } from '../types/schema';
 
 // Helper to calculate duration in minutes
 export const calculateStayTime = (
-    logs: AccessLog[], 
+    logs: AccessLog[],
     breakTimes: { start: string; end: string }[] = [],
-    sessionEnd?: Date
+    sessionEnd?: Date,
+    sessionStart?: Date
 ): number => {
     if (!logs || logs.length === 0) return 0;
 
@@ -31,22 +32,30 @@ export const calculateStayTime = (
     };
 
     const processSegment = (entry: Date, exit: Date) => {
-        let duration = (exit.getTime() - entry.getTime()) / 1000 / 60;
+        let e = entry;
+        let x = exit;
+
+        if (sessionStart && e < sessionStart) e = sessionStart;
+        if (sessionEnd && x > sessionEnd) x = sessionEnd;
+
+        if (e >= x) return 0;
+
+        let duration = (x.getTime() - e.getTime()) / 1000 / 60;
 
         // Subtract break overlaps
         if (breakTimes.length > 0) {
             breakTimes.forEach(brk => {
                 const breakStart = getBreakDate(brk.start, entry);
                 const breakEnd = getBreakDate(brk.end, entry);
-                
+
                 // Handle break crossing midnight if needed (assumed same day for now)
                 if (breakEnd < breakStart) breakEnd.setDate(breakEnd.getDate() + 1);
 
-                const overlap = getOverlapMinutes(entry, exit, breakStart, breakEnd);
+                const overlap = getOverlapMinutes(e, x, breakStart, breakEnd);
                 duration -= overlap;
             });
         }
-        
+
         return Math.max(0, duration);
     };
 
@@ -69,7 +78,7 @@ export const calculateStayTime = (
     if (entryTime !== null && sessionEnd) {
         const et = entryTime as Date;
         if (sessionEnd.getTime() > et.getTime()) {
-             totalMinutes += processSegment(et, sessionEnd);
+            totalMinutes += processSegment(et, sessionEnd);
         }
     }
 

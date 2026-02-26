@@ -231,24 +231,38 @@ const AttendanceLivePage: React.FC = () => {
             const now = new Date();
             const checkInTime = lastCheckIn.toDate();
 
-            let durationMinutes = Math.floor((now.getTime() - checkInTime.getTime()) / 60000);
-            if (durationMinutes < 0) durationMinutes = 0;
+            let durationMinutes = 0;
+            let deduction = 0;
+            let boundedStart = checkInTime;
+            let boundedEnd = now;
 
             const zoneRule = zones.find(z => z.id === currentZoneId);
-            let deduction = 0;
 
-            if (zoneRule && zoneRule.breaks) {
-                zoneRule.breaks.forEach(brk => {
-                    const localDateStr = checkInTime.getFullYear() + "-" + String(checkInTime.getMonth() + 1).padStart(2, '0') + "-" + String(checkInTime.getDate()).padStart(2, '0');
-                    const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
-                    const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
-                    const overlapStart = Math.max(checkInTime.getTime(), breakStart.getTime());
-                    const overlapEnd = Math.min(now.getTime(), breakEnd.getTime());
-                    if (overlapEnd > overlapStart) {
-                        const overlapMins = Math.floor((overlapEnd - overlapStart) / 60000);
-                        deduction += overlapMins;
-                    }
-                });
+            if (zoneRule && zoneRule.start && zoneRule.end) {
+                const localDateStr = checkInTime.getFullYear() + "-" + String(checkInTime.getMonth() + 1).padStart(2, '0') + "-" + String(checkInTime.getDate()).padStart(2, '0');
+                const sessionStart = new Date(`${localDateStr}T${zoneRule.start}:00`);
+                const sessionEnd = new Date(`${localDateStr}T${zoneRule.end}:00`);
+
+                boundedStart = new Date(Math.max(checkInTime.getTime(), sessionStart.getTime()));
+                boundedEnd = new Date(Math.min(now.getTime(), sessionEnd.getTime()));
+            }
+
+            if (boundedEnd > boundedStart) {
+                durationMinutes = Math.floor((boundedEnd.getTime() - boundedStart.getTime()) / 60000);
+
+                if (zoneRule && zoneRule.breaks) {
+                    zoneRule.breaks.forEach(brk => {
+                        const localDateStr = checkInTime.getFullYear() + "-" + String(checkInTime.getMonth() + 1).padStart(2, '0') + "-" + String(checkInTime.getDate()).padStart(2, '0');
+                        const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
+                        const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
+                        const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());
+                        const overlapEnd = Math.min(boundedEnd.getTime(), breakEnd.getTime());
+                        if (overlapEnd > overlapStart) {
+                            const overlapMins = Math.floor((overlapEnd - overlapStart) / 60000);
+                            deduction += overlapMins;
+                        }
+                    });
+                }
             }
 
             const finalMinutes = Math.max(0, durationMinutes - deduction);
@@ -446,22 +460,38 @@ const AttendanceLivePage: React.FC = () => {
 
                                     if (r.attendanceStatus === 'INSIDE' && r.lastCheckIn) {
                                         const checkInTime = r.lastCheckIn.toDate ? r.lastCheckIn.toDate() : new Date();
-                                        let diffMins = Math.floor((currentTime.getTime() - checkInTime.getTime()) / 60000);
-                                        if (diffMins < 0) diffMins = 0;
 
+                                        let diffMins = 0;
                                         let liveDeduction = 0;
+                                        let boundedStart = checkInTime;
+                                        let boundedEnd = currentTime;
+
                                         const rZoneRule = zones.find(z => z.id === r.currentZone);
-                                        if (rZoneRule && rZoneRule.breaks) {
-                                            rZoneRule.breaks.forEach(brk => {
-                                                const localDateStr = checkInTime.getFullYear() + "-" + String(checkInTime.getMonth() + 1).padStart(2, '0') + "-" + String(checkInTime.getDate()).padStart(2, '0');
-                                                const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
-                                                const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
-                                                const overlapStart = Math.max(checkInTime.getTime(), breakStart.getTime());
-                                                const overlapEnd = Math.min(currentTime.getTime(), breakEnd.getTime());
-                                                if (overlapEnd > overlapStart) {
-                                                    liveDeduction += Math.floor((overlapEnd - overlapStart) / 60000);
-                                                }
-                                            });
+
+                                        if (rZoneRule && rZoneRule.start && rZoneRule.end) {
+                                            const localDateStr = checkInTime.getFullYear() + "-" + String(checkInTime.getMonth() + 1).padStart(2, '0') + "-" + String(checkInTime.getDate()).padStart(2, '0');
+                                            const sessionStart = new Date(`${localDateStr}T${rZoneRule.start}:00`);
+                                            const sessionEnd = new Date(`${localDateStr}T${rZoneRule.end}:00`);
+
+                                            boundedStart = new Date(Math.max(checkInTime.getTime(), sessionStart.getTime()));
+                                            boundedEnd = new Date(Math.min(currentTime.getTime(), sessionEnd.getTime()));
+                                        }
+
+                                        if (boundedEnd > boundedStart) {
+                                            diffMins = Math.floor((boundedEnd.getTime() - boundedStart.getTime()) / 60000);
+
+                                            if (rZoneRule && rZoneRule.breaks) {
+                                                rZoneRule.breaks.forEach(brk => {
+                                                    const localDateStr = checkInTime.getFullYear() + "-" + String(checkInTime.getMonth() + 1).padStart(2, '0') + "-" + String(checkInTime.getDate()).padStart(2, '0');
+                                                    const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
+                                                    const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
+                                                    const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());
+                                                    const overlapEnd = Math.min(boundedEnd.getTime(), breakEnd.getTime());
+                                                    if (overlapEnd > overlapStart) {
+                                                        liveDeduction += Math.floor((overlapEnd - overlapStart) / 60000);
+                                                    }
+                                                });
+                                            }
                                         }
 
                                         displayTotal = r.totalMinutes + Math.max(0, diffMins - liveDeduction);

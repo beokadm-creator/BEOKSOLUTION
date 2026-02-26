@@ -149,7 +149,16 @@ const StatisticsPage: React.FC = () => {
             currentRule.zones.forEach(zone => {
                 const zLogs = zoneLogs[zone.id];
                 if (zLogs) {
-                    const minutes = calculateStayTime(zLogs, zone.breaks, effectiveSessionEnd);
+                    let sessionStart = new Date(`${selectedDate}T00:00:00+09:00`);
+                    let sessionEnd = effectiveSessionEnd;
+
+                    if (zone.start && zone.end) {
+                        sessionStart = new Date(`${selectedDate}T${zone.start}:00`);
+                        const endD = new Date(`${selectedDate}T${zone.end}:00`);
+                        sessionEnd = new Date(Math.min(now.getTime(), endD.getTime()));
+                    }
+
+                    const minutes = calculateStayTime(zLogs, zone.breaks, sessionEnd, sessionStart);
                     stat.zones[zone.id] = minutes;
                     total += minutes;
                 }

@@ -81,7 +81,7 @@ exports.onRegistrationCreated = functions.firestore
         // Set token expiry to conference end date + 1 day
         let expiresAt;
         if ((_a = conference === null || conference === void 0 ? void 0 : conference.dates) === null || _a === void 0 ? void 0 : _a.end) {
-            expiresAt = admin.firestore.Timestamp.fromMillis(conference.dates.end.toMillis() + (24 * 60 * 60 * 1000) // 1 day after conference end
+            expiresAt = admin.firestore.Timestamp.fromMillis(conference.dates.end.toMillis() + (48 * 60 * 60 * 1000) // 2 days after conference end to reliably cover the entire next day
             );
         }
         else {
@@ -155,8 +155,9 @@ async function sendBadgeNotification(db, conference, regId, regData, token) {
                     : (((_h = conference.venue) === null || _h === void 0 ? void 0 : _h.name) || '');
                 // URL Construction
                 const domain = `https://${conference.societyId}.eregi.co.kr`;
-                const badgePrepUrl = `${domain}/${conference.id || conference.slug || conference.conferenceId}/badge-prep/${token}`;
-                const digitalBadgeQrUrl = `${domain}/my-badge/${regId}`;
+                const redirectSlug = conference.id || conference.slug || conference.conferenceId;
+                const badgePrepUrl = `${domain}/${redirectSlug}/badge-prep/${token}`;
+                const digitalBadgeQrUrl = `${domain}/${redirectSlug}/badge-prep/${token}`;
                 const affiliation = regData.organization || regData.affiliation || ((_j = regData.userInfo) === null || _j === void 0 ? void 0 : _j.affiliation) || '';
                 // Variables Map
                 const variables = {
@@ -182,8 +183,8 @@ async function sendBadgeNotification(db, conference, regId, regData, token) {
                     var _a, _b;
                     return ({
                         ...btn,
-                        linkMobile: (_a = btn.linkMobile) === null || _a === void 0 ? void 0 : _a.replace('#{badgePrepUrl}', badgePrepUrl),
-                        linkPc: (_b = btn.linkPc) === null || _b === void 0 ? void 0 : _b.replace('#{badgePrepUrl}', badgePrepUrl)
+                        linkMobile: (_a = btn.linkMobile) === null || _a === void 0 ? void 0 : _a.replace('#{badgePrepUrl}', badgePrepUrl).replace('#{digitalBadgeQrUrl}', digitalBadgeQrUrl),
+                        linkPc: (_b = btn.linkPc) === null || _b === void 0 ? void 0 : _b.replace('#{badgePrepUrl}', badgePrepUrl).replace('#{digitalBadgeQrUrl}', digitalBadgeQrUrl)
                     });
                 });
                 // Get Sender Key from Infrastructure Settings
@@ -270,7 +271,7 @@ exports.validateBadgePrepToken = functions
             const conference = confSnap.data();
             let newExpiresAt;
             if ((_a = conference === null || conference === void 0 ? void 0 : conference.dates) === null || _a === void 0 ? void 0 : _a.end) {
-                newExpiresAt = admin.firestore.Timestamp.fromMillis(conference.dates.end.toMillis() + (24 * 60 * 60 * 1000));
+                newExpiresAt = admin.firestore.Timestamp.fromMillis(conference.dates.end.toMillis() + (48 * 60 * 60 * 1000));
             }
             else {
                 newExpiresAt = admin.firestore.Timestamp.fromMillis(now.toMillis() + (7 * 24 * 60 * 60 * 1000));
@@ -314,6 +315,31 @@ exports.validateBadgePrepToken = functions
                     receiptNumber: ''
                 }
             };
+        }
+        // If token was manually expired (e.g. resent), attempt to redirect to the new active/issued token
+        if (tokenData.status === 'EXPIRED') {
+            const activeTokensSnap = await db.collection(`conferences/${confId}/badge_tokens`)
+                .where('registrationId', '==', tokenData.registrationId)
+                .where('status', 'in', ['ACTIVE', 'ISSUED'])
+                .orderBy('createdAt', 'desc')
+                .limit(1)
+                .get();
+            if (!activeTokensSnap.empty) {
+                const newToken = activeTokensSnap.docs[0].id;
+                functions.logger.info(`[BadgeToken] Found active token ${newToken} for expired request ${token}`);
+                return {
+                    valid: true,
+                    tokenStatus: 'ACTIVE',
+                    newToken,
+                    redirectRequired: true,
+                    registration: {
+                        id: tokenData.registrationId,
+                        name: '', email: '', phone: '', affiliation: '', licenseNumber: '',
+                        confirmationQr: '', badgeQr: null, badgeIssued: false, attendanceStatus: 'OUTSIDE',
+                        currentZone: null, totalMinutes: 0, receiptNumber: ''
+                    }
+                };
+            }
         }
         // Get registration data (Check both registrations and external_attendees)
         let regSnap = await db.collection(`conferences/${confId}/registrations`).doc(tokenData.registrationId).get();
@@ -454,10 +480,10 @@ exports.resendBadgePrepToken = functions
         // Get conference for expiry date
         const confSnap = await db.collection('conferences').doc(confId).get();
         const conference = confSnap.data();
-        // Set token expiry to conference end date + 1 day
+        // Set token expiry to conference end date + 2 days
         let expiresAt;
         if ((_a = conference === null || conference === void 0 ? void 0 : conference.dates) === null || _a === void 0 ? void 0 : _a.end) {
-            expiresAt = admin.firestore.Timestamp.fromMillis(conference.dates.end.toMillis() + (24 * 60 * 60 * 1000));
+            expiresAt = admin.firestore.Timestamp.fromMillis(conference.dates.end.toMillis() + (48 * 60 * 60 * 1000));
         }
         else {
             // Fallback: 7 days if no end date
@@ -530,7 +556,7 @@ exports.onExternalAttendeeCreated = functions.firestore
         // Set token expiry
         let expiresAt;
         if ((_a = conference === null || conference === void 0 ? void 0 : conference.dates) === null || _a === void 0 ? void 0 : _a.end) {
-            expiresAt = admin.firestore.Timestamp.fromMillis(conference.dates.end.toMillis() + (24 * 60 * 60 * 1000));
+            expiresAt = admin.firestore.Timestamp.fromMillis(conference.dates.end.toMillis() + (48 * 60 * 60 * 1000));
         }
         else {
             expiresAt = admin.firestore.Timestamp.fromMillis(admin.firestore.Timestamp.now().toMillis() + (7 * 24 * 60 * 60 * 1000));
