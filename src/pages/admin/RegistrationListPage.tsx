@@ -53,7 +53,8 @@ interface RootRegistration {
         customerName?: string;
         dueDate?: string;
     };
-    options?: Record<string, unknown>[]; // Added for options indicator
+    options?: any[]; // Allow any to bypass TS error
+    badgeQr?: string; // Added for QR printing
 }
 
 const statusToKorean = (status: string) => {
@@ -211,24 +212,24 @@ const RegistrationListPage: React.FC = () => {
         try {
             // [Fix] info.badgeLayout이 null일 수 있음 (useConference 캐시/타이밍 문제)
             // settings/badge_config에서 직접 로드 훈에 info.badgeLayout fallback
-            let badgeLayout = info?.badgeLayout;
+            let badgeLayout = null;
 
-            if (!badgeLayout && conferenceId) {
-                console.log('[Bixolon] info.badgeLayout is null, fetching from settings/badge_config...');
+            if (conferenceId) {
+                console.log('[Bixolon] Fetching latest layout from settings/badge_config...');
                 try {
                     const cfgSnap = await getDoc(doc(db, `conferences/${conferenceId}/settings/badge_config`));
                     if (cfgSnap.exists() && cfgSnap.data().badgeLayout) {
                         badgeLayout = cfgSnap.data().badgeLayout;
-                        console.log('[Bixolon] 로드 성공: settings/badge_config.badgeLayout', badgeLayout);
+                        console.log('[Bixolon] 최신 로드 완료:', badgeLayout);
                     }
                 } catch (fetchErr) {
                     console.error('[Bixolon] badge_config fetch failed:', fetchErr);
                 }
             }
 
-            // info/general에도 없으면 훈체정는 conferenceId 없이 slug query
-            if (!badgeLayout && !conferenceId && slug) {
-                console.log('[Bixolon] conferenceId not set yet, fetching conference by slug...');
+            // Fallback to slug if conferenceId is missing
+            if (!badgeLayout && slug) {
+                console.log('[Bixolon] Fetching conference by slug...');
                 try {
                     const q = query(collection(db, 'conferences'), where('slug', '==', slug));
                     const snap = await getDocs(q);
@@ -237,7 +238,7 @@ const RegistrationListPage: React.FC = () => {
                         const cfgSnap = await getDoc(doc(db, `conferences/${cid}/settings/badge_config`));
                         if (cfgSnap.exists() && cfgSnap.data().badgeLayout) {
                             badgeLayout = cfgSnap.data().badgeLayout;
-                            console.log('[Bixolon] slug로 명찰 레이아웃 로드 성공:', cid);
+                            console.log('[Bixolon] slug 기반 로드 완료:', cid);
                         }
                     }
                 } catch (fetchErr) {

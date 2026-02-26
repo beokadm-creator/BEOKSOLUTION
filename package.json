@@ -16,7 +16,7 @@
     "prepare": "husky",
     "pre-deploy": "node scripts/pre-deploy-check.js",
     "deploy:safe": "node scripts/safe-deploy.js",
-    "deploy:dev": "firebase hosting:channel:deploy dev --project eregi-8fc1e",
+    "deploy:dev": "npm run build && firebase hosting:channel:deploy dev --project eregi-8fc1e",
     "deploy:live": "firebase deploy --only hosting --project eregi-8fc1e",
     "deploy:prod": "firebase deploy --only hosting,functions --project eregi-8fc1e",
     "check-versions": "node scripts/check-versions.js"

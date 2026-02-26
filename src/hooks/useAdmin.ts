@@ -15,7 +15,7 @@ export const useAdmin = (conferenceId: string) => {
     const [error, setError] = useState<string | null>(null);
 
     // 1. Save Badge Layout
-    const saveBadgeLayout = async (width: number, height: number, elements: BadgeElement[], backgroundImageUrl?: string) => {
+    const saveBadgeLayout = async (width: number, height: number, elements: BadgeElement[], backgroundImageUrl?: string, extraSettings?: any) => {
         setLoading(true);
         try {
             // [Fix] Firestore는 undefined 값을 허용하지 않으므로 저장 전 제거
@@ -29,31 +29,28 @@ export const useAdmin = (conferenceId: string) => {
                 });
 
             const cleanElements = sanitizeElements(elements);
+            const badgeLayoutData = {
+                width,
+                height,
+                elements: cleanElements,
+                backgroundImageUrl: backgroundImageUrl ?? null,
+                ...extraSettings // printXOffset 등이 여기에 포함됨
+            };
 
-            // [Fix] Save to BOTH locations for compatibility
-            // 1. Legacy Location: info/general (used by useConference for BadgeEditor)
-            // Use setDoc with merge: true to avoid "No document to update" error
+            // 1. Legacy Location: info/general
             const infoRef = doc(db, `conferences/${conferenceId}/info/general`);
             await setDoc(infoRef, {
-                badgeLayout: {
-                    width,
-                    height,
-                    elements: cleanElements,
-                    backgroundImageUrl: backgroundImageUrl ?? null
-                }
+                badgeLayout: badgeLayoutData
             }, { merge: true });
 
-            // 2. New Location: settings/badge_config (used by InfodeskPage)
+            // 2. New Location: settings/badge_config
             const settingsRef = doc(db, `conferences/${conferenceId}/settings/badge_config`);
             await setDoc(settingsRef, {
                 badgeLayout: {
-                    width,
-                    height,
-                    elements: cleanElements,
-                    backgroundImageUrl: backgroundImageUrl ?? null,
-                    enableCutting: true // Default to true
+                    ...badgeLayoutData,
+                    enableCutting: true
                 },
-                badgeLayoutEnabled: true, // Enable by default when saving
+                badgeLayoutEnabled: true,
                 updatedAt: Timestamp.now()
             }, { merge: true });
 

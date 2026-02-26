@@ -17,7 +17,11 @@ export interface BadgeElement {
   fontSize: number;
   isVisible: boolean;
   type: BadgeElementType;
-  content?: string; // For CUSTOM type or override
+  content?: string;
+  maxWidth?: number;
+  lineHeight?: number;
+  maxLines?: number;
+  textAlign?: 'left' | 'center'; // 가운데 정렬 시 프린터에서 x를 자동 계산
 }
 
 // ==========================================

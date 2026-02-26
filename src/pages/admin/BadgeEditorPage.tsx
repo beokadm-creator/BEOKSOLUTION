@@ -9,8 +9,61 @@ import ImageUpload from '../../components/ui/ImageUpload';
 import { ImageIcon, Trash2, Save, Maximize, Plus } from 'lucide-react';
 
 const PX_PER_MM = 3.779527;
-const toMm = (px: number) => (px / PX_PER_MM).toFixed(1);
+const toMm = (px: number) => parseFloat((px / PX_PER_MM).toFixed(2));
 const toPx = (mm: string | number) => Math.round(Number(mm) * PX_PER_MM);
+
+/**
+ * MmInput: mm 단위 입력 컴포넌트
+ * - 입력 중에는 로컬 문자열 상태를 유지 (자연스러운 연속 입력 가능)
+ * - 포커스를 벗어날 때(blur) px로 변환하여 저장
+ */
+const MmInput: React.FC<{
+    valuePx: number | undefined;
+    onChange: (px: number | undefined) => void;
+    placeholder?: string;
+    step?: number;
+    className?: string;
+    allowEmpty?: boolean;
+}> = ({ valuePx, onChange, placeholder, step = 0.5, className = '', allowEmpty = false }) => {
+    const [localVal, setLocalVal] = useState<string>(
+        valuePx !== undefined ? String(toMm(valuePx)) : ''
+    );
+
+    // 외부에서 valuePx가 바뀌면 로컬 상태를 동기화 (포커스 중이 아닐 때만)
+    const isFocused = useRef(false);
+    useEffect(() => {
+        if (!isFocused.current) {
+            setLocalVal(valuePx !== undefined ? String(toMm(valuePx)) : '');
+        }
+    }, [valuePx]);
+
+    return (
+        <input
+            type="number"
+            step={step}
+            value={localVal}
+            placeholder={placeholder}
+            className={`border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 ${className}`}
+            onFocus={() => { isFocused.current = true; }}
+            onChange={e => setLocalVal(e.target.value)}
+            onBlur={e => {
+                isFocused.current = false;
+                const raw = e.target.value.trim();
+                if (raw === '' && allowEmpty) {
+                    onChange(undefined);
+                    setLocalVal('');
+                } else {
+                    const num = parseFloat(raw);
+                    if (!isNaN(num)) {
+                        const px = toPx(num);
+                        onChange(px);
+                        setLocalVal(String(toMm(px)));
+                    }
+                }
+            }}
+        />
+    );
+};
 
 const BadgeEditorPage: React.FC = () => {
     const { id: confId, info, loading: confLoading } = useConference();
@@ -157,6 +210,7 @@ const BadgeEditorPage: React.FC = () => {
                                 idx={idx}
                                 isSelected={selectedIndices.includes(idx)}
                                 previewData={previewData}
+                                canvasWidth={canvasSize.width}
                                 onDragStop={handleDragStop}
                                 onSelect={(e) => handleSelect(idx, e)}
                             />
@@ -181,23 +235,11 @@ const BadgeEditorPage: React.FC = () => {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <label className="text-[11px] font-medium text-slate-500 ml-1">가로 (mm)</label>
-                                <input
-                                    type="number"
-                                    step="0.1"
-                                    value={toMm(canvasSize.width)}
-                                    onChange={e => setCanvasSize({ ...canvasSize, width: toPx(e.target.value) })}
-                                    className="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                />
+                                <MmInput valuePx={canvasSize.width} onChange={px => px !== undefined && setCanvasSize(p => ({ ...p, width: px }))} className="w-full" />
                             </div>
                             <div className="space-y-1">
                                 <label className="text-[11px] font-medium text-slate-500 ml-1">세로 (mm)</label>
-                                <input
-                                    type="number"
-                                    step="0.1"
-                                    value={toMm(canvasSize.height)}
-                                    onChange={e => setCanvasSize({ ...canvasSize, height: toPx(e.target.value) })}
-                                    className="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                />
+                                <MmInput valuePx={canvasSize.height} onChange={px => px !== undefined && setCanvasSize(p => ({ ...p, height: px }))} className="w-full" />
                             </div>
                         </div>
                     </div>
@@ -284,7 +326,8 @@ const BadgeEditorPage: React.FC = () => {
                 <div className="flex-1">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">속성 편집</h3>
                     {selectedIndices.length === 1 ? (
-                        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-6">
+                        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-5">
+                            {/* 헤더: 타입 + 삭제 */}
                             <div className="flex justify-between items-center">
                                 <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold tracking-wider">{elements[selectedIndices[0]].type}</span>
                                 <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50 h-8 font-medium text-xs" onClick={() => {
@@ -295,51 +338,51 @@ const BadgeEditorPage: React.FC = () => {
                                 </Button>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-medium text-slate-500 ml-1">X 좌표 (mm)</label>
-                                    <input
-                                        type="number"
-                                        step="0.1"
-                                        value={toMm(elements[selectedIndices[0]].x)}
-                                        onChange={e => updateElement(selectedIndices[0], 'x', toPx(e.target.value))}
-                                        className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none"
-                                    />
+                            {/* 가운데 정렬 토글 - 텍스트 요소에만 표시 */}
+                            {!['IMAGE'].includes(elements[selectedIndices[0]].type) && (
+                                <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-white">
+                                    <div>
+                                        <p className="text-[12px] font-semibold text-slate-700">가운데 정렬</p>
+                                        <p className="text-[10px] text-slate-400 mt-0.5">인쇄 시 텍스트 너비를 계산해 자동 중앙 배치</p>
+                                    </div>
+                                    <button
+                                        onClick={() => updateElement(selectedIndices[0], 'textAlign',
+                                            elements[selectedIndices[0]].textAlign === 'center' ? 'left' : 'center'
+                                        )}
+                                        className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${elements[selectedIndices[0]].textAlign === 'center'
+                                            ? 'bg-blue-500' : 'bg-slate-200'
+                                            }`}
+                                    >
+                                        <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${elements[selectedIndices[0]].textAlign === 'center' ? 'translate-x-6' : 'translate-x-1'
+                                            }`} />
+                                    </button>
                                 </div>
+                            )}
+
+                            {/* Y 좌표, X 좌표 */}
+                            <div className={`grid gap-4 ${(elements[selectedIndices[0]].textAlign === 'center' && !elements[selectedIndices[0]].maxWidth) ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                                {!(elements[selectedIndices[0]].textAlign === 'center' && !elements[selectedIndices[0]].maxWidth) && (
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] font-medium text-slate-500 ml-1">X 좌표 (mm)</label>
+                                        <MmInput valuePx={elements[selectedIndices[0]].x} onChange={px => px !== undefined && updateElement(selectedIndices[0], 'x', px)} className="w-full" />
+                                    </div>
+                                )}
                                 <div className="space-y-1">
                                     <label className="text-[11px] font-medium text-slate-500 ml-1">Y 좌표 (mm)</label>
-                                    <input
-                                        type="number"
-                                        step="0.1"
-                                        value={toMm(elements[selectedIndices[0]].y)}
-                                        onChange={e => updateElement(selectedIndices[0], 'y', toPx(e.target.value))}
-                                        className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none"
-                                    />
+                                    <MmInput valuePx={elements[selectedIndices[0]].y} onChange={px => px !== undefined && updateElement(selectedIndices[0], 'y', px)} className="w-full" />
                                 </div>
                             </div>
 
+                            {/* 크기 */}
                             {elements[selectedIndices[0]].type === 'IMAGE' ? (
                                 <div className="space-y-4">
                                     <div className="space-y-1">
                                         <label className="text-[11px] font-medium text-slate-500 ml-1">크기 (Width, mm)</label>
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            value={toMm(elements[selectedIndices[0]].fontSize)}
-                                            onChange={e => updateElement(selectedIndices[0], 'fontSize', toPx(e.target.value))}
-                                            className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none"
-                                            placeholder="이미지 가로 크기"
-                                        />
+                                        <MmInput valuePx={elements[selectedIndices[0]].fontSize} onChange={px => px !== undefined && updateElement(selectedIndices[0], 'fontSize', px)} placeholder="이미지 가로 크기" className="w-full" />
                                     </div>
                                     <div className="space-y-1">
                                         <label className="text-[11px] font-medium text-slate-500 ml-1">이미지 업로드</label>
-                                        <ImageUpload
-                                            path={`conferences/${confId}/assets/badge`}
-                                            onUploadComplete={(url) => updateElement(selectedIndices[0], 'content', url)}
-                                            previewUrl={elements[selectedIndices[0]].content}
-                                            label=""
-                                            className="mt-1"
-                                        />
+                                        <ImageUpload path={`conferences/${confId}/assets/badge`} onUploadComplete={(url) => updateElement(selectedIndices[0], 'content', url)} previewUrl={elements[selectedIndices[0]].content} label="" className="mt-1" />
                                     </div>
                                 </div>
                             ) : (
@@ -347,28 +390,46 @@ const BadgeEditorPage: React.FC = () => {
                                     <label className="text-[11px] font-medium text-slate-500 ml-1">
                                         {elements[selectedIndices[0]].type === 'QR' ? 'QR 크기 (mm)' : '글자 크기 (mm)'}
                                     </label>
-                                    <input
-                                        type="number"
-                                        step="0.1"
-                                        value={toMm(elements[selectedIndices[0]].fontSize)}
-                                        onChange={e => updateElement(selectedIndices[0], 'fontSize', toPx(e.target.value))}
-                                        className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none"
-                                    />
+                                    <MmInput valuePx={elements[selectedIndices[0]].fontSize} onChange={px => px !== undefined && updateElement(selectedIndices[0], 'fontSize', px)} className="w-full" />
                                 </div>
                             )}
 
+                            {/* 고정 텍스트 내용 */}
                             {elements[selectedIndices[0]].type === 'CUSTOM' && (
                                 <div className="space-y-1">
                                     <label className="text-[11px] font-medium text-slate-500 ml-1">내용</label>
                                     <input type="text" value={elements[selectedIndices[0]].content || ''} onChange={e => updateElement(selectedIndices[0], 'content', e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none" />
                                 </div>
                             )}
+
+                            {/* 최대 너비 (영역 지정) */}
+                            {!['QR', 'IMAGE'].includes(elements[selectedIndices[0]].type) && (
+                                <div className="pt-4 border-t border-slate-100 space-y-3">
+                                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">영역 지정 (최대 너비)</p>
+                                    <div className="flex gap-2 items-center">
+                                        <MmInput
+                                            valuePx={elements[selectedIndices[0]].maxWidth}
+                                            onChange={px => updateElement(selectedIndices[0], 'maxWidth', px)}
+                                            placeholder="제한 없음 (mm)"
+                                            allowEmpty
+                                            className="flex-1 border-amber-200 bg-amber-50/30"
+                                        />
+                                        {elements[selectedIndices[0]].maxWidth && (
+                                            <button onClick={() => updateElement(selectedIndices[0], 'maxWidth', undefined)}
+                                                className="text-[10px] text-red-400 hover:text-red-600 px-2 py-1 rounded border border-red-100 hover:bg-red-50 whitespace-nowrap">해제</button>
+                                        )}
+                                    </div>
+                                    <p className="text-[10px] text-slate-400">
+                                        {elements[selectedIndices[0]].maxWidth
+                                            ? `✅ ${toMm(elements[selectedIndices[0]].maxWidth!)}mm 가로 크기에 도달하면, 폰트 크기 유지한 채로 아래로 줄을 내립니다.`
+                                            : '텍스트 박스의 크기를 지정합니다. 너비를 초과하면 자동 줄바꿈되며 중앙정렬 됩니다.'}
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     ) : selectedIndices.length > 1 ? (
                         <div className="h-40 flex flex-col items-center justify-center border-2 border-dashed border-slate-100 rounded-2xl bg-blue-50/20">
                             <Maximize className="w-8 h-8 text-blue-300 mb-2" />
-                            <p className="text-xs text-blue-500 font-medium">다중 선택 중 ({selectedIndices.length}개)</p>
-                            <p className="text-[10px] text-slate-400 mt-1">상단 정렬 도구를 사용하세요</p>
                         </div>
                     ) : (
                         <div className="h-40 flex flex-col items-center justify-center border-2 border-dashed border-slate-100 rounded-2xl bg-slate-50/50">
@@ -387,12 +448,20 @@ interface DraggableNodeProps {
     idx: number;
     isSelected: boolean;
     previewData: Record<string, string>;
+    canvasWidth: number;
     onDragStop: (idx: number, e: unknown, data: { x: number; y: number }) => void;
     onSelect: (e: React.MouseEvent) => void;
 }
 
-const DraggableNode: React.FC<DraggableNodeProps> = ({ el, idx, isSelected, previewData, onDragStop, onSelect }) => {
+const DraggableNode: React.FC<DraggableNodeProps> = ({ el, idx, isSelected, previewData, canvasWidth, onDragStop, onSelect }) => {
     const nodeRef = useRef<HTMLDivElement>(null);
+    const isCentered = el.textAlign === 'center';
+    // 캔버스 전체 기준 중앙정렬인지 여부 (maxWidth가 없고, textAlign이 center일 때)
+    const isCanvasCentered = isCentered && !el.maxWidth;
+    // 텍스트 박스 너비: maxWidth가 있으면 해당 영역 우선, 그냥 가운데 정렬이면 캔버스 전체 비율 사용
+    const boxWidth = el.maxWidth ? el.maxWidth : (isCentered ? canvasWidth : undefined);
+    // 표시 위치 (캔버스 중앙이면 X 드래그 불가 = 0 위치 고정)
+    const posX = isCanvasCentered ? 0 : el.x;
 
     const renderContent = () => {
         if (el.type === 'QR') {
@@ -415,9 +484,19 @@ const DraggableNode: React.FC<DraggableNodeProps> = ({ el, idx, isSelected, prev
                 </div>
             );
         }
+        const displayText = previewData[el.type as keyof typeof previewData] || el.content || el.type;
+
         return (
-            <div style={{ fontSize: el.fontSize }} className="font-bold whitespace-nowrap">
-                {previewData[el.type as keyof typeof previewData] || el.content || el.type}
+            <div
+                style={{
+                    fontSize: el.fontSize,
+                    lineHeight: 1.35,
+                    whiteSpace: el.maxWidth ? 'normal' : 'nowrap',
+                    wordBreak: el.maxWidth ? 'keep-all' : 'normal',
+                }}
+                className="font-bold flex flex-col items-center"
+            >
+                {displayText}
             </div>
         );
     };
@@ -425,7 +504,8 @@ const DraggableNode: React.FC<DraggableNodeProps> = ({ el, idx, isSelected, prev
     return (
         <Draggable
             nodeRef={nodeRef}
-            position={{ x: el.x, y: el.y }}
+            position={{ x: posX, y: el.y }}
+            axis={isCanvasCentered ? 'y' : 'both'}
             onStop={(e, data) => onDragStop(idx, e, data)}
             onStart={(e) => onSelect(e as React.MouseEvent)}
             bounds="parent"
@@ -434,7 +514,12 @@ const DraggableNode: React.FC<DraggableNodeProps> = ({ el, idx, isSelected, prev
                 ref={nodeRef}
                 id={`badge-el-${idx}`}
                 className={`absolute cursor-move select-none transition-shadow ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50/20 z-10 shadow-lg' : 'hover:ring-1 hover:ring-slate-300'}`}
-                style={{ left: 0, top: 0 }}
+                style={{
+                    left: 0,
+                    top: 0,
+                    ...(boxWidth ? { width: boxWidth, textAlign: isCentered ? 'center' : 'left' } : {}),
+                    ...(el.maxWidth ? { border: '1px dashed rgba(245, 158, 11, 0.4)', backgroundColor: 'rgba(254, 252, 232, 0.3)' } : {})
+                }}
                 onClick={(e) => {
                     e.stopPropagation();
                     onSelect(e);
