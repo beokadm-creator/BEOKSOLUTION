@@ -20,7 +20,7 @@ interface Props {
 export const ConferenceWideTemplate = ({ slug }: Props) => {
   const navigate = useNavigate();
   const { t, config: rawConfig, loading, error, currentLang, setLanguage, confId, urlSlug } = useTranslation(slug);
-  const config = rawConfig as unknown;
+  const config = rawConfig as any;
 
 
   // Active section state for tabs
@@ -112,7 +112,7 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
         title={t(config.title)}
         subtitle={t(config.subtitle)}
         venueName={t(config.venue?.name) || 'Venue'}
-        bgImage={t(config.visualAssets?.banner)}
+        bgImage={t((config as any)?.visualAssets?.banner) || (typeof (config as any)?.bannerUrl === 'string' ? (config as any)?.bannerUrl : t((config as any)?.bannerUrl)) || ''}
         period={config.dates || config.period}
         societyName={typeof societyName === 'string' ? societyName : (currentLang === 'ko' ? societyName?.ko : societyName?.en) || societyId}
       />

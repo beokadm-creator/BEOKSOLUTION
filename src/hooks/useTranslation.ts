@@ -120,7 +120,7 @@ export const useTranslation = (slug: string): UseTranslationResult => {
                     societyId,
                     identity: identitySnap.exists() ? identitySnap.data() : null,
                     society: societySnap.exists() ? societySnap.data() : null,
-                    visualAssets: visualSnap.exists() ? visualSnap.data() : null,
+                    visualAssets: confData.visualAssets || (visualSnap.exists() ? visualSnap.data() : null),
                     info: infoSnap.exists() ? infoSnap.data() : null,
                     pricing: regSnap.exists() ? (regSnap.data()?.periods || []) : [],
                     pages: pagesSnap.docs.map(d => ({ id: d.id, ...d.data() })),

@@ -19,7 +19,8 @@ interface Props {
 
 export const ConferenceWideTemplatePreview = ({ slug }: Props) => {
   const navigate = useNavigate();
-  const { t, config, loading, error, currentLang, setLanguage, confId, urlSlug } = useTranslation(slug);
+  const { t, config: rawConfig, loading, error, currentLang, setLanguage, confId, urlSlug } = useTranslation(slug);
+  const config = rawConfig as any;
 
   // Active section state for tabs
   const [activeSection, setActiveSection] = useState<string>('welcome');
@@ -131,7 +132,7 @@ export const ConferenceWideTemplatePreview = ({ slug }: Props) => {
         title={t(config.title)}
         subtitle={t(config.subtitle)}
         venueName={t(config.venue?.name) || 'Venue'}
-        bgImage={t(config.visualAssets?.banner)}
+        bgImage={t((config as any)?.visualAssets?.banner) || (typeof (config as any)?.bannerUrl === 'string' ? (config as any)?.bannerUrl : t((config as any)?.bannerUrl)) || ''}
         period={config.dates || config.period}
         societyName={societyName}
       />
@@ -161,11 +162,10 @@ export const ConferenceWideTemplatePreview = ({ slug }: Props) => {
                     key={item.id}
                     type="button"
                     onClick={() => handleTabClick(item.id)}
-                    className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 sm:px-5 py-2 sm:py-3 rounded-xl font-medium transition-all duration-200 min-w-[60px] sm:min-w-0 ${
-                      isActive
-                        ? 'text-blue-600 bg-blue-50'
-                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-                    }`}
+                    className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 sm:px-5 py-2 sm:py-3 rounded-xl font-medium transition-all duration-200 min-w-[60px] sm:min-w-0 ${isActive
+                      ? 'text-blue-600 bg-blue-50'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                      }`}
                   >
                     <Icon className={`w-6 h-6 sm:w-5 sm:h-5 ${isActive ? 'text-blue-600' : ''}`} />
                     <span className="text-[10px] sm:text-xs font-medium">
