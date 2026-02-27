@@ -189,7 +189,6 @@ const ExternalAttendeePage: React.FC = () => {
     const { id: confId, info, slug, societyId } = useConference(cid);
     const { auth } = useAuth();
 
-    // Derive conference base URL for badge-prep links
     const confBaseUrl = useCallback(() => {
         const hostname = window.location.hostname;
         if (hostname.includes('localhost') || hostname.includes('.web.app') || hostname.includes('firebaseapp.com')) {
@@ -199,7 +198,9 @@ const ExternalAttendeePage: React.FC = () => {
         // Production: use societyId subdomain
         if (societyId) {
             const parts = hostname.split('.');
-            const domain = parts.slice(-2).join('.');
+            // .co.kr, .or.kr, .ac.kr 등 2단계 도메인(SLD) 처리
+            const tldPartsLength = hostname.match(/\.(co\.kr|or\.kr|ac\.kr|go\.kr|ne\.kr)$/) ? 3 : 2;
+            const domain = parts.slice(-tldPartsLength).join('.');
             return `https://${societyId}.${domain}`;
         }
         return window.location.origin;
