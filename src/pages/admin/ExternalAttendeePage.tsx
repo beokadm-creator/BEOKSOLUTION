@@ -13,9 +13,16 @@ import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { UserPlus, Upload, Download, FileText, Badge, CheckCircle2, Trash2, Loader2, Eye, EyeOff, Copy, MessageCircle, RefreshCw, ExternalLink, AlertCircle } from 'lucide-react';
+import { UserPlus, Upload, Download, FileText, Badge, CheckCircle2, Trash2, Loader2, Eye, EyeOff, Copy, MessageCircle, RefreshCw, ExternalLink, AlertCircle, Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ExternalAttendee } from '../../types/schema';
+import { useBixolon } from '../../hooks/useBixolon';
+import { BadgeConfig } from '../../types/print';
+import { convertBadgeLayoutToConfig } from '../../utils/badgeConverter';
+import PrintHandler from '../../components/print/PrintHandler';
+import BadgeTemplate from '../../components/print/BadgeTemplate';
+import { kadd_2026 } from '../../data/conferences/kadd_2026.backup';
+import { useRef } from 'react';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VoucherLinkSection: badge_tokens를 조회해 실제 badge-prep URL을 표시
@@ -259,8 +266,18 @@ const ExternalAttendeePage: React.FC = () => {
     const [showVoucherModal, setShowVoucherModal] = useState(false);
     const [selectedAttendee, setSelectedAttendee] = useState<ExternalAttendee | null>(null);
 
-    // Badge Modal
-    const [showBadgeModal, setShowBadgeModal] = useState(false);
+    // Print Modal State
+    const [showPrintModal, setShowPrintModal] = useState(false);
+    const badgeRef = useRef<HTMLDivElement>(null);
+
+    const { printBadge, printing: bixolonPrinting, error: bixolonError } = useBixolon();
+
+    const badgeConfig = React.useMemo(() => {
+        if (info?.badgeLayout && info.badgeLayout.elements.length > 0) {
+            return convertBadgeLayoutToConfig(info.badgeLayout);
+        }
+        return kadd_2026.badge as BadgeConfig;
+    }, [info]);
 
     // Receipt Config
     const [receiptConfig, setReceiptConfig] = useState<{ issuerName: string; stampUrl: string; nextSerialNo: number } | null>(null);
@@ -792,13 +809,6 @@ const ExternalAttendeePage: React.FC = () => {
                 throw new Error('Failed to issue digital badge');
             }
 
-            // Update local state
-            setExternalAttendees(prev => prev.map(a =>
-                a.id === attendee.id ? { ...a, badgeIssued: true, badgeIssuedAt: Timestamp.now(), badgeQr: result.data.badgeQr } : a
-            ));
-
-            setShowBadgeModal(true);
-            setSelectedAttendee(attendee);
             toast.success('명찰이 발급되었습니다.');
         } catch (err: any) {
             console.error('Failed to Issue Badge:', err);
@@ -806,6 +816,70 @@ const ExternalAttendeePage: React.FC = () => {
         } finally {
             setIsProcessing(false);
         }
+    };
+
+    const handleBixolonPrint = async (attendee: ExternalAttendee) => {
+        if (bixolonPrinting) return;
+
+        const qrData = attendee.badgeQr || attendee.id;
+        toast.loading("라벨 프린터 전송 중...", { id: 'bixolon-print' });
+
+        try {
+            let badgeLayout = null;
+
+            if (confId) {
+                try {
+                    const cfgSnap = await getDoc(doc(db, `conferences/${confId}/settings/badge_config`));
+                    if (cfgSnap.exists() && cfgSnap.data().badgeLayout) {
+                        badgeLayout = cfgSnap.data().badgeLayout;
+                    }
+                } catch (fetchErr) {
+                    console.error('[Bixolon] badge_config fetch failed:', fetchErr);
+                }
+            }
+
+            if (!badgeLayout && slug) {
+                try {
+                    const q = query(collection(db, 'conferences'), where('slug', '==', slug));
+                    const snap = await getDocs(q);
+                    if (!snap.empty) {
+                        const cid = snap.docs[0].id;
+                        const cfgSnap = await getDoc(doc(db, `conferences/${cid}/settings/badge_config`));
+                        if (cfgSnap.exists() && cfgSnap.data().badgeLayout) {
+                            badgeLayout = cfgSnap.data().badgeLayout;
+                        }
+                    }
+                } catch (fetchErr) { }
+            }
+
+            if (!badgeLayout) {
+                toast.error("배지 레이아웃이 설정되지 않았습니다. 설정이나 명찰 편집기 확인", { id: 'bixolon-print', duration: 5000 });
+                return;
+            }
+
+            const printSuccess = await printBadge(badgeLayout, {
+                name: attendee.name || '',
+                org: attendee.organization || '',
+                category: '외부참석자',
+                license: attendee.licenseNumber || '',
+                price: (attendee.amount || 0).toLocaleString() + '원',
+                affiliation: attendee.organization || '',
+                qrData: qrData
+            });
+
+            if (printSuccess) {
+                toast.success("라벨 출력 성공", { id: 'bixolon-print' });
+            } else {
+                toast.error(bixolonError || '라벨 출력 실패', { id: 'bixolon-print', duration: 6000 });
+            }
+        } catch (e) {
+            toast.error("프린터 오류 발생", { id: 'bixolon-print' });
+        }
+    };
+
+    const handlePrintClick = (attendee: ExternalAttendee) => {
+        setSelectedAttendee(attendee);
+        setShowPrintModal(true);
     };
 
     // Handle batch account creation for all
@@ -1298,20 +1372,45 @@ const ExternalAttendeePage: React.FC = () => {
                                                             )}
                                                         </td>
                                                         <td className="px-4 py-3 text-center">
-                                                            {attendee.badgeIssued ? (
-                                                                <CheckCircle2 className="w-5 h-5 text-green-600 mx-auto" />
-                                                            ) : (
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    className="h-7 text-xs"
-                                                                    onClick={() => handleIssueBadge(attendee)}
-                                                                    disabled={isProcessing}
-                                                                >
-                                                                    <Badge className="w-3 h-3 mr-1" />
-                                                                    발급
-                                                                </Button>
-                                                            )}
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                {attendee.badgeIssued ? (
+                                                                    <span className="text-green-600 font-bold text-xs flex items-center justify-center gap-1">
+                                                                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div> 발급완료
+                                                                    </span>
+                                                                ) : (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        className="h-7 text-xs px-2"
+                                                                        onClick={() => handleIssueBadge(attendee)}
+                                                                        disabled={isProcessing}
+                                                                    >
+                                                                        <Badge className="w-3 h-3 mr-1" />
+                                                                        발급
+                                                                    </Button>
+                                                                )}
+                                                                <div className="flex gap-1 mt-1 justify-center">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        className="h-6 px-1.5 text-xs text-slate-600"
+                                                                        onClick={() => handlePrintClick(attendee)}
+                                                                        title="웹 인쇄"
+                                                                    >
+                                                                        <Printer className="w-3 h-3" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        className="h-6 px-2 text-[10px] text-blue-700 font-bold bg-blue-50 hover:bg-blue-100"
+                                                                        onClick={() => handleBixolonPrint(attendee)}
+                                                                        disabled={bixolonPrinting}
+                                                                        title="라벨 출력(Bixolon)"
+                                                                    >
+                                                                        Label
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
                                                         </td>
                                                         <td className="px-4 py-3 text-center">
                                                             <div className="flex justify-center gap-1">
@@ -1444,24 +1543,44 @@ const ExternalAttendeePage: React.FC = () => {
                 </DialogContent>
             </Dialog>
 
-            {/* Badge Modal */}
-            <Dialog open={showBadgeModal} onOpenChange={setShowBadgeModal}>
-                <DialogContent className="max-w-md">
+            {/* Print Preview Modal */}
+            <Dialog open={showPrintModal} onOpenChange={setShowPrintModal}>
+                <DialogContent className="max-w-3xl">
                     <DialogHeader>
-                        <DialogTitle>명찰 발급 완료</DialogTitle>
+                        <DialogTitle>명찰 미리보기 (Badge Preview)</DialogTitle>
                     </DialogHeader>
-                    {selectedAttendee && (
-                        <div className="mt-4 p-6 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg text-white text-center">
-                            <h3 className="text-xl font-bold mb-2">{selectedAttendee.name}</h3>
-                            <p className="text-sm mb-4">{selectedAttendee.organization}</p>
-                            <div className="bg-white p-4 rounded-lg inline-block">
-                                <div className="text-3xl font-mono font-black text-blue-900 tracking-widest">
-                                    {selectedAttendee.badgeQr}
-                                </div>
+                    <div className="flex flex-col items-center justify-center p-6 bg-gray-100 rounded-xl min-h-[400px]">
+                        {selectedAttendee && badgeConfig && (
+                            <div ref={badgeRef} className="shadow-2xl bg-white relative">
+                                <BadgeTemplate
+                                    data={{
+                                        registrationId: selectedAttendee.id,
+                                        name: selectedAttendee.name || '',
+                                        org: selectedAttendee.organization || '',
+                                        category: '외부참석자',
+                                        LICENSE: selectedAttendee.licenseNumber || '',
+                                        PRICE: (selectedAttendee.amount || 0).toLocaleString() + '원'
+                                    }}
+                                    config={badgeConfig}
+                                />
                             </div>
-                            <p className="text-xs mt-4 opacity-80">디지털 명찰 QR 코드</p>
-                        </div>
-                    )}
+                        )}
+                        {!badgeConfig && <p className="text-red-500">배지 설정이 없습니다. (No Badge Config)</p>}
+                    </div>
+                    <div className="flex justify-end gap-3 mt-4">
+                        <Button onClick={() => setShowPrintModal(false)} variant="outline">
+                            취소
+                        </Button>
+                        <PrintHandler
+                            contentRef={badgeRef}
+                            triggerButton={
+                                <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+                                    <Printer className="w-4 h-4 mr-2" />
+                                    인쇄하기
+                                </Button>
+                            }
+                        />
+                    </div>
                 </DialogContent>
             </Dialog>
         </div>
