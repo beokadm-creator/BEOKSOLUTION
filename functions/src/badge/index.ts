@@ -563,7 +563,9 @@ export const resendBadgePrepToken = functions
         throw new Error('Registration data invalid');
       }
 
-      if (regData.status !== 'PAID') {
+      // [FIX] External attendees use 'paymentStatus' field, not 'status'
+      // Check either field to support both registrations and external_attendees
+      if (regData.paymentStatus !== 'PAID' && regData.status !== 'PAID') {
         throw new Error('Registration not paid');
       }
 

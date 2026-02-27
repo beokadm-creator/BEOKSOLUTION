@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useConference } from '../../hooks/useConference';
 import { useAuth } from '../../hooks/useAuth';
-import { collection, getDoc, getDocs, doc, setDoc, updateDoc, Timestamp, addDoc, query, where, onSnapshot, runTransaction } from 'firebase/firestore';
+import { collection, getDoc, getDocs, doc, setDoc, updateDoc, Timestamp, addDoc, query, where, onSnapshot, runTransaction, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { safeFormatDate } from '../../utils/dateUtils';
 import { httpsCallable, getFunctions } from 'firebase/functions';
@@ -13,15 +13,204 @@ import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { UserPlus, Upload, Download, FileText, Badge, CheckCircle2, Trash2, Loader2, Eye, EyeOff, Copy, MessageCircle, RefreshCw } from 'lucide-react';
+import { UserPlus, Upload, Download, FileText, Badge, CheckCircle2, Trash2, Loader2, Eye, EyeOff, Copy, MessageCircle, RefreshCw, ExternalLink, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ExternalAttendee } from '../../types/schema';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VoucherLinkSection: badge_tokens를 조회해 실제 badge-prep URL을 표시
+// ExternalAttendeePage보다 먼저 선언 (hoisting 불가 arrow function이므로)
+// ─────────────────────────────────────────────────────────────────────────────
+interface VoucherLinkSectionProps {
+    attendee: ExternalAttendee;
+    confId: string | null;
+    confBaseUrl: string;
+    confSlug: string;
+    onResend: () => void;
+    isProcessing: boolean;
+}
+
+const VoucherLinkSection: React.FC<VoucherLinkSectionProps> = ({
+    attendee, confId, confBaseUrl, confSlug, onResend, isProcessing
+}) => {
+    const [badgeToken, setBadgeToken] = React.useState<string | null>(null);
+    const [tokenStatus, setTokenStatus] = React.useState<'loading' | 'active' | 'expired' | 'issued' | 'none'>('loading');
+
+    React.useEffect(() => {
+        if (!confId || !attendee.id) return;
+
+        const fetchToken = async () => {
+            try {
+                if (attendee.badgePrepToken) {
+                    const { getDoc, doc: fsDoc } = await import('firebase/firestore');
+                    const { db: fsDb } = await import('../../firebase');
+                    const tokenSnap = await getDoc(fsDoc(fsDb, `conferences/${confId}/badge_tokens`, attendee.badgePrepToken));
+                    if (tokenSnap.exists()) {
+                        const data = tokenSnap.data();
+                        setTokenStatus(data.status === 'ACTIVE' ? 'active' : data.status === 'ISSUED' ? 'issued' : 'expired');
+                    } else {
+                        setTokenStatus('active');
+                    }
+                    setBadgeToken(attendee.badgePrepToken);
+                    return;
+                }
+
+                const { getDocs, collection: fsCol, query: fsQuery, where: fsWhere, orderBy: fsOrderBy, limit: fsLimit } = await import('firebase/firestore');
+                const { db: fsDb } = await import('../../firebase');
+                const q = fsQuery(
+                    fsCol(fsDb, `conferences/${confId}/badge_tokens`),
+                    fsWhere('registrationId', '==', attendee.id),
+                    fsWhere('status', '==', 'ACTIVE'),
+                    fsOrderBy('createdAt', 'desc'),
+                    fsLimit(1)
+                );
+                const snapshot = await getDocs(q);
+                if (!snapshot.empty) {
+                    setBadgeToken(snapshot.docs[0].data().token);
+                    setTokenStatus('active');
+                } else {
+                    const qIssued = fsQuery(
+                        fsCol(fsDb, `conferences/${confId}/badge_tokens`),
+                        fsWhere('registrationId', '==', attendee.id),
+                        fsWhere('status', '==', 'ISSUED'),
+                        fsOrderBy('createdAt', 'desc'),
+                        fsLimit(1)
+                    );
+                    const issuedSnap = await getDocs(qIssued);
+                    if (!issuedSnap.empty) {
+                        setBadgeToken(issuedSnap.docs[0].data().token);
+                        setTokenStatus('issued');
+                    } else {
+                        setTokenStatus('none');
+                    }
+                }
+            } catch (err) {
+                console.error('[VoucherLinkSection] Failed to fetch badge token:', err);
+                setTokenStatus('none');
+            }
+        };
+
+        fetchToken();
+    }, [attendee.id, attendee.badgePrepToken, confId]);
+
+    const badgePrepUrl = badgeToken ? `${confBaseUrl}/${confSlug}/badge-prep/${badgeToken}` : null;
+
+    return (
+        <div className="p-5 border rounded-lg">
+            <h3 className="text-sm font-bold text-gray-500 uppercase mb-3">바우처 링크 (Badge Prep)</h3>
+
+            {tokenStatus === 'loading' && (
+                <div className="flex items-center gap-2 text-gray-500 text-sm">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    토큰 조회 중...
+                </div>
+            )}
+
+            {tokenStatus === 'none' && (
+                <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                        <p className="text-sm font-medium text-amber-800">발급된 바우처 토큰이 없습니다</p>
+                        <p className="text-xs text-amber-600 mt-1">알림톡을 발송하면 badge prep 토큰이 자동 생성됩니다.</p>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={onResend}
+                            disabled={isProcessing}
+                            className="mt-2 text-amber-700 border-amber-300 hover:bg-amber-50"
+                        >
+                            <MessageCircle className="w-4 h-4 mr-1" />
+                            알림톡 발송
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {(tokenStatus === 'active' || tokenStatus === 'issued' || tokenStatus === 'expired') && badgePrepUrl && (
+                <div className="space-y-3">
+                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${tokenStatus === 'active' ? 'bg-green-100 text-green-700' :
+                        tokenStatus === 'issued' ? 'bg-blue-100 text-blue-700' :
+                            'bg-gray-100 text-gray-500'
+                        }`}>
+                        <CheckCircle2 className="w-3 h-3" />
+                        {tokenStatus === 'active' ? '활성 토큰' : tokenStatus === 'issued' ? '명찰 발급 완료' : '만료됨'}
+                    </div>
+
+                    <div className="p-3 bg-gray-50 rounded-lg border">
+                        <p className="text-xs text-gray-500 mb-1.5">Badge Prep URL (사용자에게 전달)</p>
+                        <p className="text-xs font-mono text-gray-800 break-all">{badgePrepUrl}</p>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                                navigator.clipboard.writeText(badgePrepUrl);
+                                toast.success('링크가 복사되었습니다.');
+                            }}
+                            className="flex-1"
+                        >
+                            <Copy className="w-4 h-4 mr-1" />
+                            링크 복사
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(badgePrepUrl, '_blank')}
+                            className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+                        >
+                            <ExternalLink className="w-4 h-4 mr-1" />
+                            바우처 열기
+                        </Button>
+                    </div>
+
+                    {tokenStatus === 'active' && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={onResend}
+                            disabled={isProcessing}
+                            className="w-full text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                        >
+                            <MessageCircle className="w-4 h-4 mr-1" />
+                            알림톡 재발송
+                        </Button>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
 
 const ExternalAttendeePage: React.FC = () => {
     const navigate = useNavigate();
     const { cid } = useParams<{ cid: string }>();
-    const { id: confId, info } = useConference(cid);
+    const { id: confId, info, slug, societyId } = useConference(cid);
     const { auth } = useAuth();
+
+    // Derive conference base URL for badge-prep links
+    const confBaseUrl = useCallback(() => {
+        const hostname = window.location.hostname;
+        if (hostname.includes('localhost') || hostname.includes('.web.app') || hostname.includes('firebaseapp.com')) {
+            // Dev: use current origin
+            return window.location.origin;
+        }
+        // Production: use societyId subdomain
+        if (societyId) {
+            const parts = hostname.split('.');
+            const domain = parts.slice(-2).join('.');
+            return `https://${societyId}.${domain}`;
+        }
+        return window.location.origin;
+    }, [societyId]);
+
+    // Derive conference slug for URL
+    const confSlug = useCallback(() => {
+        if (slug) return slug;
+        if (confId && confId.includes('_')) return confId.split('_').slice(1).join('_');
+        return confId || '';
+    }, [slug, confId]);
 
     const [externalAttendees, setExternalAttendees] = useState<ExternalAttendee[]>([]);
     const [loading, setLoading] = useState(true);
@@ -513,7 +702,7 @@ const ExternalAttendeePage: React.FC = () => {
             }
         } catch (error: unknown) {
             console.error('Account creation failed:', error);
-            toast.error(`계정 생성 실패: ${error.message}`);
+            toast.error(`계정 생성 실패: ${error instanceof Error ? error.message : String(error)}`);
         } finally {
             setIsProcessing(false);
         }
@@ -557,13 +746,21 @@ const ExternalAttendeePage: React.FC = () => {
                     token += tokenChars.charAt(Math.floor(Math.random() * tokenChars.length));
                 }
 
+                // [BUG FIX] Calculate proper expiry from conference end date (+48h)
+                // Previously was Timestamp.now() which caused immediate expiration
+                let badgeTokenExpiresAt = Timestamp.fromMillis(Timestamp.now().toMillis() + (7 * 24 * 60 * 60 * 1000)); // fallback 7 days
+                if (info?.dates?.end) {
+                    const endMs = (info.dates.end as any).toMillis ? (info.dates.end as any).toMillis() : new Date(info.dates.end as any).getTime();
+                    badgeTokenExpiresAt = Timestamp.fromMillis(endMs + (48 * 60 * 60 * 1000));
+                }
+
                 await updateDoc(doc(db, `conferences/${confId}/external_attendees`, attendee.id), {
                     badgePrepToken: token,
                     userId: firebaseUid, // Use Firebase UID
                     updatedAt: Timestamp.now()
                 });
 
-                // Create badge token document
+                // Create badge token document with correct expiry
                 await setDoc(doc(db, `conferences/${confId}/badge_tokens`, token), {
                     token,
                     registrationId: attendee.id,
@@ -571,7 +768,7 @@ const ExternalAttendeePage: React.FC = () => {
                     userId: firebaseUid, // Use Firebase UID
                     status: 'ACTIVE',
                     createdAt: Timestamp.now(),
-                    expiresAt: Timestamp.now()
+                    expiresAt: badgeTokenExpiresAt
                 });
 
                 // Update attendee with token
@@ -682,44 +879,7 @@ const ExternalAttendeePage: React.FC = () => {
         }
     };
 
-    // Handle restore data (fix missing deleted flag)
-    const handleRestoreData = async () => {
-        if (!confirm('보이지 않는 데이터를 복구하시겠습니까? (이전에 등록했으나 목록에 없는 경우)')) return;
-        if (!confId) return;
-
-        setIsProcessing(true);
-        try {
-            const attendeesRef = collection(db, `conferences/${confId}/external_attendees`);
-            const snapshot = await getDocs(attendeesRef);
-
-            let restoredCount = 0;
-            const updates = [];
-
-            for (const docSnap of snapshot.docs) {
-                const data = docSnap.data();
-                // Fix missing deleted flag
-                if (data.deleted === undefined) {
-                    updates.push(updateDoc(doc(db, `conferences/${confId}/external_attendees`, docSnap.id), {
-                        deleted: false
-                    }));
-                    restoredCount++;
-                }
-            }
-
-            await Promise.all(updates);
-
-            if (restoredCount > 0) {
-                toast.success(`${restoredCount}개의 데이터를 복구했습니다. 목록을 확인해주세요.`);
-            } else {
-                toast.success('복구할 데이터가 없습니다 (모두 정상).');
-            }
-        } catch (error) {
-            console.error('Restore failed:', error);
-            toast.error('복구 작업 실패');
-        } finally {
-            setIsProcessing(false);
-        }
-    };
+    // [REMOVED] handleRestoreData - 더 이상 사용하지 않는 데이터 복구 기능 제거
 
     // Handle sync participations (fix for missing My Page entries)
     const handleSyncParticipations = async () => {
@@ -1028,6 +1188,7 @@ const ExternalAttendeePage: React.FC = () => {
                                         onClick={handleSyncParticipations}
                                         disabled={isProcessing}
                                         className="mr-2 text-green-600 border-green-200 hover:bg-green-50 relative overflow-hidden"
+                                        title="마이페이지에 참가 기록이 없는 경우 수동으로 동기화합니다. 일반적으로 계정 생성 시 자동 처리됩니다."
                                     >
                                         <span className="relative z-10 flex items-center">
                                             {isProcessing && progress > 0 ? (
@@ -1038,7 +1199,7 @@ const ExternalAttendeePage: React.FC = () => {
                                             ) : (
                                                 <>
                                                     <RefreshCw className="w-4 h-4 mr-2" />
-                                                    마이페이지 연동
+                                                    마이페이지 연동 복구
                                                 </>
                                             )}
                                         </span>
@@ -1081,20 +1242,10 @@ const ExternalAttendeePage: React.FC = () => {
                                         size="sm"
                                         onClick={handleBulkResendNotification}
                                         disabled={isProcessing}
-                                        className="mr-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                                        className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
                                     >
                                         <MessageCircle className="w-4 h-4 mr-2" />
                                         알림톡 일괄 발송
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleRestoreData}
-                                        disabled={isProcessing}
-                                        className="text-amber-600 border-amber-200 hover:bg-amber-50"
-                                    >
-                                        <CheckCircle2 className="w-4 h-4 mr-2" />
-                                        데이터 복구
                                     </Button>
                                 </div>
                             </CardHeader>
@@ -1207,55 +1358,86 @@ const ExternalAttendeePage: React.FC = () => {
                 {/* External Attendee Migration Tool - REMOVED */}
             </div>
 
-            {/* Voucher Modal */}
+            {/* Voucher Modal - 실제 바우처 시스템 (badge-prep) 연결 */}
             <Dialog open={showVoucherModal} onOpenChange={setShowVoucherModal}>
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>바우처</DialogTitle>
+                        <DialogTitle>바우처 / 등록 확인서</DialogTitle>
                     </DialogHeader>
                     {selectedAttendee && (
-                        <div className="mt-4 p-6 bg-white border rounded-lg">
-                            <div className="text-center space-y-4">
-                                <h2 className="text-2xl font-bold">영수증</h2>
-                                <div className="border-t border-b py-4 space-y-2">
-                                    <p><strong>발행처:</strong> {receiptConfig?.issuerName || 'eRegi'}</p>
-                                    <p><strong>영수증 번호:</strong> {selectedAttendee.receiptNumber}</p>
-                                    <p><strong>성명:</strong> {selectedAttendee.name}</p>
-                                    <p><strong>소속:</strong> {selectedAttendee.organization}</p>
-                                    <p><strong>등록비:</strong> ₩{selectedAttendee.amount.toLocaleString()}</p>
-                                    <p><strong>등록일:</strong> {safeFormatDate(selectedAttendee.createdAt)}</p>
-                                </div>
-                                <div className="p-4 bg-gray-50 rounded">
-                                    <p className="text-sm text-gray-600 mb-2">확인용 QR 코드</p>
-                                    <div className="text-2xl font-mono font-bold tracking-widest">
-                                        {selectedAttendee.confirmationQr}
+                        <div className="mt-4 space-y-4">
+                            {/* 등록 정보 요약 */}
+                            <div className="p-5 bg-white border rounded-lg">
+                                <h3 className="text-sm font-bold text-gray-500 uppercase mb-3">등록 정보</h3>
+                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                        <span className="text-gray-500">성명</span>
+                                        <p className="font-bold text-gray-900">{selectedAttendee.name}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500">소속</span>
+                                        <p className="font-bold text-gray-900">{selectedAttendee.organization}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500">이메일</span>
+                                        <p className="font-medium">{selectedAttendee.email}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500">전화번호</span>
+                                        <p className="font-medium">{selectedAttendee.phone}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500">등록비</span>
+                                        <p className="font-bold text-blue-700">₩{selectedAttendee.amount.toLocaleString()}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500">영수증 번호</span>
+                                        <p className="font-mono font-medium">{selectedAttendee.receiptNumber}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500">등록일</span>
+                                        <p className="font-medium">{safeFormatDate(selectedAttendee.createdAt)}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500">발행처</span>
+                                        <p className="font-medium">{receiptConfig?.issuerName || info?.title?.ko || 'eRegi'}</p>
                                     </div>
                                 </div>
-                                {selectedAttendee.password && (
-                                    <div className="p-4 bg-blue-50 rounded border border-blue-200">
-                                        <p className="text-sm text-gray-600 mb-2">비밀번호 (Firebase Auth)</p>
-                                        <div className="flex items-center justify-center gap-2">
-                                            <span className="text-xl font-mono font-bold text-blue-800">
-                                                {selectedAttendee.password}
-                                            </span>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => {
-                                                    navigator.clipboard.writeText(selectedAttendee.password!);
-                                                    toast.success('비밀번호가 복사되었습니다.');
-                                                }}
-                                            >
-                                                <Copy className="w-4 h-4 mr-1" />
-                                                복사
-                                            </Button>
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-2">
-                                            이 비밀번호로 마이페이지에 로그인할 수 있습니다.
-                                        </p>
-                                    </div>
-                                )}
                             </div>
+
+                            {/* 바우처 링크 (badge-prep 시스템) */}
+                            <VoucherLinkSection
+                                attendee={selectedAttendee}
+                                confId={confId}
+                                confBaseUrl={confBaseUrl()}
+                                confSlug={confSlug()}
+                                onResend={() => handleResendNotification(selectedAttendee)}
+                                isProcessing={isProcessing}
+                            />
+
+                            {/* 비밀번호 */}
+                            {selectedAttendee.password && (
+                                <div className="p-4 bg-blue-50 rounded border border-blue-200">
+                                    <p className="text-sm text-gray-600 mb-2">마이페이지 로그인 비밀번호</p>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-lg font-mono font-bold text-blue-800">
+                                            {selectedAttendee.password}
+                                        </span>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(selectedAttendee.password!);
+                                                toast.success('비밀번호가 복사되었습니다.');
+                                            }}
+                                        >
+                                            <Copy className="w-4 h-4 mr-1" />
+                                            복사
+                                        </Button>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-1">이 비밀번호로 마이페이지에 로그인할 수 있습니다.</p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </DialogContent>
