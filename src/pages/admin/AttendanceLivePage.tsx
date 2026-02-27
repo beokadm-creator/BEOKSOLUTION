@@ -44,6 +44,7 @@ interface Registration {
     isCompleted: boolean;
     slug: string;
     affiliation?: string;
+    isExternal?: boolean;
 }
 
 interface LogEntry {
@@ -126,30 +127,35 @@ const AttendanceLivePage: React.FC = () => {
             }
 
             console.log('[AttendanceLive] Querying registrations...');
-            // 임시: 인덱스 문제 확인을 위해 badgeQr 조건 제외
-            const q = query(
+            const qReg = query(
                 collection(db, 'conferences', cid, 'registrations'),
                 where('paymentStatus', '==', 'PAID')
             );
-            const snap = await getDocs(q);
-            console.log('[AttendanceLive] Query result:', snap.docs.length, 'documents');
+            const snapReg = await getDocs(qReg);
+            console.log('[AttendanceLive] Registration result:', snapReg.docs.length, 'documents');
 
-            // 클라이언트에서 필터링: 디지털명찰 발급자만
-            // badgeQr 또는 badgeIssued가 있으면 발급된 것으로 간주
-            const filteredData = snap.docs
+            console.log('[AttendanceLive] Querying external attendees...');
+            const qExt = query(
+                collection(db, 'conferences', cid, 'external_attendees'),
+                where('deleted', '==', false)
+            );
+            const snapExt = await getDocs(qExt);
+            console.log('[AttendanceLive] External attendee result:', snapExt.docs.length, 'documents');
+
+            // Process registrations
+            const regData = snapReg.docs
                 .filter(d => {
-                    const docData = d.data();
-                    console.log('[AttendanceLive] Registration doc:', d.id, 'badgeQr:', docData.badgeQr, 'badgeIssued:', docData.badgeIssued);
-                    return !!docData.badgeQr || docData.badgeIssued === true;
+                    const data = d.data();
+                    return !!data.badgeQr || data.badgeIssued === true;
                 })
                 .map(d => {
                     const docData = d.data();
-                    // userInfo를 top level로 flatten (RegistrationListPage와 동일하게)
                     const flattened = {
                         id: d.id,
                         ...docData,
                         totalMinutes: docData.totalMinutes || 0,
-                        attendanceStatus: docData.attendanceStatus || 'OUTSIDE'
+                        attendanceStatus: docData.attendanceStatus || 'OUTSIDE',
+                        isExternal: false
                     } as Registration;
 
                     if (docData.userInfo) {
@@ -157,19 +163,43 @@ const AttendanceLivePage: React.FC = () => {
                         flattened.userEmail = docData.userInfo.email || docData.userEmail;
                         flattened.affiliation = docData.userInfo.affiliation || docData.affiliation;
                     }
-
                     return flattened;
-                }) as Registration[];
-            console.log('[AttendanceLive] Filtered to badge-issued:', filteredData.length, 'registrations');
+                });
 
-            filteredData.sort((a, b) => {
+            // Process external attendees
+            const extData = snapExt.docs
+                .filter(d => {
+                    const data = d.data();
+                    return !!data.badgeQr || data.badgeIssued === true;
+                })
+                .map(d => {
+                    const docData = d.data();
+                    return {
+                        id: d.id,
+                        userName: docData.name || 'Unknown',
+                        userEmail: docData.email || '',
+                        attendanceStatus: docData.attendanceStatus || 'OUTSIDE',
+                        currentZone: docData.currentZone || null,
+                        lastCheckIn: docData.lastCheckIn,
+                        totalMinutes: docData.totalMinutes || 0,
+                        isCompleted: !!docData.isCompleted,
+                        slug: docData.slug || '',
+                        affiliation: docData.userOrg || docData.organization || docData.affiliation || '',
+                        isExternal: true
+                    } as Registration;
+                });
+
+            const combinedData = [...regData, ...extData];
+            console.log('[AttendanceLive] Total combined data:', combinedData.length);
+
+            combinedData.sort((a, b) => {
                 if (a.attendanceStatus === 'INSIDE' && b.attendanceStatus !== 'INSIDE') return -1;
                 if (a.attendanceStatus !== 'INSIDE' && b.attendanceStatus === 'INSIDE') return 1;
                 return a.userName.localeCompare(b.userName);
             });
 
-            setRegistrations(filteredData);
-            console.log('[AttendanceLive] Data loaded successfully:', filteredData.length, 'registrations');
+            setRegistrations(combinedData);
+            console.log('[AttendanceLive] Data loaded successfully');
         } catch (error) {
             console.error('[AttendanceLive] Error details:', error);
             console.error('[AttendanceLive] Error stack:', error instanceof Error ? error.stack : 'No stack');
@@ -198,7 +228,8 @@ const AttendanceLivePage: React.FC = () => {
                 await handleCheckOut(regId, reg.currentZone, reg.lastCheckIn, true); // Silent checkout for switch
             }
 
-            const regRef = doc(db, 'conferences', cid!, 'registrations', regId);
+            const collectionName = reg?.isExternal ? 'external_attendees' : 'registrations';
+            const regRef = doc(db, 'conferences', cid!, collectionName, regId);
             const now = Timestamp.now();
 
             await updateDoc(regRef, {
@@ -207,7 +238,7 @@ const AttendanceLivePage: React.FC = () => {
                 lastCheckIn: now
             });
 
-            await addDoc(collection(db, 'conferences', cid!, 'registrations', regId, 'logs'), {
+            await addDoc(collection(db, 'conferences', cid!, collectionName, regId, 'logs'), {
                 type: 'ENTER',
                 zoneId,
                 timestamp: now,
@@ -266,7 +297,9 @@ const AttendanceLivePage: React.FC = () => {
             }
 
             const finalMinutes = Math.max(0, durationMinutes - deduction);
-            const regRef = doc(db, 'conferences', cid!, 'registrations', regId);
+            const reg = registrations.find(r => r.id === regId);
+            const collectionName = reg?.isExternal ? 'external_attendees' : 'registrations';
+            const regRef = doc(db, 'conferences', cid!, collectionName, regId);
 
             // 목표 설정: CUMULATIVE 모드면 전체 누적 목표, 아니면 날짜별 목표
             const goal = rules.completionMode === 'CUMULATIVE' && rules.cumulativeGoalMinutes
@@ -289,7 +322,7 @@ const AttendanceLivePage: React.FC = () => {
                 lastCheckOut: Timestamp.now()
             });
 
-            await addDoc(collection(db, 'conferences', cid!, 'registrations', regId, 'logs'), {
+            await addDoc(collection(db, 'conferences', cid!, collectionName, regId, 'logs'), {
                 type: 'EXIT',
                 zoneId: currentZoneId,
                 timestamp: Timestamp.now(),
@@ -312,8 +345,9 @@ const AttendanceLivePage: React.FC = () => {
         setSelectedRegForLog(reg);
         setShowLogModal(true);
         setLogs([]);
+        const collectionName = reg.isExternal ? 'external_attendees' : 'registrations';
         try {
-            const q = query(collection(db, 'conferences', cid!, 'registrations', reg.id, 'logs'), orderBy('timestamp', 'desc'));
+            const q = query(collection(db, 'conferences', cid!, collectionName, reg.id, 'logs'), orderBy('timestamp', 'desc'));
             const snap = await getDocs(q);
             const loadedLogs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as LogEntry[];
             setLogs(loadedLogs);

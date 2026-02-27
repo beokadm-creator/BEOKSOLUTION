@@ -128,8 +128,10 @@ const AttendanceScannerPage: React.FC = () => {
 
             let regDoc: QueryDocumentSnapshot | null = null;
 
+            let isExternal = false;
             if (!regSnap.empty) {
                 regDoc = regSnap.docs[0];
+                isExternal = false;
             } else {
                 // 2. external_attendees 컬렉션에서 badgeQr 검색
                 const extQuery = query(
@@ -141,6 +143,7 @@ const AttendanceScannerPage: React.FC = () => {
 
                 if (!extSnap.empty) {
                     regDoc = extSnap.docs[0];
+                    isExternal = true;
                 }
             }
 
@@ -191,31 +194,31 @@ const AttendanceScannerPage: React.FC = () => {
                 if (currentStatus === 'INSIDE') {
                     if (currentZone === selectedZoneId) throw new Error(`${userName}님은 이미 입장 상태입니다.`);
                     // Auto-Switch
-                    await performCheckOut(regId, currentZone, regData.lastCheckIn, currentTotalMinutes);
-                    await performCheckIn(regId, selectedZoneId);
+                    await performCheckOut(regId, currentZone, regData.lastCheckIn, currentTotalMinutes, isExternal);
+                    await performCheckIn(regId, selectedZoneId, isExternal);
                     action = 'Switched & Checked In';
                 } else {
-                    await performCheckIn(regId, selectedZoneId);
+                    await performCheckIn(regId, selectedZoneId, isExternal);
                     action = '입장 완료 (Checked In)';
                 }
             }
             else if (mode === 'EXIT_ONLY') {
                 if (currentStatus !== 'INSIDE') throw new Error(`${userName}님은 입장 기록이 없습니다.`);
-                await performCheckOut(regId, currentZone, regData.lastCheckIn, currentTotalMinutes);
+                await performCheckOut(regId, currentZone, regData.lastCheckIn, currentTotalMinutes, isExternal);
                 action = '퇴장 완료 (Checked Out)';
             }
             else if (mode === 'AUTO') {
                 if (currentStatus === 'INSIDE') {
                     if (currentZone !== selectedZoneId) {
-                        await performCheckOut(regId, currentZone, regData.lastCheckIn, currentTotalMinutes);
-                        await performCheckIn(regId, selectedZoneId);
+                        await performCheckOut(regId, currentZone, regData.lastCheckIn, currentTotalMinutes, isExternal);
+                        await performCheckIn(regId, selectedZoneId, isExternal);
                         action = 'Zone Switched';
                     } else {
-                        await performCheckOut(regId, currentZone, regData.lastCheckIn, currentTotalMinutes);
+                        await performCheckOut(regId, currentZone, regData.lastCheckIn, currentTotalMinutes, isExternal);
                         action = '퇴장 완료 (Checked Out)';
                     }
                 } else {
-                    await performCheckIn(regId, selectedZoneId);
+                    await performCheckIn(regId, selectedZoneId, isExternal);
                     action = '입장 완료 (Checked In)';
                 }
             }
@@ -244,19 +247,20 @@ const AttendanceScannerPage: React.FC = () => {
         }, 3000); // 3s delay for readability
     };
 
-    const performCheckIn = async (id: string, zoneId: string) => {
+    const performCheckIn = async (id: string, zoneId: string, isExternal: boolean = false) => {
         if (!cid) return;
-        await updateDoc(doc(db, 'conferences', cid, 'registrations', id), {
+        const collectionName = isExternal ? 'external_attendees' : 'registrations';
+        await updateDoc(doc(db, 'conferences', cid, collectionName, id), {
             attendanceStatus: 'INSIDE',
             currentZone: zoneId,
             lastCheckIn: Timestamp.now()
         });
-        await addDoc(collection(db, 'conferences', cid, 'registrations', id, 'logs'), {
+        await addDoc(collection(db, 'conferences', cid, collectionName, id, 'logs'), {
             type: 'ENTER', zoneId, timestamp: Timestamp.now(), method: 'KIOSK'
         });
     };
 
-    const performCheckOut = async (id: string, zoneId: string | null, lastIn: unknown, currentTotalMinutes: number = 0) => {
+    const performCheckOut = async (id: string, zoneId: string | null, lastIn: unknown, currentTotalMinutes: number = 0, isExternal: boolean = false) => {
         if (!cid) return;
         const now = new Date();
         const start = lastIn && typeof lastIn === 'object' && 'toDate' in lastIn ? (lastIn as { toDate: () => Date }).toDate() : now;
@@ -306,10 +310,19 @@ const AttendanceScannerPage: React.FC = () => {
             updatePayload.isCompleted = isCompleted;
         }
 
-        await updateDoc(doc(db, 'conferences', cid, 'registrations', id), updatePayload);
+        const collectionName = isExternal ? 'external_attendees' : 'registrations';
+        await updateDoc(doc(db, 'conferences', cid, collectionName, id), updatePayload);
 
-        await addDoc(collection(db, 'conferences', cid, 'registrations', id, 'logs'), {
-            type: 'EXIT', zoneId, timestamp: Timestamp.now(), method: 'KIOSK', recognizedMinutes: finalMinutes, evaluatedCompleted: isCompleted, accumulatedTotal: newTotal, rawDuration: diffMins, deduction
+        await addDoc(collection(db, 'conferences', cid, collectionName, id, 'logs'), {
+            type: 'EXIT',
+            zoneId,
+            timestamp: Timestamp.now(),
+            method: 'KIOSK',
+            recognizedMinutes: finalMinutes,
+            evaluatedCompleted: isCompleted,
+            accumulatedTotal: newTotal,
+            rawDuration: diffMins,
+            deduction
         });
     };
 

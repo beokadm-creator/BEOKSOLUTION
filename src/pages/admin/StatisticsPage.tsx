@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAdminStore } from '../../store/adminStore';
 import { useRegistrations } from '../../hooks/useRegistrations';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { calculateStayTime } from '../../utils/attendance';
 import { AccessLog } from '../../types/schema';
@@ -44,6 +44,7 @@ interface DailyRule {
 const StatisticsPage: React.FC = () => {
     const { selectedConferenceId } = useAdminStore();
     const { registrations, loading: regLoading } = useRegistrations(selectedConferenceId || '');
+    const [externalAttendees, setExternalAttendees] = useState<any[]>([]);
 
     const [logs, setLogs] = useState<AccessLog[]>([]);
     const [rules, setRules] = useState<Record<string, DailyRule>>({});
@@ -75,6 +76,18 @@ const StatisticsPage: React.FC = () => {
             const logsSnap = await getDocs(logsRef);
             const fetchedLogs = logsSnap.docs.map(d => ({ id: d.id, ...d.data() } as AccessLog));
             setLogs(fetchedLogs);
+
+            // C. Fetch External Attendees
+            const extRef = collection(db, `conferences/${selectedConferenceId}/external_attendees`);
+            const extSnap = await getDocs(query(extRef, where('deleted', '==', false)));
+            const fetchedExt = extSnap.docs.map(d => ({
+                id: d.id,
+                ...(d.data() as any),
+                userId: d.id,
+                userName: (d.data() as any).name || 'Unknown',
+                isExternal: true
+            }));
+            setExternalAttendees(fetchedExt);
 
         } catch (error) {
             console.error("Failed to fetch stats data:", error);
@@ -116,7 +129,12 @@ const StatisticsPage: React.FC = () => {
             logs: AccessLog[];
         }> = {};
 
-        registrations.forEach(reg => {
+        const allRegistrations = [
+            ...registrations,
+            ...externalAttendees
+        ];
+
+        allRegistrations.forEach(reg => {
             if (!reg.badgeQr) return; // Skip if no badge
             userStats[reg.badgeQr] = {
                 userId: reg.userId,
@@ -171,7 +189,7 @@ const StatisticsPage: React.FC = () => {
 
             stat.totalMinutes = total;
 
-            const reg = registrations.find(r => r.userId === stat.userId);
+            const reg = allRegistrations.find(r => r.userId === stat.userId);
             if (currentRule.completionMode === 'CUMULATIVE') {
                 stat.isCompliant = (reg as any)?.isCompleted || false;
             } else {
@@ -180,7 +198,7 @@ const StatisticsPage: React.FC = () => {
         });
 
         // Aggregates
-        const totalUsers = registrations.length;
+        const totalUsers = allRegistrations.length;
         const activeUsers = Object.values(userStats).filter(u => u.totalMinutes > 0).length;
 
         // [Fixed] Count compliant users correctly based on the updated logic evaluating goal vs exact minutes
