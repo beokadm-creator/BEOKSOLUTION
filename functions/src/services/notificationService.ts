@@ -80,7 +80,13 @@ class NHNProvider implements IAlimTalkProvider {
             const infraData = infraSnap.data();
             const nhnConfig = infraData?.notification;
 
-            if (!nhnConfig?.appKey || !nhnConfig?.secretKey || !nhnConfig?.senderKey) {
+            // Fallback to systemic keys if not provided in society-specific settings
+            // NHN Cloud handles authentication via appKey/secretKey
+            const appKey = nhnConfig?.appKey || 'Ik6GEBC22p5Qliqk';
+            const secretKey = nhnConfig?.secretKey || 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme';
+            const senderKey = nhnConfig?.senderKey;
+
+            if (!appKey || !secretKey || !senderKey) {
                 throw new Error('NHN Cloud configuration is incomplete');
             }
 
@@ -88,9 +94,9 @@ class NHNProvider implements IAlimTalkProvider {
             const { sendAlimTalk } = require('../utils/nhnCloud');
             const result = await sendAlimTalk(
                 {
-                    appKey: nhnConfig.appKey,
-                    secretKey: nhnConfig.secretKey,
-                    senderKey: nhnConfig.senderKey,
+                    appKey: appKey,
+                    secretKey: secretKey,
+                    senderKey: senderKey,
                 },
                 {
                     recipientNo: params.phone,

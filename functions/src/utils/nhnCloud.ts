@@ -60,9 +60,9 @@ export async function sendAlimTalk(
         if (response.data.header.isSuccessful) {
             return {
                 success: true,
-                requestId: response.data.body.data.requestId,
-                recipientSeq: response.data.body.data.recipientList?.[0]?.recipientSeq,
-                resultCode: response.data.body.data.recipientList?.[0]?.resultCode,
+                requestId: response.data.message?.requestId,
+                recipientSeq: response.data.message?.sendResults?.[0]?.recipientSeq,
+                resultCode: response.data.message?.sendResults?.[0]?.resultCode?.toString(),
                 resultMessage: 'AlimTalk sent successfully',
                 rawResponse: response.data
             };

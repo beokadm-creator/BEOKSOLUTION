@@ -78,15 +78,20 @@ class NHNProvider {
             }
             const infraData = infraSnap.data();
             const nhnConfig = infraData === null || infraData === void 0 ? void 0 : infraData.notification;
-            if (!(nhnConfig === null || nhnConfig === void 0 ? void 0 : nhnConfig.appKey) || !(nhnConfig === null || nhnConfig === void 0 ? void 0 : nhnConfig.secretKey) || !(nhnConfig === null || nhnConfig === void 0 ? void 0 : nhnConfig.senderKey)) {
+            // Fallback to systemic keys if not provided in society-specific settings
+            // NHN Cloud handles authentication via appKey/secretKey
+            const appKey = (nhnConfig === null || nhnConfig === void 0 ? void 0 : nhnConfig.appKey) || 'Ik6GEBC22p5Qliqk';
+            const secretKey = (nhnConfig === null || nhnConfig === void 0 ? void 0 : nhnConfig.secretKey) || 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme';
+            const senderKey = nhnConfig === null || nhnConfig === void 0 ? void 0 : nhnConfig.senderKey;
+            if (!appKey || !secretKey || !senderKey) {
                 throw new Error('NHN Cloud configuration is incomplete');
             }
             // NHN Cloud API 호출
             const { sendAlimTalk } = require('../utils/nhnCloud');
             const result = await sendAlimTalk({
-                appKey: nhnConfig.appKey,
-                secretKey: nhnConfig.secretKey,
-                senderKey: nhnConfig.senderKey,
+                appKey: appKey,
+                secretKey: secretKey,
+                senderKey: senderKey,
             }, {
                 recipientNo: params.phone,
                 templateCode: params.templateCode,

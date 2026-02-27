@@ -2,7 +2,7 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { sendAlimTalk } from '../utils/nhnAlimTalk';
+import { sendAlimTalk } from '../services/notificationService';
 
 // Local type definitions (aligned with schema.ts)
 interface Conference {
@@ -50,14 +50,7 @@ interface ExternalAttendee extends Registration {
   uid?: string;
 }
 
-interface AlimTalkButton {
-  name: string;
-  type: string;
-  linkMobile?: string;
-  linkPc?: string;
-  linkType?: string; // NHN uses linkType? No, it uses 'type'
-  // NHN specific fields might be needed mapping
-}
+
 
 /**
  * Generate a secure random token for badge prep
@@ -216,55 +209,20 @@ export async function sendBadgeNotification(
           venue: venueName,
         };
 
-        // Replace Content
-        let content = kakaoConfig.content || '';
-        for (const [key, value] of Object.entries(variables)) {
-          content = content.replace(new RegExp(`#{${key}}`, 'g'), value);
-        }
-
-        // Process Buttons (Replace URL variables)
-        let buttons = kakaoConfig.buttons ? [...kakaoConfig.buttons] : [];
-        buttons = buttons.map((btn: AlimTalkButton) => ({
-          ...btn,
-          linkMobile: btn.linkMobile?.replace('#{badgePrepUrl}', badgePrepUrl).replace('#{digitalBadgeQrUrl}', digitalBadgeQrUrl),
-          linkPc: btn.linkPc?.replace('#{badgePrepUrl}', badgePrepUrl).replace('#{digitalBadgeQrUrl}', digitalBadgeQrUrl)
-        }));
-
-
-        // Get Sender Key from Infrastructure Settings
-        const infraSnap = await db.doc(`societies/${conference.societyId}/settings/infrastructure`).get();
-        const infraData = infraSnap.data();
-        const senderKey = infraData?.notification?.alimTalk?.senderKey;
-
-        if (!senderKey) {
-          functions.logger.error(`[BadgeNotification] No Sender Key found for society ${conference.societyId}`);
-          return;
-        }
-
-        // Send (NHN AlimTalk)
+        // Send (NHN AlimTalk via NotificationService)
         const recipientPhone = regData.phone || regData.userInfo?.phone;
         if (recipientPhone) {
           const cleanPhone = recipientPhone.replace(/-/g, '');
 
-          // Map buttons to NHN format
-          const nhnButtons = buttons.map((btn: AlimTalkButton, index: number) => ({
-            ordering: index + 1,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            type: btn.type as any, // Type cast might be needed if types assume Aligo format
-            name: btn.name,
-            linkMo: btn.linkMobile,
-            linkPc: btn.linkPc
-          }));
-
-          await sendAlimTalk({
-            senderKey,
+          const alimTalkResult = await sendAlimTalk({
+            phone: cleanPhone,
             templateCode: kakaoConfig.kakaoTemplateCode,
-            recipientNo: cleanPhone,
-            content: content,
-            buttons: nhnButtons.length > 0 ? nhnButtons : undefined
-          });
+            variables: variables
+            // NotificationService already formats and sends these variables properly as templateParameter
+            // We omit buttons parameter as NHN AlimTalk uses the template variables to auto-fill button urls
+          }, conference.societyId);
 
-          functions.logger.info(`[BadgeNotification] AlimTalk sent to ${cleanPhone} for ${regId}`);
+          functions.logger.info(`[BadgeNotification] AlimTalk call result to ${cleanPhone}:`, JSON.stringify(alimTalkResult));
         }
       }
     } else {

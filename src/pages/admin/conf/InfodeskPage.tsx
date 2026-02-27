@@ -190,10 +190,20 @@ const InfodeskPage: React.FC = () => {
                 userName?: string;
                 affiliation?: string;
                 organization?: string;
+                userOrg?: string;
                 userEmail?: string;
                 userTier?: string;
+                tier?: string;
                 amount?: number;
                 licenseNumber?: string;
+                userId?: string;
+                userInfo?: {
+                    name?: string;
+                    affiliation?: string;
+                    organization?: string;
+                    grade?: string;
+                    licenseNumber?: string;
+                };
             } | null = null;
             let isExternal = false;
 
@@ -211,8 +221,34 @@ const InfodeskPage: React.FC = () => {
                 throw new Error("결제가 완료되지 않은 명찰입니다.");
             }
 
-            const userName = isExternal ? (regData?.name || 'Unknown') : (regData?.userName || regData.name || 'Unknown');
-            const userAffiliation = isExternal ? (regData?.organization || '') : (regData?.affiliation || regData.organization || regData?.userEmail || '');
+            let userName = isExternal ? (regData?.name || 'Unknown') : (regData?.userName || regData?.name || regData?.userInfo?.name || 'Unknown');
+            let userAffiliation = regData?.userOrg || regData?.organization || regData?.affiliation || regData?.userInfo?.affiliation || regData?.userInfo?.organization || regData?.userEmail || '';
+
+            // [Fix] Ensure we check all possible nested locations for affiliation
+            if (!userAffiliation || userAffiliation.includes('@')) {
+                if (!isExternal && regData?.userInfo) {
+                    userAffiliation = regData.userInfo.organization || regData.userInfo.affiliation || userAffiliation;
+                }
+            }
+
+            // Fallback: Fetch from user document if internal and missing affiliation
+            if (!isExternal && (!userAffiliation || userAffiliation.includes('@')) && regData?.userId) {
+                try {
+                    const userRef = doc(db, `conferences/${targetConferenceId}/users`, regData.userId);
+                    const userSnap = await getDoc(userRef);
+                    if (userSnap.exists()) {
+                        const userData = userSnap.data();
+                        userAffiliation = userData.organization || userData.affiliation || userAffiliation;
+                        if (userName === 'Unknown') userName = userData.name || 'Unknown';
+                    }
+                } catch (err) {
+                    console.error("Failed to fetch user doc for affiliation fallback:", err);
+                }
+            }
+
+            // Sync with regData snapshot to ensure consistency for other parts
+            const finalTier = isExternal ? '' : (regData.userTier || regData.userInfo?.grade || regData.tier || '');
+            const finalLicense = regData.licenseNumber || regData.userInfo?.licenseNumber || '';
 
             // Logic: Issue Badge using Cloud Function (supports both regular and external attendees)
             const functions = getFunctions();
@@ -247,10 +283,10 @@ const InfodeskPage: React.FC = () => {
                     const printSuccess = await printBadge(activeLayout, {
                         name: userName,
                         org: userAffiliation,
-                        category: isExternal ? '' : (regData.userTier || ''),
-                        license: regData.licenseNumber || '',
+                        category: finalTier,
+                        license: finalLicense,
                         price: isExternal ? '' : `${regData.amount?.toLocaleString() || 0}원`,
-                        affiliation: isExternal ? '' : (regData.affiliation || ''), // Add affiliation field
+                        affiliation: userAffiliation,
                         qrData: result.data.badgeQr
                     });
 

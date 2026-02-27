@@ -40,7 +40,7 @@ const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const date_fns_1 = require("date-fns");
 const locale_1 = require("date-fns/locale");
-const nhnAlimTalk_1 = require("../utils/nhnAlimTalk");
+const notificationService_1 = require("../services/notificationService");
 /**
  * Generate a secure random token for badge prep
  */
@@ -125,7 +125,7 @@ exports.onRegistrationCreated = functions.firestore
  * Helper: Send Badge Notification (AlimTalk)
  */
 async function sendBadgeNotification(db, conference, regId, regData, token) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
     if (!conference.societyId)
         return;
     try {
@@ -172,50 +172,18 @@ async function sendBadgeNotification(db, conference, regId, regData, token) {
                     startDate: startDate,
                     venue: venueName,
                 };
-                // Replace Content
-                let content = kakaoConfig.content || '';
-                for (const [key, value] of Object.entries(variables)) {
-                    content = content.replace(new RegExp(`#{${key}}`, 'g'), value);
-                }
-                // Process Buttons (Replace URL variables)
-                let buttons = kakaoConfig.buttons ? [...kakaoConfig.buttons] : [];
-                buttons = buttons.map((btn) => {
-                    var _a, _b;
-                    return ({
-                        ...btn,
-                        linkMobile: (_a = btn.linkMobile) === null || _a === void 0 ? void 0 : _a.replace('#{badgePrepUrl}', badgePrepUrl).replace('#{digitalBadgeQrUrl}', digitalBadgeQrUrl),
-                        linkPc: (_b = btn.linkPc) === null || _b === void 0 ? void 0 : _b.replace('#{badgePrepUrl}', badgePrepUrl).replace('#{digitalBadgeQrUrl}', digitalBadgeQrUrl)
-                    });
-                });
-                // Get Sender Key from Infrastructure Settings
-                const infraSnap = await db.doc(`societies/${conference.societyId}/settings/infrastructure`).get();
-                const infraData = infraSnap.data();
-                const senderKey = (_m = (_l = infraData === null || infraData === void 0 ? void 0 : infraData.notification) === null || _l === void 0 ? void 0 : _l.alimTalk) === null || _m === void 0 ? void 0 : _m.senderKey;
-                if (!senderKey) {
-                    functions.logger.error(`[BadgeNotification] No Sender Key found for society ${conference.societyId}`);
-                    return;
-                }
-                // Send (NHN AlimTalk)
-                const recipientPhone = regData.phone || ((_o = regData.userInfo) === null || _o === void 0 ? void 0 : _o.phone);
+                // Send (NHN AlimTalk via NotificationService)
+                const recipientPhone = regData.phone || ((_l = regData.userInfo) === null || _l === void 0 ? void 0 : _l.phone);
                 if (recipientPhone) {
                     const cleanPhone = recipientPhone.replace(/-/g, '');
-                    // Map buttons to NHN format
-                    const nhnButtons = buttons.map((btn, index) => ({
-                        ordering: index + 1,
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        type: btn.type, // Type cast might be needed if types assume Aligo format
-                        name: btn.name,
-                        linkMo: btn.linkMobile,
-                        linkPc: btn.linkPc
-                    }));
-                    await (0, nhnAlimTalk_1.sendAlimTalk)({
-                        senderKey,
+                    const alimTalkResult = await (0, notificationService_1.sendAlimTalk)({
+                        phone: cleanPhone,
                         templateCode: kakaoConfig.kakaoTemplateCode,
-                        recipientNo: cleanPhone,
-                        content: content,
-                        buttons: nhnButtons.length > 0 ? nhnButtons : undefined
-                    });
-                    functions.logger.info(`[BadgeNotification] AlimTalk sent to ${cleanPhone} for ${regId}`);
+                        variables: variables
+                        // NotificationService already formats and sends these variables properly as templateParameter
+                        // We omit buttons parameter as NHN AlimTalk uses the template variables to auto-fill button urls
+                    }, conference.societyId);
+                    functions.logger.info(`[BadgeNotification] AlimTalk call result to ${cleanPhone}:`, JSON.stringify(alimTalkResult));
                 }
             }
         }
@@ -463,9 +431,13 @@ exports.resendBadgePrepToken = functions
         const db = admin.firestore();
         const now = admin.firestore.Timestamp.now();
         // Get existing registration (check both collections)
+        let isExternalAttendee = false;
         let regSnap = await db.collection(`conferences/${confId}/registrations`).doc(regId).get();
         if (!regSnap.exists) {
             regSnap = await db.collection(`conferences/${confId}/external_attendees`).doc(regId).get();
+            if (regSnap.exists) {
+                isExternalAttendee = true;
+            }
         }
         if (!regSnap.exists) {
             throw new Error('Registration not found');
@@ -474,9 +446,8 @@ exports.resendBadgePrepToken = functions
         if (!regData) {
             throw new Error('Registration data invalid');
         }
-        // [FIX] External attendees use 'paymentStatus' field, not 'status'
-        // Check either field to support both registrations and external_attendees
-        if (regData.paymentStatus !== 'PAID' && regData.status !== 'PAID') {
+        // [FIX] External attendees are manually added by admin, so they bypass PAID check
+        if (!isExternalAttendee && regData.paymentStatus !== 'PAID' && regData.status !== 'PAID') {
             throw new Error('Registration not paid');
         }
         // Get conference for expiry date

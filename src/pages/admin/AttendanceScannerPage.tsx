@@ -163,8 +163,23 @@ const AttendanceScannerPage: React.FC = () => {
 
             const regId = regDoc.id; // Use registration ID from query result
 
-            const userName = regData.userName || regData.name || 'Unknown';
-            const userAffiliation = regData.affiliation || regData.userEmail || '';
+            let userName = regData.userName || regData.name || regData.userInfo?.name || 'Unknown';
+            let userAffiliation = regData.userOrg || regData.affiliation || regData.organization || regData.userInfo?.affiliation || regData.userInfo?.organization || regData.userEmail || '';
+
+            // Ensure we fetch from user doc if missing or is an email
+            if ((!userAffiliation || userAffiliation.includes('@')) && regData.userId) {
+                try {
+                    const userRef = doc(db, `conferences/${cid}/users`, regData.userId);
+                    const userSnap = await getDoc(userRef);
+                    if (userSnap.exists()) {
+                        const userData = userSnap.data();
+                        userAffiliation = userData.organization || userData.affiliation || userAffiliation;
+                        userName = userName !== 'Unknown' ? userName : (userData.name || 'Unknown');
+                    }
+                } catch (err) {
+                    console.error("Failed to fetch user doc for affiliation fallback:", err);
+                }
+            }
             const currentStatus = regData.attendanceStatus || 'OUTSIDE';
             const currentZone = regData.currentZone;
             const currentTotalMinutes = typeof regData.totalMinutes === 'number' ? regData.totalMinutes : 0;

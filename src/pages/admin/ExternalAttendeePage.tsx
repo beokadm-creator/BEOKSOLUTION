@@ -13,7 +13,7 @@ import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { UserPlus, Upload, Download, FileText, Badge, CheckCircle2, Trash2, Loader2, Eye, EyeOff, Copy, MessageCircle, RefreshCw, ExternalLink, AlertCircle, Printer } from 'lucide-react';
+import { UserPlus, Upload, Download, FileText, Badge, CheckCircle2, Trash2, Loader2, Eye, EyeOff, Copy, MessageCircle, RefreshCw, ExternalLink, AlertCircle, Printer, CheckSquare, Square } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ExternalAttendee } from '../../types/schema';
 import { useBixolon } from '../../hooks/useBixolon';
@@ -218,6 +218,7 @@ const ExternalAttendeePage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState(0);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
     // Fetch external attendees with real-time updates
     useEffect(() => {
@@ -628,8 +629,17 @@ const ExternalAttendeePage: React.FC = () => {
     };
 
     // Handle bulk resend notifications
-    const handleBulkResendNotification = async () => {
-        if (!confirm(`등록된 모든 참석자(${externalAttendees.length}명)에게 알림톡을 재발송하시겠습니까?`)) return;
+    const handleBulkResendNotification = async (mode: 'selected' | 'all') => {
+        const targetAttendees = mode === 'selected'
+            ? externalAttendees.filter(a => selectedIds.includes(a.id))
+            : externalAttendees;
+
+        if (targetAttendees.length === 0) {
+            toast.error('발송할 대상을 선택해주세요.');
+            return;
+        }
+
+        if (!confirm(`${targetAttendees.length}명의 참석자에게 알림톡을 ${mode === 'selected' ? '선택' : '전체'} 발송하시겠습니까?`)) return;
         if (!confId) return;
 
         setIsProcessing(true);
@@ -638,9 +648,9 @@ const ExternalAttendeePage: React.FC = () => {
 
         try {
             const chunkSize = 5;
-            for (let i = 0; i < externalAttendees.length; i += chunkSize) {
-                const chunk = externalAttendees.slice(i, i + chunkSize);
-                setProgress(Math.round(((i + chunk.length) / externalAttendees.length) * 100));
+            for (let i = 0; i < targetAttendees.length; i += chunkSize) {
+                const chunk = targetAttendees.slice(i, i + chunkSize);
+                setProgress(Math.round(((i + chunk.length) / targetAttendees.length) * 100));
 
                 await Promise.all(chunk.map(async (attendee) => {
                     try {
@@ -655,12 +665,28 @@ const ExternalAttendeePage: React.FC = () => {
                 }));
             }
             toast.success(`${successCount}명 발송 완료, ${failCount}명 실패.`);
+            setSelectedIds([]);
         } catch (error) {
             console.error('Bulk notification failed:', error);
             toast.error('일괄 발송 중 오류가 발생했습니다.');
         } finally {
             setIsProcessing(false);
             setProgress(0);
+        }
+    };
+
+    const toggleSelection = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.length === externalAttendees.length && externalAttendees.length > 0) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(externalAttendees.map(r => r.id));
         }
     };
 
@@ -711,91 +737,28 @@ const ExternalAttendeePage: React.FC = () => {
 
     // Handle issue badge
     const handleIssueBadge = async (attendee: ExternalAttendee) => {
-        if (!confirm(`${attendee.name} 님의 명찰을 발급하시겠습니까?`)) return;
+        if (!confirm(`${attendee.name} 님의 명찰을 발급 처리하시겠습니까?`)) return;
         if (!confId) return;
 
         setIsProcessing(true);
         try {
-            // STEP 1: Generate Firebase Auth User if not exists
-            let firebaseUid = attendee.userId || attendee.uid;
-
-            // Check if we need to generate auth user (if userId is missing or placeholder)
-            if (!firebaseUid || firebaseUid.startsWith('EXT-') || !attendee.authCreated) {
-                try {
-                    const functions = getFunctions();
-                    const generateAuthUserFn = httpsCallable(functions, 'generateFirebaseAuthUserForExternalAttendee');
-                    const authResult = await generateAuthUserFn({
-                        confId,
-                        externalId: attendee.id,
-                        password: attendee.password || (attendee.phone ? attendee.phone.slice(-4) : '123456')
-                    }) as { data: { success: boolean; uid: string; message: string } };
-
-                    if (authResult.data.success) {
-                        firebaseUid = authResult.data.uid;
-                    }
-                } catch (e) {
-                    console.warn("Auto-creation of auth user failed during badge issue, proceeding with simple badge...", e);
-                    // Decide if we stop or continue. Let's continue but warn.
-                }
-            }
-
-            // STEP 2: Generate badge prep token if not exists
-            if (!attendee.badgePrepToken) {
-                const tokenChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-                let token = 'TKN-';
-                for (let i = 0; i < 32; i++) {
-                    token += tokenChars.charAt(Math.floor(Math.random() * tokenChars.length));
-                }
-
-                // [BUG FIX] Calculate proper expiry from conference end date (+48h)
-                // Previously was Timestamp.now() which caused immediate expiration
-                let badgeTokenExpiresAt = Timestamp.fromMillis(Timestamp.now().toMillis() + (7 * 24 * 60 * 60 * 1000)); // fallback 7 days
-                if (info?.dates?.end) {
-                    const endMs = (info.dates.end as any).toMillis ? (info.dates.end as any).toMillis() : new Date(info.dates.end as any).getTime();
-                    badgeTokenExpiresAt = Timestamp.fromMillis(endMs + (48 * 60 * 60 * 1000));
-                }
-
-                await updateDoc(doc(db, `conferences/${confId}/external_attendees`, attendee.id), {
-                    badgePrepToken: token,
-                    userId: firebaseUid, // Use Firebase UID
-                    updatedAt: Timestamp.now()
-                });
-
-                // Create badge token document with correct expiry
-                await setDoc(doc(db, `conferences/${confId}/badge_tokens`, token), {
-                    token,
-                    registrationId: attendee.id,
-                    conferenceId: confId,
-                    userId: firebaseUid, // Use Firebase UID
-                    status: 'ACTIVE',
-                    createdAt: Timestamp.now(),
-                    expiresAt: badgeTokenExpiresAt
-                });
-
-                // Update attendee with token
-                setExternalAttendees(prev => prev.map(a =>
-                    a.id === attendee.id ? { ...a, badgePrepToken: token, userId: firebaseUid } : a
-                ));
-            }
-
-            // STEP 3: Issue badge using Cloud Function
             const functions = getFunctions();
-            const issueDigitalBadgeFn = httpsCallable(functions, 'issueDigitalBadge');
-            const result = await issueDigitalBadgeFn({
+            const issueBadgeFn = httpsCallable(functions, 'issueDigitalBadge');
+            const result = await issueBadgeFn({
                 confId,
                 regId: attendee.id,
-                issueOption: 'DIGITAL_PRINT',
-                isExternalAttendee: true
-            }) as { data: { success: boolean; badgeQr: string } };
+                issueOption: 'DIGITAL_PRINT' // Default for manual admin issuance
+            }) as { data: { success: boolean, badgeQr?: string } };
 
-            if (!result.data.success) {
-                throw new Error('Failed to issue digital badge');
+            if (result.data.success) {
+                toast.success('명찰 발급 처리 완료');
+                // Local state is updated via Firestore onSnapshot
+            } else {
+                throw new Error('발급 처리에 실패했습니다.');
             }
-
-            toast.success('명찰이 발급되었습니다.');
         } catch (err: any) {
             console.error('Failed to Issue Badge:', err);
-            toast.error(err.message || 'Failed to issue badge');
+            toast.error(err.message || '처리 실패');
         } finally {
             setIsProcessing(false);
         }
@@ -1290,16 +1253,28 @@ const ExternalAttendeePage: React.FC = () => {
                                             />
                                         )}
                                     </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleBulkResendNotification}
-                                        disabled={isProcessing}
-                                        className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                                    >
-                                        <MessageCircle className="w-4 h-4 mr-2" />
-                                        알림톡 일괄 발송
-                                    </Button>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleBulkResendNotification('selected')}
+                                            disabled={isProcessing || selectedIds.length === 0}
+                                            className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                                        >
+                                            <MessageCircle className="w-4 h-4 mr-2" />
+                                            선택 발송 ({selectedIds.length})
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleBulkResendNotification('all')}
+                                            disabled={isProcessing || externalAttendees.length === 0}
+                                            className="text-white bg-indigo-600 border-indigo-600 hover:bg-indigo-700"
+                                        >
+                                            <MessageCircle className="w-4 h-4 mr-2" />
+                                            전체 발송 ({externalAttendees.length})
+                                        </Button>
+                                    </div>
                                 </div>
                             </CardHeader>
                             <CardContent>
@@ -1307,6 +1282,15 @@ const ExternalAttendeePage: React.FC = () => {
                                     <table className="w-full text-sm">
                                         <thead className="bg-gray-50">
                                             <tr>
+                                                <th className="px-4 py-3 w-10 text-center">
+                                                    <button onClick={toggleSelectAll} className="p-1 hover:bg-blue-50 rounded">
+                                                        {selectedIds.length === externalAttendees.length && externalAttendees.length > 0 ? (
+                                                            <CheckSquare size={18} className="text-blue-600 inline" />
+                                                        ) : (
+                                                            <Square size={18} className="text-gray-300 inline" />
+                                                        )}
+                                                    </button>
+                                                </th>
                                                 <th className="px-4 py-3 text-left font-semibold">이름</th>
                                                 <th className="px-4 py-3 text-left font-semibold">이메일</th>
                                                 <th className="px-4 py-3 text-left font-semibold">전화번호 / 소속</th>
@@ -1319,7 +1303,16 @@ const ExternalAttendeePage: React.FC = () => {
                                             {externalAttendees.map(attendee => {
                                                 const hasAccount = attendee.authCreated || (attendee.userId && !attendee.userId.startsWith('EXT-'));
                                                 return (
-                                                    <tr key={attendee.id} className="border-t hover:bg-gray-50">
+                                                    <tr key={attendee.id} className={`border-t hover:bg-gray-50 transition-colors ${selectedIds.includes(attendee.id) ? 'bg-blue-50/50' : ''}`}>
+                                                        <td className="px-4 py-3 text-center" onClick={(e) => toggleSelection(e, attendee.id)}>
+                                                            <button className="p-1 hover:bg-blue-50 rounded">
+                                                                {selectedIds.includes(attendee.id) ? (
+                                                                    <CheckSquare size={18} className="text-blue-600 inline" />
+                                                                ) : (
+                                                                    <Square size={18} className="text-gray-300 inline" />
+                                                                )}
+                                                            </button>
+                                                        </td>
                                                         <td className="px-4 py-3 font-medium">{attendee.name}</td>
                                                         <td className="px-4 py-3">{attendee.email}</td>
                                                         <td className="px-4 py-3">
@@ -1374,9 +1367,9 @@ const ExternalAttendeePage: React.FC = () => {
                                                                         className="h-6 px-2 text-[10px] text-blue-700 font-bold bg-blue-50 hover:bg-blue-100"
                                                                         onClick={() => handleBixolonPrint(attendee)}
                                                                         disabled={bixolonPrinting}
-                                                                        title="라벨 출력(Bixolon)"
+                                                                        title="명찰 프린트"
                                                                     >
-                                                                        Label
+                                                                        명찰 프린트
                                                                     </Button>
                                                                 </div>
                                                             </div>

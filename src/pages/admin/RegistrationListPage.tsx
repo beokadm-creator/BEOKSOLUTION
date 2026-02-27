@@ -9,8 +9,9 @@ import { useConference } from '../../hooks/useConference';
 import { convertBadgeLayoutToConfig } from '../../utils/badgeConverter';
 import toast from 'react-hot-toast';
 import { query, collection, getDocs, getDoc, limit, doc, updateDoc, Timestamp, addDoc, where } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../../firebase';
-import { Loader2, Printer, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, Printer, ChevronLeft, ChevronRight, MessageCircle, CheckSquare, Square, CheckCircle2 } from 'lucide-react';
 import { EregiButton } from '../../components/eregi/EregiForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { safeFormatDate } from '../../utils/dateUtils';
@@ -97,10 +98,10 @@ const RegistrationListPage: React.FC = () => {
     // Bixolon Hook
     const { printBadge, printing: bixolonPrinting, error: bixolonError } = useBixolon();
 
-    // Print Modal State
-    const [selectedReg, setSelectedReg] = useState<RootRegistration | null>(null);
-    const [showPrintModal, setShowPrintModal] = useState(false);
-    const badgeRef = useRef<HTMLDivElement>(null);
+    // Selection & Processing State
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [progress, setProgress] = useState(0);
 
     const badgeConfig = useMemo(() => {
         if (info?.badgeLayout && info.badgeLayout.elements.length > 0) {
@@ -176,26 +177,122 @@ const RegistrationListPage: React.FC = () => {
         e.stopPropagation();
         if (!confirm(`${reg.userName || '사용자'} 님의 명찰을 발급 처리하시겠습니까?`)) return;
 
+        setIsProcessing(true);
         try {
-            // Need to update in subcollection now
-            // conferences/{conferenceId}/registrations/{reg.id}
             if (!conferenceId) {
                 toast.error("Conference ID missing");
                 return;
             }
-            await updateDoc(doc(db, 'conferences', conferenceId, 'registrations', reg.id), {
-                badgeIssued: true,
-                badgeIssuedAt: Timestamp.now()
-            });
-            await addDoc(collection(db, `conferences/${conferenceId}/registrations/${reg.id}/logs`), {
-                type: 'BADGE_ISSUED', timestamp: Timestamp.now(), method: 'MANUAL_ADMIN_LIST'
-            });
-            toast.success("명찰 발급 처리 완료");
-            // Refresh pagination to show updated badge status
-            refreshPagination();
+
+            const functions = getFunctions();
+            const issueBadgeFn = httpsCallable(functions, 'issueDigitalBadge');
+            const result = await issueBadgeFn({
+                confId: conferenceId,
+                regId: reg.id,
+                issueOption: 'DIGITAL_PRINT' // Default for manual admin issuance
+            }) as { data: { success: boolean, badgeQr?: string } };
+
+            if (result.data.success) {
+                toast.success("명찰 발급 처리 완료");
+                refreshPagination();
+            } else {
+                throw new Error("발급 처리에 실패했습니다.");
+            }
         } catch (e: unknown) {
             console.error("Badge issue failed:", e);
-            toast.error("처리 실패");
+            toast.error("처리 실패: " + (e instanceof Error ? e.message : '알 수 없는 오류'));
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    // Action: Resend Notification (AlimTalk)
+    const handleResendNotification = async (e: React.MouseEvent, reg: RootRegistration) => {
+        e.stopPropagation();
+        if (!confirm(`${reg.userName || '사용자'} 님에게 알림톡을 재발송하시겠습니까?`)) return;
+        if (!conferenceId) return;
+
+        setIsProcessing(true);
+        try {
+            const functions = getFunctions();
+            const resendNotificationFn = httpsCallable(functions, 'resendBadgePrepToken');
+            const result = await resendNotificationFn({
+                confId: conferenceId,
+                regId: reg.id
+            }) as { data: { success: boolean; newToken: string } };
+
+            if (result.data.success) {
+                toast.success('알림톡이 발송되었습니다.');
+            } else {
+                throw new Error('Failed to send notification');
+            }
+        } catch (error: any) {
+            console.error('Failed to send notification:', error);
+            toast.error(`Error: ${error.message || 'Unknown error'}`);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    // Action: Bulk Send Notification
+    const handleBulkResendNotification = async (mode: 'selected' | 'all') => {
+        const targetRegs = mode === 'selected'
+            ? filteredData.filter(r => selectedIds.includes(r.id))
+            : filteredData;
+
+        if (targetRegs.length === 0) {
+            toast.error('발송할 대상을 선택해주세요.');
+            return;
+        }
+
+        if (!confirm(`${targetRegs.length}명의 사용자에게 알림톡을 ${mode === 'selected' ? '선택' : '전체'} 발송하시겠습니까?`)) return;
+        if (!conferenceId) return;
+
+        setIsProcessing(true);
+        let successCount = 0;
+        let failCount = 0;
+
+        try {
+            const chunkSize = 5;
+            for (let i = 0; i < targetRegs.length; i += chunkSize) {
+                const chunk = targetRegs.slice(i, i + chunkSize);
+                setProgress(Math.round(((i + chunk.length) / targetRegs.length) * 100));
+
+                await Promise.all(chunk.map(async (reg) => {
+                    try {
+                        const functions = getFunctions();
+                        const resendNotificationFn = httpsCallable(functions, 'resendBadgePrepToken');
+                        await resendNotificationFn({ confId: conferenceId, regId: reg.id });
+                        successCount++;
+                    } catch (err) {
+                        console.error(`Failed notification for ${reg.userName}:`, err);
+                        failCount++;
+                    }
+                }));
+            }
+            toast.success(`${successCount}명 발송 완료, ${failCount}명 실패.`);
+            setSelectedIds([]); // Clear selection
+        } catch (error) {
+            console.error('Bulk notification failed:', error);
+            toast.error('일괄 발송 중 오류가 발생했습니다.');
+        } finally {
+            setIsProcessing(false);
+            setProgress(0);
+        }
+    };
+
+    const toggleSelection = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.length === filteredData.length && filteredData.length > 0) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredData.map(r => r.id));
         }
     };
 
@@ -251,13 +348,31 @@ const RegistrationListPage: React.FC = () => {
                 return;
             }
 
+            let userName = reg.userName || '';
+            let userAffiliation = reg.userOrg || reg.affiliation || '';
+
+            // Fallback: Fetch from user document if missing affiliation
+            if ((!userAffiliation || userAffiliation.includes('@')) && reg.userId && conferenceId) {
+                try {
+                    const userRef = doc(db, `conferences/${conferenceId}/users`, reg.userId);
+                    const userSnap = await getDoc(userRef);
+                    if (userSnap.exists()) {
+                        const userData = userSnap.data();
+                        userAffiliation = userData.organization || userData.affiliation || userAffiliation;
+                        userName = userName || userData.name || '';
+                    }
+                } catch (err) {
+                    console.error("Failed to fetch user doc for affiliation fallback (print):", err);
+                }
+            }
+
             const printSuccess = await printBadge(badgeLayout, {
-                name: reg.userName || '',
-                org: reg.userOrg || reg.affiliation || '',
+                name: userName,
+                org: userAffiliation,
                 category: displayTier(reg.tier),
                 license: reg.licenseNumber || '',
                 price: (reg.amount || 0).toLocaleString() + '원',
-                affiliation: reg.affiliation || '',
+                affiliation: userAffiliation,
                 qrData: qrData
             });
 
@@ -272,12 +387,6 @@ const RegistrationListPage: React.FC = () => {
             console.error(e);
             toast.error("프린터 오류 발생", { id: 'bixolon-print' });
         }
-    };
-
-    const handlePrintClick = (e: React.MouseEvent, reg: RootRegistration) => {
-        e.stopPropagation();
-        setSelectedReg(reg);
-        setShowPrintModal(true);
     };
 
     const handleDeleteRegistration = async (e: React.MouseEvent, reg: RootRegistration) => {
@@ -423,6 +532,26 @@ const RegistrationListPage: React.FC = () => {
                 </select>
                 <div className="ml-auto flex gap-2">
                     <EregiButton
+                        onClick={() => handleBulkResendNotification('selected')}
+                        disabled={isProcessing || selectedIds.length === 0}
+                        isLoading={isProcessing && selectedIds.length > 0 && selectedIds.length < filteredData.length}
+                        variant="secondary"
+                        className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 py-2 px-4 h-auto text-sm"
+                    >
+                        <MessageCircle size={14} className="mr-1.5" />
+                        선택 발송 ({selectedIds.length})
+                    </EregiButton>
+                    <EregiButton
+                        onClick={() => handleBulkResendNotification('all')}
+                        disabled={isProcessing || filteredData.length === 0}
+                        isLoading={isProcessing && selectedIds.length === 0}
+                        variant="secondary"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white border-none py-2 px-4 h-auto text-sm"
+                    >
+                        <MessageCircle size={14} className="mr-1.5" />
+                        전체 발송 ({filteredData.length})
+                    </EregiButton>
+                    <EregiButton
                         onClick={handleExport}
                         disabled={exporting}
                         isLoading={exporting}
@@ -439,6 +568,15 @@ const RegistrationListPage: React.FC = () => {
                 <table className="w-full text-left min-w-[1000px]">
                     <thead className="bg-[#f0f5fa] border-b border-[#e1ecf6]">
                         <tr>
+                            <th className="p-4 w-10">
+                                <button onClick={toggleSelectAll} className="p-1 hover:bg-blue-50 rounded">
+                                    {selectedIds.length === filteredData.length && filteredData.length > 0 ? (
+                                        <CheckSquare size={18} className="text-blue-600" />
+                                    ) : (
+                                        <Square size={18} className="text-gray-300" />
+                                    )}
+                                </button>
+                            </th>
                             <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">주문번호</th>
                             <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">이름</th>
                             <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">이메일</th>
@@ -449,8 +587,8 @@ const RegistrationListPage: React.FC = () => {
                             <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">결제금액</th>
                             <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">결제수단</th>
                             <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">상태</th>
-                            <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">명찰/알림</th>
-                            <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">삭제</th>
+                            <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider text-center">명찰/알림</th>
+                            <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider text-center">삭제</th>
                             <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">등록일</th>
                         </tr>
                     </thead>
@@ -458,9 +596,18 @@ const RegistrationListPage: React.FC = () => {
                         {filteredData.map(r => (
                             <tr
                                 key={r.id}
-                                className="hover:bg-slate-50 cursor-pointer transition-colors"
+                                className={`hover:bg-slate-50 cursor-pointer transition-colors ${selectedIds.includes(r.id) ? 'bg-blue-50/50' : ''}`}
                                 onClick={() => navigate(`/admin/conf/${conferenceId}/registrations/${r.id}`)}
                             >
+                                <td className="p-4" onClick={(e) => toggleSelection(e, r.id)}>
+                                    <div className="flex justify-center">
+                                        {selectedIds.includes(r.id) ? (
+                                            <CheckSquare size={18} className="text-blue-600" />
+                                        ) : (
+                                            <Square size={18} className="text-gray-300" />
+                                        )}
+                                    </div>
+                                </td>
                                 <td className="p-4 font-mono text-xs text-gray-400">{r.orderId || r.id}</td>
                                 <td className="p-4 font-medium text-gray-900">{r.userName}</td>
                                 <td className="p-4 text-sm text-gray-500">{r.userEmail || '-'}</td>
@@ -493,7 +640,7 @@ const RegistrationListPage: React.FC = () => {
                                     )}
                                 </td>
                                 <td className="p-4">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 justify-center">
                                         {r.badgeIssued ? (
                                             <span className="text-green-600 font-bold text-xs flex items-center gap-1">
                                                 <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div> 발급완료
@@ -510,32 +657,33 @@ const RegistrationListPage: React.FC = () => {
                                             )
                                         )}
                                         <EregiButton
-                                            onClick={(e) => handlePrintClick(e, r)}
-                                            variant="secondary"
-                                            className="px-2 py-1 text-xs h-auto bg-white border-slate-200 hover:bg-slate-50 text-slate-600"
-                                            title="웹 인쇄 (브라우저)"
-                                        >
-                                            <Printer size={14} />
-                                        </EregiButton>
-                                        <EregiButton
                                             onClick={(e) => handleBixolonPrint(e, r)}
                                             variant="secondary"
                                             className="px-2 py-1 text-xs h-auto bg-blue-50 border-blue-200 hover:bg-blue-100 text-blue-700 font-bold"
-                                            title="라벨 출력 (Bixolon)"
+                                            title="명찰 프린트"
                                             disabled={bixolonPrinting}
                                         >
-                                            Label
+                                            명찰 프린트
+                                        </EregiButton>
+                                        <EregiButton
+                                            onClick={(e) => handleResendNotification(e, r)}
+                                            variant="secondary"
+                                            className="px-2 py-1 text-xs h-auto bg-indigo-50 border-indigo-200 hover:bg-indigo-100 text-indigo-700"
+                                            title="알림톡 발송"
+                                            disabled={isProcessing}
+                                        >
+                                            <MessageCircle size={14} />
                                         </EregiButton>
                                     </div>
                                 </td>
-                                <td className="p-4">
+                                <td className="p-4 text-center">
                                     <EregiButton
                                         onClick={(e) => handleDeleteRegistration(e, r)}
                                         variant="secondary"
                                         className="px-2 py-1 text-xs h-auto bg-red-50 border-red-200 hover:bg-red-100 text-red-600"
                                         title="삭제"
                                     >
-                                        🗑️ 삭제
+                                        🗑️
                                     </EregiButton>
                                 </td>
                                 <td className="p-4 text-sm text-gray-500 whitespace-nowrap">
@@ -624,46 +772,7 @@ const RegistrationListPage: React.FC = () => {
                 </div>
             )}
 
-            {/* Print Preview Modal */}
-            <Dialog open={showPrintModal} onOpenChange={setShowPrintModal}>
-                <DialogContent className="max-w-3xl">
-                    <DialogHeader>
-                        <DialogTitle>명찰 미리보기 (Badge Preview)</DialogTitle>
-                    </DialogHeader>
-                    <div className="flex flex-col items-center justify-center p-6 bg-gray-100 rounded-xl min-h-[400px]">
-                        {selectedReg && badgeConfig && (
-                            <div ref={badgeRef} className="shadow-2xl">
-                                <BadgeTemplate
-                                    data={{
-                                        registrationId: selectedReg.id,
-                                        name: selectedReg.userName || '',
-                                        org: selectedReg.userOrg || selectedReg.affiliation || '',
-                                        category: displayTier(selectedReg.tier) || selectedReg.categoryName || '참가자',
-                                        LICENSE: selectedReg.licenseNumber || '',
-                                        PRICE: (selectedReg.amount || 0).toLocaleString() + '원'
-                                    }}
-                                    config={badgeConfig}
-                                />
-                            </div>
-                        )}
-                        {!badgeConfig && <p className="text-red-500">배지 설정이 없습니다. (No Badge Config)</p>}
-                    </div>
-                    <div className="flex justify-end gap-3 mt-4">
-                        <EregiButton onClick={() => setShowPrintModal(false)} variant="secondary">
-                            취소
-                        </EregiButton>
-                        <PrintHandler
-                            contentRef={badgeRef}
-                            triggerButton={
-                                <EregiButton variant="primary" className="bg-purple-600 hover:bg-purple-700 text-white">
-                                    <Printer className="w-4 h-4 mr-2" />
-                                    인쇄하기
-                                </EregiButton>
-                            }
-                        />
-                    </div>
-                </DialogContent>
-            </Dialog>
+            {/* Print Preview Modal - REMOVED AS REQUESTED */}
         </div>
     );
 };
