@@ -264,26 +264,38 @@ const AttendanceScannerPage: React.FC = () => {
         if (!cid) return;
         const now = new Date();
         const start = lastIn && typeof lastIn === 'object' && 'toDate' in lastIn ? (lastIn as { toDate: () => Date }).toDate() : now;
-        const diffMins = Math.floor((now.getTime() - start.getTime()) / 60000);
-
-        // 휴게 시간 차감 로직 추가
         const zoneRule = zones.find(z => typeof z === 'object' && z !== null && 'id' in z && (z as { id: string }).id === zoneId) as any;
+
+        let durationMinutes = 0;
         let deduction = 0;
-        if (zoneRule && typeof zoneRule === 'object' && zoneRule !== null && 'breaks' in zoneRule && Array.isArray(zoneRule.breaks)) {
-            zoneRule.breaks.forEach((brk: { start: string; end: string }) => {
-                const localDateStr = zoneRule.ruleDate || start.getFullYear() + "-" + String(start.getMonth() + 1).padStart(2, '0') + "-" + String(start.getDate()).padStart(2, '0');
-                const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
-                const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
-                const overlapStart = Math.max(start.getTime(), breakStart.getTime());
-                const overlapEnd = Math.min(now.getTime(), breakEnd.getTime());
-                if (overlapEnd > overlapStart) {
-                    const overlapMins = Math.floor((overlapEnd - overlapStart) / 60000);
-                    deduction += overlapMins;
-                }
-            });
+        let boundedStart = start;
+        let boundedEnd = now;
+
+        if (zoneRule && zoneRule.start && zoneRule.end && zoneRule.ruleDate) {
+            const sessionStart = new Date(`${zoneRule.ruleDate}T${zoneRule.start}:00`);
+            const sessionEnd = new Date(`${zoneRule.ruleDate}T${zoneRule.end}:00`);
+            boundedStart = new Date(Math.max(start.getTime(), sessionStart.getTime()));
+            boundedEnd = new Date(Math.min(now.getTime(), sessionEnd.getTime()));
         }
 
-        const finalMinutes = Math.max(0, diffMins - deduction); // 휴게 시간 차감 후 저장
+        if (boundedEnd > boundedStart) {
+            durationMinutes = Math.floor((boundedEnd.getTime() - boundedStart.getTime()) / 60000);
+
+            if (zoneRule && Array.isArray(zoneRule.breaks)) {
+                zoneRule.breaks.forEach((brk: { start: string; end: string }) => {
+                    const localDateStr = zoneRule.ruleDate;
+                    const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
+                    const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
+                    const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());
+                    const overlapEnd = Math.min(boundedEnd.getTime(), breakEnd.getTime());
+                    if (overlapEnd > overlapStart) {
+                        deduction += Math.floor((overlapEnd - overlapStart) / 60000);
+                    }
+                });
+            }
+        }
+
+        const finalMinutes = Math.max(0, durationMinutes - deduction); // 휴게 시간 차감 후 저장
         const newTotal = currentTotalMinutes + finalMinutes;
 
         // "수강완료" 판정 (Goal check)
@@ -321,7 +333,7 @@ const AttendanceScannerPage: React.FC = () => {
             recognizedMinutes: finalMinutes,
             evaluatedCompleted: isCompleted,
             accumulatedTotal: newTotal,
-            rawDuration: diffMins,
+            rawDuration: durationMinutes,
             deduction
         });
     };
