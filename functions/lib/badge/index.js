@@ -363,7 +363,7 @@ exports.validateBadgePrepToken = functions
                 phone: regData.phone || ((_d = regData.userInfo) === null || _d === void 0 ? void 0 : _d.phone),
                 affiliation: regData.affiliation || regData.organization || ((_e = regData.userInfo) === null || _e === void 0 ? void 0 : _e.affiliation) || '',
                 licenseNumber: regData.licenseNumber || ((_f = regData.userInfo) === null || _f === void 0 ? void 0 : _f.licenseNumber) || '',
-                confirmationQr: regData.confirmationQr,
+                confirmationQr: regData.confirmationQr || regSnap.id, // fallback to regId for external_attendees without confirmationQr
                 badgeQr: regData.badgeQr,
                 badgeIssued: !!regData.badgeIssued,
                 attendanceStatus: regData.attendanceStatus || 'OUTSIDE',
@@ -474,7 +474,9 @@ exports.resendBadgePrepToken = functions
         if (!regData) {
             throw new Error('Registration data invalid');
         }
-        if (regData.status !== 'PAID') {
+        // [FIX] External attendees use 'paymentStatus' field, not 'status'
+        // Check either field to support both registrations and external_attendees
+        if (regData.paymentStatus !== 'PAID' && regData.status !== 'PAID') {
             throw new Error('Registration not paid');
         }
         // Get conference for expiry date
@@ -574,8 +576,9 @@ exports.onExternalAttendeeCreated = functions.firestore
             createdAt: now,
             expiresAt
         });
-        // Update external attendee doc (legacy compatibility if needed, but mainly updatedAt)
+        // Update external attendee doc - set confirmationQr same as regId (for InfoDesk scanning)
         await db.collection(`conferences/${confId}/external_attendees`).doc(regId).update({
+            confirmationQr: regId, // Used by BadgePrepPage for voucher QR code
             updatedAt: now
         });
         // Send notification

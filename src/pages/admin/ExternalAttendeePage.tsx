@@ -17,12 +17,6 @@ import { UserPlus, Upload, Download, FileText, Badge, CheckCircle2, Trash2, Load
 import toast from 'react-hot-toast';
 import type { ExternalAttendee } from '../../types/schema';
 import { useBixolon } from '../../hooks/useBixolon';
-import { BadgeConfig } from '../../types/print';
-import { convertBadgeLayoutToConfig } from '../../utils/badgeConverter';
-import PrintHandler from '../../components/print/PrintHandler';
-import BadgeTemplate from '../../components/print/BadgeTemplate';
-import { kadd_2026 } from '../../data/conferences/kadd_2026.backup';
-import { useRef } from 'react';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VoucherLinkSection: badge_tokens를 조회해 실제 badge-prep URL을 표시
@@ -266,18 +260,7 @@ const ExternalAttendeePage: React.FC = () => {
     const [showVoucherModal, setShowVoucherModal] = useState(false);
     const [selectedAttendee, setSelectedAttendee] = useState<ExternalAttendee | null>(null);
 
-    // Print Modal State
-    const [showPrintModal, setShowPrintModal] = useState(false);
-    const badgeRef = useRef<HTMLDivElement>(null);
-
     const { printBadge, printing: bixolonPrinting, error: bixolonError } = useBixolon();
-
-    const badgeConfig = React.useMemo(() => {
-        if (info?.badgeLayout && info.badgeLayout.elements.length > 0) {
-            return convertBadgeLayoutToConfig(info.badgeLayout);
-        }
-        return kadd_2026.badge as BadgeConfig;
-    }, [info]);
 
     // Receipt Config
     const [receiptConfig, setReceiptConfig] = useState<{ issuerName: string; stampUrl: string; nextSerialNo: number } | null>(null);
@@ -877,11 +860,6 @@ const ExternalAttendeePage: React.FC = () => {
         }
     };
 
-    const handlePrintClick = (attendee: ExternalAttendee) => {
-        setSelectedAttendee(attendee);
-        setShowPrintModal(true);
-    };
-
     // Handle batch account creation for all
     const handleBatchCreateAccount = async () => {
         const targetAttendees = externalAttendees.filter(a => {
@@ -1393,15 +1371,6 @@ const ExternalAttendeePage: React.FC = () => {
                                                                     <Button
                                                                         size="sm"
                                                                         variant="outline"
-                                                                        className="h-6 px-1.5 text-xs text-slate-600"
-                                                                        onClick={() => handlePrintClick(attendee)}
-                                                                        title="웹 인쇄"
-                                                                    >
-                                                                        <Printer className="w-3 h-3" />
-                                                                    </Button>
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="outline"
                                                                         className="h-6 px-2 text-[10px] text-blue-700 font-bold bg-blue-50 hover:bg-blue-100"
                                                                         onClick={() => handleBixolonPrint(attendee)}
                                                                         disabled={bixolonPrinting}
@@ -1543,46 +1512,6 @@ const ExternalAttendeePage: React.FC = () => {
                 </DialogContent>
             </Dialog>
 
-            {/* Print Preview Modal */}
-            <Dialog open={showPrintModal} onOpenChange={setShowPrintModal}>
-                <DialogContent className="max-w-3xl">
-                    <DialogHeader>
-                        <DialogTitle>명찰 미리보기 (Badge Preview)</DialogTitle>
-                    </DialogHeader>
-                    <div className="flex flex-col items-center justify-center p-6 bg-gray-100 rounded-xl min-h-[400px]">
-                        {selectedAttendee && badgeConfig && (
-                            <div ref={badgeRef} className="shadow-2xl bg-white relative">
-                                <BadgeTemplate
-                                    data={{
-                                        registrationId: selectedAttendee.id,
-                                        name: selectedAttendee.name || '',
-                                        org: selectedAttendee.organization || '',
-                                        category: '외부참석자',
-                                        LICENSE: selectedAttendee.licenseNumber || '',
-                                        PRICE: (selectedAttendee.amount || 0).toLocaleString() + '원'
-                                    }}
-                                    config={badgeConfig}
-                                />
-                            </div>
-                        )}
-                        {!badgeConfig && <p className="text-red-500">배지 설정이 없습니다. (No Badge Config)</p>}
-                    </div>
-                    <div className="flex justify-end gap-3 mt-4">
-                        <Button onClick={() => setShowPrintModal(false)} variant="outline">
-                            취소
-                        </Button>
-                        <PrintHandler
-                            contentRef={badgeRef}
-                            triggerButton={
-                                <Button className="bg-purple-600 hover:bg-purple-700 text-white">
-                                    <Printer className="w-4 h-4 mr-2" />
-                                    인쇄하기
-                                </Button>
-                            }
-                        />
-                    </div>
-                </DialogContent>
-            </Dialog>
         </div>
     );
 };

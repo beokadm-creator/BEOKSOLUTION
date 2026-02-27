@@ -548,10 +548,14 @@ export const resendBadgePrepToken = functions
       const now = admin.firestore.Timestamp.now();
 
       // Get existing registration (check both collections)
+      let isExternalAttendee = false;
       let regSnap = await db.collection(`conferences/${confId}/registrations`).doc(regId).get();
 
       if (!regSnap.exists) {
         regSnap = await db.collection(`conferences/${confId}/external_attendees`).doc(regId).get();
+        if (regSnap.exists) {
+          isExternalAttendee = true;
+        }
       }
 
       if (!regSnap.exists) {
@@ -563,9 +567,8 @@ export const resendBadgePrepToken = functions
         throw new Error('Registration data invalid');
       }
 
-      // [FIX] External attendees use 'paymentStatus' field, not 'status'
-      // Check either field to support both registrations and external_attendees
-      if (regData.paymentStatus !== 'PAID' && regData.status !== 'PAID') {
+      // [FIX] External attendees are manually added by admin, so they bypass PAID check
+      if (!isExternalAttendee && regData.paymentStatus !== 'PAID' && regData.status !== 'PAID') {
         throw new Error('Registration not paid');
       }
 
