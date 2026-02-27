@@ -158,10 +158,14 @@ const AttendanceLivePage: React.FC = () => {
                         isExternal: false
                     } as Registration;
 
+                    flattened.userName = docData.userName || docData.name || docData.userInfo?.name || 'Unknown';
+                    flattened.userEmail = docData.userEmail || docData.userInfo?.email || '';
+                    flattened.affiliation = docData.userOrg || docData.organization || docData.affiliation || docData.userInfo?.affiliation || docData.userInfo?.organization || '';
+
                     if (docData.userInfo) {
-                        flattened.userName = docData.userInfo.name || docData.userName;
-                        flattened.userEmail = docData.userInfo.email || docData.userEmail;
-                        flattened.affiliation = docData.userInfo.affiliation || docData.affiliation;
+                        flattened.userName = docData.userInfo.name || flattened.userName;
+                        flattened.userEmail = docData.userInfo.email || flattened.userEmail;
+                        flattened.affiliation = docData.userInfo.affiliation || docData.userInfo.organization || flattened.affiliation;
                     }
                     return flattened;
                 });

@@ -171,8 +171,13 @@ const GatePage: React.FC = () => {
             setScannerState({ status: 'ERROR', message: 'No Zone Selected', lastScanned: code });
             return;
         }
+        const confId = cid || selectedConferenceId;
+        if (!confId) {
+            setScannerState({ status: 'ERROR', message: '입장 정보를 처리할 컨퍼런스가 선택되지 않았습니다.', lastScanned: code });
+            return;
+        }
 
-        setScannerState({ status: 'PROCESSING', message: 'Verifying...', lastScanned: code });
+        setScannerState({ status: 'PROCESSING', message: '확인 중...', lastScanned: code });
 
         try {
             // Function to handle Hangul typos from Korean keyboard barcode scanners
@@ -209,7 +214,7 @@ const GatePage: React.FC = () => {
 
             if (isExternalAttendee) {
                 // External attendee path
-                const extRef = doc(db, `conferences/${selectedConferenceId}/external_attendees`, regId);
+                const extRef = doc(db, `conferences/${confId}/external_attendees`, regId);
                 const extSnap = await getDoc(extRef);
 
                 if (!extSnap.exists()) {
@@ -227,7 +232,7 @@ const GatePage: React.FC = () => {
                 currentZone = regData.currentZone;
             } else {
                 // Regular registration path
-                const regRef = doc(db, `conferences/${selectedConferenceId}/registrations`, regId);
+                const regRef = doc(db, `conferences/${confId}/registrations`, regId);
                 const regSnap = await getDoc(regRef);
 
                 if (!regSnap.exists()) {
@@ -241,8 +246,29 @@ const GatePage: React.FC = () => {
                 // Removed strict redundant slug check as we already queried the specific conference subcollection.
                 // Depending on data import methods, old registrations might lack the slug field.
 
-                userName = regData.userName || 'Unknown';
-                userAffiliation = regData.affiliation || regData.userEmail || '';
+                userName = regData.userName || regData.name || regData.userInfo?.name || '';
+                userAffiliation = regData.userOrg || regData.organization || regData.affiliation || regData.userInfo?.affiliation || regData.userInfo?.organization || regData.userEmail || '';
+
+                if (!userName || userName === 'Unknown' || (!userAffiliation || userAffiliation.includes('@'))) {
+                    try {
+                        if (regData.userId && confId) {
+                            const userRef = doc(db, `conferences/${confId}/users`, regData.userId);
+                            const userSnap = await getDoc(userRef);
+                            if (userSnap.exists()) {
+                                const userData = userSnap.data();
+                                userName = userName || userData.name || 'Unknown';
+                                if (!userAffiliation || userAffiliation.includes('@')) {
+                                    userAffiliation = userData.organization || userData.affiliation || userAffiliation;
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Failed to fetch user data for fallback', err);
+                    }
+                }
+
+                if (!userName) userName = 'Unknown';
+
                 currentStatus = regData.attendanceStatus || 'OUTSIDE';
                 currentZone = regData.currentZone;
             }
