@@ -166,11 +166,11 @@ const AttendanceScannerPage: React.FC = () => {
 
             const regId = regDoc.id; // Use registration ID from query result
 
-            let userName = regData.userName || regData.name || regData.userInfo?.name || 'Unknown';
+            let userName = isExternal ? (regData.name || 'Unknown') : (regData.userName || regData.name || regData.userInfo?.name || 'Unknown');
             let userAffiliation = regData.userOrg || regData.affiliation || regData.organization || regData.userInfo?.affiliation || regData.userInfo?.organization || regData.userEmail || '';
 
             // Ensure we fetch from user doc if missing or is an email
-            if ((!userAffiliation || userAffiliation.includes('@')) && regData.userId) {
+            if (!isExternal && (userName === 'Unknown' || !userAffiliation || userAffiliation.includes('@')) && regData.userId) {
                 try {
                     const userRef = doc(db, `conferences/${cid}/users`, regData.userId);
                     const userSnap = await getDoc(userRef);
