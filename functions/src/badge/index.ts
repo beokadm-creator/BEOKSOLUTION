@@ -434,7 +434,7 @@ export const validateBadgePrepToken = functions
           phone: regData.phone || regData.userInfo?.phone,
           affiliation: regData.affiliation || regData.organization || regData.userInfo?.affiliation || '',
           licenseNumber: regData.licenseNumber || regData.userInfo?.licenseNumber || '',
-          confirmationQr: regData.confirmationQr,
+          confirmationQr: regData.confirmationQr || regSnap.id,  // fallback to regId for external_attendees without confirmationQr
           badgeQr: regData.badgeQr,
           badgeIssued: !!regData.badgeIssued,
           attendanceStatus: regData.attendanceStatus || 'OUTSIDE',
@@ -687,8 +687,9 @@ export const onExternalAttendeeCreated = functions.firestore
         expiresAt
       });
 
-      // Update external attendee doc (legacy compatibility if needed, but mainly updatedAt)
+      // Update external attendee doc - set confirmationQr same as regId (for InfoDesk scanning)
       await db.collection(`conferences/${confId}/external_attendees`).doc(regId).update({
+        confirmationQr: regId,  // Used by BadgePrepPage for voucher QR code
         updatedAt: now
       });
 
