@@ -17,6 +17,7 @@ interface ScannerState {
         name: string;
         affiliation: string;
     };
+    actionType?: 'ENTER' | 'EXIT';
 }
 
 interface DesignConfig {
@@ -167,6 +168,10 @@ const GatePage: React.FC = () => {
     // PROCESS SCAN
     const processScan = async (code: string) => {
         if (scannerState.status === 'PROCESSING') return;
+
+        // Immediately clear input to allow next scan to be typed in by hardware
+        setInputValue('');
+
         if (!selectedZoneId) {
             setScannerState({ status: 'ERROR', message: 'No Zone Selected', lastScanned: code });
             return;
@@ -186,9 +191,11 @@ const GatePage: React.FC = () => {
                     'ㅂ': 'q', 'ㅈ': 'w', 'ㄷ': 'e', 'ㄱ': 'r', 'ㅅ': 't', 'ㅛ': 'y', 'ㅕ': 'u', 'ㅑ': 'i', 'ㅐ': 'o', 'ㅔ': 'p',
                     'ㅁ': 'a', 'ㄴ': 's', 'ㅇ': 'd', 'ㄹ': 'f', 'ㅎ': 'g', 'ㅗ': 'h', 'ㅓ': 'j', 'ㅏ': 'k', 'ㅣ': 'l',
                     'ㅋ': 'z', 'ㅌ': 'x', 'ㅊ': 'c', 'ㅍ': 'v', 'ㅠ': 'b', 'ㅜ': 'n', 'ㅡ': 'm',
-                    'ㅃ': 'Q', 'ㅉ': 'W', 'ㄸ': 'E', 'ㄲ': 'R', 'ㅆ': 'T', 'ㅒ': 'O', 'ㅖ': 'P'
+                    'ㅃ': 'Q', 'ㅉ': 'W', 'ㄸ': 'E', 'ㄲ': 'R', 'ㅆ': 'T', 'ㅒ': 'O', 'ㅖ': 'P',
+                    // Additional common typos if needed
                 };
-                return str.split('').map(char => korToEng[char] || char).join('');
+                // Ensure we only keep English alphanumeric and standard prefixes
+                return str.split('').map(char => korToEng[char] || char).join('').replace(/[^a-zA-Z0-9-]/g, '');
             };
 
             // Extract registration ID from QR code (remove BADGE- prefix if exists)
@@ -274,7 +281,8 @@ const GatePage: React.FC = () => {
             }
 
             // 2. Logic Switch
-            let action = '';
+            let actionText = '';
+            let actionType: 'ENTER' | 'EXIT' = 'ENTER';
             const currentTotalMinutes = typeof (regData as any).totalMinutes === 'number' ? (regData as any).totalMinutes : 0;
 
             if (mode === 'ENTER_ONLY') {
@@ -283,40 +291,47 @@ const GatePage: React.FC = () => {
                     // Auto-Switch
                     await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee, currentTotalMinutes);
                     await performCheckIn(regId, selectedZoneId, isExternalAttendee);
-                    action = 'Switched & Checked In';
+                    actionText = 'Switch & ENTER';
+                    actionType = 'ENTER';
                 } else {
                     await performCheckIn(regId, selectedZoneId, isExternalAttendee);
-                    action = '입장 완료 (Checked In)';
+                    actionText = '입장 완료 (ENTER)';
+                    actionType = 'ENTER';
                 }
             }
             else if (mode === 'EXIT_ONLY') {
                 if (currentStatus !== 'INSIDE') throw new Error(`${userName}님은 입장 기록이 없습니다.`);
                 await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee, currentTotalMinutes);
-                action = '퇴장 완료 (Checked Out)';
+                actionText = '퇴장 완료 (EXIT)';
+                actionType = 'EXIT';
             }
             else if (mode === 'AUTO') {
                 if (currentStatus === 'INSIDE') {
                     if (currentZone !== selectedZoneId) {
                         await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee, currentTotalMinutes);
                         await performCheckIn(regId, selectedZoneId, isExternalAttendee);
-                        action = 'Zone Switched';
+                        actionText = 'Zone Switched';
+                        actionType = 'ENTER';
                     } else {
                         await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee, currentTotalMinutes);
-                        action = '퇴장 완료 (Checked Out)';
+                        actionText = '퇴장 완료 (EXIT)';
+                        actionType = 'EXIT';
                     }
                 } else {
                     await performCheckIn(regId, selectedZoneId, isExternalAttendee);
-                    action = '입장 완료 (Checked In)';
+                    actionText = '입장 완료 (ENTER)';
+                    actionType = 'ENTER';
                 }
             }
 
             // Success
             setScannerState({
                 status: 'SUCCESS',
-                message: action,
+                message: actionText,
                 subMessage: userName,
                 lastScanned: regId,
-                userData: { name: userName, affiliation: userAffiliation }
+                userData: { name: userName, affiliation: userAffiliation },
+                actionType
             });
 
         } catch (e) {
@@ -331,8 +346,7 @@ const GatePage: React.FC = () => {
 
         setTimeout(() => {
             setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE', message: 'Ready' });
-            setInputValue('');
-        }, 3000); // 3s delay for readability
+        }, 1200); // Reduced delay for faster throughput
     };
 
     const performCheckIn = async (id: string, zoneId: string, isExternal: boolean = false) => {
@@ -448,6 +462,9 @@ const GatePage: React.FC = () => {
     if (loading) return <div>Loading Kiosk...</div>;
 
     const getModeColor = () => {
+        if (scannerState.status === 'SUCCESS') {
+            return scannerState.actionType === 'ENTER' ? 'bg-blue-600' : 'bg-orange-600';
+        }
         if (mode === 'ENTER_ONLY') return 'bg-blue-600';
         if (mode === 'EXIT_ONLY') return 'bg-red-600';
         return 'bg-purple-600';
@@ -591,7 +608,12 @@ const GatePage: React.FC = () => {
                     <div className={`absolute inset-0 z-[60000] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200 ${scannerState.status === 'SUCCESS' ? getModeColor() : 'bg-red-600'
                         } text-white`}>
                         {scannerState.status === 'SUCCESS' ? (
-                            <CheckCircle className="w-40 h-40 mb-8 drop-shadow-lg" />
+                            <div className="flex flex-col items-center">
+                                <CheckCircle className="w-40 h-40 mb-4 drop-shadow-lg" />
+                                <div className="text-4xl font-black uppercase tracking-widest opacity-80 mb-4">
+                                    {scannerState.actionType === 'ENTER' ? 'Check-In Success' : 'Check-Out Success'}
+                                </div>
+                            </div>
                         ) : (
                             <AlertCircle className="w-40 h-40 mb-8 drop-shadow-lg" />
                         )}
