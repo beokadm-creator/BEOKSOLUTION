@@ -2,7 +2,7 @@ import React, { useLayoutEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, getDocs } from 'firebase/firestore';
 import QRCode from 'react-qr-code';
 
 const ConferenceBadgePage: React.FC = () => {
@@ -23,6 +23,10 @@ const ConferenceBadgePage: React.FC = () => {
   const [zones, setZones] = useState<any[]>([]);
   const [liveMinutes, setLiveMinutes] = useState<number>(0);
   const [msg, setMsg] = useState("초기화 중...");
+
+  // Gamification states
+  const [totalVendors, setTotalVendors] = useState<number>(0);
+  const [myStamps, setMyStamps] = useState<string[]>([]);
 
   useLayoutEffect(() => {
     if (!slug || !auth.user) {
@@ -186,6 +190,40 @@ const ConferenceBadgePage: React.FC = () => {
     return () => clearInterval(timer);
   }, [uiData, zones]);
 
+  // Gamification Data Loader
+  useLayoutEffect(() => {
+    if (!slug || !uiData?.id) return;
+
+    let unsubStamps = () => { };
+
+    const fetchGamification = async () => {
+      try {
+        // 1. Fetch total vendors participating in stamp tour
+        const vSnap = await getDocs(query(collection(db, `conferences/${slug}/sponsors`), where("isStampTourParticipant", "==", true)));
+        // Get valid vendorIds that are actively participating in the stamp tour for this conference
+        const validVendorIds = new Set(vSnap.docs.filter(d => d.data().vendorId).map(d => d.data().vendorId));
+        setTotalVendors(validVendorIds.size);
+
+        // 2. Listen to my stamps
+        const sQ = query(collection(db, `conferences/${slug}/stamps`), where('userId', '==', uiData.id));
+        unsubStamps = onSnapshot(sQ, (snap) => {
+          const list = snap.docs.map(d => d.data());
+          // Only count stamps for vendors that are CURRENTLY participants
+          const uniqueVendors = Array.from(new Set(list.map(s => s.vendorId))).filter(vid => validVendorIds.has(vid));
+          setMyStamps(uniqueVendors);
+        });
+      } catch (e) {
+        console.error("Failed to load Gamification data", e);
+      }
+    };
+
+    fetchGamification();
+
+    return () => {
+      unsubStamps();
+    }
+  }, [slug, uiData?.id]);
+
   // Render - outside useEffect
   if (msg) return <div className="p-10 text-center font-bold text-gray-500 flex items-center justify-center min-h-screen">{msg}</div>;
   if (!uiData) return <div className="p-10 text-center flex items-center justify-center min-h-screen">데이터 로드 실패</div>;
@@ -230,6 +268,48 @@ const ConferenceBadgePage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* GAMIFICATION - STAMP TOUR */}
+      {uiData && uiData.issued && totalVendors > 0 && (
+        <div className="mt-6 w-full max-w-sm border-2 border-dashed border-indigo-400 rounded-3xl p-6 text-center shadow-md bg-indigo-50">
+          <h3 className="text-xl font-bold text-indigo-900 mb-2">⭐ 부스 스탬프 투어</h3>
+          <p className="text-sm text-indigo-700 mb-4">
+            파트너사 부스를 방문하고 스탬프를 모아보세요!<br />
+            <span className="font-semibold text-xs text-indigo-500">모두 모으면 경품 추첨 자동 응모!</span>
+          </p>
+
+          <div className="flex justify-between items-center text-sm font-bold text-indigo-800 mb-2">
+            <span>내 진행 상황</span>
+            <span className="text-indigo-600 bg-white px-3 py-1 rounded-full shadow-sm">{myStamps.length} / {totalVendors}</span>
+          </div>
+
+          <div className="w-full bg-indigo-200 rounded-full h-3 mb-4 overflow-hidden">
+            <div
+              className="bg-indigo-600 h-3 rounded-full transition-all duration-1000 ease-out relative"
+              style={{ width: `${Math.min(100, (myStamps.length / totalVendors) * 100)}%` }}
+            >
+              {myStamps.length === totalVendors && (
+                <div className="absolute inset-0 bg-white/30 animate-pulse"></div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 justify-center mt-4">
+            {Array.from({ length: totalVendors }).map((_, i) => (
+              <div
+                key={i}
+                className={`w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-sm border ${i < myStamps.length
+                  ? 'bg-indigo-500 border-indigo-600 text-white animate-bounce'
+                  : 'bg-white border-indigo-200 text-transparent'
+                  }`}
+              >
+                {i < myStamps.length && '⭐'}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="mt-6 text-center">
         <p className="text-sm font-bold text-gray-500 tracking-wider">REF: {uiData.receiptNumber}</p>
         <p className="text-[10px] text-gray-300 font-mono tracking-widest mt-1">ID: {uiData.id}</p>

@@ -62,6 +62,7 @@ import { FeatureFlagProvider } from './contexts/FeatureFlagContext';
 import LandingPage from './pages/LandingPage';
 import SocietyLandingPage from './pages/SocietyLandingPage';
 import VendorDashboard from './pages/vendor/VendorDashboard';
+import VendorIntroPage from './pages/conference/VendorIntroPage';
 
 import SecurityPolicyManager from './components/admin/SecurityPolicyManager';
 
@@ -92,16 +93,16 @@ const App: React.FC = () => {
     // 이 로직은 오직 Admin 라우팅 내부에서만 동작하므로 일반 사용자에게는 영향 없음.
     let effectiveSubdomain = subdomain;
     if (!effectiveSubdomain && !hostname.includes('localhost') && !hostname.includes('admin.eregi')) {
-       const parts = hostname.split('.');
-       // www 제거 후 첫 번째 파트 확인
-       const cleanParts = parts[0] === 'www' ? parts.slice(1) : parts;
-       
-       if (cleanParts.length >= 3) {
-          const first = cleanParts[0];
-          if (first !== 'eregi' && first !== 'admin' && first !== 'web') {
-             effectiveSubdomain = first;
-          }
-       }
+      const parts = hostname.split('.');
+      // www 제거 후 첫 번째 파트 확인
+      const cleanParts = parts[0] === 'www' ? parts.slice(1) : parts;
+
+      if (cleanParts.length >= 3) {
+        const first = cleanParts[0];
+        if (first !== 'eregi' && first !== 'admin' && first !== 'web') {
+          effectiveSubdomain = first;
+        }
+      }
     }
 
     const activeSocietyId = params.get('society') || effectiveSubdomain;
@@ -319,6 +320,7 @@ const App: React.FC = () => {
                 <Route path="/:slug/terms" element={<TermsPage />} />
                 <Route path="/:slug/privacy" element={<PrivacyPage />} />
                 <Route path="/payment/success" element={<PaymentSuccessHandler />} />
+                <Route path="/:slug/vendors/:vid" element={<VendorIntroPage />} />
 
                 {/* --- PRIORITY 5: CONFERENCE LANDING (/2026spring, etc.) --- */}
                 {/* Preview route must come before general slug route */}
@@ -402,6 +404,7 @@ const App: React.FC = () => {
               <Route path="/:slug/abstracts" element={<AbstractSubmissionPage />} />
               <Route path="/:slug/program" element={<ProgramPage />} />
               <Route path="/:slug/agenda" element={<ProgramPage />} />
+              <Route path="/:slug/vendors/:vid" element={<VendorIntroPage />} />
 
               {/* --- PRIORITY 6: CONFERENCE LANDING (/2026spring, etc.) --- */}
               {/* Preview route must come before general slug route */}

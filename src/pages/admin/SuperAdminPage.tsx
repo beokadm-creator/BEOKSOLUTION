@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../../components/ui/card';
-import { LogOut, Plus, Building2, Calendar, Edit, Save, Users, Settings, Trash2, Key, ShieldCheck, Search, Filter, Activity, CheckCircle2 } from 'lucide-react';
+import { LogOut, Plus, Building2, Calendar, Edit, Save, Users, Settings, Trash2, Key, ShieldCheck, Search, Filter, Activity, CheckCircle2, Store } from 'lucide-react';
 import { auth, functions } from '../../firebase';
 import { httpsCallable } from 'firebase/functions';
 import { doc, updateDoc, getDocs, collection, getDoc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
@@ -18,7 +18,7 @@ import { Textarea } from '../../components/ui/textarea';
 
 const SuperAdminPage: React.FC = () => {
     const { societies, createSociety, createConference, loading } = useSuperAdmin();
-    const [activeTab, setActiveTab] = useState<'SOCIETY' | 'CONFERENCE' | 'MEMBERS' | 'CODES' | 'SETTINGS' | 'MONITORING'>('SOCIETY');
+    const [activeTab, setActiveTab] = useState<'SOCIETY' | 'CONFERENCE' | 'MEMBERS' | 'CODES' | 'SETTINGS' | 'MONITORING' | 'VENDORS'>('SOCIETY');
 
     const [socNameKo, setSocNameKo] = useState('');
     const [socNameEn, setSocNameEn] = useState('');
@@ -61,6 +61,15 @@ const SuperAdminPage: React.FC = () => {
     const [editingSoc, setEditingSoc] = useState<{ id: string; name: { ko: string; en?: string }; description?: { ko?: string }; homepageUrl?: string; adminEmails?: string[] } | null>(null);
     const [editDescKo, setEditDescKo] = useState('');
     const [editHomepage, setEditHomepage] = useState('');
+
+    // Vendors State
+    const [vendors, setVendors] = useState<Array<{ id: string; name: string; description?: string; logoUrl?: string; }>>([]);
+    const [loadingVendors, setLoadingVendors] = useState(false);
+    const [newVendorName, setNewVendorName] = useState('');
+    const [newVendorDesc, setNewVendorDesc] = useState('');
+    const [editingVendor, setEditingVendor] = useState<{ id: string; name: string; description?: string; logoUrl?: string } | null>(null);
+    const [editVendorName, setEditVendorName] = useState('');
+    const [editVendorDesc, setEditVendorDesc] = useState('');
 
     // Monitoring state
     const today = new Date().toISOString().split('T')[0];
@@ -147,14 +156,78 @@ const SuperAdminPage: React.FC = () => {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             toast.error('알림톡 설정 확인 실패: ' + errorMessage);
             setAlimTalkConfigData({ success: false, error: errorMessage });
-            console.error('[fetchAlimTalkConfig] Failed:', error);
-            toast.error('알림톡 설정 확인 실패: ' + error.message);
-            setAlimTalkConfigData({ success: false, error: error.message });
         } finally {
             setAlimTalkConfigLoading(false);
         }
     };
 
+    const fetchVendors = useCallback(async () => {
+        setLoadingVendors(true);
+        try {
+            const snap = await getDocs(collection(db, 'vendors'));
+            const data = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+            setVendors(data);
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to load vendors');
+        } finally {
+            setLoadingVendors(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (activeTab === 'VENDORS') {
+            fetchVendors();
+        }
+    }, [activeTab, fetchVendors]);
+
+    const handleCreateVendor = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newVendorName.trim()) return;
+        try {
+            await addDoc(collection(db, 'vendors'), {
+                name: newVendorName.trim(),
+                description: newVendorDesc.trim(),
+                createdAt: new Date()
+            });
+            toast.success('Vendor created successfully');
+            setNewVendorName('');
+            setNewVendorDesc('');
+            fetchVendors();
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to create vendor');
+        }
+    };
+
+    const handleUpdateVendor = async (id: string) => {
+        if (!editVendorName.trim()) return;
+        try {
+            await updateDoc(doc(db, 'vendors', id), {
+                name: editVendorName.trim(),
+                description: editVendorDesc.trim(),
+                updatedAt: new Date()
+            });
+            toast.success('Vendor updated');
+            setEditingVendor(null);
+            fetchVendors();
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to update vendor');
+        }
+    };
+
+    const handleDeleteVendor = async (id: string, name: string) => {
+        if (!window.confirm(`Delete vendor "${name}"? This action cannot be undone.`)) return;
+        try {
+            await deleteDoc(doc(db, 'vendors', id));
+            toast.success('Vendor deleted');
+            fetchVendors();
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to delete vendor');
+        }
+    };
 
     const fetchMembers = useCallback(async () => {
         console.log('[SuperAdminPage] fetchMembers called, currentSocietyId:', currentSocietyId);
@@ -435,11 +508,12 @@ const SuperAdminPage: React.FC = () => {
                             { id: 'MEMBERS', label: 'Members', icon: <Users className="w-4 h-4" /> },
                             { id: 'CODES', label: 'Codes', icon: <Key className="w-4 h-4" /> },
                             { id: 'SETTINGS', label: 'Settings', icon: <Settings className="w-4 h-4" /> },
-                            { id: 'MONITORING', label: '모니터링', icon: <Activity className="w-4 h-4" /> }
+                            { id: 'MONITORING', label: '모니터링', icon: <Activity className="w-4 h-4" /> },
+                            { id: 'VENDORS', label: 'Vendors', icon: <Store className="w-4 h-4" /> }
                         ].map(tab => (
                             <button
                                 key={tab.id}
-                                onClick={() => setActiveTab(tab.id as 'SOCIETY' | 'CONFERENCE' | 'MEMBERS' | 'CODES' | 'SETTINGS' | 'MONITORING')}
+                                onClick={() => setActiveTab(tab.id as 'SOCIETY' | 'CONFERENCE' | 'MEMBERS' | 'CODES' | 'SETTINGS' | 'MONITORING' | 'VENDORS')}
                                 className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === tab.id ? 'bg-[#fbbf24] text-black' : 'bg-[#1e1e1e] text-gray-400 hover:bg-[#333] hover:text-white'}`}
                             >
                                 {tab.icon}
@@ -1022,8 +1096,8 @@ const SuperAdminPage: React.FC = () => {
                                             {healthCheckData && (
                                                 <div className="space-y-3">
                                                     <div className={`p-4 rounded-lg border-2 ${healthCheckData.status === 'healthy' ? 'bg-green-500/10 border-green-500' :
-                                                            healthCheckData.status === 'degraded' ? 'bg-yellow-500/10 border-yellow-500' :
-                                                                'bg-red-500/10 border-red-500'
+                                                        healthCheckData.status === 'degraded' ? 'bg-yellow-500/10 border-yellow-500' :
+                                                            'bg-red-500/10 border-red-500'
                                                         }`}>
                                                         <div className="flex items-center gap-2 mb-2">
                                                             {healthCheckData.status === 'healthy' ? <CheckCircle2 className="w-5 h-5 text-green-400" /> :
@@ -1349,6 +1423,107 @@ const SuperAdminPage: React.FC = () => {
                                     </CardContent>
                                 </Card>
                             </>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'VENDORS' && (
+                    <div className="space-y-6">
+                        <Card className="shadow-lg border-t-4 border-t-indigo-500">
+                            <CardHeader className="pb-4">
+                                <CardTitle className="text-xl flex items-center gap-2">
+                                    <Store className="w-5 h-5 text-indigo-500" /> Register Global Vendor
+                                </CardTitle>
+                                <CardDescription>Add new independent vendors to the platform</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                <form onSubmit={handleCreateVendor} className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-gray-400 uppercase">Vendor Name</Label>
+                                            <Input required value={newVendorName} onChange={e => setNewVendorName(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-indigo-500 text-gray-200" placeholder="e.g. ABC IT Solutions" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-gray-400 uppercase">Description (Optional)</Label>
+                                            <Input value={newVendorDesc} onChange={e => setNewVendorDesc(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-indigo-500 text-gray-200" placeholder="Brief description..." />
+                                        </div>
+                                    </div>
+                                    <Button type="submit" disabled={!newVendorName.trim()} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold">
+                                        <Plus className="w-4 h-4 mr-2" /> Register Vendor
+                                    </Button>
+                                </form>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="shadow-lg">
+                            <CardHeader>
+                                <CardTitle>Existing Global Vendors</CardTitle>
+                                <CardDescription>Manage platform-wide vendors</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {loadingVendors ? (
+                                    <div className="py-12 flex justify-center"><LoadingSpinner /></div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {vendors.map(v => (
+                                            <div key={v.id} className="flex items-center justify-between p-4 bg-[#2a2a2a] rounded-lg border border-[#333]">
+                                                <div className="flex-1">
+                                                    <div className="font-semibold text-gray-200">{v.name}</div>
+                                                    <div className="text-xs text-gray-400">{v.description || 'No description'} • ID: <span className="font-mono">{v.id}</span></div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white" onClick={() => {
+                                                        setEditingVendor(v);
+                                                        setEditVendorName(v.name);
+                                                        setEditVendorDesc(v.description || '');
+                                                    }}>
+                                                        <Edit className="w-4 h-4" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-500" onClick={() => handleDeleteVendor(v.id, v.name)}>
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {vendors.length === 0 && (
+                                            <div className="text-center py-12 text-gray-400">
+                                                <Store className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                                                <p>No vendors registered yet.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {editingVendor && (
+                            <Card className="shadow-lg border-t-4 border-t-blue-600">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Edit className="w-5 h-5 text-blue-600" /> Edit Vendor Info
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-4">
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-gray-400 uppercase">Vendor Name</Label>
+                                            <Input value={editVendorName} onChange={e => setEditVendorName(e.target.value)} className="bg-white" placeholder="Name" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-gray-400 uppercase">Description</Label>
+                                            <Input value={editVendorDesc} onChange={e => setEditVendorDesc(e.target.value)} className="bg-white" placeholder="Description" />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button onClick={() => handleUpdateVendor(editingVendor.id)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold flex-1">
+                                                <Save className="w-4 h-4 mr-2" /> Save Changes
+                                            </Button>
+                                            <Button onClick={() => setEditingVendor(null)} variant="outline">
+                                                Cancel
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
                         )}
                     </div>
                 )}

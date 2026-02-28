@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAdminStore } from '../../store/adminStore';
-import { Sponsor, SponsorDoc, SponsorTier } from '../../types/schema';
+import { Sponsor, SponsorDoc, SponsorTier, Vendor } from '../../types/schema';
 import { Timestamp, collection, getDocs, doc, setDoc, updateDoc, deleteDoc, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Button } from '../../components/ui/button';
@@ -17,12 +17,14 @@ const SponsorManager: React.FC = () => {
   const { selectedConferenceId: confId } = useAdminStore();
 
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+  const [globalVendors, setGlobalVendors] = useState<Vendor[]>([]);
   const [selectedSponsorId, setSelectedSponsorId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Form state
   const [form, setForm] = useState<Partial<SponsorDoc>>({
     isActive: true,
+    isStampTourParticipant: false,
     // tier: undefined by default (no tier)
   });
 
@@ -36,6 +38,12 @@ const SponsorManager: React.FC = () => {
       const list = spSnap.docs.map(d => ({ id: d.id, ...d.data() } as Sponsor));
       list.sort((a, b) => (a.order || 999) - (b.order || 999));
       setSponsors(list);
+
+      // Fetch global vendors for linking
+      const vRef = collection(db, 'vendors');
+      const vSnap = await getDocs(vRef);
+      const vList = vSnap.docs.map(d => ({ id: d.id, ...d.data() } as Vendor));
+      setGlobalVendors(vList);
     } catch (error) {
       console.error('Failed to fetch sponsors:', error);
       toast.error('스폰서 목록을 불러오는데 실패했습니다.');
@@ -52,6 +60,8 @@ const SponsorManager: React.FC = () => {
   const resetForm = () => {
     setForm({
       isActive: true,
+      isStampTourParticipant: false,
+      vendorId: undefined,
       order: sponsors.length > 0 ? Math.max(...sponsors.map(s => s.order || 0)) + 1 : 1,
       // tier: undefined by default (no tier)
     });
@@ -74,7 +84,7 @@ const SponsorManager: React.FC = () => {
     setLoading(true);
     try {
       const now = Timestamp.now();
-      
+
       // Build data object without undefined fields (Firestore doesn't accept undefined)
       const data: Record<string, unknown> = {
         name: form.name.trim(),
@@ -83,9 +93,14 @@ const SponsorManager: React.FC = () => {
         websiteUrl: form.websiteUrl.trim(),
         order: form.order ?? sponsors.length + 1,
         isActive: form.isActive ?? true,
+        isStampTourParticipant: form.isStampTourParticipant ?? false,
         createdAt: form.createdAt || now,
         updatedAt: now,
       };
+
+      if (form.vendorId) {
+        data.vendorId = form.vendorId;
+      }
 
       // Handle tier field: include if defined, delete if undefined/empty
       if (form.tier) {
@@ -95,14 +110,17 @@ const SponsorManager: React.FC = () => {
       if (selectedSponsorId) {
         // Update existing document
         const docRef = doc(db, `conferences/${confId}/sponsors`, selectedSponsorId);
-        
+
         // Check if we need to remove the tier field
         const existingSponsor = sponsors.find(s => s.id === selectedSponsorId);
         if (existingSponsor && existingSponsor.tier && !form.tier) {
           // Tier exists in DB but being removed -> use deleteField()
           data.tier = deleteField();
         }
-        
+        if (existingSponsor && existingSponsor.vendorId && !form.vendorId) {
+          data.vendorId = deleteField();
+        }
+
         await updateDoc(docRef, data);
         toast.success('스폰서 정보가 수정되었습니다.');
       } else {
@@ -207,9 +225,8 @@ const SponsorManager: React.FC = () => {
               {sponsors.map((sponsor, index) => (
                 <Card
                   key={sponsor.id}
-                  className={`cursor-pointer transition-all hover:shadow-md ${
-                    selectedSponsorId === sponsor.id ? 'ring-2 ring-blue-500' : ''
-                  }`}
+                  className={`cursor-pointer transition-all hover:shadow-md ${selectedSponsorId === sponsor.id ? 'ring-2 ring-blue-500' : ''
+                    }`}
                   onClick={() => selectSponsor(sponsor)}
                 >
                   <CardContent className="p-4">
@@ -319,6 +336,47 @@ const SponsorManager: React.FC = () => {
                     placeholder="스폰서에 대한 간단한 소개"
                     rows={2}
                   />
+                </div>
+
+                {/* Global Vendor Linking & Stamp Tour */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-4">
+                  <div>
+                    <Label htmlFor="vendorId">파트너사 시스템 연결(L3 Vendor)</Label>
+                    <select
+                      id="vendorId"
+                      value={form.vendorId || ''}
+                      onChange={(e) => setForm({ ...form, vendorId: e.target.value === '' ? undefined : e.target.value })}
+                      className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="">연결 안 함 (단순 스폰서 로고 노출용)</option>
+                      {globalVendors.map(v => (
+                        <option key={v.id} value={v.id}>{v.name} ({v.id})</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-slate-500 mt-1">
+                      독립된 파트너사(Vendor) 어드민을 할당받은 업체를 연결합니다. 연결 시 리드 및 방문자 데이터를 수집할 수 있습니다.
+                    </p>
+                  </div>
+
+                  {form.vendorId && (
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-200 mt-2">
+                      <input
+                        type="checkbox"
+                        id="isStampTourParticipant"
+                        checked={form.isStampTourParticipant ?? false}
+                        onChange={(e) => setForm({ ...form, isStampTourParticipant: e.target.checked })}
+                        className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                      />
+                      <Label htmlFor="isStampTourParticipant" className="cursor-pointer text-indigo-900 font-semibold">
+                        ⭐ 스탬프 투어(게이미피케이션) 참여 부스
+                      </Label>
+                    </div>
+                  )}
+                  {form.vendorId && !(form.isStampTourParticipant ?? false) && (
+                    <p className="text-xs text-slate-500 ml-6">
+                      체크하지 않으면 '단순 리드(방명록) 수집 모드'로만 동작하며, 사용자 명찰의 스탬프 보드에는 노출되지 않습니다.
+                    </p>
+                  )}
                 </div>
 
                 {/* Website URL */}

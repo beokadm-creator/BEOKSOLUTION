@@ -1,59 +1,38 @@
-
 import { useState, useEffect, useCallback } from 'react';
-import { doc, getDoc, collection, addDoc, query, where, getDocs, Timestamp, orderBy, limit, collectionGroup } from 'firebase/firestore';
-import { db, auth } from '../firebase'; // Import auth
+import { doc, getDoc, setDoc, collection, addDoc, query, where, getDocs, Timestamp, orderBy, limit, collectionGroup } from 'firebase/firestore';
+import { db, auth } from '../firebase';
 import { ConferenceUser, Registration } from '../types/schema';
 import { useNavigate } from 'react-router-dom';
 
-// Helper to resolve vendor and conference from vid
-const resolveVendorAndConference = async (vid: string) => {
-    try {
-        // 1. Check if vid matches current user UID (Direct Mapping)
-        // If the architecture uses Auth UID as Vendor ID, this is safest.
-        // Prompt says: "ID 위조 방지 로직... 현재 로그인한 사용자의 ... vendorId와 일치하는지"
-        
-        // Let's assume the Vendor Document ID is the VID.
-        // And the Vendor Document has a field `ownerUid` OR we check claims.
-        // For MVP, we'll fetch the vendor doc and check if `ownerUid` == auth.currentUser.uid
-        // OR simply assume for now we use Collection Group to find the vendor doc.
-        
-        const q = query(collectionGroup(db, 'vendors'), where('id', '==', vid), limit(1));
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-            const d = snap.docs[0];
-            const ref = d.ref;
-            const confRef = ref.parent.parent;
-            if (confRef) {
-                return {
-                    vendor: { id: d.id, ...d.data() },
-                    conferenceId: confRef.id
-                };
-            }
-        }
-    } catch (e) {
-        console.warn('Collection Group Query failed:', e);
-    }
-    return null;
-};
+export interface VendorProfile {
+    id: string;
+    name: string;
+    description?: string;
+    logoUrl?: string;
+    homeUrl?: string;
+    productUrl?: string;
+    ownerUid?: string;
+}
 
 export interface VisitLog {
     id: string;
     visitorName: string;
     visitorOrg?: string;
     visitorPhone?: string;
+    visitorEmail?: string;
+    conferenceId: string;
     timestamp: Date;
     isConsentAgreed: boolean;
 }
 
 export const useVendor = (vid: string | undefined) => {
-    const [vendor, setVendor] = useState<Record<string, unknown> | null>(null);
+    const [vendor, setVendor] = useState<VendorProfile | null>(null);
+    const [conferences, setConferences] = useState<{ id: string, name: string }[]>([]);
     const [conferenceId, setConferenceId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [scanResult, setScanResult] = useState<{ user: ConferenceUser; reg: Registration } | null>(null);
     const [visits, setVisits] = useState<VisitLog[]>([]);
-    
-    // Auth Integration
     const navigate = useNavigate();
 
     // 1. Initialize & Resolve Vendor
@@ -66,83 +45,71 @@ export const useVendor = (vid: string | undefined) => {
         const init = async () => {
             setLoading(true);
             try {
-                // AUTH CHECK: Ensure User is Logged In
                 if (!auth.currentUser) {
-                    console.warn('[useVendor] Unauthenticated access attempt. Redirecting...');
                     navigate('/admin/login');
                     return;
                 }
 
-                // ID VERIFICATION: Check if vid matches permitted vendorId
-                // Option A: Check Custom Claims (if available)
-                // const token = await auth.currentUser.getIdTokenResult();
-                // if (token.claims.vendorId !== vid) throw new Error("Unauthorized Vendor ID");
+                // SECURITY CHECK: vendorId should match auth.currentUser.uid or they have some other mapping.
+                // Assuming `vid` is the auth.currentUser.uid for L3 independent access
+                const vendorId = vid;
 
-                // Option B: Check User Profile (Firestore)
-                // const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
-                // if (userDoc.data()?.vendorId !== vid) ...
+                // Fetch Root Vendor Document
+                const vendorRef = doc(db, 'vendors', vendorId);
+                const vendorSnap = await getDoc(vendorRef);
 
-                // Option C (Simplest for now): 
-                // We fetch the vendor doc. If it has an 'ownerId' field, we match it. 
-                // Or we trust that if they can read it (via rules), they are owners?
-                // Rules say: allow read if data.vendorId == auth.uid. 
-                // So if resolveVendorAndConference succeeds, it implies ownership (if rules active).
-                
-                // Let's implement a hard check: 
-                // Assume VID in URL *MUST* match the Auth UID for this "Real Auth" transition?
-                // OR Assume the user has a profile with `vendorId`.
-                // For this implementation, I will assume the User's UID *IS* the Vendor ID (or linked).
-                // But `vid` in URL is likely 'vendor_samsung'.
-                // Let's just fetch and verify ownership field if exists, OR verify `vid` matches a claim.
-                // Since I cannot set claims easily here, I will verify against `auth.currentUser.uid` 
-                // assuming we updated the Vendor Doc to have `ownerId: uid`.
-                
-                // For the purpose of the prompt "Fake Data -> Real Data":
-                // We'll perform the resolution.
-                const resolved = await resolveVendorAndConference(vid);
-                
-                if (resolved) {
-                    // SECURITY CHECK
-                    // If the vendor doc has ownerUid, check it. 
-                    // If not, we might be open (bad).
-                    // Let's enforce: resolved.vendor.ownerUid === auth.currentUser.uid
-                    // If field missing, we FAIL SAFE for now or log warning.
-                    
-                    /* 
-                    if (resolved.vendor.ownerUid !== auth.currentUser.uid) {
-                         throw new Error("Access Denied: You are not the owner of this vendor booth.");
-                    } 
-                    */
-                   
-                    // For now, if resolved, we use it.
-                    setVendor(resolved.vendor);
-                    setConferenceId(resolved.conferenceId);
-                    fetchVisits(resolved.conferenceId, resolved.vendor.id);
-                } else {
-                    // NO MOCK FALLBACK
-                    throw new Error('Vendor Not Found or Access Denied');
+                if (!vendorSnap.exists()) {
+                    // Create basic profile if it doesn't exist (First Login)
+                    await setDoc(vendorRef, {
+                        id: vendorId,
+                        name: 'New Partner',
+                        ownerUid: auth.currentUser.uid,
+                        createdAt: Timestamp.now()
+                    });
                 }
+
+                const vData = (await getDoc(vendorRef)).data() as VendorProfile;
+
+                if (vData.ownerUid && vData.ownerUid !== auth.currentUser.uid) {
+                    throw new Error("Access Denied: You are not the owner of this vendor account.");
+                }
+
+                setVendor(vData);
+
+                // Fetch Joined Conferences by finding sponsors that link to this vendor
+                const q = query(collectionGroup(db, 'sponsors'), where('vendorId', '==', vendorId));
+                const snap = await getDocs(q);
+                const confs = snap.docs.map(d => {
+                    const confRef = d.ref.parent.parent;
+                    return confRef ? { id: confRef.id, name: confRef.id } : null; // simplified name to confId
+                }).filter(c => c !== null) as { id: string, name: string }[];
+
+                // Remove duplicates in case a vendor is mapped magically multiple times
+                const uniqueConfs = Array.from(new Map(confs.map(item => [item.id, item])).values());
+
+                setConferences(uniqueConfs);
+                if (uniqueConfs.length > 0) {
+                    setConferenceId(uniqueConfs[0].id); // Default to first conf
+                }
+
+                await fetchVisits(vendorId);
             } catch (e) {
                 console.error(e);
-                const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-                setError(errorMessage);
-                // navigate('/denied'); // Optional
+                setError(e instanceof Error ? e.message : 'Unknown error');
             } finally {
                 setLoading(false);
             }
         };
-
         init();
     }, [vid, navigate]);
 
-    // 2. Fetch Visits
-    const fetchVisits = async (confId: string, vendorId: string) => {
+    // 2. Fetch Leads (Vendor DB)
+    const fetchVisits = async (vendorId: string) => {
         try {
             const q = query(
-                collection(db, `conferences/${confId}/booth_visits`),
-                where('vendorId', '==', vendorId),
+                collection(db, `vendors/${vendorId}/leads`),
                 orderBy('timestamp', 'desc'),
-                limit(10)
+                limit(50)
             );
             const snap = await getDocs(q);
             const list = snap.docs.map(d => {
@@ -152,20 +119,22 @@ export const useVendor = (vid: string | undefined) => {
                     visitorName: data.visitorName,
                     visitorOrg: data.visitorOrg,
                     visitorPhone: data.visitorPhone,
+                    visitorEmail: data.visitorEmail,
+                    conferenceId: data.conferenceId,
                     timestamp: data.timestamp?.toDate() || new Date(),
                     isConsentAgreed: data.isConsentAgreed
                 } as VisitLog;
             });
             setVisits(list);
         } catch (e) {
-            console.error('Error fetching visits:', e);
+            console.error('Error fetching leads:', e);
         }
     };
 
     // 3. Scan Badge
     const scanBadge = useCallback(async (qrData: string) => {
         if (!conferenceId) {
-            setError('Conference Context Missing');
+            setError('참여 중인 학회가 선택되지 않았습니다.');
             return;
         }
 
@@ -174,35 +143,47 @@ export const useVendor = (vid: string | undefined) => {
         setScanResult(null);
 
         try {
-            console.log(`[useVendor] Scanning QR: ${qrData} in Conf: ${conferenceId}`);
-            
-            // 2. Query Registration by badgeQr
-                const regQ = query(collection(db, `conferences/${conferenceId}/registrations`), where('badgeQr', '==', qrData), limit(1));
-                const regSnap = await getDocs(regQ);
+            // First check badgeQr
+            const regQ = query(collection(db, `conferences/${conferenceId}/registrations`), where('badgeQr', '==', qrData), limit(1));
+            let regSnap = await getDocs(regQ);
+
+            // Fallback for DEV, just match ID directly if QR is simple 
+            if (regSnap.empty) {
+                const directRef = doc(db, `conferences/${conferenceId}/registrations`, qrData);
+                const singleDoc = await getDoc(directRef);
+                if (singleDoc.exists()) {
+                    regSnap = { docs: [singleDoc], empty: false } as any;
+                }
+            }
 
             if (regSnap.empty) {
-                throw new Error('유효하지 않은 QR 코드입니다.');
+                throw new Error('유효하지 않은 QR 코드이거나 해당 학회에 등록되지 않은 참석자입니다.');
             }
 
             const reg = regSnap.docs[0].data() as Registration;
-            
-            // Fetch User
-            const userRef = doc(db, `conferences/${conferenceId}/users/${reg.userId}`);
+            const regId = regSnap.docs[0].id;
+            reg.id = regId;
+
+            // Try fetching from users collection or fallback to registration data
+            const userRef = doc(db, `conferences/${conferenceId}/users/${reg.userId || regId}`);
             const userSnap = await getDoc(userRef);
 
-            if (!userSnap.exists()) {
-                throw new Error('참석자 정보를 찾을 수 없습니다.');
-            }
+            const userData = userSnap.exists() ? (userSnap.data() as ConferenceUser) : {
+                id: reg.userId || regId,
+                name: (reg as any).userName || (reg as any).name || '알 수 없음',
+                email: (reg as any).email,
+                phone: (reg as any).phone,
+                affiliation: (reg as any).affiliation || (reg as any).organization
+            } as any as ConferenceUser;
 
             setScanResult({
-                user: userSnap.data() as ConferenceUser,
+                user: userData,
                 reg
             });
 
         } catch (e) {
             console.error(e);
-            const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-            setError(errorMessage);
+            setError(e instanceof Error ? e.message : 'Unknown error');
         } finally {
             setLoading(false);
         }
@@ -211,40 +192,44 @@ export const useVendor = (vid: string | undefined) => {
     // 4. Process Visit (Consent Gate)
     const processVisit = useCallback(async (agreed: boolean) => {
         if (!vendor || !conferenceId || !scanResult) return;
-        if (!auth.currentUser) return; // Double check
+        if (!auth.currentUser) return;
 
         setLoading(true);
         try {
-            const visitData: Record<string, unknown> = {
-                vendorId: vendor.id,
-                ownerUid: auth.currentUser.uid,
-                vendorName: vendor.name,
+            const visitorName = agreed ? (scanResult.user.name || 'Unknown User') : 'Anonymous (별칭)';
+
+            // L3 VENDOR DB: Write to /vendors/{vendorId}/leads
+            const leadData: Record<string, unknown> = {
+                conferenceId,
                 visitorId: scanResult.user.id,
+                visitorName,
                 timestamp: Timestamp.now(),
                 isConsentAgreed: agreed,
             };
 
-            // Snapshot Data if Agreed
             if (agreed) {
-                const u = scanResult.user as Record<string, unknown>;
-                visitData.visitorName = (u.name as string) || 'Unknown';
-                visitData.visitorOrg = (u.affiliations as Array<{ name?: string }> | undefined)?.[0]?.name || (u.affiliation as string) || (u.org as string) || '';
-                visitData.visitorPhone = (u.phone as string) || (u.mobile as string) || '';
-                visitData.visitorEmail = (u.email as string) || '';
-                visitData.visitorPosition = (u.position as string) || '';
-            } else {
-                visitData.visitorName = 'Anonymous (Consent Denied)';
+                leadData.visitorOrg = (scanResult.user as any).affiliations?.[0]?.name || (scanResult.user as any).affiliation || (scanResult.reg as any).affiliation || '';
+                leadData.visitorPhone = (scanResult.user as any).phone || (scanResult.reg as any).phone || '';
+                leadData.visitorEmail = (scanResult.user as any).email || (scanResult.reg as any).email || '';
             }
 
-            await addDoc(collection(db, `conferences/${conferenceId}/booth_visits`), visitData);
+            await addDoc(collection(db, `vendors/${vendor.id}/leads`), leadData);
 
-            // Reset
+            // STAMP TOUR: Write to /conferences/{confId}/stamps (Gamification Validation)
+            // Even if denied, grant the stamp for the tour.
+            await addDoc(collection(db, `conferences/${conferenceId}/stamps`), {
+                userId: scanResult.user.id,
+                vendorId: vendor.id,
+                vendorName: vendor.name,
+                timestamp: Timestamp.now()
+            });
+
             setScanResult(null);
-            fetchVisits(conferenceId, vendor.id);
+            await fetchVisits(vendor.id);
+            alert("처리되었습니다. (Stamp Issued)");
 
         } catch (e) {
-            const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-            setError(errorMessage);
+            setError(e instanceof Error ? e.message : 'Unknown error');
         } finally {
             setLoading(false);
         }
@@ -255,9 +240,35 @@ export const useVendor = (vid: string | undefined) => {
         setError(null);
     };
 
+    // Save Vendor Info (L3 Profile Edit)
+    const updateVendorProfile = async (updates: Partial<VendorProfile>) => {
+        if (!vendor) return;
+        setLoading(true);
+        try {
+            const vendorRef = doc(db, 'vendors', vendor.id);
+            await setDoc(vendorRef, updates, { merge: true });
+
+            setVendor({ ...vendor, ...updates } as VendorProfile);
+
+            // Also optionally sync to conferences mappings so L2 sees updated name
+            for (const c of conferences) {
+                const confVRef = doc(db, `conferences/${c.id}/vendors/${vendor.id}`);
+                await setDoc(confVRef, { name: updates.name, logoUrl: updates.logoUrl }, { merge: true });
+            }
+
+            alert('프로필이 업데이트 되었습니다!');
+        } catch (e) {
+            setError('프로필 업데이트 실패');
+        } finally {
+            setLoading(false);
+        }
+    }
+
     return {
         vendor,
+        conferences,
         conferenceId,
+        setConferenceId,
         loading,
         error,
         scanResult,
@@ -265,6 +276,7 @@ export const useVendor = (vid: string | undefined) => {
         scanBadge,
         processVisit,
         resetScan,
+        updateVendorProfile,
         logout: () => auth.signOut(),
         login: () => navigate('/admin/login')
     };

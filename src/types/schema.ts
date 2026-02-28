@@ -443,6 +443,8 @@ export interface SponsorDoc {
   order?: number;         // Display order (lower = first)
   isActive: boolean;      // Enable/disable without deleting
   useTiers?: boolean;     // Conference-level setting: enable tier-based styling
+  vendorId?: string;      // (NEW) Link to L3 Vendor (global vendors collection)
+  isStampTourParticipant?: boolean; // (NEW) Whether this sponsor participates in Gamification Stamp Tour
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

@@ -55,9 +55,23 @@ service cloud.firestore {
          }
       }
 
-      // Booth Visits: Vendor Ownership Logic (override from above)
+      // Booth Visits: Legacy Vendor Ownership Logic
       match /booth_visits/{visitId} {
          allow read: if request.auth != null && (resource.data.vendorId == request.auth.uid || resource.data.vendorId == request.auth.token.vendorId);
+         allow create: if request.auth != null && request.resource.data.vendorId == request.auth.uid;
+      }
+
+      // V2 Vendors Mapping (N:M)
+      match /vendors/{vendorId} {
+         allow read: if true;
+         allow write: if request.auth != null;
+      }
+
+      // V2 Sub-stamps for Gamification (Gamification Stamp Tour)
+      match /stamps/{stampId} {
+         // User can read their own stamps. L2 admins can read.
+         allow read: if request.auth != null || true; // Publicly readable for gamification verification or L2 admin
+         // Vendor can create
          allow create: if request.auth != null && request.resource.data.vendorId == request.auth.uid;
       }
 
@@ -137,6 +151,17 @@ service cloud.firestore {
       // This must be configured in Firestore indexes
     }
     
+    // --- L3 VENDOR RULES ---
+    match /vendors/{vendorId} {
+      allow read: if true; // Public can see vendor intro
+      allow write: if request.auth != null && request.auth.uid == vendorId; // Simple vendor auth
+      
+      match /leads/{leadId} {
+        // Only vendor can read and write leads
+        allow read, write: if request.auth != null && request.auth.uid == vendorId;
+      }
+    }
+
     // Logs stats for rate limiting
     match /logs/stats/{date} {
       allow read, write: if request.auth != null;
