@@ -45,7 +45,8 @@ service cloud.firestore {
       // [Fix-Step 370] Support guest auto-save with data field validation
       // Allow write if: document owner, or saved data's userId matches auth, or super admin
       match /registrations/{userId} {
-        allow read: if request.auth.uid == userId || request.auth.token.email == 'aaron@beoksolution.com';
+        // [Vendor Scanner Fix] Allow authenticated users to read registrations so vendors can verify badges
+        allow read: if request.auth != null;
         allow write: if request.auth.uid == userId 
                      || (request.auth != null && request.resource.data.userId == request.auth.uid) 
                      || request.auth.token.email == 'aaron@beoksolution.com';
@@ -85,7 +86,12 @@ service cloud.firestore {
     // [FIX] Allow collection group queries for registrations (My Page issue)
     // This allows queries from any path (e.g., collectionGroup('registrations'))
     match /{path=**}/registrations/{regId} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null;
+    }
+
+    // [FIX] Allow collection group queries for sponsors so vendors can find their conferences
+    match /{path=**}/sponsors/{sponsorId} {
+      allow read: if true;
     }
 
     // [FIX] Allow collection group queries for abstracts (Abstracts Error)
