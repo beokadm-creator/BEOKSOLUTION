@@ -63,13 +63,15 @@ const SuperAdminPage: React.FC = () => {
     const [editHomepage, setEditHomepage] = useState('');
 
     // Vendors State
-    const [vendors, setVendors] = useState<Array<{ id: string; name: string; description?: string; logoUrl?: string; }>>([]);
+    const [vendors, setVendors] = useState<Array<{ id: string; name: string; description?: string; logoUrl?: string; adminEmail?: string }>>([]);
     const [loadingVendors, setLoadingVendors] = useState(false);
     const [newVendorName, setNewVendorName] = useState('');
     const [newVendorDesc, setNewVendorDesc] = useState('');
-    const [editingVendor, setEditingVendor] = useState<{ id: string; name: string; description?: string; logoUrl?: string } | null>(null);
+    const [newVendorEmail, setNewVendorEmail] = useState('');
+    const [editingVendor, setEditingVendor] = useState<{ id: string; name: string; description?: string; logoUrl?: string; adminEmail?: string } | null>(null);
     const [editVendorName, setEditVendorName] = useState('');
     const [editVendorDesc, setEditVendorDesc] = useState('');
+    const [editVendorEmail, setEditVendorEmail] = useState('');
 
     // Monitoring state
     const today = new Date().toISOString().split('T')[0];
@@ -188,11 +190,13 @@ const SuperAdminPage: React.FC = () => {
             await addDoc(collection(db, 'vendors'), {
                 name: newVendorName.trim(),
                 description: newVendorDesc.trim(),
+                adminEmail: newVendorEmail.trim(),
                 createdAt: new Date()
             });
             toast.success('Vendor created successfully');
             setNewVendorName('');
             setNewVendorDesc('');
+            setNewVendorEmail('');
             fetchVendors();
         } catch (error) {
             console.error(error);
@@ -206,6 +210,7 @@ const SuperAdminPage: React.FC = () => {
             await updateDoc(doc(db, 'vendors', id), {
                 name: editVendorName.trim(),
                 description: editVendorDesc.trim(),
+                adminEmail: editVendorEmail.trim(),
                 updatedAt: new Date()
             });
             toast.success('Vendor updated');
@@ -1438,10 +1443,14 @@ const SuperAdminPage: React.FC = () => {
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 <form onSubmit={handleCreateVendor} className="space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div className="space-y-1.5">
                                             <Label className="text-xs font-semibold text-gray-400 uppercase">Vendor Name</Label>
                                             <Input required value={newVendorName} onChange={e => setNewVendorName(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-indigo-500 text-gray-200" placeholder="e.g. ABC IT Solutions" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-gray-400 uppercase">Admin Email (Optional)</Label>
+                                            <Input type="email" value={newVendorEmail} onChange={e => setNewVendorEmail(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-indigo-500 text-gray-200" placeholder="admin@vendor.com" />
                                         </div>
                                         <div className="space-y-1.5">
                                             <Label className="text-xs font-semibold text-gray-400 uppercase">Description (Optional)</Label>
@@ -1469,13 +1478,18 @@ const SuperAdminPage: React.FC = () => {
                                             <div key={v.id} className="flex items-center justify-between p-4 bg-[#2a2a2a] rounded-lg border border-[#333]">
                                                 <div className="flex-1">
                                                     <div className="font-semibold text-gray-200">{v.name}</div>
-                                                    <div className="text-xs text-gray-400">{v.description || 'No description'} • ID: <span className="font-mono">{v.id}</span></div>
+                                                    <div className="text-xs text-gray-400">
+                                                        {v.description || 'No description'}
+                                                        {v.adminEmail ? ` • Admin: ${v.adminEmail}` : ' • No Admin Email'}
+                                                        • ID: <span className="font-mono">{v.id}</span>
+                                                    </div>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white" onClick={() => {
                                                         setEditingVendor(v);
                                                         setEditVendorName(v.name);
                                                         setEditVendorDesc(v.description || '');
+                                                        setEditVendorEmail(v.adminEmail || '');
                                                     }}>
                                                         <Edit className="w-4 h-4" />
                                                     </Button>
@@ -1508,6 +1522,10 @@ const SuperAdminPage: React.FC = () => {
                                         <div className="space-y-1.5">
                                             <Label className="text-xs font-semibold text-gray-400 uppercase">Vendor Name</Label>
                                             <Input value={editVendorName} onChange={e => setEditVendorName(e.target.value)} className="bg-white" placeholder="Name" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-gray-400 uppercase">Admin Email</Label>
+                                            <Input type="email" value={editVendorEmail} onChange={e => setEditVendorEmail(e.target.value)} className="bg-white" placeholder="admin@vendor.com" />
                                         </div>
                                         <div className="space-y-1.5">
                                             <Label className="text-xs font-semibold text-gray-400 uppercase">Description</Label>

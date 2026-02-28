@@ -71,6 +71,9 @@ import SuperLayout from './layouts/SuperLayout';
 import SocietyLayout from './layouts/SocietyLayout';
 import ConfLayout from './layouts/ConfLayout';
 import VendorLayout from './layouts/VendorLayout';
+import VendorPortalLayout from './layouts/VendorPortalLayout';
+import VendorLoginPage from './pages/vendor/VendorLoginPage';
+import VendorDashboardPage from './pages/vendor/VendorDashboardPage';
 
 const App: React.FC = () => {
   const { subdomain } = useSubdomain();
@@ -128,8 +131,8 @@ const App: React.FC = () => {
                 }}
               />
               <Routes>
-                <Route path="/login" element={activeSocietyId ? <SocietyLoginPage societyId={activeSocietyId} /> : <AdminLoginPage />} />
-                <Route path="/admin/login" element={activeSocietyId ? <SocietyLoginPage societyId={activeSocietyId} /> : <AdminLoginPage />} />
+                <Route path="/login" element={activeSocietyId ? <SocietyLoginPage /> : <AdminLoginPage />} />
+                <Route path="/admin/login" element={activeSocietyId ? <SocietyLoginPage /> : <AdminLoginPage />} />
 
                 <Route element={<AdminGuard />}>
                   {/* 루트 경로 리다이렉트 - society 파라미터 또는 서브도메인에 따라 분기 */}
@@ -367,6 +370,12 @@ const App: React.FC = () => {
                   <Route path="/super" element={<SuperAdminPage />} />
                   <Route path="/super/security" element={<SecurityPolicyManager />} />
                 </Route>
+              </Route>
+
+              {/* --- PRIORITY 0.5: VENDOR PORTAL (L3) --- */}
+              <Route path="/partner/login" element={<VendorLoginPage />} />
+              <Route path="/partner" element={<VendorPortalLayout />}>
+                <Route index element={<VendorDashboardPage />} />
               </Route>
 
               {/* --- PRIORITY 1: GLOBAL AUTH --- */}

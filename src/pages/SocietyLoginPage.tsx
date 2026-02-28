@@ -14,7 +14,11 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../components/ui/card';
 
-const SocietyLoginPage: React.FC = () => {
+interface SocietyLoginPageProps {
+    societyId?: string;
+}
+
+const SocietyLoginPage: React.FC<SocietyLoginPageProps> = ({ societyId }) => {
     const { society, loading: socLoading } = useSociety();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -23,7 +27,7 @@ const SocietyLoginPage: React.FC = () => {
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         console.log(`🔐 [SocietyLogin] Login attempt: ${email}`);
 
         setLoading(true);
@@ -39,12 +43,12 @@ const SocietyLoginPage: React.FC = () => {
                 if (isSuperAdmin) {
                     console.log(`🔐 [SocietyLogin] SUPER_ADMIN bypassing society check`);
                     toast.success(`Welcome Super Admin to ${society.name.en}`);
-                    
+
                     // ✅ sessionStorage에 Super Admin 정보 저장
                     sessionStorage.setItem('societyAdmin', 'true');
                     sessionStorage.setItem('societyId', society.id);
                     sessionStorage.setItem('isSuperAdmin', 'true');
-                    
+
                     navigate('/admin/society');
                     return;
                 }
@@ -67,11 +71,11 @@ const SocietyLoginPage: React.FC = () => {
                 }
 
                 toast.success(`Welcome back to ${society.name.en}`);
-                
+
                 // ✅ sessionStorage에 admin 정보 저장 (AdminGuard에서 확인용)
                 sessionStorage.setItem('societyAdmin', 'true');
                 sessionStorage.setItem('societyId', society.id);
-                
+
                 navigate('/admin/society');
             } else {
                 toast.success("Logged in");
@@ -139,8 +143,8 @@ const SocietyLoginPage: React.FC = () => {
                                 />
                             </div>
 
-                            <Button 
-                                type="submit" 
+                            <Button
+                                type="submit"
                                 className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-blue-600/20"
                                 disabled={loading}
                             >

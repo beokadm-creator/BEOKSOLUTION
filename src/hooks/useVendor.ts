@@ -68,10 +68,13 @@ export const useVendor = (vid: string | undefined) => {
                     });
                 }
 
-                const vData = (await getDoc(vendorRef)).data() as VendorProfile;
+                const vData = (await getDoc(vendorRef)).data() as VendorProfile & { adminEmail?: string };
 
-                if (vData.ownerUid && vData.ownerUid !== auth.currentUser.uid) {
-                    throw new Error("Access Denied: You are not the owner of this vendor account.");
+                const isOwner = vData.ownerUid === auth.currentUser.uid;
+                const isAdmin = vData.adminEmail && vData.adminEmail === auth.currentUser.email;
+
+                if (!isOwner && !isAdmin) {
+                    throw new Error("Access Denied: You are not authorized to manage this vendor account.");
                 }
 
                 setVendor(vData);
