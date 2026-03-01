@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Outlet, Navigate, useNavigate } from 'react-router-dom';
+import { Outlet, Navigate, useNavigate, NavLink } from 'react-router-dom';
 import { getAuth } from 'firebase/auth';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -95,10 +95,30 @@ export default function VendorPortalLayout() {
                     )}
 
                     <nav className="space-y-1 px-2">
-                        <div className="bg-indigo-800 text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md cursor-default">
-                            <LayoutDashboard className={`flex-shrink-0 w-5 h-5 text-indigo-300 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
-                            {sidebarOpen && 'Dashboard Overview'}
-                        </div>
+                        <NavLink
+                            to="/partner"
+                            end
+                            className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
+                        >
+                            <LayoutDashboard className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
+                            {sidebarOpen && 'Overview'}
+                        </NavLink>
+
+                        <NavLink
+                            to="/partner/scanner"
+                            className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
+                        >
+                            <QrCode className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
+                            {sidebarOpen && 'Scanner'}
+                        </NavLink>
+
+                        <NavLink
+                            to="/partner/profile"
+                            className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
+                        >
+                            <Settings className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
+                            {sidebarOpen && 'Profile Settings'}
+                        </NavLink>
                     </nav>
                 </div>
 

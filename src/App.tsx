@@ -74,6 +74,8 @@ import VendorLayout from './layouts/VendorLayout';
 import VendorPortalLayout from './layouts/VendorPortalLayout';
 import VendorLoginPage from './pages/vendor/VendorLoginPage';
 import VendorDashboardPage from './pages/vendor/VendorDashboardPage';
+import VendorScannerPage from './pages/vendor/VendorScannerPage';
+import VendorSettingsPage from './pages/vendor/VendorSettingsPage';
 
 const App: React.FC = () => {
   const { subdomain } = useSubdomain();
@@ -376,6 +378,8 @@ const App: React.FC = () => {
               <Route path="/partner/login" element={<VendorLoginPage />} />
               <Route path="/partner" element={<VendorPortalLayout />}>
                 <Route index element={<VendorDashboardPage />} />
+                <Route path="scanner" element={<VendorScannerPage />} />
+                <Route path="profile" element={<VendorSettingsPage />} />
               </Route>
 
               {/* --- PRIORITY 1: GLOBAL AUTH --- */}

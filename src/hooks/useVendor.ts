@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { doc, getDoc, setDoc, collection, addDoc, query, where, getDocs, Timestamp, orderBy, limit, collectionGroup } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 import { db, auth } from '../firebase';
 import { ConferenceUser, Registration } from '../types/schema';
 import { useNavigate } from 'react-router-dom';
@@ -259,8 +260,9 @@ export const useVendor = (vid: string | undefined) => {
                 await setDoc(confVRef, { name: updates.name, logoUrl: updates.logoUrl }, { merge: true });
             }
 
-            alert('프로필이 업데이트 되었습니다!');
+            toast.success('프로필이 업데이트 되었습니다!');
         } catch (e) {
+            toast.error('프로필 업데이트 실패');
             setError('프로필 업데이트 실패');
         } finally {
             setLoading(false);
@@ -276,6 +278,7 @@ export const useVendor = (vid: string | undefined) => {
         error,
         scanResult,
         visits,
+        fetchVisits,
         scanBadge,
         processVisit,
         resetScan,
