@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Outlet, Navigate, useNavigate, NavLink } from 'react-router-dom';
+import { Outlet, Navigate, useNavigate, NavLink, useLocation } from 'react-router-dom';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -14,6 +14,9 @@ export default function VendorPortalLayout() {
     const [activeVendorId, setActiveVendorId] = useState<string | null>(null);
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const navigate = useNavigate();
+    const location = useLocation();
+
+    const isCameraMode = location.pathname.includes('/scanner/camera');
 
     useEffect(() => {
         const auth = getAuth();
@@ -70,84 +73,88 @@ export default function VendorPortalLayout() {
     const activeVendor = vendors.find(v => v.id === activeVendorId);
 
     return (
-        <div className="flex h-screen bg-gray-100 font-sans">
+        <div className="flex h-[100dvh] bg-gray-100 font-sans">
             {/* Sidebar */}
-            <aside className={`bg-indigo-900 text-white transition-all duration-300 flex flex-col ${sidebarOpen ? 'w-64' : 'w-20'}`}>
-                <div className="p-4 flex items-center justify-between border-b border-indigo-800">
-                    {sidebarOpen && <span className="font-bold text-xl tracking-wide flex items-center gap-2"><Building2 className="w-5 h-5" /> eRegi B2B</span>}
-                    <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-1 hover:bg-indigo-800 rounded">
-                        {sidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeft className="w-5 h-5 mx-auto" />}
-                    </button>
-                </div>
+            {!isCameraMode && (
+                <aside className={`bg-indigo-900 text-white transition-all duration-300 flex flex-col ${sidebarOpen ? 'w-64' : 'w-20'}`}>
+                    <div className="p-4 flex items-center justify-between border-b border-indigo-800">
+                        {sidebarOpen && <span className="font-bold text-xl tracking-wide flex items-center gap-2"><Building2 className="w-5 h-5" /> eRegi B2B</span>}
+                        <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-1 hover:bg-indigo-800 rounded">
+                            {sidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeft className="w-5 h-5 mx-auto" />}
+                        </button>
+                    </div>
 
-                <div className="flex-1 overflow-y-auto py-4">
-                    {sidebarOpen && (
-                        <div className="px-4 mb-6">
-                            <label className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2 block">Active Partner</label>
-                            <select
-                                value={activeVendorId || ''}
-                                onChange={(e) => setActiveVendorId(e.target.value)}
-                                className="w-full bg-indigo-800 border-none rounded text-sm py-2 px-3 text-white focus:ring-0"
+                    <div className="flex-1 overflow-y-auto py-4">
+                        {sidebarOpen && (
+                            <div className="px-4 mb-6">
+                                <label className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2 block">Active Partner</label>
+                                <select
+                                    value={activeVendorId || ''}
+                                    onChange={(e) => setActiveVendorId(e.target.value)}
+                                    className="w-full bg-indigo-800 border-none rounded text-sm py-2 px-3 text-white focus:ring-0"
+                                >
+                                    {vendors.map(v => (
+                                        <option key={v.id} value={v.id}>{v.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        <nav className="space-y-1 px-2">
+                            <NavLink
+                                to="/partner"
+                                end
+                                className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
                             >
-                                {vendors.map(v => (
-                                    <option key={v.id} value={v.id}>{v.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
+                                <LayoutDashboard className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
+                                {sidebarOpen && 'Overview'}
+                            </NavLink>
 
-                    <nav className="space-y-1 px-2">
-                        <NavLink
-                            to="/partner"
-                            end
-                            className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
-                        >
-                            <LayoutDashboard className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
-                            {sidebarOpen && 'Overview'}
-                        </NavLink>
+                            <NavLink
+                                to="/partner/scanner"
+                                className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
+                            >
+                                <QrCode className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
+                                {sidebarOpen && 'Scanner'}
+                            </NavLink>
 
-                        <NavLink
-                            to="/partner/scanner"
-                            className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
-                        >
-                            <QrCode className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
-                            {sidebarOpen && 'Scanner'}
-                        </NavLink>
+                            <NavLink
+                                to="/partner/profile"
+                                className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
+                            >
+                                <Settings className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
+                                {sidebarOpen && 'Profile Settings'}
+                            </NavLink>
 
-                        <NavLink
-                            to="/partner/profile"
-                            className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
-                        >
-                            <Settings className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
-                            {sidebarOpen && 'Profile Settings'}
-                        </NavLink>
+                            <NavLink
+                                to="/partner/staff"
+                                className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
+                            >
+                                <Users className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
+                                {sidebarOpen && 'Staff Management'}
+                            </NavLink>
+                        </nav>
+                    </div>
 
-                        <NavLink
-                            to="/partner/staff"
-                            className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
-                        >
-                            <Users className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
-                            {sidebarOpen && 'Staff Management'}
-                        </NavLink>
-                    </nav>
-                </div>
-
-                <div className="p-4 border-t border-indigo-800">
-                    <button onClick={handleLogout} className={`flex items-center text-sm font-medium text-indigo-300 hover:text-white w-full ${!sidebarOpen && 'justify-center'}`}>
-                        <LogOut className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : ''}`} />
-                        {sidebarOpen && 'Sign out'}
-                    </button>
-                </div>
-            </aside>
+                    <div className="p-4 border-t border-indigo-800">
+                        <button onClick={handleLogout} className={`flex items-center text-sm font-medium text-indigo-300 hover:text-white w-full ${!sidebarOpen && 'justify-center'}`}>
+                            <LogOut className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : ''}`} />
+                            {sidebarOpen && 'Sign out'}
+                        </button>
+                    </div>
+                </aside>
+            )}
 
             {/* Main Content */}
-            <main className="flex-1 flex flex-col overflow-hidden">
-                <header className="bg-white border-b border-gray-200 h-16 flex items-center px-6 justify-between shadow-sm z-10">
-                    <h1 className="text-xl font-semibold text-gray-800">
-                        {activeVendor?.name || 'Loading...'}
-                    </h1>
-                </header>
-                <div className="flex-1 overflow-auto p-6">
+            <main className="flex-1 flex flex-col overflow-hidden relative">
+                {!isCameraMode && (
+                    <header className="bg-white border-b border-gray-200 h-16 flex items-center px-6 justify-between shadow-sm z-10 shrink-0">
+                        <h1 className="text-xl font-semibold text-gray-800">
+                            {activeVendor?.name || 'Loading...'}
+                        </h1>
+                    </header>
+                )}
+                <div className={`flex-1 overflow-auto ${isCameraMode ? 'p-0 w-full h-full bg-black' : 'p-6'}`}>
                     {/* We pass activeVendorId to children via Outlet context so they know which vendor to load data for */}
                     <Outlet context={{ activeVendorId }} />
                 </div>

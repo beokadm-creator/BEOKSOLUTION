@@ -4,7 +4,7 @@ import { useVendor } from '../../hooks/useVendor';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../../components/ui/card';
-import { QrCode, Camera, Keyboard, AlertCircle, CheckCircle2, Monitor } from 'lucide-react';
+import { QrCode, Camera, Keyboard, AlertCircle, CheckCircle2, Monitor, ChevronLeft } from 'lucide-react';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external' }) {
@@ -108,12 +108,134 @@ export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external
         }
     }, [mode, isScanning, scanResult, error, cameraError]);
 
+    if (mode === 'camera') {
+        return (
+            <div className="flex flex-col h-full w-full bg-black text-white relative">
+                {/* Mobile Header */}
+                <div className="flex justify-between items-center p-4 bg-gray-900 shadow-md z-10 shrink-0">
+                    <button onClick={() => window.history.back()} className="flex items-center text-gray-300 hover:text-white transition-colors">
+                        <ChevronLeft className="w-7 h-7 -ml-2" />
+                        <span className="font-bold text-lg">목록으로</span>
+                    </button>
+                    {conferences.length > 0 && (
+                        <select
+                            value={conferenceId || ''}
+                            onChange={e => setConferenceId(e.target.value)}
+                            className="bg-gray-800 text-white border-0 rounded-lg text-sm py-2 px-3 focus:ring-1 focus:ring-indigo-500 font-bold max-w-[150px] truncate"
+                        >
+                            {conferences.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                    )}
+                </div>
+
+                {/* Error Toast */}
+                {error && (
+                    <div className="absolute top-20 left-4 right-4 z-50 bg-red-600/95 backdrop-blur text-white px-5 py-4 rounded-2xl flex items-start gap-3 shadow-2xl animate-in fade-in slide-in-from-top-4">
+                        <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 text-sm font-bold leading-relaxed">{error}</div>
+                        <button onClick={() => vendorLogic.resetScan()} className="text-white/70 hover:text-white p-1 bg-red-700 rounded-full">✕</button>
+                    </div>
+                )}
+
+                {/* Main Content Area */}
+                <div className="flex-1 relative flex flex-col items-center justify-center p-6 overflow-y-auto">
+                    {!scanResult ? (
+                        <>
+                            <div className="w-full max-w-sm rounded-[2rem] overflow-hidden border-4 border-indigo-500/30 bg-gray-800 relative aspect-[3/4] flex items-center justify-center shadow-[0_0_40px_rgba(99,102,241,0.2)]">
+                                {!isScanning && !cameraError && (
+                                    <div className="text-gray-400 flex flex-col items-center animate-pulse">
+                                        <Camera className="w-12 h-12 mb-3 opacity-50 text-indigo-400" />
+                                        <p className="font-bold tracking-wide">카메라 기동 중...</p>
+                                    </div>
+                                )}
+                                <div id="vendor-reader" className="absolute inset-0 w-full h-full object-cover [&>video]:object-cover [&>video]:h-full"></div>
+                                {cameraError && <p className="text-red-400 text-sm font-bold p-6 text-center z-10 bg-black/80 absolute inset-0 flex items-center justify-center">{cameraError}</p>}
+
+                                {isScanning && !cameraError && (
+                                    <div className="absolute inset-0 pointer-events-none border-[3px] border-indigo-500/50 m-12 rounded-3xl">
+                                        <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white -mt-1 -ml-1 rounded-tl-lg"></div>
+                                        <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white -mt-1 -mr-1 rounded-tr-lg"></div>
+                                        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white -mb-1 -ml-1 rounded-bl-lg"></div>
+                                        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white -mb-1 -mr-1 rounded-br-lg"></div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <p className="mt-10 text-center text-gray-400 font-bold tracking-wide">
+                                참관객 명찰의 바코드를 화면 중앙에 맞춰주세요
+                            </p>
+                        </>
+                    ) : (
+                        <div className="w-full max-w-sm bg-gray-900 rounded-[2rem] overflow-hidden border border-gray-800 shadow-2xl animate-in slide-in-from-bottom-8 duration-300">
+                            <div className="bg-indigo-600/20 p-8 text-center border-b border-indigo-500/20 relative">
+                                <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/10 to-transparent"></div>
+                                <CheckCircle2 className="w-20 h-20 text-indigo-400 mx-auto mb-4 relative z-10 animate-bounce" />
+                                <h2 className="text-2xl font-black text-white tracking-tight relative z-10">스캔 성공!</h2>
+                                <p className="text-indigo-200 mt-2 text-sm font-bold relative z-10">방문자 정보를 확인하고 저장해주세요.</p>
+                            </div>
+
+                            <div className="p-6 space-y-6">
+                                <div className="bg-gray-800/80 rounded-2xl border border-gray-700/50 p-5 space-y-4">
+                                    <div className="grid grid-cols-[100px_1fr] gap-y-4 text-sm items-center">
+                                        <div className="text-gray-400 font-bold">이름</div>
+                                        <div className="font-bold text-white text-right text-lg">{scanResult.user.name || '알 수 없음'}</div>
+
+                                        <div className="text-gray-400 font-bold">소속</div>
+                                        <div className="font-medium text-gray-300 text-right leading-tight">
+                                            {((scanResult.user as any).affiliations)?.[0]?.name || (scanResult.user as any).affiliation || (scanResult.reg as any).affiliation || (scanResult.reg as any).organization || '-'}
+                                        </div>
+
+                                        <div className="text-gray-400 font-bold">등록 타입</div>
+                                        <div className="font-bold text-indigo-300 text-right uppercase">
+                                            {(scanResult.reg as any).type || (scanResult.reg as any).category || '-'}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-indigo-950/50 p-4 rounded-xl flex items-start gap-3 text-sm text-indigo-200 border border-indigo-900/50">
+                                    <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-indigo-400" />
+                                    <div>
+                                        <p className="font-bold mb-1 text-indigo-300">개인정보 제공 동의</p>
+                                        <p className="leading-tight">방문객이 해당 업체(<span className="text-white font-bold">{vendor?.name}</span>)에 연락처 등 정보를 제공하는 것에 동의합니까?</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-4 grid grid-cols-2 gap-3 bg-gray-950">
+                                <Button
+                                    variant="outline"
+                                    className="py-7 text-sm font-bold text-gray-400 border-gray-800 bg-gray-900 hover:bg-gray-800 hover:text-white rounded-xl"
+                                    onClick={() => processVisit(false)}
+                                    disabled={loading}
+                                >
+                                    동의 거부<br />(익명 스탬프)
+                                </Button>
+                                <Button
+                                    className="py-7 text-sm font-black bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-lg shadow-indigo-500/20"
+                                    onClick={() => processVisit(true)}
+                                    disabled={loading}
+                                >
+                                    동의 및 저장
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+                {loading && (
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[100]">
+                        <LoadingSpinner text="처리 중..." />
+                    </div>
+                )}
+            </div>
+        );
+    }
+
     return (
         <div className="max-w-2xl mx-auto space-y-6">
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Lead Scanner</h1>
-                    <p className="text-sm text-gray-500">Scan attendee badges to collect leads.</p>
+                    <p className="text-sm text-gray-500">외부 바코드 리더기를 사용하여 방명록을 스캔합니다.</p>
                 </div>
                 {conferences.length > 0 && (
                     <div className="flex flex-col items-end">
@@ -141,66 +263,36 @@ export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external
             )}
 
             {!scanResult ? (
-                <Card className="shadow-lg border-t-4 border-t-indigo-600">
+                <Card className="shadow-lg border-t-4 border-t-blue-600">
                     <CardHeader className="text-center pb-4">
-                        <div className="mx-auto w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-4">
-                            <QrCode className="w-8 h-8" />
+                        <div className="mx-auto w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4">
+                            <Monitor className="w-8 h-8" />
                         </div>
-                        <CardTitle>Scan Attendee Badge</CardTitle>
+                        <CardTitle>외부 바코드 리더기 모드</CardTitle>
                         <CardDescription>
-                            {mode === 'camera' ? '모바일 기기의 카메라 렌즈를 통해 QR을 인식합니다.' : '입력 창에 바코드 리더기를 통해 값을 입력받습니다.'}
+                            커서를 아래 텍스트 박스에 두고 바코드를 스캔하세요.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        {isScanning ? (
-                            <div className="flex flex-col items-center">
-                                <div id="vendor-reader" className="w-full max-w-sm rounded-lg overflow-hidden border-2 border-indigo-200 shadow-inner"></div>
-                                {cameraError && <p className="text-red-500 text-sm mt-3 font-semibold">{cameraError}</p>}
-                                <Button onClick={stopScanner} variant="outline" className="mt-4 border-red-200 text-red-600 hover:bg-red-50">
-                                    Stop Camera
+                        <div className="flex flex-col items-center gap-4">
+                            <form onSubmit={handleScan} className="w-full flex gap-2">
+                                <div className="relative flex-1">
+                                    <Keyboard className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                                    <input
+                                        ref={inputRef}
+                                        type="text"
+                                        value={qrInput}
+                                        onChange={e => setQrInput(e.target.value)}
+                                        placeholder="여기를 클릭하고 스캔..."
+                                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        autoFocus
+                                    />
+                                </div>
+                                <Button type="submit" variant="secondary" className="px-6 h-auto" disabled={loading}>
+                                    {loading ? <LoadingSpinner text="로딩 중..." /> : 'Enter'}
                                 </Button>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center gap-4">
-                                {mode === 'camera' ? (
-                                    <>
-                                        <Button
-                                            onClick={startScanner}
-                                            className="w-full h-14 text-lg font-bold bg-indigo-600 hover:bg-indigo-700 shadow-md"
-                                        >
-                                            <Camera className="w-5 h-5 mr-2" /> 모바일 카메라 켜기
-                                        </Button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="bg-blue-50 text-blue-800 p-4 rounded-lg flex items-center gap-3 w-full border border-blue-100">
-                                            <Monitor className="w-8 h-8 flex-shrink-0 text-blue-500" />
-                                            <div className="text-sm">
-                                                <p className="font-bold">PC 외부 리더기 모드</p>
-                                                <p>커서를 아래 텍스트 박스에 두고 바코드를 스캔하세요.</p>
-                                            </div>
-                                        </div>
-                                        <form onSubmit={handleScan} className="w-full flex gap-2">
-                                            <div className="relative flex-1">
-                                                <Keyboard className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                                                <input
-                                                    ref={inputRef}
-                                                    type="text"
-                                                    value={qrInput}
-                                                    onChange={e => setQrInput(e.target.value)}
-                                                    placeholder="여기를 클릭하고 스캔..."
-                                                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                                    autoFocus
-                                                />
-                                            </div>
-                                            <Button type="submit" variant="secondary" className="px-6 h-auto" disabled={loading}>
-                                                {loading ? <LoadingSpinner text="로딩 중..." /> : 'Enter'}
-                                            </Button>
-                                        </form>
-                                    </>
-                                )}
-                            </div>
-                        )}
+                            </form>
+                        </div>
                     </CardContent>
                 </Card>
             ) : (
