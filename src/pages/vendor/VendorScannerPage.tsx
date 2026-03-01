@@ -4,10 +4,10 @@ import { useVendor } from '../../hooks/useVendor';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../../components/ui/card';
-import { QrCode, Camera, Keyboard, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { QrCode, Camera, Keyboard, AlertCircle, CheckCircle2, Monitor } from 'lucide-react';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
-export default function VendorScannerPage() {
+export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external' }) {
     const { activeVendorId } = useOutletContext<{ activeVendorId: string }>();
     const vendorLogic = useVendor(activeVendorId);
 
@@ -58,6 +58,7 @@ export default function VendorScannerPage() {
     };
 
     const startScanner = () => {
+        if (mode === 'external') return; // Prevent camera in external mode
         if (isScanning) return;
         setIsScanning(true);
         setCameraError(null);
@@ -140,7 +141,7 @@ export default function VendorScannerPage() {
                         </div>
                         <CardTitle>Scan Attendee Badge</CardTitle>
                         <CardDescription>
-                            Use your device camera or external barcode scanner.
+                            {mode === 'camera' ? '모바일 기기의 카메라 렌즈를 통해 QR을 인식합니다.' : '입력 창에 바코드 리더기를 통해 값을 입력받습니다.'}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -154,35 +155,43 @@ export default function VendorScannerPage() {
                             </div>
                         ) : (
                             <div className="flex flex-col items-center gap-4">
-                                <Button
-                                    onClick={startScanner}
-                                    className="w-full h-14 text-lg font-bold bg-indigo-600 hover:bg-indigo-700 shadow-md"
-                                >
-                                    <Camera className="w-5 h-5 mr-2" /> Start Mobile Camera
-                                </Button>
-
-                                <div className="relative w-full text-center my-2">
-                                    <span className="bg-white px-3 text-sm text-gray-400 relative z-10">or use external scanner</span>
-                                    <div className="absolute inset-x-0 top-1/2 -mt-px w-full border-t border-gray-200"></div>
-                                </div>
-
-                                <form onSubmit={handleScan} className="w-full flex gap-2">
-                                    <div className="relative flex-1">
-                                        <Keyboard className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                                        <input
-                                            ref={inputRef}
-                                            type="text"
-                                            value={qrInput}
-                                            onChange={e => setQrInput(e.target.value)}
-                                            placeholder="Click here & scan..."
-                                            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                            autoFocus
-                                        />
-                                    </div>
-                                    <Button type="submit" variant="secondary" className="px-6 h-auto" disabled={loading}>
-                                        {loading ? <LoadingSpinner text="로딩 중..." /> : 'Enter'}
-                                    </Button>
-                                </form>
+                                {mode === 'camera' ? (
+                                    <>
+                                        <Button
+                                            onClick={startScanner}
+                                            className="w-full h-14 text-lg font-bold bg-indigo-600 hover:bg-indigo-700 shadow-md"
+                                        >
+                                            <Camera className="w-5 h-5 mr-2" /> 모바일 카메라 켜기
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="bg-blue-50 text-blue-800 p-4 rounded-lg flex items-center gap-3 w-full border border-blue-100">
+                                            <Monitor className="w-8 h-8 flex-shrink-0 text-blue-500" />
+                                            <div className="text-sm">
+                                                <p className="font-bold">PC 외부 리더기 모드</p>
+                                                <p>커서를 아래 텍스트 박스에 두고 바코드를 스캔하세요.</p>
+                                            </div>
+                                        </div>
+                                        <form onSubmit={handleScan} className="w-full flex gap-2">
+                                            <div className="relative flex-1">
+                                                <Keyboard className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                                                <input
+                                                    ref={inputRef}
+                                                    type="text"
+                                                    value={qrInput}
+                                                    onChange={e => setQrInput(e.target.value)}
+                                                    placeholder="여기를 클릭하고 스캔..."
+                                                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                                    autoFocus
+                                                />
+                                            </div>
+                                            <Button type="submit" variant="secondary" className="px-6 h-auto" disabled={loading}>
+                                                {loading ? <LoadingSpinner text="로딩 중..." /> : 'Enter'}
+                                            </Button>
+                                        </form>
+                                    </>
+                                )}
                             </div>
                         )}
                     </CardContent>
