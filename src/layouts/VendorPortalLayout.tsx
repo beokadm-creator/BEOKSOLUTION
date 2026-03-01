@@ -95,11 +95,10 @@ export default function VendorPortalLayout() {
                     )}
 
                     <nav className="space-y-1 px-2">
-                        {/* More navigation items can be added here */}
-                        <a href="#" className="bg-indigo-800 text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                        <div className="bg-indigo-800 text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md cursor-default">
                             <LayoutDashboard className={`flex-shrink-0 w-5 h-5 text-indigo-300 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
                             {sidebarOpen && 'Dashboard Overview'}
-                        </a>
+                        </div>
                     </nav>
                 </div>
 
