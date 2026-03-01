@@ -101,6 +101,13 @@ export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external
         }
     };
 
+    // Auto-start camera if in camera mode and not currently showing a result/error
+    useEffect(() => {
+        if (mode === 'camera' && !isScanning && !scanResult && !error && !cameraError) {
+            startScanner();
+        }
+    }, [mode, isScanning, scanResult, error, cameraError]);
+
     return (
         <div className="max-w-2xl mx-auto space-y-6">
             <div className="flex justify-between items-center mb-6">
@@ -212,7 +219,7 @@ export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external
 
                                 <div className="text-gray-500">Affiliation</div>
                                 <div className="font-medium text-gray-900 text-right">
-                                    {scanResult.user.affiliations?.[0]?.name || (scanResult.user as any).affiliation || (scanResult.reg as any).affiliation || (scanResult.reg as any).organization || 'N/A'}
+                                    {((scanResult.user as any).affiliations)?.[0]?.name || (scanResult.user as any).affiliation || (scanResult.reg as any).affiliation || (scanResult.reg as any).organization || 'N/A'}
                                 </div>
 
                                 <div className="text-gray-500">Registration Type</div>
