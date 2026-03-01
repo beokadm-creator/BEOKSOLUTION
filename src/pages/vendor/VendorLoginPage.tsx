@@ -26,13 +26,14 @@ export default function VendorLoginPage() {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
 
-            // Check if this user is actually a vendor (owner or adminEmail)
+            // Check if this user is actually a vendor (owner, adminEmail, or staff)
             const vQuery1 = query(collection(db, 'vendors'), where('adminEmail', '==', user.email));
             const vQuery2 = query(collection(db, 'vendors'), where('ownerUid', '==', user.uid));
+            const vQuery3 = query(collection(db, 'vendors'), where('staffEmails', 'array-contains', user.email));
 
-            const [snap1, snap2] = await Promise.all([getDocs(vQuery1), getDocs(vQuery2)]);
+            const [snap1, snap2, snap3] = await Promise.all([getDocs(vQuery1), getDocs(vQuery2), getDocs(vQuery3)]);
 
-            if (snap1.empty && snap2.empty) {
+            if (snap1.empty && snap2.empty && snap3.empty) {
                 // Not a vendor admin
                 toast.error("등록된 관리자 권한이 없습니다. (슈퍼어드민에게 권한 부여를 요청하세요)");
                 await auth.signOut();

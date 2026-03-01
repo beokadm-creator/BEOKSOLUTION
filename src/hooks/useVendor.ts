@@ -13,6 +13,8 @@ export interface VendorProfile {
     homeUrl?: string;
     productUrl?: string;
     ownerUid?: string;
+    adminEmail?: string;
+    staffEmails?: string[];
 }
 
 export interface VisitLog {

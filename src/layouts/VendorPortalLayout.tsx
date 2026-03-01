@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, Navigate, useNavigate, NavLink } from 'react-router-dom';
-import { getAuth } from 'firebase/auth';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { Button } from '../components/ui/button';
-import { LogOut, Building2, PanelLeftClose, PanelLeft, LayoutDashboard, QrCode, FileSpreadsheet, Settings } from 'lucide-react';
+import { LogOut, Building2, PanelLeftClose, PanelLeft, LayoutDashboard, QrCode, FileSpreadsheet, Settings, Users } from 'lucide-react';
 
 export default function VendorPortalLayout() {
     const [loading, setLoading] = useState(true);
@@ -16,21 +16,23 @@ export default function VendorPortalLayout() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        const checkAuth = async () => {
-            const auth = getAuth();
-            if (!auth.currentUser) {
+        const auth = getAuth();
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (!user) {
                 setLoading(false);
+                setAuthorized(false);
                 return;
             }
 
             try {
-                // Find vendors where the user is admin or owner
-                const vQuery1 = query(collection(db, 'vendors'), where('adminEmail', '==', auth.currentUser.email));
-                const vQuery2 = query(collection(db, 'vendors'), where('ownerUid', '==', auth.currentUser.uid));
+                // Find vendors where the user is admin, owner, or staff
+                const vQuery1 = query(collection(db, 'vendors'), where('adminEmail', '==', user.email));
+                const vQuery2 = query(collection(db, 'vendors'), where('ownerUid', '==', user.uid));
+                const vQuery3 = query(collection(db, 'vendors'), where('staffEmails', 'array-contains', user.email));
 
-                const [snap1, snap2] = await Promise.all([getDocs(vQuery1), getDocs(vQuery2)]);
+                const [snap1, snap2, snap3] = await Promise.all([getDocs(vQuery1), getDocs(vQuery2), getDocs(vQuery3)]);
 
-                const combined = [...snap1.docs, ...snap2.docs];
+                const combined = [...snap1.docs, ...snap2.docs, ...snap3.docs];
                 const uniqueVendors = Array.from(new Map(combined.map(d => [d.id, { id: d.id, ...d.data() }])).values());
 
                 if (uniqueVendors.length > 0) {
@@ -46,9 +48,9 @@ export default function VendorPortalLayout() {
             } finally {
                 setLoading(false);
             }
-        };
+        });
 
-        checkAuth();
+        return () => unsubscribe();
     }, []);
 
     const handleLogout = async () => {
@@ -118,6 +120,14 @@ export default function VendorPortalLayout() {
                         >
                             <Settings className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
                             {sidebarOpen && 'Profile Settings'}
+                        </NavLink>
+
+                        <NavLink
+                            to="/partner/staff"
+                            className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
+                        >
+                            <Users className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
+                            {sidebarOpen && 'Staff Management'}
                         </NavLink>
                     </nav>
                 </div>
