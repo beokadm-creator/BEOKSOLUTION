@@ -114,8 +114,7 @@ export const useVendor = (vid: string | undefined) => {
         try {
             const q = query(
                 collection(db, `vendors/${vendorId}/leads`),
-                orderBy('timestamp', 'desc'),
-                limit(50)
+                orderBy('timestamp', 'desc')
             );
             const snap = await getDocs(q);
             const list = snap.docs.map(d => {
