@@ -8,10 +8,10 @@ import { useRegistrationsPagination } from '../../hooks/useRegistrationsPaginati
 import { useConference } from '../../hooks/useConference';
 import { convertBadgeLayoutToConfig } from '../../utils/badgeConverter';
 import toast from 'react-hot-toast';
-import { query, collection, getDocs, getDoc, limit, doc, updateDoc, Timestamp, addDoc, where } from 'firebase/firestore';
+import { query, collection, getDocs, getDoc, limit, doc, updateDoc, Timestamp, addDoc, where, orderBy as fbOrderBy } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../../firebase';
-import { Loader2, Printer, ChevronLeft, ChevronRight, MessageCircle, CheckSquare, Square, CheckCircle2 } from 'lucide-react';
+import { Loader2, Printer, ChevronLeft, ChevronRight, MessageCircle, CheckSquare, Square, CheckCircle2, AlertTriangle, ShieldCheck, X } from 'lucide-react';
 import { EregiButton } from '../../components/eregi/EregiForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { safeFormatDate } from '../../utils/dateUtils';
@@ -102,6 +102,23 @@ const RegistrationListPage: React.FC = () => {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState(0);
+
+    // ─── Bulk Send Modal State ───────────────────────────────────────────────
+    const [bulkModal, setBulkModal] = useState<{
+        open: boolean;
+        step: 'confirm' | 'processing' | 'done';
+        targetIds: string[];
+        confirmInput: string;
+        checks: boolean[];
+        result: { sent: number; failed: number; skipped: number; tokenGenerated: number } | null;
+    }>({
+        open: false,
+        step: 'confirm',
+        targetIds: [],
+        confirmInput: '',
+        checks: [false, false, false],
+        result: null
+    });
 
     const badgeConfig = useMemo(() => {
         if (info?.badgeLayout && info.badgeLayout.elements.length > 0) {
@@ -234,50 +251,114 @@ const RegistrationListPage: React.FC = () => {
         }
     };
 
-    // Action: Bulk Send Notification
-    const handleBulkResendNotification = async (mode: 'selected' | 'all') => {
-        const targetRegs = mode === 'selected'
-            ? filteredData.filter(r => selectedIds.includes(r.id))
-            : filteredData;
+    // Helper: Firestore에서 페이지네이션 없이 전체 등록 데이터를 가져오기
+    const fetchAllRegistrations = async (): Promise<RootRegistration[]> => {
+        if (!conferenceId) return [];
+        const regRef = collection(db, 'conferences', conferenceId, 'registrations');
+        const q = query(regRef, fbOrderBy('createdAt', 'desc'));
+        const snap = await getDocs(q);
+        return snap.docs.map(d => {
+            const docData = d.data();
+            const flattened = { id: d.id, ...docData } as RootRegistration;
+            if (!flattened.orderId) flattened.orderId = flattened.id;
+            if (docData.userInfo) {
+                flattened.userName = docData.userInfo.name || docData.userName;
+                flattened.userEmail = docData.userInfo.email || docData.userEmail;
+                flattened.userPhone = docData.userInfo.phone || docData.userPhone;
+                flattened.affiliation = docData.userInfo.affiliation || docData.affiliation;
+                flattened.licenseNumber = docData.userInfo.licenseNumber || docData.licenseNumber;
+                if (!flattened.tier && docData.userInfo.grade) flattened.tier = docData.userInfo.grade;
+            }
+            if (!flattened.tier && docData.userTier) flattened.tier = docData.userTier;
+            if (!flattened.tier && docData.categoryName) flattened.tier = docData.categoryName;
+            if (!flattened.licenseNumber) {
+                if (docData.license) flattened.licenseNumber = docData.license;
+                else if (docData.userInfo?.licensenumber) flattened.licenseNumber = docData.userInfo.licensenumber;
+                else if (docData.formData?.licenseNumber) flattened.licenseNumber = docData.formData.licenseNumber;
+            }
+            if (docData.badgeQr) flattened.badgeQr = docData.badgeQr;
+            return flattened;
+        });
+    };
 
-        if (targetRegs.length === 0) {
-            toast.error('발송할 대상을 선택해주세요.');
+    // Action: Bulk Send — open safety modal
+    const prepareBulkSend = async (mode: 'selected' | 'all') => {
+        if (!conferenceId) return;
+
+        let targetIds: string[];
+        if (mode === 'selected') {
+            targetIds = selectedIds;
+        } else {
+            const toastId = toast.loading('전체 등록자 목록을 불러오는 중...');
+            try {
+                const allRegs = await fetchAllRegistrations();
+                // 중복 제거 + 필터 적용
+                const seen = new Map<string, RootRegistration>();
+                allRegs.forEach(r => {
+                    if (!r.userId) return;
+                    const prev = seen.get(r.userId);
+                    if (!prev || (r.status === 'PAID' && prev.status !== 'PAID')) seen.set(r.userId, r);
+                });
+                targetIds = Array.from(seen.values())
+                    .filter(r => {
+                        // 상태 필터
+                        let matchesStatus = false;
+                        if (filterStatus === 'ALL') matchesStatus = true;
+                        else if (filterStatus === 'SUCCESSFUL') matchesStatus = r.status === 'PAID';
+                        else if (filterStatus === 'CANCELED') matchesStatus = ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED'].includes(r.status);
+                        else if (filterStatus === 'WAITING') matchesStatus = ['WAITING_FOR_DEPOSIT', 'PENDING_PAYMENT'].includes(r.status);
+                        else matchesStatus = r.status === filterStatus;
+                        // 이름/이메일/전화번호 검색 필터 (searchName 있을 때만)
+                        const matchesSearch = searchName.trim()
+                            ? (r.userName ?? '').toLowerCase().includes(searchName.toLowerCase()) ||
+                            (r.userEmail ?? '').toLowerCase().includes(searchName.toLowerCase()) ||
+                            (r.userPhone ?? '').toLowerCase().includes(searchName.toLowerCase())
+                            : true;
+                        return matchesStatus && matchesSearch;
+                    })
+                    .map(r => r.id);
+                toast.dismiss(toastId);
+            } catch {
+                toast.error('전체 목록을 불러오는데 실패했습니다.', { id: toastId });
+                return;
+            }
+        }
+
+        if (targetIds.length === 0) {
+            toast.error('발송할 대상이 없습니다.');
             return;
         }
 
-        if (!confirm(`${targetRegs.length}명의 사용자에게 알림톡을 ${mode === 'selected' ? '선택' : '전체'} 발송하시겠습니까?`)) return;
+        setBulkModal({ open: true, step: 'confirm', targetIds, confirmInput: '', checks: [false, false, false], result: null });
+    };
+
+    // Action: Bulk Send — execute via server-side Cloud Function
+    const executeBulkSend = async () => {
         if (!conferenceId) return;
-
-        setIsProcessing(true);
-        let successCount = 0;
-        let failCount = 0;
-
+        setBulkModal(prev => ({ ...prev, step: 'processing' }));
         try {
-            const chunkSize = 5;
-            for (let i = 0; i < targetRegs.length; i += chunkSize) {
-                const chunk = targetRegs.slice(i, i + chunkSize);
-                setProgress(Math.round(((i + chunk.length) / targetRegs.length) * 100));
+            const fns = getFunctions();
+            const bulkFn = httpsCallable(fns, 'bulkSendNotifications');
+            const result = await bulkFn({
+                confId: conferenceId,
+                regIds: bulkModal.targetIds
+            }) as { data: { success: boolean; sent: number; failed: number; skipped: number; tokenGenerated: number } };
 
-                await Promise.all(chunk.map(async (reg) => {
-                    try {
-                        const functions = getFunctions();
-                        const resendNotificationFn = httpsCallable(functions, 'resendBadgePrepToken');
-                        await resendNotificationFn({ confId: conferenceId, regId: reg.id });
-                        successCount++;
-                    } catch (err) {
-                        console.error(`Failed notification for ${reg.userName}:`, err);
-                        failCount++;
-                    }
-                }));
-            }
-            toast.success(`${successCount}명 발송 완료, ${failCount}명 실패.`);
-            setSelectedIds([]); // Clear selection
-        } catch (error) {
-            console.error('Bulk notification failed:', error);
-            toast.error('일괄 발송 중 오류가 발생했습니다.');
-        } finally {
-            setIsProcessing(false);
-            setProgress(0);
+            setBulkModal(prev => ({
+                ...prev,
+                step: 'done',
+                result: {
+                    sent: result.data.sent,
+                    failed: result.data.failed,
+                    skipped: result.data.skipped,
+                    tokenGenerated: result.data.tokenGenerated
+                }
+            }));
+            setSelectedIds([]);
+        } catch (error: any) {
+            console.error('Bulk send failed:', error);
+            toast.error(`발송 실패: ${error.message || '알 수 없는 오류'}`);
+            setBulkModal(prev => ({ ...prev, step: 'confirm' }));
         }
     };
 
@@ -472,22 +553,70 @@ const RegistrationListPage: React.FC = () => {
         });
     }, [registrations, filterStatus, searchName]);
 
-    const handleExport = () => {
-        const data = filteredData.map(r => ({
-            '주문번호': r.id,
-            '이름': r.userName,
-            '이메일': r.userEmail || '-',
-            '전화번호': r.userPhone || '-',
-            '소속': r.userOrg || r.affiliation || '-',
-            '면허번호': r.licenseNumber || '-',
-            '등급': displayTier(r.tier),
-            '결제금액': r.amount,
-            '선택옵션': r.options ? r.options.map(o => `${typeof o.name === 'string' ? o.name : o.name.ko}(${o.quantity})`).join(', ') : '-',
-            '결제수단': r.paymentType || r.paymentMethod || r.method || '카드',
-            '상태': statusToKorean(r.status),
-            '등록일': safeFormatDate(r.createdAt),
-        }));
-        exportToExcel(data, `Registrants_${activeSlug}_${new Date().toISOString().slice(0, 10)}`);
+    const handleExport = async () => {
+        // 엑셀 다운로드: 페이지네이션 무관하게 Firestore에서 전체 데이터 조회
+        const toastId = toast.loading('전체 등록자 데이터를 불러오는 중...');
+        try {
+            const allRegs = await fetchAllRegistrations();
+
+            // 중복 제거 및 필터 적용
+            const userRegistrations = new Map<string, RootRegistration[]>();
+            allRegs.forEach(r => {
+                if (r.userId) {
+                    if (!userRegistrations.has(r.userId)) userRegistrations.set(r.userId, []);
+                    userRegistrations.get(r.userId)!.push(r);
+                }
+            });
+            const deduped: RootRegistration[] = [];
+            userRegistrations.forEach((regs) => {
+                const sorted = regs.sort((a, b) => {
+                    if (a.status === 'PAID' && b.status !== 'PAID') return -1;
+                    if (a.status !== 'PAID' && b.status === 'PAID') return 1;
+                    return (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0);
+                });
+                const best = sorted[0];
+                if (['PAID', 'REFUNDED', 'CANCELED', 'REFUND_REQUESTED', 'WAITING_FOR_DEPOSIT', 'PENDING_PAYMENT'].includes(best.status)) {
+                    deduped.push(best);
+                }
+            });
+            const fullFilteredData = deduped.filter(r => {
+                // 상태 필터
+                let matchesStatus = false;
+                if (filterStatus === 'ALL') matchesStatus = true;
+                else if (filterStatus === 'SUCCESSFUL') matchesStatus = r.status === 'PAID';
+                else if (filterStatus === 'CANCELED') matchesStatus = ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED'].includes(r.status);
+                else if (filterStatus === 'WAITING') matchesStatus = ['WAITING_FOR_DEPOSIT', 'PENDING_PAYMENT'].includes(r.status);
+                else matchesStatus = r.status === filterStatus;
+                // 이름/이메일/전화번호 검색 필터 (searchName 있을 때만)
+                const matchesSearch = searchName.trim()
+                    ? (r.userName ?? '').toLowerCase().includes(searchName.toLowerCase()) ||
+                    (r.userEmail ?? '').toLowerCase().includes(searchName.toLowerCase()) ||
+                    (r.userPhone ?? '').toLowerCase().includes(searchName.toLowerCase())
+                    : true;
+                return matchesStatus && matchesSearch;
+            });
+
+            toast.dismiss(toastId);
+            const data = fullFilteredData.map(r => ({
+                '주문번호': r.id,
+                '이름': r.userName,
+                '이메일': r.userEmail || '-',
+                '전화번호': r.userPhone || '-',
+                '소속': r.userOrg || r.affiliation || '-',
+                '면허번호': r.licenseNumber || '-',
+                '등급': displayTier(r.tier),
+                '결제금액': r.amount,
+                '선택옵션': r.options ? r.options.map((o: any) => `${typeof o.name === 'string' ? o.name : o.name?.ko || ''}(${o.quantity})`).join(', ') : '-',
+                '결제수단': r.paymentType || r.paymentMethod || r.method || '카드',
+                '상태': statusToKorean(r.status),
+                '등록일': safeFormatDate(r.createdAt),
+            }));
+            exportToExcel(data, `Registrants_${activeSlug}_${new Date().toISOString().slice(0, 10)}`);
+            toast.success(`총 ${data.length}명의 데이터를 다운로드했습니다.`);
+        } catch (err) {
+            toast.dismiss(toastId);
+            toast.error('데이터를 불러오는데 실패했습니다.');
+        }
     };
 
     if (loading && !activeSlug) return (
@@ -532,9 +661,8 @@ const RegistrationListPage: React.FC = () => {
                 </select>
                 <div className="ml-auto flex gap-2">
                     <EregiButton
-                        onClick={() => handleBulkResendNotification('selected')}
+                        onClick={() => prepareBulkSend('selected')}
                         disabled={isProcessing || selectedIds.length === 0}
-                        isLoading={isProcessing && selectedIds.length > 0 && selectedIds.length < filteredData.length}
                         variant="secondary"
                         className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 py-2 px-4 h-auto text-sm"
                     >
@@ -542,14 +670,13 @@ const RegistrationListPage: React.FC = () => {
                         선택 발송 ({selectedIds.length})
                     </EregiButton>
                     <EregiButton
-                        onClick={() => handleBulkResendNotification('all')}
+                        onClick={() => prepareBulkSend('all')}
                         disabled={isProcessing || filteredData.length === 0}
-                        isLoading={isProcessing && selectedIds.length === 0}
                         variant="secondary"
                         className="bg-indigo-600 hover:bg-indigo-700 text-white border-none py-2 px-4 h-auto text-sm"
                     >
                         <MessageCircle size={14} className="mr-1.5" />
-                        전체 발송 ({filteredData.length})
+                        전체 발송 (전체)
                     </EregiButton>
                     <EregiButton
                         onClick={handleExport}
@@ -772,7 +899,163 @@ const RegistrationListPage: React.FC = () => {
                 </div>
             )}
 
-            {/* Print Preview Modal - REMOVED AS REQUESTED */}
+            {/* ─── Bulk Send Safety Modal ─────────────────────────────────────────────── */}
+            {bulkModal.open && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+
+                        {/* Header */}
+                        <div className={`px-6 py-4 flex items-center gap-3 ${bulkModal.step === 'done' ? 'bg-green-600' :
+                            bulkModal.step === 'processing' ? 'bg-blue-600' : 'bg-amber-500'
+                            }`}>
+                            {bulkModal.step === 'confirm' && <AlertTriangle className="w-6 h-6 text-white" />}
+                            {bulkModal.step === 'processing' && <Loader2 className="w-6 h-6 text-white animate-spin" />}
+                            {bulkModal.step === 'done' && <ShieldCheck className="w-6 h-6 text-white" />}
+                            <h2 className="text-white font-bold text-lg flex-1">
+                                {bulkModal.step === 'confirm' && '전체 알림톡 발송 확인'}
+                                {bulkModal.step === 'processing' && '서버에서 발송 중...'}
+                                {bulkModal.step === 'done' && '발송 완료'}
+                            </h2>
+                            {bulkModal.step !== 'processing' && (
+                                <button onClick={() => setBulkModal(prev => ({ ...prev, open: false }))} className="text-white/80 hover:text-white">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="px-6 py-5">
+
+                            {/* STEP 1: Confirm */}
+                            {bulkModal.step === 'confirm' && (
+                                <div className="space-y-4">
+                                    {/* Target Count */}
+                                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                                        <p className="text-sm text-amber-700 font-medium">발송 대상</p>
+                                        <p className="text-3xl font-extrabold text-amber-900 mt-1">{bulkModal.targetIds.length}명</p>
+                                        <p className="text-xs text-amber-600 mt-1">기존 수령 링크는 무효화되고 새 링크가 발급됩니다.</p>
+                                    </div>
+
+                                    {/* Checklist */}
+                                    <div className="space-y-2">
+                                        <p className="text-sm font-semibold text-gray-700">다음 사항을 확인하세요 ⚠️</p>
+                                        {[
+                                            '앞에 표시된 등록자가 모두 전화번호를 보유한 실제 수령 대상임을 확인했습니다.',
+                                            '이미 알림톡을 받은 대상에게 재발송하면 기존 링크가 만료되는 점을 이해했습니다.',
+                                            '사전에 테스트 발송을 통해 템플릿과 시간 표기를 확인했습니다.',
+                                        ].map((label, i) => (
+                                            <label key={i} className={`flex items-start gap-2 p-2.5 rounded-lg cursor-pointer transition-colors ${bulkModal.checks[i] ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
+                                                }`}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={bulkModal.checks[i]}
+                                                    onChange={() => setBulkModal(prev => ({
+                                                        ...prev,
+                                                        checks: prev.checks.map((c, j) => j === i ? !c : c)
+                                                    }))}
+                                                    className="mt-0.5 w-4 h-4 accent-green-600"
+                                                />
+                                                <span className="text-sm text-gray-700">{label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+
+                                    {/* Confirmation Input */}
+                                    <div>
+                                        <p className="text-sm text-gray-600 mb-1.5">
+                                            아래에 정확히 <strong className="text-red-600">{bulkModal.targetIds.length}</strong> 을 입력하세요
+                                        </p>
+                                        <input
+                                            type="text"
+                                            value={bulkModal.confirmInput}
+                                            onChange={e => setBulkModal(prev => ({ ...prev, confirmInput: e.target.value }))}
+                                            placeholder={`${bulkModal.targetIds.length} 입력`}
+                                            className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 focus:border-indigo-400 focus:outline-none text-lg font-bold text-center"
+                                        />
+                                    </div>
+
+                                    {/* Server-side Note */}
+                                    <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                                        <ShieldCheck className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                                        <p className="text-xs text-blue-700"><strong>안전:</strong> 화면을 닫아도 서버에서 멈춰지 않고 처리됩니다.</p>
+                                    </div>
+
+                                    {/* Buttons */}
+                                    <div className="flex gap-3 pt-2">
+                                        <button
+                                            onClick={() => setBulkModal(prev => ({ ...prev, open: false }))}
+                                            className="flex-1 py-2.5 border border-gray-300 rounded-xl text-gray-600 hover:bg-gray-50 font-medium"
+                                        >
+                                            취소
+                                        </button>
+                                        <button
+                                            onClick={executeBulkSend}
+                                            disabled={
+                                                !bulkModal.checks.every(Boolean) ||
+                                                bulkModal.confirmInput.trim() !== String(bulkModal.targetIds.length)
+                                            }
+                                            className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            발송 시작
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* STEP 2: Processing */}
+                            {bulkModal.step === 'processing' && (
+                                <div className="py-8 text-center space-y-4">
+                                    <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto" />
+                                    <div>
+                                        <p className="font-bold text-gray-800 text-lg">{bulkModal.targetIds.length}명 발송 중...</p>
+                                        <p className="text-sm text-gray-500 mt-1">30명 병렬 토큰 생성 → NHN 배치 전송</p>
+                                    </div>
+                                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                                        <p className="text-sm text-blue-700 font-medium">✅ 이 창을 닫아도 안전합니다</p>
+                                        <p className="text-xs text-blue-600 mt-1">서버에서 자동 완료 후 결과를 저장합니다.</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* STEP 3: Done */}
+                            {bulkModal.step === 'done' && bulkModal.result && (
+                                <div className="py-6 space-y-4">
+                                    <div className="text-center">
+                                        <CheckCircle2 className="w-14 h-14 text-green-500 mx-auto mb-3" />
+                                        <p className="font-bold text-gray-800 text-xl">발송 완료!</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-center">
+                                            <p className="text-3xl font-extrabold text-green-700">{bulkModal.result.sent}</p>
+                                            <p className="text-xs text-green-600 mt-1">발송 성공</p>
+                                        </div>
+                                        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-center">
+                                            <p className="text-3xl font-extrabold text-red-700">{bulkModal.result.failed}</p>
+                                            <p className="text-xs text-red-600 mt-1">발송 실패</p>
+                                        </div>
+                                        <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl text-center">
+                                            <p className="text-3xl font-extrabold text-gray-700">{bulkModal.result.skipped}</p>
+                                            <p className="text-xs text-gray-600 mt-1">스킵 (전화번호 없음 등)</p>
+                                        </div>
+                                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-center">
+                                            <p className="text-3xl font-extrabold text-blue-700">{bulkModal.result.tokenGenerated}</p>
+                                            <p className="text-xs text-blue-600 mt-1">토큰 발급</p>
+                                        </div>
+                                    </div>
+                                    {bulkModal.result.failed > 0 && (
+                                        <p className="text-xs text-gray-500 text-center">Firebase 콘솔 로그에서 실패 대상 확인 가능</p>
+                                    )}
+                                    <button
+                                        onClick={() => setBulkModal(prev => ({ ...prev, open: false }))}
+                                        className="w-full py-3 bg-gray-800 text-white rounded-xl font-bold hover:bg-gray-900 transition-colors"
+                                    >
+                                        닫기
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

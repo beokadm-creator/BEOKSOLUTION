@@ -1,6 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { ko } from 'date-fns/locale';
 import { sendAlimTalk } from '../services/notificationService';
 
@@ -180,8 +180,18 @@ export async function sendBadgeNotification(
 
         // Event Info
         const eventName = conference.title?.ko || conference.title?.en || '';
-        const startDate = conference.dates?.start
-          ? format(conference.dates.start.toDate(), 'yyyy-MM-dd HH:mm', { locale: ko })
+        const timeZone = 'Asia/Seoul'; // Default for Korean conferences
+
+        // dates.start 또는 구버전 startDate 필드에서 시작 시간을 가져옴
+        const rawStartTimestamp = conference.dates?.start || (conference as any).startDate;
+        functions.logger.info(`[BadgeNotification] rawStartTimestamp:`, JSON.stringify({
+          hasDatesStart: !!conference.dates?.start,
+          hasStartDate: !!(conference as any).startDate,
+          rawValue: rawStartTimestamp ? rawStartTimestamp.toDate?.()?.toISOString() : null
+        }));
+
+        const startDate = rawStartTimestamp && typeof rawStartTimestamp.toDate === 'function'
+          ? formatInTimeZone(rawStartTimestamp.toDate(), timeZone, 'yyyy-MM-dd HH:mm', { locale: ko })
           : '';
 
         const venueName = typeof conference.venue?.name === 'object'
@@ -597,6 +607,216 @@ export const resendBadgePrepToken = functions
       functions.logger.error('[BadgeToken] Resend token error:', error);
       throw new functions.https.HttpsError('internal', 'Failed to resend token');
     }
+  });
+
+/**
+ * Cloud Function: Bulk Send AlimTalk Notifications (Server-side batch)
+ *
+ * 브라우저가 닫혀도 서버에서 안전하게 처리됩니다.
+ * 1) 각 등록자별 토큰을 30개 병렬로 생성 (Firestore write)
+ * 2) NHN Cloud API에 최대 1,000명씩 1회 배치 호출
+ * 3) 결과를 conferences/{confId}/notification_logs에 저장
+ */
+export const bulkSendNotifications = functions
+  .runWith({
+    timeoutSeconds: 540,   // 9분 (Firebase v1 최대값)
+    memory: '512MB',
+    enforceAppCheck: false,
+    ingressSettings: 'ALLOW_ALL'
+  })
+  .https.onCall(async (data) => {
+    const { confId, regIds } = data;
+
+    if (!confId || !Array.isArray(regIds) || regIds.length === 0) {
+      throw new functions.https.HttpsError('invalid-argument', 'confId and regIds[] are required');
+    }
+
+    const db = admin.firestore();
+    const now = admin.firestore.Timestamp.now();
+
+    // 1. Conference 정보 조회
+    const confSnap = await db.collection('conferences').doc(confId).get();
+    if (!confSnap.exists) throw new functions.https.HttpsError('not-found', 'Conference not found');
+    const conference = { id: confSnap.id, ...confSnap.data() } as Conference;
+    if (!conference.societyId) throw new functions.https.HttpsError('failed-precondition', 'Conference missing societyId');
+
+    // 2. 알림톡 템플릿 조회
+    const templatesQuery = await db
+      .collection(`societies/${conference.societyId}/notification-templates`)
+      .where('eventType', '==', 'CONFERENCE_REGISTER')
+      .where('isActive', '==', true)
+      .limit(1)
+      .get();
+
+    if (templatesQuery.empty) {
+      throw new functions.https.HttpsError('not-found', 'No active CONFERENCE_REGISTER template');
+    }
+    const kakaoConfig = templatesQuery.docs[0].data().channels?.kakao;
+    if (!kakaoConfig || kakaoConfig.status !== 'APPROVED' || !kakaoConfig.kakaoTemplateCode) {
+      throw new functions.https.HttpsError('failed-precondition', 'No approved AlimTalk template configured');
+    }
+
+    // 3. NHN Cloud 설정 조회
+    const infraSnap = await db.collection('societies').doc(conference.societyId).collection('settings').doc('infrastructure').get();
+    const nhnConfig = infraSnap.data()?.notification;
+    const appKey = nhnConfig?.appKey || 'Ik6GEBC22p5Qliqk';
+    const secretKey = nhnConfig?.secretKey || 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme';
+    const senderKey = nhnConfig?.senderKey;
+    if (!senderKey) throw new functions.https.HttpsError('failed-precondition', 'NHN senderKey not configured');
+
+    // 4. Society / Conference 메타데이터  
+    const societySnap = await db.collection('societies').doc(conference.societyId).get();
+    const societyName = societySnap.data()?.name?.ko || societySnap.data()?.name?.en || conference.societyId;
+    const eventName = conference.title?.ko || conference.title?.en || '';
+    const domain = `https://${conference.societyId}.eregi.co.kr`;
+    const redirectSlug = conference.id || (conference as any).slug || (conference as any).conferenceId;
+    const timeZone = 'Asia/Seoul';
+    const rawStart = conference.dates?.start || (conference as any).startDate;
+    const startDate = rawStart && typeof rawStart.toDate === 'function'
+      ? formatInTimeZone(rawStart.toDate(), timeZone, 'yyyy-MM-dd HH:mm', { locale: ko })
+      : '';
+    const venueName = typeof conference.venue?.name === 'object'
+      ? ((conference.venue.name as any).ko || (conference.venue.name as any).en || '')
+      : (conference.venue?.name || '');
+    let expiresAt: admin.firestore.Timestamp;
+    if (conference.dates?.end) {
+      expiresAt = admin.firestore.Timestamp.fromMillis(conference.dates.end.toMillis() + 48 * 3600 * 1000);
+    } else {
+      expiresAt = admin.firestore.Timestamp.fromMillis(now.toMillis() + 7 * 24 * 3600 * 1000);
+    }
+
+    // 5. 각 등록자별 토큰 생성 (30개 병렬)
+    const nhnRecipients: Array<{ recipientNo: string; templateParameter: Record<string, string> }> = [];
+    let tokenGenerated = 0;
+    let skipped = 0;
+    let tokenErrors = 0;
+
+    const CONCURRENCY = 30;
+    for (let i = 0; i < regIds.length; i += CONCURRENCY) {
+      const chunk: string[] = regIds.slice(i, i + CONCURRENCY);
+      const chunkResults = await Promise.allSettled(chunk.map(async (regId: string) => {
+        try {
+          // registration 또는 external_attendees 에서 조회
+          let isExternal = false;
+          let regSnap = await db.collection(`conferences/${confId}/registrations`).doc(regId).get();
+          if (!regSnap.exists) {
+            regSnap = await db.collection(`conferences/${confId}/external_attendees`).doc(regId).get();
+            if (regSnap.exists) isExternal = true;
+          }
+          if (!regSnap.exists) return null;
+
+          const regData = regSnap.data() as Registration;
+          if (!isExternal && regData.paymentStatus !== 'PAID' && regData.status !== 'PAID') return null;
+
+          const phone = (regData.phone || regData.userInfo?.phone || '').replace(/[^0-9]/g, '');
+          if (!phone) return null;
+
+          // 기존 ACTIVE 토큰 만료 처리 + 새 토큰 생성을 Batch write로
+          const oldTokens = await db
+            .collection(`conferences/${confId}/badge_tokens`)
+            .where('registrationId', '==', regId)
+            .where('status', '==', 'ACTIVE')
+            .get();
+
+          const batch = db.batch();
+          oldTokens.docs.forEach(t => batch.update(t.ref, { status: 'EXPIRED', updatedAt: now }));
+          const newToken = generateBadgePrepToken();
+          const tokenRef = db.collection(`conferences/${confId}/badge_tokens`).doc(newToken);
+          batch.set(tokenRef, {
+            token: newToken,
+            registrationId: regId,
+            conferenceId: confId,
+            userId: regData.userId || 'GUEST',
+            status: 'ACTIVE',
+            createdAt: now,
+            expiresAt
+          });
+          await batch.commit();
+
+          const badgePrepUrl = `${domain}/${redirectSlug}/badge-prep/${newToken}`;
+          const affiliation = regData.organization || regData.affiliation || regData.userInfo?.affiliation || '';
+
+          return {
+            recipientNo: phone,
+            templateParameter: {
+              userName: regData.name || regData.userInfo?.name || '',
+              society: societyName,
+              eventName,
+              badgePrepUrl,
+              digitalBadgeQrUrl: badgePrepUrl,
+              organization: affiliation,
+              affiliation,
+              registrationId: regId,
+              startDate,
+              venue: venueName,
+            }
+          };
+        } catch (err) {
+          functions.logger.error(`[BulkSend] Token error for ${regId}:`, err);
+          return null;
+        }
+      }));
+
+      for (const result of chunkResults) {
+        if (result.status === 'fulfilled' && result.value) {
+          nhnRecipients.push(result.value);
+          tokenGenerated++;
+        } else if (result.status === 'rejected') {
+          tokenErrors++;
+        } else {
+          skipped++;
+        }
+      }
+    }
+
+    functions.logger.info(`[BulkSend] Tokens ready: ${tokenGenerated}, skipped: ${skipped}, errors: ${tokenErrors}`);
+
+    // 6. NHN Cloud 배치 발송 (최대 1,000명씩)
+    const { sendAlimTalkBatch } = require('../utils/nhnCloud');
+    let totalSent = 0;
+    let totalFailed = 0;
+    const NHN_CHUNK = 1000;
+
+    for (let i = 0; i < nhnRecipients.length; i += NHN_CHUNK) {
+      const slice = nhnRecipients.slice(i, i + NHN_CHUNK);
+      try {
+        const batchResult = await sendAlimTalkBatch(
+          { appKey, secretKey, senderKey },
+          slice,
+          kakaoConfig.kakaoTemplateCode
+        );
+        totalSent += batchResult.successCount;
+        totalFailed += batchResult.failCount;
+        functions.logger.info(`[BulkSend] Batch ${i / NHN_CHUNK + 1}: sent=${batchResult.successCount}, failed=${batchResult.failCount}`);
+      } catch (err) {
+        functions.logger.error(`[BulkSend] Batch ${i / NHN_CHUNK + 1} failed:`, err);
+        totalFailed += slice.length;
+      }
+    }
+
+    // 7. 발송 이력 Firestore 저장
+    await db.collection(`conferences/${confId}/notification_logs`).add({
+      type: 'BULK_ALIMTALK',
+      templateCode: kakaoConfig.kakaoTemplateCode,
+      totalRequested: regIds.length,
+      tokenGenerated,
+      skipped: skipped + tokenErrors,
+      sent: totalSent,
+      failed: totalFailed,
+      sentAt: now,
+      createdAt: now
+    });
+
+    functions.logger.info(`[BulkSend] Complete — sent: ${totalSent}, failed: ${totalFailed}`);
+
+    return {
+      success: true,
+      totalRequested: regIds.length,
+      tokenGenerated,
+      skipped: skipped + tokenErrors,
+      sent: totalSent,
+      failed: totalFailed
+    };
   });
 
 /**

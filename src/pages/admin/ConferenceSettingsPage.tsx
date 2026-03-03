@@ -78,9 +78,26 @@ export default function ConferenceSettingsPage() {
                 if (docSnap.exists()) {
                     const snapData = docSnap.data();
 
-                    const toDateStr = (ts: { toDate?: () => Date } | null | string | undefined): string => {
-                        if (ts && typeof ts === 'object' && ts.toDate) return ts.toDate().toISOString().split('T')[0];
-                        return String(ts || '');
+                    const toDateTimeLocalStr = (ts: any): string => {
+                        if (ts && typeof ts === 'object' && ts.toDate) {
+                            // Firestore Timestamp → KST 기준 datetime-local 문자열로 변환
+                            const d = ts.toDate();
+                            // KST(Asia/Seoul, UTC+9) 기준으로 변환
+                            const kstOffset = 9 * 60; // 분 단위
+                            const localMs = d.getTime() + kstOffset * 60 * 1000;
+                            const kstDate = new Date(localMs);
+                            const year = kstDate.getUTCFullYear();
+                            const month = String(kstDate.getUTCMonth() + 1).padStart(2, '0');
+                            const day = String(kstDate.getUTCDate()).padStart(2, '0');
+                            const hours = String(kstDate.getUTCHours()).padStart(2, '0');
+                            const minutes = String(kstDate.getUTCMinutes()).padStart(2, '0');
+                            return `${year}-${month}-${day}T${hours}:${minutes}`;
+                        }
+                        if (typeof ts === 'string' && ts.length >= 10) {
+                            // 날짜만 있는 문자열('YYYY-MM-DD')은 00:00으로 표기
+                            return ts.includes('T') ? ts.substring(0, 16) : `${ts}T00:00`;
+                        }
+                        return '';
                     };
 
                     setData({
@@ -88,8 +105,8 @@ export default function ConferenceSettingsPage() {
                         subtitle: snapData.subtitle || '',
                         slug: snapData.slug || cid || '',
                         dates: {
-                            start: toDateStr(snapData.startDate || snapData.dates?.start),
-                            end: toDateStr(snapData.endDate || snapData.dates?.end)
+                            start: toDateTimeLocalStr(snapData.startDate || snapData.dates?.start),
+                            end: toDateTimeLocalStr(snapData.endDate || snapData.dates?.end)
                         },
                         venue: {
                             name: {
@@ -104,8 +121,8 @@ export default function ConferenceSettingsPage() {
                             googleMapEmbedUrl: snapData.venue?.googleMapEmbedUrl || ''
                         },
                         abstractDeadlines: {
-                            submissionDeadline: toDateStr(snapData.abstractSubmissionDeadline),
-                            editDeadline: toDateStr(snapData.abstractEditDeadline)
+                            submissionDeadline: toDateTimeLocalStr(snapData.abstractSubmissionDeadline),
+                            editDeadline: toDateTimeLocalStr(snapData.abstractEditDeadline)
                         },
                         visualAssets: {
                             banner: {
@@ -141,14 +158,27 @@ export default function ConferenceSettingsPage() {
         try {
             const docRef = doc(db, 'conferences', cid);
 
+            // datetime-local 값(예: "2026-05-10T09:00")을 KST 기준 UTC Timestamp로 변환
+            // new Date("2026-05-10T09:00")는 로컬 타임존(KST) 기준으로 파싱됨
+            // 단, 브라우저가 다른 타임존에 있을 경우를 대비해 명시적으로 KST 오프셋 적용
+            const parseDatetimeLocal = (dtStr: string): Date => {
+                // datetime-local 값은 타임존 정보 없음 → KST(UTC+9)로 명시 처리
+                // "2026-05-10T09:00" → UTC 2026-05-10T00:00:00Z 로 변환
+                const [datePart, timePart] = dtStr.split('T');
+                const [year, month, day] = datePart.split('-').map(Number);
+                const [hour, minute] = (timePart || '00:00').split(':').map(Number);
+                // KST = UTC+9, 즉 UTC로 변환할 때 9시간 빼기
+                return new Date(Date.UTC(year, month - 1, day, hour - 9, minute, 0, 0));
+            };
+
             const updateData = {
                 title: data.title,
                 subtitle: data.subtitle,
-                startDate: data.dates.start ? Timestamp.fromDate(new Date(data.dates.start)) : null,
-                endDate: data.dates.end ? Timestamp.fromDate(new Date(data.dates.end)) : null,
+                startDate: data.dates.start ? Timestamp.fromDate(parseDatetimeLocal(data.dates.start)) : null,
+                endDate: data.dates.end ? Timestamp.fromDate(parseDatetimeLocal(data.dates.end)) : null,
                 dates: {
-                    start: data.dates.start ? Timestamp.fromDate(new Date(data.dates.start)) : null,
-                    end: data.dates.end ? Timestamp.fromDate(new Date(data.dates.end)) : null,
+                    start: data.dates.start ? Timestamp.fromDate(parseDatetimeLocal(data.dates.start)) : null,
+                    end: data.dates.end ? Timestamp.fromDate(parseDatetimeLocal(data.dates.end)) : null,
                 },
                 venue: data.venue,
                 bannerUrl: data.visualAssets.banner.ko,
@@ -156,8 +186,8 @@ export default function ConferenceSettingsPage() {
                 visualAssets: data.visualAssets,
                 welcomeMessage: data.welcomeMessage,
                 welcomeMessageImages: data.welcomeMessageImages || [],
-                abstractSubmissionDeadline: data.abstractDeadlines.submissionDeadline ? Timestamp.fromDate(new Date(data.abstractDeadlines.submissionDeadline)) : null,
-                abstractEditDeadline: data.abstractDeadlines.editDeadline ? Timestamp.fromDate(new Date(data.abstractDeadlines.editDeadline)) : null,
+                abstractSubmissionDeadline: data.abstractDeadlines.submissionDeadline ? Timestamp.fromDate(parseDatetimeLocal(data.abstractDeadlines.submissionDeadline)) : null,
+                abstractEditDeadline: data.abstractDeadlines.editDeadline ? Timestamp.fromDate(parseDatetimeLocal(data.abstractDeadlines.editDeadline)) : null,
                 updatedAt: Timestamp.now()
             };
 
@@ -316,18 +346,18 @@ export default function ConferenceSettingsPage() {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-3">
-                                        <Label className="text-base font-medium text-slate-700">시작일 (Start Date)</Label>
+                                        <Label className="text-base font-medium text-slate-700">시작 일시 (Start Date & Time)</Label>
                                         <Input
-                                            type="date"
+                                            type="datetime-local"
                                             value={data.dates.start}
                                             onChange={(e) => setData(prev => ({ ...prev, dates: { ...prev.dates, start: e.target.value } }))}
                                             className="h-11 border-slate-200 rounded-lg"
                                         />
                                     </div>
                                     <div className="space-y-3">
-                                        <Label className="text-base font-medium text-slate-700">종료일 (End Date)</Label>
+                                        <Label className="text-base font-medium text-slate-700">종료 일시 (End Date & Time)</Label>
                                         <Input
-                                            type="date"
+                                            type="datetime-local"
                                             value={data.dates.end}
                                             onChange={(e) => setData(prev => ({ ...prev, dates: { ...prev.dates, end: e.target.value } }))}
                                             className="h-11 border-slate-200 rounded-lg"
@@ -361,27 +391,27 @@ export default function ConferenceSettingsPage() {
                             <CardContent className="p-6 md:p-8 space-y-8">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-3">
-                                        <Label className="text-base font-medium text-slate-700">신규 접수 마감일 (Submission Deadline)</Label>
+                                        <Label className="text-base font-medium text-slate-700">신규 접수 마감 일시 (Submission Deadline)</Label>
                                         <Input
-                                            type="date"
+                                            type="datetime-local"
                                             value={data.abstractDeadlines.submissionDeadline || ''}
                                             onChange={(e) => setData(prev => ({ ...prev, abstractDeadlines: { ...prev.abstractDeadlines, submissionDeadline: e.target.value } }))}
                                             className="h-11 border-slate-200 rounded-lg"
                                         />
                                         <p className="text-xs text-slate-400 mt-1">
-                                            이 날짜까지 새로운 초록을 제출할 수 있습니다.
+                                            이 시간까지 새로운 초록을 제출할 수 있습니다.
                                         </p>
                                     </div>
                                     <div className="space-y-3">
-                                        <Label className="text-base font-medium text-slate-700">수정 마감일 (Edit Deadline)</Label>
+                                        <Label className="text-base font-medium text-slate-700">수정 마감 일시 (Edit Deadline)</Label>
                                         <Input
-                                            type="date"
+                                            type="datetime-local"
                                             value={data.abstractDeadlines.editDeadline || ''}
                                             onChange={(e) => setData(prev => ({ ...prev, abstractDeadlines: { ...prev.abstractDeadlines, editDeadline: e.target.value } }))}
                                             className="h-11 border-slate-200 rounded-lg"
                                         />
                                         <p className="text-xs text-slate-400 mt-1">
-                                            이 날짜까지 기존 초록을 수정할 수 있습니다.
+                                            이 시간까지 기존 초록을 수정할 수 있습니다.
                                         </p>
                                     </div>
                                 </div>

@@ -3,60 +3,25 @@
 **ALL AGENTS MUST READ THIS BEFORE STARTING ANY WORK**
 
 ## Current Production Baseline
-- **Version**: v1.0.0 (Immutable)
-- **Tracking**: `.DEPLOYED_VERSION` file
-- **Release Notes**: `RELEASE_NOTES_v1.0.0.md`
+- **Version**: v1.0.1 (check with `git describe --tags --abbrev=0`)
+- **Baseline**: v1.0.0 at commit `35aaeed` (immutable)
+- **NEVER** delete, move, or modify tags
 
-## 🛡️ Rollback Prevention System (ENFORCED)
-
+## Rollback Prevention System (ENFORCED)
 This codebase has **multi-layer protection** against accidental rollbacks:
 
-### Layer 1: Git Tag Anchor
-- **v1.0.0** is the production baseline (commit `35aaeed`)
-- **NEVER** delete, move, or modify this tag
-- All forward progress must be from this point
+**Layer 1: Pre-commit Hooks** — ESLint (0 errors, 0 warnings) + Jest tests (all must pass)
+**Layer 2: GitHub Branch Protection** — Direct push to `main` BLOCKED, PR required
+**Layer 3: CI/CD Pipeline** — ESLint → TypeScript → Jest → Vite Build validation
+**Layer 4: Git Tag Protection** — v1.0.0 is immutable production baseline
 
-### Layer 2: Pre-commit Hooks (LOCAL ENFORCEMENT)
-- **ESLint** must pass (no errors, no warnings)
-- **Jest Tests** must pass (167 tests, 100% pass rate required)
-- **Auto-fix** runs on staged files
-- Hook location: `.husky/pre-commit`
-
-### Layer 3: GitHub Branch Protection (SERVER ENFORCEMENT)
-- **Direct push to `main`**: BLOCKED
-- **PR required**: ALL changes must go through pull requests
-- **CI/CD validation required**: ESLint + TypeScript + Tests + Build
-- **Force push protection**: ENABLED
-
-### Layer 4: CI/CD Pipeline (AUTOMATED VALIDATION)
-- File: `.github/workflows/ci.yml`
-- Runs on every PR to `main` or `develop`
-- Checks: ESLint → TypeScript → Jest → Vite Build
-- **ALL must pass** before merge button activates
-
-## 📋 MANDATORY PRE-WORK CHECKLIST
-
-**Before starting ANY work**, agents MUST:
-
-1. **Read** `MANDATORY_WORKFLOW.md` (this file's continuation)
-2. **Check** `.DEPLOYED_VERSION` to know current production version
+## MANDATORY Pre-Work Checklist
+Before starting ANY work, agents MUST:
+1. **Read** `MANDATORY_WORKFLOW.md` (primary workflow document)
+2. **Check** current version: `git describe --tags --abbrev=0`
 3. **Create** feature branch: `git checkout -b feature/description`
 4. **NEVER** work directly on `main` branch
-
-## ⚠️ Consequences of Violation
-
-- **Pre-commit hook failure**: Commit blocked
-- **Direct push to main**: GitHub rejects with error
-- **CI/CD failure**: PR cannot be merged
-- **Rollback attempt**: Tag protection prevents deletion
-
-## 🛠️ Emergency Recovery
-
-If you accidentally cause issues:
-1. **DO NOT** try to rollback
-2. **DO** create a new feature branch with fix
-3. **DO** follow normal PR workflow
-4. **READ** `VERSION_CONTROL_POLICY.md` for detailed procedures
+5. **Verify** Node version: `node --version` (CI/CD requires 20.x, package.json allows 18+)
 
 ---
 
@@ -65,23 +30,22 @@ If you accidentally cause issues:
 ## Essential Commands
 
 ```bash
-# Development & Build (uses rolldown-vite for faster builds)
+# Development & Build (rolldown-vite for faster builds)
 npm run dev              # Vite dev server (HMR, port 5173)
 npm run build           # TypeScript + Vite build (dist/)
 npm run lint            # ESLint check on all TS/TSX files
 
-# Testing (Jest: ts-jest preset, node env, 10s timeout)
-npm test                # Run all Jest tests
+# Testing (Jest: ts-jest preset, jsdom env, 10s timeout)
+npm test                # Run all Jest tests (10 test files)
 npx jest --testPathPattern=MyComponent.test.ts  # Single file
-npx jest --testNamePattern="should render"    # Single test
+npx jest --testNamePattern="should render"     # Single test
+npx jest --listTests    # List all test files
 
-# Firebase Functions (functions/src/{payment,scheduled,utils})
+# Firebase Functions (functions/src/ - Node 20 runtime)
 cd functions && npm run build                      # Compile to lib/
 firebase emulators:start --only functions          # Local emulator
 firebase deploy --only functions                   # Deploy functions
 ```
-
----
 
 ## Code Style Guidelines
 
@@ -99,14 +63,14 @@ import toast from 'react-hot-toast';
 ```
 
 ### Formatting & Linting
-- **ESLint**: Flat config (ts-eslint + react-hooks + react-refresh)
+- **ESLint**: Flat config (eslint.config.js) with ts-eslint + react-hooks + react-refresh
 - **No Prettier**: Formatting handled by ESLint only
 - **Line length**: ~100 chars recommended, 120 soft limit
 - **Quotes**: Double for JS/TS, backticks for templates
-- **TypeScript**: strict mode is FALSE; use schema.ts interfaces, NOT 'any'
+- **TypeScript**: `strict: false` in tsconfig; use schema.ts interfaces, NEVER 'any'
 
 ### TypeScript Best Practices
-- Use schema.ts interfaces, NOT 'any'
+- Use `schema.ts` interfaces for Firestore models, NOT 'any'
 - Firestore dates: Always use `Timestamp` from firebase/firestore
 - Type assertion: `const data = doc.data() as Conference;`
 - Optional chaining: `data.venue?.name || 'Unknown'`
@@ -127,7 +91,7 @@ try {
   toast.error('업데이트 실패했습니다.');
 }
 
-// Async with loading
+// Async with loading state
 const [loading, setLoading] = useState(false);
 const handleAction = async () => {
   setLoading(true);
@@ -142,7 +106,7 @@ const handleAction = async () => {
   }
 };
 
-// Firebase auth errors
+// Firebase auth error handling
 if (error.code === 'auth/user-not-found') toast.error('사용자를 찾을 수 없습니다.');
 ```
 
@@ -166,7 +130,6 @@ if (error.code === 'auth/user-not-found') toast.error('사용자를 찾을 수 �
 - `ConfContext` → Conference-specific data (confId, conference info)
 - `SocietyContext` → Society admin operations
 - `VendorContext` → Payment/vendor integration
-- Wrap pages with appropriate layout to activate context
 - **20+ custom hooks in src/hooks**: Use `useConference`, `useAuth`, `useConferenceAdmin` for domain logic
 - Each hook returns `{ loading, error, data }` states; always check `loading` before render
 
@@ -179,11 +142,6 @@ doc(db, 'conferences', confId)
 // Collection group queries - require firestore.indexes.json
 collectionGroup(db, 'submissions')
 ```
-
-### Firestore Security Rules
-- Collection group queries require indexes in firestore.indexes.json
-- Deploy: `firebase deploy --only firestore:rules,firestore:indexes`
-- Check FIXES_APPLIED.md for deployment history
 
 ---
 
@@ -212,11 +170,12 @@ src/
 ## Key Dependencies & Build
 
 - **React 19 + React Router 7**: Uses `useParams` (v7 API, not v6)
-- **Firebase**: Auth (session persistence), Firestore, Storage, Functions
+- **Firebase**: Auth (session persistence), Firestore, Storage, Functions (Node 20 runtime)
 - **Radix UI + Tailwind**: Accessible primitives + CSS-in-JS
 - **Payment**: Toss (domestic), Nice (backup)
 - **Notifications**: react-hot-toast, **Charts**: recharts
-- **Build Strategy**: Vite manual chunks - react-vendor, firebase-vendor, print-vendor, vendor
+- **Build Strategy**: Rolldown-Vite (faster than standard Vite), manual chunks - react-vendor, firebase-vendor, print-vendor, vendor
+- **Node Version**: package.json allows 18+, but CI/CD and Functions runtime require **20.x**
 
 ---
 

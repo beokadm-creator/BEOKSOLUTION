@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/button';
 import { ArrowLeft, Printer, XCircle, CheckCircle, CreditCard } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Registration } from '../../types/schema';
+import { DOMAIN_CONFIG, extractSocietyFromHost } from '../../utils/domainHelper';
 
 // Extended type for flattened data in UI
 // Extended type for flattened data in UI
@@ -45,13 +46,8 @@ interface ExtendedRegistration extends Omit<Registration, 'baseAmount' | 'option
 
 const getConferenceIdByDomain = () => {
     const hostname = window.location.hostname;
-    if (hostname.includes('kap.eregi')) {
-        return 'kap_2026spring';
-    }
-    if (hostname.includes('kadd.eregi')) {
-        return 'kadd_2026spring';
-    }
-    return 'kadd_2026spring';
+    const societyId = extractSocietyFromHost(hostname) || DOMAIN_CONFIG.DEFAULT_SOCIETY;
+    return `${societyId}_2026spring`;
 };
 
 const paymentMethodToKorean = (method: string | undefined): string => {

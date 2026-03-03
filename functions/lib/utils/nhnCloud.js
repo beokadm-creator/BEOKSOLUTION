@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendAlimTalk = sendAlimTalk;
+exports.sendAlimTalkBatch = sendAlimTalkBatch;
 exports.getTemplateList = getTemplateList;
 exports.getTemplate = getTemplate;
 exports.getSendHistory = getSendHistory;
@@ -59,6 +60,69 @@ async function sendAlimTalk(config, params) {
             success: false,
             error: ((_m = (_l = (_k = error.response) === null || _k === void 0 ? void 0 : _k.data) === null || _l === void 0 ? void 0 : _l.header) === null || _m === void 0 ? void 0 : _m.resultMessage) || error.message || 'Unknown error occurred',
             rawResponse: (_o = error.response) === null || _o === void 0 ? void 0 : _o.data
+        };
+    }
+}
+/**
+ * Send AlimTalk to multiple recipients in a single API call
+ * NHN Cloud supports up to 1,000 recipients per request, each with individual templateParameter
+ */
+async function sendAlimTalkBatch(config, recipients, templateCode) {
+    var _a, _b, _c, _d, _e, _f, _g;
+    if (recipients.length === 0) {
+        return { success: true, totalCount: 0, successCount: 0, failCount: 0 };
+    }
+    try {
+        const url = `https://api-alimtalk.cloud.toast.com/alimtalk/v2.3/appkeys/${config.appKey}/messages`;
+        const requestBody = {
+            senderKey: config.senderKey,
+            templateCode,
+            recipientList: recipients.map(r => ({
+                recipientNo: r.recipientNo,
+                templateParameter: r.templateParameter || {},
+                recipientGroupingKey: r.recipientGroupingKey
+            }))
+        };
+        const response = await axios_1.default.post(url, requestBody, {
+            headers: {
+                'Content-Type': 'application/json;charset=UTF-8',
+                'X-Secret-Key': config.secretKey
+            },
+            timeout: 30000 // 30s timeout per batch call
+        });
+        if (response.data.header.isSuccessful) {
+            const sendResults = ((_a = response.data.message) === null || _a === void 0 ? void 0 : _a.sendResults) || [];
+            const successCount = sendResults.filter((r) => r.resultCode === 0).length;
+            const failCount = sendResults.length - successCount;
+            return {
+                success: true,
+                requestId: (_b = response.data.message) === null || _b === void 0 ? void 0 : _b.requestId,
+                totalCount: recipients.length,
+                successCount: successCount || recipients.length, // fallback if no detail
+                failCount: failCount,
+                rawResponse: response.data
+            };
+        }
+        else {
+            return {
+                success: false,
+                totalCount: recipients.length,
+                successCount: 0,
+                failCount: recipients.length,
+                error: response.data.header.resultMessage,
+                rawResponse: response.data
+            };
+        }
+    }
+    catch (error) {
+        console.error('[NHN Cloud AlimTalk] Batch send error:', ((_c = error.response) === null || _c === void 0 ? void 0 : _c.data) || error.message);
+        return {
+            success: false,
+            totalCount: recipients.length,
+            successCount: 0,
+            failCount: recipients.length,
+            error: ((_f = (_e = (_d = error.response) === null || _d === void 0 ? void 0 : _d.data) === null || _e === void 0 ? void 0 : _e.header) === null || _f === void 0 ? void 0 : _f.resultMessage) || error.message || 'Unknown error',
+            rawResponse: (_g = error.response) === null || _g === void 0 ? void 0 : _g.data
         };
     }
 }

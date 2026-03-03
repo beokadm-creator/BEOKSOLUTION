@@ -22,6 +22,7 @@ interface WideContentPreviewProps {
       name: LocalizedString | string;
       prices?: Record<string, number>;
     }>;
+    subCollectionsLoading?: boolean;
     venue?: {
       name?: LocalizedString;
       address?: LocalizedString;
@@ -62,6 +63,13 @@ export const WideContentPreview: React.FC<WideContentPreviewProps> = ({
         );
 
       case 'program':
+        if (config.subCollectionsLoading) {
+          return (
+            <div id="section-program" className="animate-fade-in pt-8 pb-4 flex justify-center items-center min-h-[300px]">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          );
+        }
         return (
           <div id="section-program" className="animate-fade-in pt-8 pb-4">
             <div className="max-w-7xl mx-auto px-6">
@@ -75,6 +83,13 @@ export const WideContentPreview: React.FC<WideContentPreviewProps> = ({
         );
 
       case 'speakers':
+        if (config.subCollectionsLoading) {
+          return (
+            <div id="section-speakers" className="animate-fade-in pt-8 pb-4 flex justify-center items-center min-h-[300px]">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          );
+        }
         return (
           <div id="section-speakers" className="animate-fade-in pt-8 pb-4">
             <div className="max-w-7xl mx-auto px-6">
@@ -120,6 +135,13 @@ export const WideContentPreview: React.FC<WideContentPreviewProps> = ({
         );
 
       case 'sponsors':
+        if (config.subCollectionsLoading) {
+          return (
+            <div id="section-sponsors" className="animate-fade-in pt-8 pb-4 flex justify-center items-center min-h-[300px]">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          );
+        }
         return (
           <div id="section-sponsors" className="animate-fade-in">
             <WideSponsors sponsors={config.sponsors as Conference['sponsors']} lang={lang} />

@@ -1,9 +1,33 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'aaron@beoksolution.com' || 
+        request.auth.token.email == 'test@eregi.co.kr' ||
+        request.auth.token.admin == true
+      );
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // abstracts: User can manage their own, admin can see all
+    match /conferences/{confId}/abstracts/{userId}/{allPaths=**} {
+      allow read, write: if isOwner(userId) || isSuperAdmin();
+    }
+
+    // Default Storage Rule
     match /{allPaths=**} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read: if true; // Public assets
+      allow write: if isSuperAdmin(); // Restrict generic writing to super admins
     }
   }
 }

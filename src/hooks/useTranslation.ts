@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, getDocs, collection, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
+import { DOMAIN_CONFIG } from '../utils/domainHelper';
 
 /**
  * Translation hook for conference content
@@ -95,7 +96,11 @@ export const useTranslation = (slug: string): UseTranslationResult => {
 
                 const confId = confDoc.id;
                 const confData = confDoc.data();
-                const societyId = confData.societyId || confId.split('_')[0] || 'kadd';
+                const societyId = confData.societyId || confId.split('_')[0] || DOMAIN_CONFIG.DEFAULT_SOCIETY;
+
+                if (!societyId) {
+                    throw new Error("유효하지 않은 학회 정보입니다. 도메인 (주소)을 확인해주세요.");
+                }
 
                 // 2. Parallel Fetch ALL required configurations
                 const [identitySnap, societySnap, visualSnap, infoSnap, regSnap] = await Promise.all([
@@ -106,15 +111,7 @@ export const useTranslation = (slug: string): UseTranslationResult => {
                     getDoc(doc(db, 'conferences', confId, 'settings', 'registration'))
                 ]);
 
-                // 3. Parallel Fetch Sub-collections (Performance Boost)
-                const [pagesSnap, agendasSnap, speakersSnap, sponsorsSnap] = await Promise.all([
-                    getDocs(collection(db, 'conferences', confId, 'pages')),
-                    getDocs(collection(db, 'conferences', confId, 'agendas')),
-                    getDocs(collection(db, 'conferences', confId, 'speakers')),
-                    getDocs(collection(db, 'conferences', confId, 'sponsors'))
-                ]);
-
-                const combinedConfig = {
+                const baseConfig = {
                     ...confData,
                     id: confId,
                     societyId,
@@ -123,15 +120,37 @@ export const useTranslation = (slug: string): UseTranslationResult => {
                     visualAssets: confData.visualAssets || (visualSnap.exists() ? visualSnap.data() : null),
                     info: infoSnap.exists() ? infoSnap.data() : null,
                     pricing: regSnap.exists() ? (regSnap.data()?.periods || []) : [],
-                    pages: pagesSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-                    agendas: agendasSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-                    speakers: speakersSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-                    sponsors: sponsorsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                    pages: [],
+                    agendas: [],
+                    speakers: [],
+                    sponsors: [],
+                    subCollectionsLoading: true,
                 };
 
-                translationCache.set(cacheKey, { data: combinedConfig, timestamp: now });
+                // Asynchronous fetch for heavy sub-collections to unblock initial render
+                Promise.all([
+                    getDocs(collection(db, 'conferences', confId, 'pages')),
+                    getDocs(collection(db, 'conferences', confId, 'agendas')),
+                    getDocs(collection(db, 'conferences', confId, 'speakers')),
+                    getDocs(collection(db, 'conferences', confId, 'sponsors'))
+                ]).then(([pagesSnap, agendasSnap, speakersSnap, sponsorsSnap]) => {
+                    const fullConfig = {
+                        ...baseConfig,
+                        pages: pagesSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                        agendas: agendasSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                        speakers: speakersSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                        sponsors: sponsorsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                        subCollectionsLoading: false,
+                    };
+                    translationCache.set(cacheKey, { data: fullConfig, timestamp: Date.now() });
+                    setConfig(fullConfig);
+                }).catch(err => {
+                    console.error('[useTranslation] Background fetch error:', err);
+                });
+
+                translationCache.set(cacheKey, { data: baseConfig, timestamp: now });
                 pendingTranslations.delete(cacheKey);
-                return combinedConfig;
+                return baseConfig;
 
             } catch (err: unknown) {
                 console.error('[useTranslation] Fetch error:', err);

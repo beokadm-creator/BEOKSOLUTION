@@ -96,24 +96,35 @@ export function useRegistrationsPagination({
                 // Corrected Path: conferences/{conferenceId}/registrations
                 const regRef = collection(db, 'conferences', conferenceId, 'registrations');
 
-                // Build query with pagination
-                let q = query(
-                    regRef,
-                    orderBy('createdAt', 'desc'),
-                    limit(itemsPerPage)
-                );
+                const isSearching = !!(searchQuery && searchQuery.trim());
 
-                // If loading next page, start after last document
-                if (currentPage > 1 && lastVisible) {
-                    q = query(
+                let snap;
+                if (isSearching) {
+                    // [Bug Fix] 검색 시에는 limit 없이 전체 데이터를 조회해야 함.
+                    // 기존에는 limit(50)으로 최신 50건만 조회 후 클라이언트 필터링을 했기 때문에
+                    // 50건 이후에 있는 데이터(예: 강민규)가 검색 결과에서 누락되는 버그가 있었음.
+                    const q = query(regRef, orderBy('createdAt', 'desc'));
+                    snap = await getDocs(q);
+                } else {
+                    // 검색어가 없을 때는 기존 페이지네이션 방식 사용
+                    let q = query(
                         regRef,
                         orderBy('createdAt', 'desc'),
-                        startAfter(lastVisible),
                         limit(itemsPerPage)
                     );
+
+                    // If loading next page, start after last document
+                    if (currentPage > 1 && lastVisible) {
+                        q = query(
+                            regRef,
+                            orderBy('createdAt', 'desc'),
+                            startAfter(lastVisible),
+                            limit(itemsPerPage)
+                        );
+                    }
+                    snap = await getDocs(q);
                 }
 
-                const snap = await getDocs(q);
                 const data = snap.docs.map(d => {
                     const docData = d.data();
                     const flattened = {
@@ -166,27 +177,25 @@ export function useRegistrationsPagination({
                     return flattened;
                 });
 
-                // Update cursor states
-                if (snap.docs.length > 0) {
-                    setLastVisible(snap.docs[snap.docs.length - 1]);
-                }
-
-                // Check if more pages available
-                setHasMore(snap.docs.length === itemsPerPage);
-
-                // Client-side filtering by search query
-                let filteredData = data;
-                if (searchQuery && searchQuery.trim()) {
-                    const query = searchQuery.toLowerCase().trim();
-                    filteredData = data.filter(reg => {
+                if (isSearching) {
+                    // 검색 모드: 전체 조회이므로 페이지네이션 없음
+                    const searchTerm = searchQuery.toLowerCase().trim();
+                    const filteredData = data.filter(reg => {
                         const name = (reg.userName || '').toLowerCase();
                         const email = (reg.userEmail || '').toLowerCase();
                         const phone = (reg.userPhone || '').toLowerCase();
-                        return name.includes(query) || email.includes(query) || phone.includes(query);
+                        return name.includes(searchTerm) || email.includes(searchTerm) || phone.includes(searchTerm);
                     });
+                    setHasMore(false); // 검색 중에는 페이지 이동 없음
+                    setRegistrations(filteredData);
+                } else {
+                    // 일반 페이지네이션 모드
+                    if (snap.docs.length > 0) {
+                        setLastVisible(snap.docs[snap.docs.length - 1]);
+                    }
+                    setHasMore(snap.docs.length === itemsPerPage);
+                    setRegistrations(data);
                 }
-
-                setRegistrations(filteredData);
             } catch (err: unknown) {
                 setError((err instanceof Error ? err.message : 'Unknown error') + " (Check Console for Link)");
             } finally {

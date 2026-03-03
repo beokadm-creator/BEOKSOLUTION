@@ -7,6 +7,7 @@ import { db } from '../../../firebase';
 
 import { RegistrationModal } from '../RegistrationModal';
 import { safeFormatDate } from '../../../utils/dateUtils';
+import { DOMAIN_CONFIG, extractSocietyFromHost } from '../../../utils/domainHelper';
 
 type LocalizedString = { [lang: string]: string } | string;
 
@@ -56,7 +57,7 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
 
   // Extract societyId from confId (format: kadd_2026spring)
   const confIdToUse = propConfId || (slug && slug.includes('_') ? slug : undefined);
-  const societyId = confIdToUse?.split('_')[0] || 'kadd';
+  const societyId = confIdToUse?.split('_')[0] || DOMAIN_CONFIG.DEFAULT_SOCIETY;
 
   const t = (val: LocalizedString | undefined): string => {
     if (!val) return '';
@@ -106,12 +107,7 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
         } else {
           // URL에서 societyId 추출
           const hostname = window.location.hostname;
-          const parts = hostname.split('.');
-          let societyIdToUse = 'kadd';
-
-          if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') {
-            societyIdToUse = parts[0].toLowerCase();
-          }
+          let societyIdToUse = extractSocietyFromHost(hostname) || DOMAIN_CONFIG.DEFAULT_SOCIETY;
 
           confIdToUse = `${societyIdToUse}_${targetSlug}`;
         }

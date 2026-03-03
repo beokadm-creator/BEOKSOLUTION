@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { useSearchParams } from 'react-router-dom';
 import { db } from '../firebase';
+import { DOMAIN_CONFIG } from '../utils/domainHelper';
 
 export interface GradeMasterData {
     code: string;
@@ -14,8 +15,8 @@ export interface GradeMasterData {
 export const useSocietyGrades = (societyId: string | undefined) => {
     useSearchParams();
 
-    // Technical Compliance: Support guest mode fallback to 'kadd'
-    const effectiveSocietyId = societyId || 'kadd';
+    // Technical Compliance: Support guest mode fallback to DOMAIN_CONFIG.DEFAULT_SOCIETY
+    const effectiveSocietyId = societyId || DOMAIN_CONFIG.DEFAULT_SOCIETY;
 
     const [gradeMasterMap, setGradeMasterMap] = useState<Map<string, { ko: string; en: string }>>(new Map());
     const [gradesList, setGradesList] = useState<GradeMasterData[]>([]);

@@ -3,6 +3,7 @@ import { getApp } from 'firebase/app';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
+import { DOMAIN_CONFIG } from '../utils/domainHelper';
 
 import { useTranslation } from '../hooks/useTranslation';
 import { WideHeaderPreview } from '../components/conference/wide-preview/WideHeaderPreview';
@@ -30,7 +31,7 @@ export const ConferenceWideTemplatePreview = ({ slug }: Props) => {
 
   // Extract societyId from confId for registration modal
   const confIdToUse = confId || (slug && slug.includes('_') ? slug : undefined);
-  const societyId = confIdToUse?.split('_')[0] || 'kadd';
+  const societyId = confIdToUse?.split('_')[0] || DOMAIN_CONFIG.DEFAULT_SOCIETY;
 
   // Terms Agreement Modal state
   const [showTermsModal, setShowTermsModal] = useState(false);

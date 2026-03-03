@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { SESSION_KEYS } from '../utils/cookie';
 import { RefreshCw, CheckCircle, Loader2, Clock, FileText, Calendar, Languages, Download, User, MapPin, TrendingUp } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { DOMAIN_CONFIG, extractSocietyFromHost } from '../utils/domainHelper';
 
 const StandAloneBadgePage: React.FC = () => {
     // BUGFIX-20250124: Fixed React error #130 by moving unsubscribeDB to outer scope
@@ -24,18 +25,17 @@ const StandAloneBadgePage: React.FC = () => {
 
     // Helper to determine correct confId
     const getConfIdToUse = (slugVal: string | undefined): string => {
-        if (!slugVal) return 'kadd_2026spring';
+        if (!slugVal) {
+            const hostname = window.location.hostname;
+            const societyId = extractSocietyFromHost(hostname) || DOMAIN_CONFIG.DEFAULT_SOCIETY;
+            return `${societyId}_2026spring`;
+        }
 
         if (slugVal.includes('_')) {
             return slugVal;
         } else {
             const hostname = window.location.hostname;
-            const parts = hostname.split('.');
-            let societyIdToUse = 'kadd';
-
-            if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') {
-                societyIdToUse = parts[0].toLowerCase();
-            }
+            let societyIdToUse = extractSocietyFromHost(hostname) || DOMAIN_CONFIG.DEFAULT_SOCIETY;
 
             return `${societyIdToUse}_${slugVal}`;
         }

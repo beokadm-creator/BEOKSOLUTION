@@ -18,6 +18,22 @@ export interface AlimTalkSendParams {
     recipientGroupingKey?: string;  // 수신자 그룹핑 키
 }
 
+export interface BatchRecipient {
+    recipientNo: string;
+    templateParameter?: { [key: string]: string };
+    recipientGroupingKey?: string;
+}
+
+export interface BatchAlimTalkSendResult {
+    success: boolean;
+    requestId?: string;
+    totalCount: number;
+    successCount: number;
+    failCount: number;
+    error?: string;
+    rawResponse?: any;
+}
+
 export interface AlimTalkSendResult {
     success: boolean;
     requestId?: string;
@@ -80,6 +96,74 @@ export async function sendAlimTalk(
         return {
             success: false,
             error: error.response?.data?.header?.resultMessage || error.message || 'Unknown error occurred',
+            rawResponse: error.response?.data
+        };
+    }
+}
+
+/**
+ * Send AlimTalk to multiple recipients in a single API call
+ * NHN Cloud supports up to 1,000 recipients per request, each with individual templateParameter
+ */
+export async function sendAlimTalkBatch(
+    config: NHNCloudConfig,
+    recipients: BatchRecipient[],
+    templateCode: string
+): Promise<BatchAlimTalkSendResult> {
+    if (recipients.length === 0) {
+        return { success: true, totalCount: 0, successCount: 0, failCount: 0 };
+    }
+    try {
+        const url = `https://api-alimtalk.cloud.toast.com/alimtalk/v2.3/appkeys/${config.appKey}/messages`;
+
+        const requestBody = {
+            senderKey: config.senderKey,
+            templateCode,
+            recipientList: recipients.map(r => ({
+                recipientNo: r.recipientNo,
+                templateParameter: r.templateParameter || {},
+                recipientGroupingKey: r.recipientGroupingKey
+            }))
+        };
+
+        const response = await axios.post(url, requestBody, {
+            headers: {
+                'Content-Type': 'application/json;charset=UTF-8',
+                'X-Secret-Key': config.secretKey
+            },
+            timeout: 30000 // 30s timeout per batch call
+        });
+
+        if (response.data.header.isSuccessful) {
+            const sendResults = response.data.message?.sendResults || [];
+            const successCount = sendResults.filter((r: any) => r.resultCode === 0).length;
+            const failCount = sendResults.length - successCount;
+            return {
+                success: true,
+                requestId: response.data.message?.requestId,
+                totalCount: recipients.length,
+                successCount: successCount || recipients.length, // fallback if no detail
+                failCount: failCount,
+                rawResponse: response.data
+            };
+        } else {
+            return {
+                success: false,
+                totalCount: recipients.length,
+                successCount: 0,
+                failCount: recipients.length,
+                error: response.data.header.resultMessage,
+                rawResponse: response.data
+            };
+        }
+    } catch (error: any) {
+        console.error('[NHN Cloud AlimTalk] Batch send error:', error.response?.data || error.message);
+        return {
+            success: false,
+            totalCount: recipients.length,
+            successCount: 0,
+            failCount: recipients.length,
+            error: error.response?.data?.header?.resultMessage || error.message || 'Unknown error',
             rawResponse: error.response?.data
         };
     }

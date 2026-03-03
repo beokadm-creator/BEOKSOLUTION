@@ -36,19 +36,21 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.healthCheck = exports.onTossWebhook = exports.logPerformance = exports.logError = exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.confirmTossPaymentHttp = exports.confirmTossPayment = exports.confirmNicePayment = exports.prepareNicePayment = exports.resolveDataIntegrityAlert = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.cors = void 0;
+exports.healthCheck = exports.onTossWebhook = exports.logPerformance = exports.logError = exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.confirmTossPaymentHttp = exports.confirmTossPayment = exports.confirmNicePayment = exports.prepareNicePayment = exports.resolveDataIntegrityAlert = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.bulkSendNotifications = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.corsHandler = void 0;
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const cors_1 = __importDefault(require("cors"));
 const nice_1 = require("./payment/nice");
 const toss_1 = require("./payment/toss");
+const paymentVerifier_1 = require("./utils/paymentVerifier"); // New import
 const index_1 = require("./badge/index");
 Object.defineProperty(exports, "onRegistrationCreated", { enumerable: true, get: function () { return index_1.onRegistrationCreated; } });
 Object.defineProperty(exports, "onExternalAttendeeCreated", { enumerable: true, get: function () { return index_1.onExternalAttendeeCreated; } });
 Object.defineProperty(exports, "validateBadgePrepToken", { enumerable: true, get: function () { return index_1.validateBadgePrepToken; } });
 Object.defineProperty(exports, "issueDigitalBadge", { enumerable: true, get: function () { return index_1.issueDigitalBadge; } });
 Object.defineProperty(exports, "resendBadgePrepToken", { enumerable: true, get: function () { return index_1.resendBadgePrepToken; } });
+Object.defineProperty(exports, "bulkSendNotifications", { enumerable: true, get: function () { return index_1.bulkSendNotifications; } });
 // import { migrateExternalAttendeeParticipations } from './migrations/migrateExternalAttendeeParticipations';
 const migrateRegistrationsForOptions_1 = require("./migrations/migrateRegistrationsForOptions");
 Object.defineProperty(exports, "migrateRegistrationsForOptions", { enumerable: true, get: function () { return migrateRegistrationsForOptions_1.migrateRegistrationsForOptions; } });
@@ -63,7 +65,7 @@ const resolveAlert_1 = require("./monitoring/resolveAlert");
 Object.defineProperty(exports, "resolveDataIntegrityAlert", { enumerable: true, get: function () { return resolveAlert_1.resolveDataIntegrityAlert; } });
 // import { healthCheck, scheduledHealthCheck } from './health';
 // import { checkAlimTalkConfig, checkAlimTalkConfigHttp } from './alimtalk/checkConfig';
-exports.cors = (0, cors_1.default)({ origin: true });
+exports.corsHandler = (0, cors_1.default)({ origin: true });
 admin.initializeApp();
 // import { sendAlimTalkTest } from './alimtalk/sendTest';
 const external_1 = require("./auth/external");
@@ -74,10 +76,14 @@ Object.defineProperty(exports, "generateFirebaseAuthUserForExternalAttendee", { 
 // 1. Prepare NicePayment (Get SignData & EdiDate)
 exports.prepareNicePayment = functions
     .runWith({
-    enforceAppCheck: false,
+    enforceAppCheck: false, // Keep false as it's for public payment initiation
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onCall(async (data, _context) => {
+    // Add authentication check for callable functions as per instruction
+    if (!_context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    }
     const { amt, mid, key } = data;
     if (!amt || !mid || !key) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing amt, mid, or key');
@@ -95,15 +101,24 @@ exports.prepareNicePayment = functions
 // 2. Confirm NicePayment (Approve Transaction)
 exports.confirmNicePayment = functions
     .runWith({
-    enforceAppCheck: false,
+    // enforceAppCheck: false, // Removed: Enable App Check for authenticated calls
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onCall(async (data, _context) => {
     var _a;
-    // [FIX-20250124-04] Force recompile by adding comment
+    // [Security] Require Authentication
+    if (!_context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be logged in to confirm payment.');
+    }
     const { tid, amt, mid, key, regId, confId, userData, baseAmount, optionsTotal, selectedOptions } = data;
     if (!tid || !amt || !mid || !key) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing payment details');
+    }
+    // [Security] Verify Payment Amount against Database
+    const verification = await (0, paymentVerifier_1.verifyPaymentAmount)(confId, userData.tier, selectedOptions || [], parseInt(amt, 10));
+    if (!verification.isValid) {
+        functions.logger.error(`[Security] Payment verification failed for ${regId}: ${verification.error} `);
+        throw new functions.https.HttpsError('aborted', verification.error || 'Payment amount verification failed');
     }
     if (!userData) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing user data for registration creation');
@@ -255,14 +270,24 @@ exports.confirmNicePayment = functions
 // 3. Confirm TossPayment (Approve Transaction)
 exports.confirmTossPayment = functions
     .runWith({
-    enforceAppCheck: false,
+    // enforceAppCheck: false, // Removed: Enable App Check for authenticated calls
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onCall(async (data, _context) => {
     var _a, _b, _c, _d;
+    // [Security] Require Authentication
+    if (!_context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be logged in to confirm payment.');
+    }
     const { paymentKey, orderId, amount, regId, confId, secretKey, userData, baseAmount, optionsTotal, selectedOptions } = data;
     if (!paymentKey || !orderId || !amount) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing payment details (paymentKey, orderId, amount)');
+    }
+    // [Security] Verify Payment Amount against Database
+    const verification = await (0, paymentVerifier_1.verifyPaymentAmount)(confId, userData.tier, selectedOptions || [], Number(amount));
+    if (!verification.isValid) {
+        functions.logger.error(`[Security] Payment verification failed for ${regId}: ${verification.error}`);
+        throw new functions.https.HttpsError('aborted', verification.error || 'Payment amount verification failed');
     }
     if (!userData) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing user data for registration creation');
@@ -442,12 +467,11 @@ exports.confirmTossPayment = functions
 // This is an alternative to the callable version for better CORS support
 exports.confirmTossPaymentHttp = functions
     .runWith({
-    enforceAppCheck: false,
+    enforceAppCheck: false, // Keep false as it might be used for external integrations/webhooks
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onRequest(async (req, res) => {
-    // Apply CORS
-    (0, exports.cors)(req, res, async () => {
+    return (0, exports.corsHandler)(req, res, async () => {
         var _a, _b, _c, _d;
         // Handle OPTIONS preflight request
         if (req.method === 'OPTIONS') {
@@ -459,16 +483,23 @@ exports.confirmTossPaymentHttp = functions
             res.status(405).json({ error: 'Method not allowed' });
             return;
         }
+        const { paymentKey, orderId, amount, regId, confId, secretKey, userData, baseAmount, optionsTotal, selectedOptions } = req.body;
+        if (!paymentKey || !orderId || !amount || !confId) { // Added confId to required check
+            res.status(400).json({ error: 'Missing required parameters' });
+            return;
+        }
+        // [Security] Verify Payment Amount against Database
+        const verification = await (0, paymentVerifier_1.verifyPaymentAmount)(confId, userData === null || userData === void 0 ? void 0 : userData.tier, selectedOptions || [], Number(amount));
+        if (!verification.isValid) {
+            functions.logger.error(`[Security] HTTP Payment verification failed for ${regId}: ${verification.error}`);
+            res.status(403).json({ error: verification.error || 'Payment amount verification failed' });
+            return;
+        }
+        if (!userData) {
+            res.status(400).json({ error: 'Missing user data for registration creation' });
+            return;
+        }
         try {
-            const { paymentKey, orderId, amount, regId, confId, secretKey, userData, baseAmount, optionsTotal, selectedOptions } = req.body;
-            if (!paymentKey || !orderId || !amount) {
-                res.status(400).json({ error: 'Missing payment details' });
-                return;
-            }
-            if (!userData) {
-                res.status(400).json({ error: 'Missing user data for registration creation' });
-                return;
-            }
             // [Modified] Fetch Secret Key from DB (Secure)
             const db = admin.firestore();
             const confSnap = await db.collection('conferences').doc(confId).get();

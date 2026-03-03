@@ -24,7 +24,6 @@ import { CreditCard } from 'lucide-react';
 import { Submission, ConferenceUser } from '../types/schema';
 import { normalizeUserData } from '../utils/userDataMapper';
 import { safeFormatDate } from '../utils/dateUtils';
-import { DOMAIN_CONFIG, extractSocietyFromHost } from '../utils/domainHelper';
 
 interface Stringable {
     ko?: string;
@@ -197,7 +196,7 @@ const UserHubPage: React.FC = () => {
                     logger.debug('UserHub', 'Participations query returned', { count: participationsSnap.size });
                     if (!participationsSnap.empty) {
                         const nonMemberParticipation = participationsSnap.docs[0].data();
-                        const confSlug = nonMemberParticipation.slug || nonMemberParticipation.conferenceId || nonMemberParticipation.conferenceSlug || `${DOMAIN_CONFIG.DEFAULT_SOCIETY}_2026spring`;
+                        const confSlug = nonMemberParticipation.slug || nonMemberParticipation.conferenceId || nonMemberParticipation.conferenceSlug || 'kadd_2026spring';
 
                         // [Non-member detection] users/{uid} doesn't exist but participations do
                         logger.debug('UserHub', 'Non-member detected', { uid: u.id, hasParticipations: participationsSnap.size, confSlug });
@@ -261,10 +260,10 @@ const UserHubPage: React.FC = () => {
             if (errorMsg?.includes('index') || errorMsg?.includes('Index')) {
                 logger.warn('UserHub', 'Abstracts index is still building, showing empty state');
                 setAbstracts([]);
-                toast('초록 내역이 준비 중입니다. 잠시 후 새로고침해주세요.');
+                toast('珥덈줉 ?댁뿭??以鍮?以묒엯?덈떎. ?좎떆 ???덈줈怨좎묠?댁＜?몄슂.');
             } else {
                 setAbstracts([]);
-                toast.error('초록 내역을 불러올 수 없습니다.');
+                toast.error('珥덈줉 ?댁뿭??遺덈윭?????놁뒿?덈떎.');
             }
         }
 
@@ -451,7 +450,7 @@ const UserHubPage: React.FC = () => {
                             const d = p.data;
                             let sid = d.societyId;
                             if (!sid || sid === 'unknown') {
-                                sid = p.confSlug.includes('_') ? p.confSlug.split('_')[0] : DOMAIN_CONFIG.DEFAULT_SOCIETY;
+                                sid = p.confSlug.includes('_') ? p.confSlug.split('_')[0] : 'kadd';
                             }
                             return sid as string;
                         }))];
@@ -479,7 +478,7 @@ const UserHubPage: React.FC = () => {
 
                             let realTitle = forceString(data.conferenceName || confSlug);
                             let socName = forceString(data.societyName);
-                            let loc = '장소 정보 없음';
+                            let loc = '?μ냼 ?뺣낫 ?놁쓬';
                             let dates = '';
                             let receiptConfig: ReceiptConfig | undefined = undefined;
 
@@ -494,13 +493,13 @@ const UserHubPage: React.FC = () => {
 
                                 const venueName = cData.venue?.name || cData.venueName;
                                 const venueAddress = cData.venue?.address || cData.venueAddress;
-                                loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : '장소 정보 없음');
+                                loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : '?μ냼 ?뺣낫 ?놁쓬');
                                 receiptConfig = cData.receipt as ReceiptConfig | undefined;
                             }
 
                             let societyId = data.societyId as string;
                             if (!societyId || societyId === 'unknown') {
-                                societyId = confSlug.includes('_') ? confSlug.split('_')[0] : DOMAIN_CONFIG.DEFAULT_SOCIETY;
+                                societyId = confSlug.includes('_') ? confSlug.split('_')[0] : 'kadd';
                             }
 
                             const socData = societyCache.get(societyId);
@@ -518,7 +517,7 @@ const UserHubPage: React.FC = () => {
                                 societyName: socName,
                                 earnedPoints: Number(data.earnedPoints || 0),
                                 slug: forceString(data.slug || data.conferenceId || data.conferenceSlug || confSlug),
-                                societyId: forceString(data.societyId === 'unknown' ? cData?.societyId || societyId || DOMAIN_CONFIG.DEFAULT_SOCIETY : data.societyId || cData?.societyId || societyId || DOMAIN_CONFIG.DEFAULT_SOCIETY),
+                                societyId: forceString(data.societyId === 'unknown' ? cData?.societyId || societyId || 'kadd' : data.societyId || cData?.societyId || societyId || 'kadd'),
                                 location: loc,
                                 dates,
                                 paymentStatus: data.paymentStatus,
@@ -549,14 +548,11 @@ const UserHubPage: React.FC = () => {
                             // 1. Check for ANY PAID registration -> Show it
                             // NOTE: In users/{uid}/participations, status=COMPLETED means
                             // 'record created' and payment confirmed.
-                            const paidReg = regs.find(r => {
-                                const p = (r.paymentStatus || '').toUpperCase();
-                                const s = (r.status || '').toUpperCase();
-                                const isCanceled = ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(p) ||
-                                    ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(s);
-                                if (isCanceled) return false;
-                                return p === 'PAID' || s === 'PAID' || s === 'COMPLETED';
-                            });
+                            const paidReg = regs.find(r =>
+                                (r.paymentStatus || '').toUpperCase() === 'PAID' ||
+                                (r.status || '').toUpperCase() === 'PAID' ||
+                                (r.status || '').toUpperCase() === 'COMPLETED'
+                            );
                             if (paidReg) {
                                 activeRegs.push(paidReg);
                                 return;
@@ -610,7 +606,7 @@ const UserHubPage: React.FC = () => {
                             setSyncStatus('connected');
                         } else {
                             setSyncStatus('disconnected');
-                            toast.error("마이페이지 데이터 로드 실패. 새로고침 후 다시 시도해 주세요.");
+                            toast.error("留덉씠?섏씠吏 ?곗씠??濡쒕뱶 ?ㅽ뙣. ?덈줈怨좎묠 ???ㅼ떆 ?쒕룄??二쇱꽭??");
                         }
                         setLoading(false);
                     }
@@ -635,7 +631,7 @@ const UserHubPage: React.FC = () => {
                     const uniqueSocIds = [...new Set(enrichedDocs.map(p => {
                         const d = p.data;
                         let sid = d.societyId as string;
-                        if (!sid || sid === 'unknown') sid = p.confSlug.includes('_') ? p.confSlug.split('_')[0] : DOMAIN_CONFIG.DEFAULT_SOCIETY;
+                        if (!sid || sid === 'unknown') sid = p.confSlug.includes('_') ? p.confSlug.split('_')[0] : 'kadd';
                         return sid;
                     }))];
 
@@ -655,7 +651,7 @@ const UserHubPage: React.FC = () => {
 
                         let realTitle = forceString(data.conferenceName || confSlug);
                         let socName = forceString(data.societyName);
-                        let loc = '장소 정보 없음';
+                        let loc = '?μ냼 ?뺣낫 ?놁쓬';
                         let dates = '';
                         let receiptConfig: ReceiptConfig | undefined = undefined;
 
@@ -663,7 +659,7 @@ const UserHubPage: React.FC = () => {
                             realTitle = forceString(cData.title?.ko || cData.title?.en || cData.title);
                             const venueName = cData.venue?.name || cData.venueName;
                             const venueAddress = cData.venue?.address || cData.venueAddress;
-                            loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : '장소 정보 없음');
+                            loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : '?μ냼 ?뺣낫 ?놁쓬');
 
                             const dateStart = cData.dates?.start || cData.startDate || cData.dates?.startDate;
                             const dateEnd = cData.dates?.end || cData.endDate;
@@ -675,7 +671,7 @@ const UserHubPage: React.FC = () => {
 
                         let societyId = data.societyId as string;
                         if (!societyId || societyId === 'unknown') {
-                            societyId = confSlug.includes('_') ? confSlug.split('_')[0] : DOMAIN_CONFIG.DEFAULT_SOCIETY;
+                            societyId = confSlug.includes('_') ? confSlug.split('_')[0] : 'kadd';
                         }
 
                         const socData = socCache.get(societyId);
@@ -695,13 +691,12 @@ const UserHubPage: React.FC = () => {
                             societyName: socName,
                             earnedPoints: Number(data.earnedPoints || 0),
                             slug: forceString(data.slug || data.conferenceId || data.conferenceSlug || confSlug),
-                            societyId: forceString(data.societyId === 'unknown' ? cData?.societyId || societyId || DOMAIN_CONFIG.DEFAULT_SOCIETY : data.societyId || cData?.societyId || societyId || DOMAIN_CONFIG.DEFAULT_SOCIETY),
+                            societyId: forceString(data.societyId === 'unknown' ? cData?.societyId || societyId || 'kadd' : data.societyId || cData?.societyId || societyId || 'kadd'),
                             location: loc,
                             dates,
                             paymentStatus: data.paymentStatus,
                             amount: data.amount,
                             receiptNumber: data.id,
-                            names: data.names,
                             paymentDate: data.createdAt || data.updatedAt || data.registeredAt,
                             receiptConfig,
                             userName: data.userName || user.name || (user as { displayName?: string }).displayName,
@@ -722,14 +717,11 @@ const UserHubPage: React.FC = () => {
                     grouped.forEach((regs, slug) => {
                         // 1. Check for ANY PAID registration -> Show it
                         // NOTE: COMPLETED in participations means registration confirmed.
-                        const paidReg = regs.find(r => {
-                            const p = (r.paymentStatus || '').toUpperCase();
-                            const s = (r.status || '').toUpperCase();
-                            const isCanceled = ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(p) ||
-                                ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(s);
-                            if (isCanceled) return false;
-                            return p === 'PAID' || s === 'PAID' || s === 'COMPLETED';
-                        });
+                        const paidReg = regs.find(r =>
+                            (r.paymentStatus || '').toUpperCase() === 'PAID' ||
+                            (r.status || '').toUpperCase() === 'PAID' ||
+                            (r.status || '').toUpperCase() === 'COMPLETED'
+                        );
                         if (paidReg) {
                             activeRegs.push(paidReg);
                             return;
@@ -791,14 +783,14 @@ const UserHubPage: React.FC = () => {
 
                 if (isIndexingError) {
                     // For indexing errors, don't retry - indexes are being deployed
-                    toast.error("인덱스 생성 중입니다. 잠시 후 새로고침 해주세요.");
+                    toast.error("?몃뜳???앹꽦 以묒엯?덈떎. ?좎떆 ???덈줈怨좎묠 ?댁＜?몄슂.");
                     return;
                 }
 
                 // For other errors, retry with exponential backoff
                 if (realtimeRetryCount.current < MAX_REALTIME_RETRIES) {
                     const backoffMs = 3000 * Math.pow(2, realtimeRetryCount.current);
-                    toast.error(`연결 실패. ${backoffMs / 1000}초 후 재연결을 시도합니다.`);
+                    toast.error(`?곌껐 ?ㅽ뙣. ${backoffMs / 1000}珥????ъ뿰寃곗쓣 ?쒕룄?⑸땲??`);
 
                     if (retryTimer) clearTimeout(retryTimer);
                     retryTimer = setTimeout(() => {
@@ -807,7 +799,7 @@ const UserHubPage: React.FC = () => {
                     }, backoffMs);
                 } else {
                     // Max retries exceeded
-                    toast.error("실시간 데이터 연결이 실패했습니다. 페이지를 새로고침해 주세요.");
+                    toast.error("?ㅼ떆媛??곗씠???곌껐???ㅽ뙣?덉뒿?덈떎. ?섏씠吏瑜??덈줈怨좎묠??二쇱꽭??");
                 }
             });
         };
@@ -822,7 +814,7 @@ const UserHubPage: React.FC = () => {
 
     const handleEventClick = (r: UserReg) => {
         const currentHost = window.location.hostname;
-        const targetHost = `${r.societyId}.${DOMAIN_CONFIG.BASE_DOMAIN}`;
+        const targetHost = `${r.societyId}.eregi.co.kr`;
         // [Step 403-D] Redirect to main mypage (not conference-specific mypage)
         const cleanPath = `/mypage`;
 
@@ -841,12 +833,12 @@ const UserHubPage: React.FC = () => {
     const handleQrClick = (e: React.MouseEvent, r: UserReg) => {
         e.stopPropagation(); // Prevent card click
         const currentHost = window.location.hostname;
-        // [CRITICAL FIX] Use societyId from registration, fallback to DOMAIN_CONFIG.DEFAULT_SOCIETY if 'unknown'
-        const safeSocietyId = r.societyId && r.societyId !== 'unknown' ? r.societyId : DOMAIN_CONFIG.DEFAULT_SOCIETY;
-        const targetHost = `${safeSocietyId}.${DOMAIN_CONFIG.BASE_DOMAIN}`;
+        // [CRITICAL FIX] Use societyId from registration, fallback to 'kadd' if 'unknown'
+        const safeSocietyId = r.societyId && r.societyId !== 'unknown' ? r.societyId : 'kadd';
+        const targetHost = `${safeSocietyId}.eregi.co.kr`;
 
         // [CRITICAL FIX] Safely extract slug with fallback
-        const badgeSlug = r.slug && r.slug !== 'unknown' && r.slug !== '' ? r.slug : `${DOMAIN_CONFIG.DEFAULT_SOCIETY}_2026spring`;
+        const badgeSlug = r.slug && r.slug !== 'unknown' && r.slug !== '' ? r.slug : 'kadd_2026spring';
         const cleanPath = `/${badgeSlug}/badge`;
 
         console.log('[UserHub] Badge click - Registration slug:', r.slug, 'Badge slug:', badgeSlug, 'Society ID:', safeSocietyId);
@@ -871,12 +863,12 @@ const UserHubPage: React.FC = () => {
     const handleReceiptClick = (e: React.MouseEvent, r: UserReg) => {
         e.stopPropagation();
         if (r.paymentStatus !== 'PAID') {
-            toast.error("결제 완료된 건만 출력 가능합니다.");
+            toast.error("寃곗젣 ?꾨즺??嫄대쭔 異쒕젰 媛?ν빀?덈떎.");
             return;
         }
         // Fallback for config if missing (optional: can hardcode for demo if needed, but better to rely on data)
         if (!r.receiptConfig) {
-            toast.error("영수증 설정이 없습니다. 관리자에게 문의하세요.");
+            toast.error("?곸닔利??ㅼ젙???놁뒿?덈떎. 愿由ъ옄?먭쾶 臾몄쓽?섏꽭??");
             return;
         }
         setSelectedReceiptReg(r);
@@ -885,7 +877,7 @@ const UserHubPage: React.FC = () => {
 
     const handleOpenModal = () => {
         const hostname = window.location.hostname;
-        const isMain = hostname === DOMAIN_CONFIG.BASE_DOMAIN || hostname.startsWith('www') || hostname.includes('firebaseapp') || hostname.includes('localhost');
+        const isMain = hostname === 'eregi.co.kr' || hostname.startsWith('www') || hostname.includes('firebaseapp') || hostname.includes('localhost');
         if (isMain) {
             setIsSocLocked(false);
             setVerifyForm(prev => ({ ...prev, societyId: "" }));
@@ -909,7 +901,7 @@ const UserHubPage: React.FC = () => {
         if (res.success) {
             // [Fix-Step 350] Removed Legacy Cert Doc Creation. 
             // AuthContext onSnapshot will auto-update the UI via affiliations.
-            toast.success("인증되었습니다.");
+            toast.success("?몄쬆?섏뿀?듬땲??");
             setShowCertModal(false);
             // No need to call fetchUserData explicitly as onSnapshot handles it.
         } else {
@@ -921,7 +913,7 @@ const UserHubPage: React.FC = () => {
     // if (loading) return <LoadingSpinner />;
 
     const hostname = window.location.hostname;
-    const isMain = hostname === DOMAIN_CONFIG.BASE_DOMAIN || hostname.startsWith('www') || hostname.includes('firebaseapp') || hostname.includes('localhost');
+    const isMain = hostname === 'eregi.co.kr' || hostname.startsWith('www') || hostname.includes('firebaseapp') || hostname.includes('localhost');
 
     // Dynamic page title based on fetched society name from database
     const getSocietyName = (): string => {
@@ -942,7 +934,7 @@ const UserHubPage: React.FC = () => {
     };
 
     const societyName = getSocietyName();
-    const pageTitle = isMain ? "통합 마이페이지" : `${societyName} 마이페이지`;
+    const pageTitle = isMain ? "?듯빀 留덉씠?섏씠吏" : `${societyName} 留덉씠?섏씠吏`;
 
     const formatDate = (date: any): string => {
         return safeFormatDate(date, 'ko-KR');
@@ -1005,11 +997,11 @@ const UserHubPage: React.FC = () => {
 
                 {/* TABS */}
                 <div className="flex gap-4 border-b mb-6 overflow-x-auto no-scrollbar flex-nowrap min-w-0">
-                    <button onClick={() => setActiveTab('EVENTS')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'EVENTS' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>등록학회</button>
-                    <button onClick={() => setActiveTab('ABSTRACTS')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'ABSTRACTS' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>초록 내역</button>
+                    <button onClick={() => setActiveTab('EVENTS')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'EVENTS' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>?깅줉?숉쉶</button>
+                    <button onClick={() => setActiveTab('ABSTRACTS')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'ABSTRACTS' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>珥덈줉 ?댁뿭</button>
                     {/* [SIMPLIFIED] Anonymous check removed - all users have full accounts */}
-                    <button onClick={() => setActiveTab('CERTS')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'CERTS' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>학회 인증</button>
-                    <button onClick={() => setActiveTab('PROFILE')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'PROFILE' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>내 정보</button>
+                    <button onClick={() => setActiveTab('CERTS')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'CERTS' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>?숉쉶 ?몄쬆</button>
+                    <button onClick={() => setActiveTab('PROFILE')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'PROFILE' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>???뺣낫</button>
                 </div>
 
                 {/* 1. EVENTS (FIXED LINKS & TITLES) */}
@@ -1034,16 +1026,16 @@ const UserHubPage: React.FC = () => {
                                 <div className="w-20 h-20 bg-blue-50 text-blue-200 rounded-full flex items-center justify-center mb-6">
                                     <Calendar className="w-10 h-10 text-blue-400" />
                                 </div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-2">등록된 학회가 없습니다</h3>
+                                <h3 className="text-xl font-bold text-gray-900 mb-2">?깅줉???숉쉶媛 ?놁뒿?덈떎</h3>
                                 <p className="text-gray-500 max-w-sm mb-8">
-                                    현재 참여 중인 학술대회 내역이 없습니다.<br />
-                                    진행 중인 학술대회를 찾아 등록해보세요.
+                                    ?꾩옱 李몄뿬 以묒씤 ?숈닠????댁뿭???놁뒿?덈떎.<br />
+                                    吏꾪뻾 以묒씤 ?숈닠??뚮? 李얠븘 ?깅줉?대낫?몄슂.
                                 </p>
                                 <Button
                                     onClick={() => window.location.href = '/'}
                                     className="px-8 py-6 text-base font-bold bg-[#003366] hover:bg-[#002244] text-white shadow-lg shadow-blue-900/10"
                                 >
-                                    지금 학회 등록하기
+                                    吏湲??숉쉶 ?깅줉?섍린
                                 </Button>
                             </div>
                         )}
@@ -1055,8 +1047,8 @@ const UserHubPage: React.FC = () => {
                                     </div>
                                     <h3 className="font-heading-3 text-slate-900 mb-2 group-hover:text-[#1b4d77] transition-colors">{r.conferenceName}</h3>
                                     <div className="text-body-sm text-slate-500 flex flex-col gap-1">
-                                        <span>📅 {r.dates}</span>
-                                        <span>📍 {r.location}</span>
+                                        <span>?뱟 {r.dates}</span>
+                                        <span>?뱧 {r.location}</span>
                                     </div>
                                 </div>
                                 <div className="mt-auto border-t border-slate-100 pt-4 flex items-center justify-between">
@@ -1064,7 +1056,7 @@ const UserHubPage: React.FC = () => {
                                         (r.status === 'PENDING_PAYMENT' || r.paymentStatus === 'WAITING_FOR_DEPOSIT') ? "bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-xs font-bold border border-orange-100" :
                                             "bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-xs"}>
                                         {r.earnedPoints ? `+${r.earnedPoints} pts` :
-                                            (r.status === 'PENDING_PAYMENT' || r.paymentStatus === 'WAITING_FOR_DEPOSIT') ? '입금 대기 (가상계좌)' :
+                                            (r.status === 'PENDING_PAYMENT' || r.paymentStatus === 'WAITING_FOR_DEPOSIT') ? '?낃툑 ?湲?(媛?곴퀎醫?' :
                                                 `[STATUS] ${r.paymentStatus || r.status}`}
                                     </span>
                                     <div className="flex gap-2">
@@ -1074,12 +1066,12 @@ const UserHubPage: React.FC = () => {
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 const currentLang = searchParams.get('lang') || 'ko';
-                                                const safeSlug = r.slug && r.slug !== 'unknown' && r.slug !== '' ? r.slug : `${DOMAIN_CONFIG.DEFAULT_SOCIETY}_2026spring`;
+                                                const safeSlug = r.slug && r.slug !== 'unknown' && r.slug !== '' ? r.slug : 'kadd_2026spring';
                                                 navigate(`/${safeSlug}/abstracts?lang=${currentLang}`);
                                             }}
                                             className="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs gap-1.5 shadow-sm border border-slate-200"
                                         >
-                                            <FileText size={14} /> 초록 접수/확인
+                                            <FileText size={14} /> 珥덈줉 ?묒닔/?뺤씤
                                         </Button>
                                         <Button
                                             size="sm"
@@ -1087,7 +1079,7 @@ const UserHubPage: React.FC = () => {
                                             onClick={(e) => handleQrClick(e, r)}
                                             className="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs gap-1.5 shadow-sm border border-slate-200"
                                         >
-                                            <QrCode size={14} /> 등록 확인증 (QR)
+                                            <QrCode size={14} /> ?깅줉 ?뺤씤利?(QR)
                                         </Button>
                                         {r.paymentStatus === 'PAID' && (
                                             <Button
@@ -1096,8 +1088,7 @@ const UserHubPage: React.FC = () => {
                                                 onClick={(e) => handleReceiptClick(e, r)}
                                                 className="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs gap-1.5 shadow-sm border border-slate-200"
                                             >
-                                                <Printer size={14} /> 영수증
-                                            </Button>
+                                                <Printer size={14} /> ?곸닔利?                                            </Button>
                                         )}
                                         {(r.status === 'PENDING_PAYMENT' || r.paymentStatus === 'WAITING_FOR_DEPOSIT') && r.virtualAccount && (
                                             <Button
@@ -1110,7 +1101,7 @@ const UserHubPage: React.FC = () => {
                                                 }}
                                                 className="bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold text-xs gap-1.5 shadow-sm border border-orange-200"
                                             >
-                                                <CreditCard size={14} /> 계좌 확인
+                                                <CreditCard size={14} /> 怨꾩쥖 ?뺤씤
                                             </Button>
                                         )}
                                     </div>
@@ -1145,7 +1136,7 @@ const UserHubPage: React.FC = () => {
                             return (
                                 <div key={socId} className="eregi-card flex justify-between items-center bg-blue-50/30 border-blue-100">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-[#e1ecf6] text-[#24669e] rounded-full flex items-center justify-center font-bold text-xl">✓</div>
+                                        <div className="w-12 h-12 bg-[#e1ecf6] text-[#24669e] rounded-full flex items-center justify-center font-bold text-xl">??/div>
                                         <div>
                                             <h4 className="font-heading-3 text-slate-900 leading-tight">{forceString(soc?.name || socId)}</h4>
                                             <p className="text-body-sm text-slate-500 flex flex-col gap-1">
@@ -1155,21 +1146,21 @@ const UserHubPage: React.FC = () => {
                                     </div>
                                     <div className="text-right">
                                         <span className="bg-white border border-blue-100 text-eregi-700 px-3 py-1 rounded text-xs font-bold block mb-1 shadow-sm">
-                                            {forceString(aff.grade || '정회원')}
+                                            {forceString(aff.grade || '?뺥쉶??)}
                                         </span>
                                         <p className="text-xs text-blue-600 mt-1">
-                                            {aff.expiry || aff.expiryDate ? `유효기간: ${formatDate(aff.expiry || aff.expiryDate)}` : '무기한'}
+                                            {aff.expiry || aff.expiryDate ? `?좏슚湲곌컙: ${formatDate(aff.expiry || aff.expiryDate)}` : '臾닿린??}
                                         </p>
                                     </div>
                                 </div>
                             );
                         })}
                         <button onClick={handleOpenModal} className="w-full py-4 bg-white border-2 border-dashed border-blue-300 text-blue-600 rounded-xl font-bold hover:bg-blue-50">
-                            + 학회 정회원 인증 추가하기
+                            + ?숉쉶 ?뺥쉶???몄쬆 異붽??섍린
                         </button>
                         <button onClick={() => navigate('/mypage/membership')} className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-bold hover:from-blue-700 hover:to-blue-800 shadow-md flex items-center justify-center gap-2">
                             <CreditCard className="w-5 h-5" />
-                            학회 회비 납부
+                            ?숉쉶 ?뚮퉬 ?⑸?
                         </button>
                     </div>
                 )}
@@ -1196,17 +1187,17 @@ const UserHubPage: React.FC = () => {
                                 <div className="w-20 h-20 bg-blue-50 text-blue-200 rounded-full flex items-center justify-center mb-6">
                                     <FileText className="w-10 h-10 text-blue-400" />
                                 </div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-2">제출된 초록이 없습니다</h3>
+                                <h3 className="text-xl font-bold text-gray-900 mb-2">?쒖텧??珥덈줉???놁뒿?덈떎</h3>
                                 <p className="text-gray-500 max-w-sm mb-8">
-                                    아직 제출된 초록이 없습니다.<br />
-                                    현재 접수 중인 학술대회를 확인해보세요.
+                                    ?꾩쭅 ?쒖텧??珥덈줉???놁뒿?덈떎.<br />
+                                    ?꾩옱 ?묒닔 以묒씤 ?숈닠??뚮? ?뺤씤?대낫?몄슂.
                                 </p>
                                 <Button
                                     onClick={() => setActiveTab('EVENTS')}
                                     variant="outline"
                                     className="px-8 py-6 text-base font-bold border-2 border-blue-100 text-blue-600 hover:bg-blue-50 hover:border-blue-200"
                                 >
-                                    등록된 학회 보기
+                                    ?깅줉???숉쉶 蹂닿린
                                 </Button>
                             </div>
                         )}
@@ -1235,8 +1226,8 @@ const UserHubPage: React.FC = () => {
                                     </span>
                                 </div>
                                 <div className="text-sm text-gray-500 flex flex-col gap-1 mt-2">
-                                    <p>제출일: {formatDate(abs.submittedAt || abs.createdAt)}</p>
-                                    <p>저자: {abs.authors?.map((a: { name: string; email: string; affiliation: string; isPresenter: boolean }) => a.name).join(', ') || '-'}</p>
+                                    <p>?쒖텧?? {formatDate(abs.submittedAt || abs.createdAt)}</p>
+                                    <p>??? {abs.authors?.map((a: { name: string; email: string; affiliation: string; isPresenter: boolean }) => a.name).join(', ') || '-'}</p>
 
                                     {/* [Step 405-D] Edit/Withdraw Buttons */}
                                     <div className="flex flex-col sm:flex-row gap-2 mt-4 w-full sm:w-auto">
@@ -1246,7 +1237,7 @@ const UserHubPage: React.FC = () => {
                                                 e.stopPropagation();
                                                 // [Fix-Step 410-D] Correct Edit URL with proper query string
                                                 const currentHost = window.location.hostname;
-                                                const targetHost = `${abs.confId}.${DOMAIN_CONFIG.BASE_DOMAIN}`;
+                                                const targetHost = `${abs.confId}.eregi.co.kr`;
                                                 const token = getRootCookie('eregi_session');
 
                                                 // If we are on the same domain or localhost, use React Router if possible, 
@@ -1254,7 +1245,7 @@ const UserHubPage: React.FC = () => {
                                                 // However, user specifically asked for `/${slug}/abstracts?mode=edit&id=${abs.id}` format.
                                                 // Let's assume we stay on the current domain if it matches, or redirect if not.
 
-                                                if (currentHost === targetHost || currentHost.includes('localhost') || currentHost === DOMAIN_CONFIG.BASE_DOMAIN) {
+                                                if (currentHost === targetHost || currentHost.includes('localhost') || currentHost === 'eregi.co.kr') {
                                                     // Use the slug-based route we just confirmed in App.tsx: /:slug/abstracts
                                                     navigate(`/${abs.confId}/abstracts?mode=edit&id=${abs.id}`);
                                                 } else {
@@ -1265,20 +1256,20 @@ const UserHubPage: React.FC = () => {
                                             }}
                                             className="w-full sm:w-auto text-xs bg-blue-50 text-blue-600 px-3 py-2 sm:py-1.5 rounded hover:bg-blue-100 font-bold border border-blue-200"
                                         >
-                                            수정하기
+                                            ?섏젙?섍린
                                         </button>
 
                                         {/* Withdraw Button */}
                                         <button
                                             onClick={async (e) => {
                                                 e.stopPropagation();
-                                                if (!confirm("정말 철회하시겠습니까? 철회 후에는 복구할 수 없습니다.")) return;
+                                                if (!confirm("?뺣쭚 泥좏쉶?섏떆寃좎뒿?덇퉴? 泥좏쉶 ?꾩뿉??蹂듦뎄?????놁뒿?덈떎.")) return;
 
                                                 try {
                                                     const db = getFirestore();
                                                     const confId = abs.confId;
                                                     if (!confId) {
-                                                        toast.error("유효하지 않은 컨퍼런스 ID입니다.");
+                                                        toast.error("?좏슚?섏? ?딆? 而⑦띁?곗뒪 ID?낅땲??");
                                                         return;
                                                     }
                                                     // 1. Delete Firestore Doc
@@ -1286,15 +1277,15 @@ const UserHubPage: React.FC = () => {
 
                                                     // 2. Update Local State
                                                     setAbstracts(prev => prev.filter(p => p.id !== abs.id));
-                                                    toast.success("초록이 철회되었습니다.");
+                                                    toast.success("珥덈줉??泥좏쉶?섏뿀?듬땲??");
                                                 } catch (err) {
                                                     logger.error('UserHub', 'Withdraw failed', err);
-                                                    toast.error("철회 실패: 관리자에게 문의하세요.");
+                                                    toast.error("泥좏쉶 ?ㅽ뙣: 愿由ъ옄?먭쾶 臾몄쓽?섏꽭??");
                                                 }
                                             }}
                                             className="w-full sm:w-auto text-xs bg-red-50 text-red-600 px-3 py-2 sm:py-1.5 rounded hover:bg-red-100 font-bold border border-red-200"
                                         >
-                                            제출 철회
+                                            ?쒖텧 泥좏쉶
                                         </button>
                                     </div>
                                 </div>
@@ -1306,7 +1297,7 @@ const UserHubPage: React.FC = () => {
                 {/* 4. PROFILE (LOCKED READ-ONLY) */}
                 {activeTab === 'PROFILE' && (
                     <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="font-bold text-lg mb-6">내 정보 확인</h3>
+                        <h3 className="font-bold text-lg mb-6">???뺣낫 ?뺤씤</h3>
                         {loading ? (
                             <div className="space-y-4">
                                 {[1, 2, 3, 4, 5].map((i) => (
@@ -1318,13 +1309,13 @@ const UserHubPage: React.FC = () => {
                             </div>
                         ) : (
                             <>
-                                <p className="text-sm text-red-500 mb-4 bg-red-50 p-2 rounded">※ 정보 수정은 인증 후 가능합니다 (현재 읽기 전용)</p>
+                                <p className="text-sm text-red-500 mb-4 bg-red-50 p-2 rounded">???뺣낫 ?섏젙? ?몄쬆 ??媛?ν빀?덈떎 (?꾩옱 ?쎄린 ?꾩슜)</p>
                                 <div className="space-y-4 opacity-70">
-                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">이름</label><input type="text" className="w-full border p-3 rounded-lg bg-gray-100" value={profile.displayName} disabled /></div>
-                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">전화번호</label><input type="text" className="w-full border p-3 rounded-lg bg-gray-100" value={profile.phoneNumber} disabled /></div>
-                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">소속</label><input type="text" className="w-full border p-3 rounded-lg bg-gray-100" value={profile.affiliation} disabled /></div>
-                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">면허번호</label><input type="text" className="w-full border p-3 rounded-lg bg-gray-100" value={profile.licenseNumber} disabled /></div>
-                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">이메일</label><input type="text" className="w-full border p-3 rounded-lg bg-gray-100" value={profile.email} disabled /></div>
+                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">?대쫫</label><input type="text" className="w-full border p-3 rounded-lg bg-gray-100" value={profile.displayName} disabled /></div>
+                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">?꾪솕踰덊샇</label><input type="text" className="w-full border p-3 rounded-lg bg-gray-100" value={profile.phoneNumber} disabled /></div>
+                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">?뚯냽</label><input type="text" className="w-full border p-3 rounded-lg bg-gray-100" value={profile.affiliation} disabled /></div>
+                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">硫댄뿀踰덊샇</label><input type="text" className="w-full border p-3 rounded-lg bg-gray-100" value={profile.licenseNumber} disabled /></div>
+                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">?대찓??/label><input type="text" className="w-full border p-3 rounded-lg bg-gray-100" value={profile.email} disabled /></div>
                                 </div>
                             </>
                         )}
@@ -1336,28 +1327,28 @@ const UserHubPage: React.FC = () => {
             {showCertModal && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
                     <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full relative">
-                        <h3 className="text-xl font-bold mb-2 text-gray-900">학회 정회원 인증</h3>
-                        <p className="text-xs text-center text-blue-500 mb-6 font-bold bg-blue-50 p-1 rounded">{isSocLocked ? `[${verifyForm.societyId}] 학회 전용 모드` : '통합 모드 (학회 선택 가능)'}</p>
+                        <h3 className="text-xl font-bold mb-2 text-gray-900">?숉쉶 ?뺥쉶???몄쬆</h3>
+                        <p className="text-xs text-center text-blue-500 mb-6 font-bold bg-blue-50 p-1 rounded">{isSocLocked ? `[${verifyForm.societyId}] ?숉쉶 ?꾩슜 紐⑤뱶` : '?듯빀 紐⑤뱶 (?숉쉶 ?좏깮 媛??'}</p>
                         {/* Form Fields */}
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium mb-1">학회 선택</label>
+                                <label className="block text-sm font-medium mb-1">?숉쉶 ?좏깮</label>
                                 <select className={`w-full border p-3 rounded-lg ${isSocLocked ? 'bg-gray-100 text-gray-500' : 'bg-white'}`} value={verifyForm.societyId} onChange={(e) => setVerifyForm({ ...verifyForm, societyId: e.target.value })} disabled={isSocLocked}>
-                                    <option value="">선택해주세요</option>
+                                    <option value="">?좏깮?댁＜?몄슂</option>
                                     {societies.map((s) => <option key={s.id} value={s.id}>{forceString(s.name) || s.id}</option>)}
                                 </select>
                             </div>
-                            <div><label className="block text-sm font-medium mb-1">이름</label><input type="text" className="w-full border p-3 rounded-lg" value={verifyForm.name} onChange={(e) => setVerifyForm({ ...verifyForm, name: e.target.value })} /></div>
-                            <div><label className="block text-sm font-medium mb-1">인증 코드</label><input type="text" className="w-full border p-3 rounded-lg" value={verifyForm.code} onChange={(e) => setVerifyForm({ ...verifyForm, code: e.target.value })} /></div>
+                            <div><label className="block text-sm font-medium mb-1">?대쫫</label><input type="text" className="w-full border p-3 rounded-lg" value={verifyForm.name} onChange={(e) => setVerifyForm({ ...verifyForm, name: e.target.value })} /></div>
+                            <div><label className="block text-sm font-medium mb-1">?몄쬆 肄붾뱶</label><input type="text" className="w-full border p-3 rounded-lg" value={verifyForm.code} onChange={(e) => setVerifyForm({ ...verifyForm, code: e.target.value })} /></div>
                         </div>
                         <div className="flex justify-end gap-3">
-                            <button onClick={() => setShowCertModal(false)} className="px-5 py-3 text-gray-500 hover:bg-gray-100 rounded-lg font-bold">취소</button>
+                            <button onClick={() => setShowCertModal(false)} className="px-5 py-3 text-gray-500 hover:bg-gray-100 rounded-lg font-bold">痍⑥냼</button>
                             <button
                                 onClick={handleVerify}
                                 className="px-5 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 flex items-center justify-center min-w-[100px]"
                                 disabled={verifyLoading}
                             >
-                                {verifyLoading ? <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" /> : '인증 받기'}
+                                {verifyLoading ? <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" /> : '?몄쬆 諛쏄린'}
                             </button>
                         </div>
                     </div>
@@ -1368,7 +1359,7 @@ const UserHubPage: React.FC = () => {
             <Dialog open={showReceiptModal} onOpenChange={setShowReceiptModal}>
                 <DialogContent className="max-w-3xl overflow-y-auto max-h-[90vh]">
                     <DialogHeader>
-                        <DialogTitle>영수증 미리보기 (Receipt Preview)</DialogTitle>
+                        <DialogTitle>?곸닔利?誘몃━蹂닿린 (Receipt Preview)</DialogTitle>
                     </DialogHeader>
                     <div className="flex flex-col items-center justify-center p-6 bg-gray-100 rounded-xl">
                         {selectedReceiptReg && selectedReceiptReg.receiptConfig && (
@@ -1391,14 +1382,14 @@ const UserHubPage: React.FC = () => {
                     </div>
                     <div className="flex justify-end gap-3 mt-4">
                         <Button onClick={() => setShowReceiptModal(false)} variant="secondary">
-                            닫기
+                            ?リ린
                         </Button>
                         <PrintHandler
                             contentRef={receiptRef}
                             triggerButton={
                                 <Button className="bg-blue-600 hover:bg-blue-700 text-white">
                                     <Printer className="w-4 h-4 mr-2" />
-                                    인쇄하기
+                                    ?몄뇙?섍린
                                 </Button>
                             }
                         />
@@ -1410,31 +1401,31 @@ const UserHubPage: React.FC = () => {
             <Dialog open={showVirtualAccountModal} onOpenChange={setShowVirtualAccountModal}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>가상계좌 입금 정보</DialogTitle>
+                        <DialogTitle>媛?곴퀎醫??낃툑 ?뺣낫</DialogTitle>
                     </DialogHeader>
                     {selectedVirtualAccountReg && selectedVirtualAccountReg.virtualAccount && (
                         <div className="bg-white p-6 rounded-xl border border-orange-200 shadow-sm mt-2">
                             <h3 className="text-lg font-bold text-orange-800 mb-4 border-b border-orange-100 pb-2">
-                                입금 계좌 안내
+                                ?낃툑 怨꾩쥖 ?덈궡
                             </h3>
                             <div className="space-y-3">
                                 <div className="flex justify-between">
-                                    <span className="text-gray-500">은행</span>
+                                    <span className="text-gray-500">???/span>
                                     <span className="font-bold">{selectedVirtualAccountReg.virtualAccount.bank}</span>
                                 </div>
                                 <div className="flex justify-between items-center bg-gray-50 p-2 rounded">
-                                    <span className="text-gray-500">계좌번호</span>
+                                    <span className="text-gray-500">怨꾩쥖踰덊샇</span>
                                     <div className="flex items-center gap-2">
                                         <span className="font-bold text-lg text-blue-600">{selectedVirtualAccountReg.virtualAccount.accountNumber}</span>
                                     </div>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-gray-500">예금주</span>
+                                    <span className="text-gray-500">?덇툑二?/span>
                                     <span className="font-medium">{selectedVirtualAccountReg.virtualAccount.customerName || 'Toss Payments'}</span>
                                 </div>
                                 {selectedVirtualAccountReg.virtualAccount.dueDate && (
                                     <div className="flex justify-between text-red-500 pt-2 border-t border-dashed border-gray-200 mt-2">
-                                        <span className="font-medium">입금기한</span>
+                                        <span className="font-medium">?낃툑湲고븳</span>
                                         <span className="font-bold">
                                             {new Date(selectedVirtualAccountReg.virtualAccount.dueDate).toLocaleString()}
                                         </span>
@@ -1442,13 +1433,13 @@ const UserHubPage: React.FC = () => {
                                 )}
                             </div>
                             <div className="mt-6 text-xs text-gray-400 text-center">
-                                ※ 입금 기한 내에 입금하지 않으시면 자동 취소됩니다.
+                                ???낃툑 湲고븳 ?댁뿉 ?낃툑?섏? ?딆쑝?쒕㈃ ?먮룞 痍⑥냼?⑸땲??
                             </div>
                         </div>
                     )}
                     <div className="flex justify-center mt-4">
                         <Button onClick={() => setShowVirtualAccountModal(false)} className="w-full bg-slate-900 text-white hover:bg-slate-800">
-                            확인
+                            ?뺤씤
                         </Button>
                     </div>
                 </DialogContent>

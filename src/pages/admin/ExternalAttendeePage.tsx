@@ -7,6 +7,7 @@ import { db } from '../../firebase';
 import { safeFormatDate } from '../../utils/dateUtils';
 import { httpsCallable, getFunctions } from 'firebase/functions';
 import { v4 as uuidv4 } from 'uuid';
+import { useExcel } from '../../hooks/useExcel';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -262,6 +263,25 @@ const ExternalAttendeePage: React.FC = () => {
     const [selectedAttendee, setSelectedAttendee] = useState<ExternalAttendee | null>(null);
 
     const { printBadge, printing: bixolonPrinting, error: bixolonError } = useBixolon();
+    const { exportToExcel, processing: exporting } = useExcel();
+
+    // Handle export to Excel (externalAttendees 전체는 onSnapshot으로 이미 수신 중)
+    const handleExport = () => {
+        const data = externalAttendees.map(a => ({
+            'ID': a.id,
+            '이름': a.name,
+            '이메일': a.email || '-',
+            '전화번호': a.phone || '-',
+            '소속': a.organization || '-',
+            '면허번호': a.licenseNumber || '-',
+            '등록비': a.amount || 0,
+            '수령번호': a.receiptNumber || '-',
+            '명찰발급': a.badgeIssued ? '발급완료' : '미발급',
+            '체크인': a.isCheckedIn ? '완료' : '대기',
+            '등록일': safeFormatDate(a.createdAt),
+        }));
+        exportToExcel(data, `ExternalAttendees_${confId}_${new Date().toISOString().slice(0, 10)}`);
+    };
 
     // Receipt Config
     const [receiptConfig, setReceiptConfig] = useState<{ issuerName: string; stampUrl: string; nextSerialNo: number } | null>(null);
@@ -1272,7 +1292,17 @@ const ExternalAttendeePage: React.FC = () => {
                                             className="text-white bg-indigo-600 border-indigo-600 hover:bg-indigo-700"
                                         >
                                             <MessageCircle className="w-4 h-4 mr-2" />
-                                            전체 발송 ({externalAttendees.length})
+                                            전체 발송 (전체)
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleExport}
+                                            disabled={exporting || externalAttendees.length === 0}
+                                            className="text-white bg-green-600 border-green-600 hover:bg-green-700"
+                                        >
+                                            <Download className="w-4 h-4 mr-2" />
+                                            엑셀 다운로드 ({externalAttendees.length})
                                         </Button>
                                     </div>
                                 </div>

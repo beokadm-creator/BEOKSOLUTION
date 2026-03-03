@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import corsLib from 'cors';
+import cors from 'cors';
 import { getNiceAuthParams, approveNicePayment } from './payment/nice';
 import { approveTossPayment, cancelTossPayment as cancelTossPaymentApi } from './payment/toss';
+import { verifyPaymentAmount } from './utils/paymentVerifier'; // New import
 
-import { onRegistrationCreated, onExternalAttendeeCreated, validateBadgePrepToken, issueDigitalBadge, resendBadgePrepToken, generateBadgePrepToken, sendBadgeNotification } from './badge/index';
+import { onRegistrationCreated, onExternalAttendeeCreated, validateBadgePrepToken, issueDigitalBadge, resendBadgePrepToken, generateBadgePrepToken, sendBadgeNotification, bulkSendNotifications } from './badge/index';
 // import { migrateExternalAttendeeParticipations } from './migrations/migrateExternalAttendeeParticipations';
 import { migrateRegistrationsForOptions, migrateRegistrationsForOptionsCallable } from './migrations/migrateRegistrationsForOptions';
 import { monitorRegistrationIntegrity, monitorMemberCodeIntegrity } from './monitoring/dataIntegrity';
@@ -15,7 +16,7 @@ import { resolveDataIntegrityAlert } from './monitoring/resolveAlert';
 // import { checkAlimTalkConfig, checkAlimTalkConfigHttp } from './alimtalk/checkConfig';
 
 
-export const cors = corsLib({ origin: true });
+export const corsHandler = cors({ origin: true });
 
 admin.initializeApp();
 
@@ -25,6 +26,7 @@ export {
     validateBadgePrepToken,
     issueDigitalBadge,
     resendBadgePrepToken,
+    bulkSendNotifications,
     generateFirebaseAuthUserForExternalAttendee,
     // migrateExternalAttendeeParticipations,
     migrateRegistrationsForOptions,
@@ -52,10 +54,15 @@ import { generateFirebaseAuthUserForExternalAttendee } from './auth/external';
 // 1. Prepare NicePayment (Get SignData & EdiDate)
 export const prepareNicePayment = functions
     .runWith({
-        enforceAppCheck: false,
+        enforceAppCheck: false, // Keep false as it's for public payment initiation
         ingressSettings: 'ALLOW_ALL'
     })
     .https.onCall(async (data, _context) => {
+        // Add authentication check for callable functions as per instruction
+        if (!_context.auth) {
+            throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+        }
+
         const { amt, mid, key } = data;
 
         if (!amt || !mid || !key) {
@@ -75,15 +82,26 @@ export const prepareNicePayment = functions
 // 2. Confirm NicePayment (Approve Transaction)
 export const confirmNicePayment = functions
     .runWith({
-        enforceAppCheck: false,
+        // enforceAppCheck: false, // Removed: Enable App Check for authenticated calls
         ingressSettings: 'ALLOW_ALL'
     })
     .https.onCall(async (data, _context) => {
-        // [FIX-20250124-04] Force recompile by adding comment
+        // [Security] Require Authentication
+        if (!_context.auth) {
+            throw new functions.https.HttpsError('unauthenticated', 'User must be logged in to confirm payment.');
+        }
+
         const { tid, amt, mid, key, regId, confId, userData, baseAmount, optionsTotal, selectedOptions } = data;
 
         if (!tid || !amt || !mid || !key) {
             throw new functions.https.HttpsError('invalid-argument', 'Missing payment details');
+        }
+
+        // [Security] Verify Payment Amount against Database
+        const verification = await verifyPaymentAmount(confId, userData.tier, selectedOptions || [], parseInt(amt, 10));
+        if (!verification.isValid) {
+            functions.logger.error(`[Security] Payment verification failed for ${regId}: ${verification.error} `);
+            throw new functions.https.HttpsError('aborted', verification.error || 'Payment amount verification failed');
         }
 
         if (!userData) {
@@ -242,14 +260,26 @@ export const confirmNicePayment = functions
 // 3. Confirm TossPayment (Approve Transaction)
 export const confirmTossPayment = functions
     .runWith({
-        enforceAppCheck: false,
+        // enforceAppCheck: false, // Removed: Enable App Check for authenticated calls
         ingressSettings: 'ALLOW_ALL'
     })
     .https.onCall(async (data, _context) => {
+        // [Security] Require Authentication
+        if (!_context.auth) {
+            throw new functions.https.HttpsError('unauthenticated', 'User must be logged in to confirm payment.');
+        }
+
         const { paymentKey, orderId, amount, regId, confId, secretKey, userData, baseAmount, optionsTotal, selectedOptions } = data;
 
         if (!paymentKey || !orderId || !amount) {
             throw new functions.https.HttpsError('invalid-argument', 'Missing payment details (paymentKey, orderId, amount)');
+        }
+
+        // [Security] Verify Payment Amount against Database
+        const verification = await verifyPaymentAmount(confId, userData.tier, selectedOptions || [], Number(amount));
+        if (!verification.isValid) {
+            functions.logger.error(`[Security] Payment verification failed for ${regId}: ${verification.error}`);
+            throw new functions.https.HttpsError('aborted', verification.error || 'Payment amount verification failed');
         }
 
         if (!userData) {
@@ -444,12 +474,11 @@ export const confirmTossPayment = functions
 // This is an alternative to the callable version for better CORS support
 export const confirmTossPaymentHttp = functions
     .runWith({
-        enforceAppCheck: false,
+        enforceAppCheck: false, // Keep false as it might be used for external integrations/webhooks
         ingressSettings: 'ALLOW_ALL'
     })
     .https.onRequest(async (req, res) => {
-        // Apply CORS
-        cors(req, res, async () => {
+        return corsHandler(req, res, async () => {
             // Handle OPTIONS preflight request
             if (req.method === 'OPTIONS') {
                 res.status(204).end();
@@ -462,19 +491,27 @@ export const confirmTossPaymentHttp = functions
                 return;
             }
 
+            const { paymentKey, orderId, amount, regId, confId, secretKey, userData, baseAmount, optionsTotal, selectedOptions } = req.body;
+
+            if (!paymentKey || !orderId || !amount || !confId) { // Added confId to required check
+                res.status(400).json({ error: 'Missing required parameters' });
+                return;
+            }
+
+            // [Security] Verify Payment Amount against Database
+            const verification = await verifyPaymentAmount(confId, userData?.tier, selectedOptions || [], Number(amount));
+            if (!verification.isValid) {
+                functions.logger.error(`[Security] HTTP Payment verification failed for ${regId}: ${verification.error}`);
+                res.status(403).json({ error: verification.error || 'Payment amount verification failed' });
+                return;
+            }
+
+            if (!userData) {
+                res.status(400).json({ error: 'Missing user data for registration creation' });
+                return;
+            }
+
             try {
-                const { paymentKey, orderId, amount, regId, confId, secretKey, userData, baseAmount, optionsTotal, selectedOptions } = req.body;
-
-                if (!paymentKey || !orderId || !amount) {
-                    res.status(400).json({ error: 'Missing payment details' });
-                    return;
-                }
-
-                if (!userData) {
-                    res.status(400).json({ error: 'Missing user data for registration creation' });
-                    return;
-                }
-
                 // [Modified] Fetch Secret Key from DB (Secure)
                 const db = admin.firestore();
                 const confSnap = await db.collection('conferences').doc(confId).get();

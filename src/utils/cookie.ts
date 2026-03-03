@@ -1,5 +1,6 @@
+import { DOMAIN_CONFIG } from './domainHelper';
 
-const ROOT_DOMAIN = '.eregi.co.kr';
+const ROOT_DOMAIN = `.${DOMAIN_CONFIG.BASE_DOMAIN}`;
 
 export const setRootCookie = (name: string, value: string, days: number = 7) => {
   const date = new Date();
@@ -15,7 +16,7 @@ export const setRootCookie = (name: string, value: string, days: number = 7) => 
 export const getRootCookie = (name: string): string | null => {
   const nameEQ = name + "=";
   const ca = document.cookie.split(';');
-  for(let i = 0; i < ca.length; i++) {
+  for (let i = 0; i < ca.length; i++) {
     let c = ca[i];
     while (c.charAt(0) === ' ') c = c.substring(1, c.length);
     if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { DOMAIN_CONFIG } from '../utils/domainHelper';
 
 export const useConferenceData = (slug: string) => {
   const [conference, setConference] = useState<Record<string, unknown> | null>(null);
@@ -17,8 +18,8 @@ export const useConferenceData = (slug: string) => {
 
     const fetchData = async () => {
       // [Fix-Step 318] Simplified Fetch Logic & State Separation
-      const societyId = 'kadd'; 
-      const docId = `${societyId}_${slug}`; 
+      const societyId = DOMAIN_CONFIG.DEFAULT_SOCIETY;
+      const docId = `${societyId}_${slug}`;
       const collectionName = 'conferences';
       const path = `${collectionName}/${docId}`;
 
@@ -30,7 +31,7 @@ export const useConferenceData = (slug: string) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           // --- Fetch Sub-collections ---
-          
+
           const feesRef = doc(db, `${path}/settings/registration`);
           const feesSnap = await getDoc(feesRef);
           let feesData: Record<string, unknown>[] = [];
@@ -38,43 +39,43 @@ export const useConferenceData = (slug: string) => {
           let refundPolicyData: string = "";
 
           if (feesSnap.exists()) {
-              const regData = feesSnap.data();
-              if (Array.isArray(regData.fees)) {
-                  feesData = regData.fees;
-              } else if (regData.prices) {
-                  feesData = Object.entries(regData.prices).map(([name, amount]) => ({ name, amount, currency: 'KRW' }));
-              }
-              
-              if (regData.periods) periodsData = regData.periods;
-              if (regData.refundPolicy) refundPolicyData = regData.refundPolicy;
+            const regData = feesSnap.data();
+            if (Array.isArray(regData.fees)) {
+              feesData = regData.fees;
+            } else if (regData.prices) {
+              feesData = Object.entries(regData.prices).map(([name, amount]) => ({ name, amount, currency: 'KRW' }));
+            }
+
+            if (regData.periods) periodsData = regData.periods;
+            if (regData.refundPolicy) refundPolicyData = regData.refundPolicy;
           }
 
           // Agendas
           const agendasRef = collection(db, `${path}/agendas`);
           const agendasSnap = await getDocs(agendasRef);
           const agendasData = agendasSnap.docs.map(d => {
-              const dData = d.data();
-              return {
-                  id: d.id,
-                  startTime: dData.startTime ? (dData.startTime.toDate ? dData.startTime.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : dData.startTime) : 'TBD',
-                  title: dData.title?.ko || dData.title?.en || dData.title || 'Untitled Session',
-                  speakers: dData.speakers ? (Array.isArray(dData.speakers) ? dData.speakers.join(', ') : dData.speakers) : '',
-                  description: dData.description?.ko || dData.description?.en || ''
-              };
+            const dData = d.data();
+            return {
+              id: d.id,
+              startTime: dData.startTime ? (dData.startTime.toDate ? dData.startTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : dData.startTime) : 'TBD',
+              title: dData.title?.ko || dData.title?.en || dData.title || 'Untitled Session',
+              speakers: dData.speakers ? (Array.isArray(dData.speakers) ? dData.speakers.join(', ') : dData.speakers) : '',
+              description: dData.description?.ko || dData.description?.en || ''
+            };
           });
 
           // Speakers (Separate State)
           const speakersRef = collection(db, `${path}/speakers`);
           const speakersSnap = await getDocs(speakersRef);
           const speakersData = speakersSnap.docs.map(d => {
-              const sData = d.data();
-              return {
-                  id: d.id,
-                  name: sData.name?.ko || sData.name?.en || sData.name || 'Unknown',
-                  affiliation: sData.affiliation?.ko || sData.affiliation?.en || sData.affiliation || '',
-                  image: sData.image?.url || sData.photoUrl || null,
-                  role: sData.role || 'Speaker'
-              };
+            const sData = d.data();
+            return {
+              id: d.id,
+              name: sData.name?.ko || sData.name?.en || sData.name || 'Unknown',
+              affiliation: sData.affiliation?.ko || sData.affiliation?.en || sData.affiliation || '',
+              image: sData.image?.url || sData.photoUrl || null,
+              role: sData.role || 'Speaker'
+            };
           });
           setSpeakers(speakersData);
 
@@ -82,16 +83,16 @@ export const useConferenceData = (slug: string) => {
           const societyRef = doc(db, `societies/${societyId}`);
           const societySnap = await getDoc(societyRef);
           if (societySnap.exists()) {
-              setSociety(societySnap.data());
+            setSociety(societySnap.data());
           }
 
           // Construct Conference Object (Direct Mapping)
           const finalData = {
-              ...data, // Spread raw data
-              fees: feesData,
-              periods: periodsData,
-              refundPolicy: refundPolicyData,
-              programs: agendasData
+            ...data, // Spread raw data
+            fees: feesData,
+            periods: periodsData,
+            refundPolicy: refundPolicyData,
+            programs: agendasData
           };
 
           setConference(finalData);

@@ -6,9 +6,10 @@ import { auth, db } from '../../firebase';
 import { EregiInput, EregiButton } from '../../components/eregi/EregiForm';
 import EregiNavigation from '../../components/eregi/EregiNavigation';
 import toast from 'react-hot-toast';
-import { LogIn, UserPlus, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, ArrowRight, UserPlus, LogIn } from 'lucide-react';
 import { ConferenceUser } from '../../types/schema';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
+import { DOMAIN_CONFIG } from '../../utils/domainHelper';
 
 type AuthMode = 'login' | 'signup';
 
@@ -42,19 +43,19 @@ const AuthPage: React.FC = () => {
     // Check if signup is allowed (eregi.co.kr only)
     useEffect(() => {
         const hostname = window.location.hostname;
-        // Allow eregi.co.kr, www.eregi.co.kr, and localhost for development
-        const allowed = hostname === 'eregi.co.kr' ||
-                      hostname === 'www.eregi.co.kr' ||
-                      hostname.includes('localhost');
+        // Allow BASE_DOMAIN, www.BASE_DOMAIN, and localhost for development
+        const allowed = hostname === DOMAIN_CONFIG.BASE_DOMAIN ||
+            hostname === `www.${DOMAIN_CONFIG.BASE_DOMAIN}` ||
+            hostname.includes('localhost');
         setIsAllowedDomain(allowed);
     }, []);
 
     // Domain check helper
     const isEregiDomain = (): boolean => {
         const hostname = window.location.hostname;
-        return hostname === 'eregi.co.kr' ||
-               hostname === 'www.eregi.co.kr' ||
-               hostname.includes('localhost');
+        return hostname === DOMAIN_CONFIG.BASE_DOMAIN ||
+            hostname === `www.${DOMAIN_CONFIG.BASE_DOMAIN}` ||
+            hostname.includes('localhost');
     };
 
     // Email validation
@@ -134,7 +135,7 @@ const AuthPage: React.FC = () => {
 
         // Domain restriction
         if (!isAllowedDomain) {
-            toast.error('회원가입은 eregi.co.kr에서만 가능합니다.');
+            toast.error(`회원가입은 ${DOMAIN_CONFIG.BASE_DOMAIN}에서만 가능합니다.`);
             return;
         }
 
@@ -253,11 +254,10 @@ const AuthPage: React.FC = () => {
                     <div className="flex mb-8 bg-gray-100 rounded-xl p-1">
                         <button
                             onClick={() => setMode('login')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-all ${
-                                mode === 'login'
+                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-all ${mode === 'login'
                                     ? 'bg-white text-[#003366] shadow-md'
                                     : 'text-gray-600 hover:text-gray-900'
-                            }`}
+                                }`}
                         >
                             <LogIn size={18} />
                             <span>Log In</span>
@@ -265,11 +265,10 @@ const AuthPage: React.FC = () => {
                         {isEregiDomain() && (
                             <button
                                 onClick={() => setMode('signup')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-all ${
-                                    mode === 'signup'
+                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-all ${mode === 'signup'
                                         ? 'bg-white text-[#003366] shadow-md'
                                         : 'text-gray-600 hover:text-gray-900'
-                                }`}
+                                    }`}
                             >
                                 <UserPlus size={18} />
                                 <span>Sign Up</span>
@@ -343,7 +342,7 @@ const AuthPage: React.FC = () => {
                             {!isAllowedDomain && (
                                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
                                     <p className="text-yellow-800 text-sm font-medium">
-                                        ⚠️ 회원가입은 eregi.co.kr 도메인에서만 가능합니다.
+                                        ⚠️ 회원가입은 {DOMAIN_CONFIG.BASE_DOMAIN} 도메인에서만 가능합니다.
                                     </p>
                                 </div>
                             )}
