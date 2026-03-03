@@ -295,9 +295,9 @@ const RegistrationListPage: React.FC = () => {
                 // 중복 제거 + 필터 적용
                 const seen = new Map<string, RootRegistration>();
                 allRegs.forEach(r => {
-                    if (!r.userId) return;
-                    const prev = seen.get(r.userId);
-                    if (!prev || (r.status === 'PAID' && prev.status !== 'PAID')) seen.set(r.userId, r);
+                    const key = r.userId || `no-user-${r.id}`;
+                    const prev = seen.get(key);
+                    if (!prev || (r.status === 'PAID' && prev.status !== 'PAID')) seen.set(key, r);
                 });
                 targetIds = Array.from(seen.values())
                     .filter(r => {
@@ -308,11 +308,14 @@ const RegistrationListPage: React.FC = () => {
                         else if (filterStatus === 'CANCELED') matchesStatus = ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED'].includes(r.status);
                         else if (filterStatus === 'WAITING') matchesStatus = ['WAITING_FOR_DEPOSIT', 'PENDING_PAYMENT'].includes(r.status);
                         else matchesStatus = r.status === filterStatus;
-                        // 이름/이메일/전화번호 검색 필터 (searchName 있을 때만)
-                        const matchesSearch = searchName.trim()
-                            ? (r.userName ?? '').toLowerCase().includes(searchName.toLowerCase()) ||
-                            (r.userEmail ?? '').toLowerCase().includes(searchName.toLowerCase()) ||
-                            (r.userPhone ?? '').toLowerCase().includes(searchName.toLowerCase())
+                        // [Fix] 검색 필터 (이름, 이메일, 전화번호, 주문번호)
+                        const searchTerm = searchName.trim().toLowerCase();
+                        const matchesSearch = searchTerm
+                            ? (r.userName ?? '').toLowerCase().includes(searchTerm) ||
+                            (r.userEmail ?? '').toLowerCase().includes(searchTerm) ||
+                            (r.userPhone ?? '').toLowerCase().includes(searchTerm) ||
+                            (r.orderId ?? '').toLowerCase().includes(searchTerm) ||
+                            (r.id ?? '').toLowerCase().includes(searchTerm)
                             : true;
                         return matchesStatus && matchesSearch;
                     })
@@ -497,15 +500,16 @@ const RegistrationListPage: React.FC = () => {
     };
 
     const filteredData = useMemo(() => {
-        // First, group registrations by userId to handle duplicates
+        // [Fix] 누락되었던 Map 선언 복구
         const userRegistrations = new Map<string, RootRegistration[]>();
+
         registrations.forEach(r => {
-            if (r.userId) {
-                if (!userRegistrations.has(r.userId)) {
-                    userRegistrations.set(r.userId, []);
-                }
-                userRegistrations.get(r.userId)!.push(r);
+            // [Fix] userId가 없으면 본인의 id를 키로 사용하여 목록에서 누락되지 않도록 함
+            const key = r.userId || `no-user-${r.id}`;
+            if (!userRegistrations.has(key)) {
+                userRegistrations.set(key, []);
             }
+            userRegistrations.get(key)!.push(r);
         });
 
         // For each user, select the best registration (priority: PAID > others)
@@ -543,8 +547,13 @@ const RegistrationListPage: React.FC = () => {
                     matchesStatus = r.status === filterStatus;
                 }
 
-                // Fix: Null-safe access
-                const matchesName = (r.userName ?? '').toLowerCase().includes(searchName.toLowerCase());
+                // [Fix] 주문번호(orderId/id) 검색 추가 및 Null-safe 처리
+                const searchTerm = searchName.toLowerCase();
+                const matchesName = (r.userName ?? '').toLowerCase().includes(searchTerm) ||
+                    (r.orderId ?? '').toLowerCase().includes(searchTerm) ||
+                    (r.id ?? '').toLowerCase().includes(searchTerm) ||
+                    (r.userEmail ?? '').toLowerCase().includes(searchTerm) ||
+                    (r.userPhone ?? '').toLowerCase().includes(searchTerm);
                 return matchesStatus && matchesName;
             } catch (e) {
                 console.error("데이터 오류 발생 레코드 ID:", r.id, e);
@@ -562,10 +571,9 @@ const RegistrationListPage: React.FC = () => {
             // 중복 제거 및 필터 적용
             const userRegistrations = new Map<string, RootRegistration[]>();
             allRegs.forEach(r => {
-                if (r.userId) {
-                    if (!userRegistrations.has(r.userId)) userRegistrations.set(r.userId, []);
-                    userRegistrations.get(r.userId)!.push(r);
-                }
+                const key = r.userId || `no-user-${r.id}`;
+                if (!userRegistrations.has(key)) userRegistrations.set(key, []);
+                userRegistrations.get(key)!.push(r);
             });
             const deduped: RootRegistration[] = [];
             userRegistrations.forEach((regs) => {
@@ -587,11 +595,14 @@ const RegistrationListPage: React.FC = () => {
                 else if (filterStatus === 'CANCELED') matchesStatus = ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED'].includes(r.status);
                 else if (filterStatus === 'WAITING') matchesStatus = ['WAITING_FOR_DEPOSIT', 'PENDING_PAYMENT'].includes(r.status);
                 else matchesStatus = r.status === filterStatus;
-                // 이름/이메일/전화번호 검색 필터 (searchName 있을 때만)
-                const matchesSearch = searchName.trim()
-                    ? (r.userName ?? '').toLowerCase().includes(searchName.toLowerCase()) ||
-                    (r.userEmail ?? '').toLowerCase().includes(searchName.toLowerCase()) ||
-                    (r.userPhone ?? '').toLowerCase().includes(searchName.toLowerCase())
+                // [Fix] 검색 필터 (이름, 이메일, 전화번호, 주문번호)
+                const searchTerm = searchName.trim().toLowerCase();
+                const matchesSearch = searchTerm
+                    ? (r.userName ?? '').toLowerCase().includes(searchTerm) ||
+                    (r.userEmail ?? '').toLowerCase().includes(searchTerm) ||
+                    (r.userPhone ?? '').toLowerCase().includes(searchTerm) ||
+                    (r.orderId ?? '').toLowerCase().includes(searchTerm) ||
+                    (r.id ?? '').toLowerCase().includes(searchTerm)
                     : true;
                 return matchesStatus && matchesSearch;
             });

@@ -184,7 +184,13 @@ export function useRegistrationsPagination({
                         const name = (reg.userName || '').toLowerCase();
                         const email = (reg.userEmail || '').toLowerCase();
                         const phone = (reg.userPhone || '').toLowerCase();
-                        return name.includes(searchTerm) || email.includes(searchTerm) || phone.includes(searchTerm);
+                        const orderId = (reg.orderId || reg.id || '').toLowerCase(); // 주문번호 검색 추가
+                        return (
+                            name.includes(searchTerm) ||
+                            email.includes(searchTerm) ||
+                            phone.includes(searchTerm) ||
+                            orderId.includes(searchTerm)
+                        );
                     });
                     setHasMore(false); // 검색 중에는 페이지 이동 없음
                     setRegistrations(filteredData);
