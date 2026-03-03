@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, getDocs, Timestamp, limit, orderBy, startAfter, QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, query, getDocs, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 
 // Define the root-level registration type based on PaymentSuccessHandler
@@ -41,9 +41,8 @@ export interface RootRegistration {
 interface UseRegistrationsPaginationParams {
     conferenceId: string | null;
     itemsPerPage?: number;
-    searchQuery?: string; // 검색어 (이름, 이메일, 전화번호)
+    searchQuery?: string;
 }
-
 
 interface UseRegistrationsPaginationReturn {
     registrations: RootRegistration[];
@@ -53,35 +52,31 @@ interface UseRegistrationsPaginationReturn {
     itemsPerPage: number;
     setCurrentPage: (page: number) => void;
     setItemsPerPage: (size: number) => void;
-    lastVisible: QueryDocumentSnapshot | null;
+    lastVisible: null;
     hasMore: boolean;
     refresh: () => void;
 }
 
 /**
- * Custom hook for paginated registration list
- * Follows project convention: use hooks for data access, not direct Firestore calls in pages
- *
- * @param conferenceId - The conference ID to fetch registrations for
- * @param itemsPerPage - Number of items per page (default: 50)
- * @returns Paginated registration data and controls
+ * Custom hook for registration list.
+ * [Fix-Final] 항상 전체 데이터를 Firestore에서 가져옴. limit() 미사용.
+ * 이전 limit(50) 방식은 오래된 등록자(예: 강민규)가 일반 목록에서 사라지는 버그를 유발했음.
+ * 클라이언트에서 검색/필터/페이지네이션을 처리하므로 UI 동작은 동일.
  */
 export function useRegistrationsPagination({
     conferenceId,
     itemsPerPage: initialItemsPerPage = 50,
     searchQuery = ''
 }: UseRegistrationsPaginationParams): UseRegistrationsPaginationReturn {
+    const [allData, setAllData] = useState<RootRegistration[]>([]);
     const [registrations, setRegistrations] = useState<RootRegistration[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [currentPage, setCurrentPageState] = useState(1);
+    const [itemsPerPage, setItemsPerPageState] = useState(initialItemsPerPage);
+    const [refreshTick, setRefreshTick] = useState(0);
 
-    // Pagination states
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(initialItemsPerPage);
-    const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot | null>(null);
-    const [hasMore, setHasMore] = useState(true);
-
-    // Fetch data from Firestore with pagination
+    // 1. Firestore에서 전체 데이터 로드 (conferenceId 또는 refresh 요청 시)
     useEffect(() => {
         const loadData = async () => {
             if (!conferenceId) {
@@ -93,49 +88,16 @@ export function useRegistrationsPagination({
             setError(null);
 
             try {
-                // Corrected Path: conferences/{conferenceId}/registrations
                 const regRef = collection(db, 'conferences', conferenceId, 'registrations');
-
-                const isSearching = !!(searchQuery && searchQuery.trim());
-
-                let snap;
-                if (isSearching) {
-                    // [Bug Fix] 검색 시에는 limit 없이 전체 데이터를 조회해야 함.
-                    // 기존에는 limit(50)으로 최신 50건만 조회 후 클라이언트 필터링을 했기 때문에
-                    // 50건 이후에 있는 데이터(예: 강민규)가 검색 결과에서 누락되는 버그가 있었음.
-                    const q = query(regRef, orderBy('createdAt', 'desc'));
-                    snap = await getDocs(q);
-                } else {
-                    // 검색어가 없을 때는 기존 페이지네이션 방식 사용
-                    let q = query(
-                        regRef,
-                        orderBy('createdAt', 'desc'),
-                        limit(itemsPerPage)
-                    );
-
-                    // If loading next page, start after last document
-                    if (currentPage > 1 && lastVisible) {
-                        q = query(
-                            regRef,
-                            orderBy('createdAt', 'desc'),
-                            startAfter(lastVisible),
-                            limit(itemsPerPage)
-                        );
-                    }
-                    snap = await getDocs(q);
-                }
+                // [Fix-Final] limit() 없이 전체 조회
+                const q = query(regRef, orderBy('createdAt', 'desc'));
+                const snap = await getDocs(q);
 
                 const data = snap.docs.map(d => {
                     const docData = d.data();
-                    const flattened = {
-                        id: d.id,
-                        ...docData
-                    } as RootRegistration;
+                    const flattened = { id: d.id, ...docData } as RootRegistration;
 
-                    // Ensure orderId is populated, fallback to id
-                    if (!flattened.orderId) {
-                        flattened.orderId = flattened.id;
-                    }
+                    if (!flattened.orderId) flattened.orderId = flattened.id;
 
                     // Flatten userInfo fields to top level for display
                     if (docData.userInfo) {
@@ -144,109 +106,72 @@ export function useRegistrationsPagination({
                         flattened.userPhone = docData.userInfo.phone || docData.userPhone;
                         flattened.affiliation = docData.userInfo.affiliation || docData.affiliation;
                         flattened.licenseNumber = docData.userInfo.licenseNumber || docData.licenseNumber;
-
-                        // [Fix] Map grade/tier from userInfo if available
-                        if (!flattened.tier && docData.userInfo.grade) {
-                            flattened.tier = docData.userInfo.grade;
-                        }
+                        if (!flattened.tier && docData.userInfo.grade) flattened.tier = docData.userInfo.grade;
                     }
 
-                    // [Fix] Map schema-defined userTier to tier if tier is missing
-                    if (!flattened.tier && docData.userTier) {
-                        flattened.tier = docData.userTier;
-                    }
+                    if (!flattened.tier && docData.userTier) flattened.tier = docData.userTier;
+                    if (!flattened.tier && docData.categoryName) flattened.tier = docData.categoryName;
 
-                    // [Fix] Fallback to categoryName if tier is still missing (for display)
-                    if (!flattened.tier && docData.categoryName) {
-                        flattened.tier = docData.categoryName;
-                    }
-
-                    // [Fix] Fallback for licenseNumber if still missing
                     if (!flattened.licenseNumber) {
                         if (docData.license) flattened.licenseNumber = docData.license;
                         else if (docData.userInfo?.licensenumber) flattened.licenseNumber = docData.userInfo.licensenumber;
-                        // Check formData as last resort (some legacy data might be here)
                         else if (docData.formData?.licenseNumber) flattened.licenseNumber = docData.formData.licenseNumber;
                     }
 
-                    // [Fix] Map badgeQr
-                    if (docData.badgeQr) {
-                        flattened.badgeQr = docData.badgeQr;
-                    }
+                    if (docData.badgeQr) flattened.badgeQr = docData.badgeQr;
 
                     return flattened;
                 });
 
-                if (isSearching) {
-                    // 검색 모드: 전체 조회이므로 페이지네이션 없음
-                    const searchTerm = searchQuery.toLowerCase().trim();
-                    const filteredData = data.filter(reg => {
-                        const name = (reg.userName || '').toLowerCase();
-                        const email = (reg.userEmail || '').toLowerCase();
-                        const phone = (reg.userPhone || '').toLowerCase();
-                        const orderId = (reg.orderId || reg.id || '').toLowerCase(); // 주문번호 검색 추가
-                        return (
-                            name.includes(searchTerm) ||
-                            email.includes(searchTerm) ||
-                            phone.includes(searchTerm) ||
-                            orderId.includes(searchTerm)
-                        );
-                    });
-                    setHasMore(false); // 검색 중에는 페이지 이동 없음
-                    setRegistrations(filteredData);
-                } else {
-                    // 일반 페이지네이션 모드
-                    if (snap.docs.length > 0) {
-                        setLastVisible(snap.docs[snap.docs.length - 1]);
-                    }
-                    setHasMore(snap.docs.length === itemsPerPage);
-                    setRegistrations(data);
-                }
+                setAllData(data);
+                setCurrentPageState(1); // 새 데이터 로드 시 1페이지로 초기화
             } catch (err: unknown) {
-                setError((err instanceof Error ? err.message : 'Unknown error') + " (Check Console for Link)");
+                setError((err instanceof Error ? err.message : 'Unknown error') + ' (Check Console for Link)');
             } finally {
                 setLoading(false);
             }
         };
 
         loadData();
-
-        // lastVisible is intentionally excluded - it's updated during pagination and shouldn't trigger refetch
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [conferenceId, currentPage, itemsPerPage, searchQuery]);
+    }, [conferenceId, refreshTick]);
 
-    /**
-     * Refresh data (reset to page 1)
-     */
-    const refresh = () => {
-        setCurrentPage(1);
-        setLastVisible(null);
-    };
+    // 2. allData + searchQuery → 클라이언트 사이드 필터 및 페이지 슬라이싱
+    useEffect(() => {
+        let filtered = allData;
 
-    /**
-     * Handle page size change
-     */
-    const handleItemsPerPageChange = (newSize: number) => {
-        setItemsPerPage(newSize);
-        setCurrentPage(1);
-        setLastVisible(null);
-    };
-
-    /**
-     * Handle page change
-     */
-    const handlePageChange = (newPage: number) => {
-        if (newPage === 1) {
-            setCurrentPage(1);
-            setLastVisible(null);
-        } else if (newPage > currentPage && hasMore) {
-            setCurrentPage(newPage);
-        } else if (newPage < currentPage && newPage >= 1) {
-            // For simplicity, reset to page 1 when going backward
-            // A full implementation would track firstVisible for "Previous" functionality
-            setCurrentPage(1);
-            setLastVisible(null);
+        if (searchQuery && searchQuery.trim()) {
+            const st = searchQuery.toLowerCase().trim();
+            filtered = allData.filter(reg => {
+                return (
+                    (reg.userName || '').toLowerCase().includes(st) ||
+                    (reg.userEmail || '').toLowerCase().includes(st) ||
+                    (reg.userPhone || '').toLowerCase().includes(st) ||
+                    (reg.orderId || '').toLowerCase().includes(st) ||
+                    (reg.id || '').toLowerCase().includes(st)
+                );
+            });
+            // 검색 시에는 전체 결과를 한번에 보여줌
+            setRegistrations(filtered);
+        } else {
+            // 페이지네이션 적용
+            const start = (currentPage - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            setRegistrations(filtered.slice(start, end));
         }
+    }, [allData, searchQuery, currentPage, itemsPerPage]);
+
+    const hasMore = !searchQuery?.trim() && currentPage * itemsPerPage < allData.length;
+
+    const refresh = () => setRefreshTick(t => t + 1);
+
+    const handlePageChange = (newPage: number) => {
+        if (newPage >= 1) setCurrentPageState(newPage);
+    };
+
+    const handleItemsPerPageChange = (newSize: number) => {
+        setItemsPerPageState(newSize);
+        setCurrentPageState(1);
     };
 
     return {
@@ -257,7 +182,7 @@ export function useRegistrationsPagination({
         itemsPerPage,
         setCurrentPage: handlePageChange,
         setItemsPerPage: handleItemsPerPageChange,
-        lastVisible,
+        lastVisible: null,
         hasMore,
         refresh
     };
