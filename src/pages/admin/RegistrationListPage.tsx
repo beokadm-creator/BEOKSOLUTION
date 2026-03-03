@@ -295,7 +295,7 @@ const RegistrationListPage: React.FC = () => {
                 // 중복 제거 + 필터 적용
                 const seen = new Map<string, RootRegistration>();
                 allRegs.forEach(r => {
-                    const key = r.userId || `no-user-${r.id}`;
+                    const key = (!r.userId || r.userId === 'GUEST' || r.userId === 'undefined') ? `guest-${r.id}` : r.userId;
                     const prev = seen.get(key);
                     if (!prev || (r.status === 'PAID' && prev.status !== 'PAID')) seen.set(key, r);
                 });
@@ -504,8 +504,8 @@ const RegistrationListPage: React.FC = () => {
         const userRegistrations = new Map<string, RootRegistration[]>();
 
         registrations.forEach(r => {
-            // [Fix] userId가 없으면 본인의 id를 키로 사용하여 목록에서 누락되지 않도록 함
-            const key = r.userId || `no-user-${r.id}`;
+            // [Fix] userId가 없거나 'GUEST'인 사용자들이 맵에서 동일한 키로 덮어씌워지지 않도록 고유 키 부여
+            const key = (!r.userId || r.userId === 'GUEST' || r.userId === 'undefined') ? `guest-${r.id}` : r.userId;
             if (!userRegistrations.has(key)) {
                 userRegistrations.set(key, []);
             }
@@ -571,7 +571,7 @@ const RegistrationListPage: React.FC = () => {
             // 중복 제거 및 필터 적용
             const userRegistrations = new Map<string, RootRegistration[]>();
             allRegs.forEach(r => {
-                const key = r.userId || `no-user-${r.id}`;
+                const key = (!r.userId || r.userId === 'GUEST' || r.userId === 'undefined') ? `guest-${r.id}` : r.userId;
                 if (!userRegistrations.has(key)) userRegistrations.set(key, []);
                 userRegistrations.get(key)!.push(r);
             });
