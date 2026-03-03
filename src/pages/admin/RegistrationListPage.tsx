@@ -292,14 +292,14 @@ const RegistrationListPage: React.FC = () => {
             const toastId = toast.loading('전체 등록자 목록을 불러오는 중...');
             try {
                 const allRegs = await fetchAllRegistrations();
-                // 중복 제거 + 필터 적용
-                const seen = new Map<string, RootRegistration>();
+                // [Fix-Critical] orderId 기반 중복 제거 (userId 기반 → 가족/대리 등록 누락 버그 수정)
+                const seenIds = new Set<string>();
+                const deduped: RootRegistration[] = [];
                 allRegs.forEach(r => {
-                    const key = (!r.userId || r.userId === 'GUEST' || r.userId === 'undefined') ? `guest-${r.id}` : r.userId;
-                    const prev = seen.get(key);
-                    if (!prev || (r.status === 'PAID' && prev.status !== 'PAID')) seen.set(key, r);
+                    const oid = r.orderId || r.id;
+                    if (!seenIds.has(oid)) { seenIds.add(oid); deduped.push(r); }
                 });
-                targetIds = Array.from(seen.values())
+                targetIds = deduped
                     .filter(r => {
                         // 상태 필터
                         let matchesStatus = false;
@@ -500,34 +500,19 @@ const RegistrationListPage: React.FC = () => {
     };
 
     const filteredData = useMemo(() => {
-        // [Fix] 누락되었던 Map 선언 복구
-        const userRegistrations = new Map<string, RootRegistration[]>();
-
-        registrations.forEach(r => {
-            // [Fix] userId가 없거나 'GUEST'인 사용자들이 맵에서 동일한 키로 덮어씌워지지 않도록 고유 키 부여
-            const key = (!r.userId || r.userId === 'GUEST' || r.userId === 'undefined') ? `guest-${r.id}` : r.userId;
-            if (!userRegistrations.has(key)) {
-                userRegistrations.set(key, []);
-            }
-            userRegistrations.get(key)!.push(r);
-        });
-
-        // For each user, select the best registration (priority: PAID > others)
+        // [Fix-Critical] userId 기반 중복제거 제거
+        // 기존 로직은 같은 계정(userId)으로 등록한 여러 명(가족/대리 등록)을 1명으로 줄이는 버그가 있었음.
+        // 관련 문서: sunjaikim@gmail.com (UID: HrFOQzgeVGW8PQ0hUOhSUAlywIX2)로 등록된 3건 중 2건이 누락됨.
+        // 수정: orderId(= 문서 ID)를 기준으로만 중복 제거. 한 계정의 여러 등록은 모두 표시.
+        const seenOrderIds = new Set<string>();
         const deduplicatedRegs: RootRegistration[] = [];
-        userRegistrations.forEach((regs) => {
-            // Sort by status priority: PAID first, then by createdAt desc
-            const sorted = regs.sort((a, b) => {
-                if (a.status === 'PAID' && b.status !== 'PAID') return -1;
-                if (a.status !== 'PAID' && b.status === 'PAID') return 1;
-                // If same status, newer first
-                const aTime = a.createdAt?.toMillis() || 0;
-                const bTime = b.createdAt?.toMillis() || 0;
-                return bTime - aTime;
-            });
-            // Only include if status is one of the allowed statuses
-            const best = sorted[0];
-            if (['PAID', 'REFUNDED', 'CANCELED', 'REFUND_REQUESTED', 'WAITING_FOR_DEPOSIT', 'PENDING_PAYMENT'].includes(best.status)) {
-                deduplicatedRegs.push(best);
+        registrations.forEach(r => {
+            const orderId = r.orderId || r.id;
+            if (!seenOrderIds.has(orderId)) {
+                seenOrderIds.add(orderId);
+                if (['PAID', 'REFUNDED', 'CANCELED', 'REFUND_REQUESTED', 'WAITING_FOR_DEPOSIT', 'PENDING_PAYMENT'].includes(r.status)) {
+                    deduplicatedRegs.push(r);
+                }
             }
         });
 
@@ -568,24 +553,12 @@ const RegistrationListPage: React.FC = () => {
         try {
             const allRegs = await fetchAllRegistrations();
 
-            // 중복 제거 및 필터 적용
-            const userRegistrations = new Map<string, RootRegistration[]>();
-            allRegs.forEach(r => {
-                const key = (!r.userId || r.userId === 'GUEST' || r.userId === 'undefined') ? `guest-${r.id}` : r.userId;
-                if (!userRegistrations.has(key)) userRegistrations.set(key, []);
-                userRegistrations.get(key)!.push(r);
-            });
+            // [Fix-Critical] orderId 기반 중복 제거 (userId 기반 → 가족/대리 등록 누락 버그 수정)
+            const seenOrderIds = new Set<string>();
             const deduped: RootRegistration[] = [];
-            userRegistrations.forEach((regs) => {
-                const sorted = regs.sort((a, b) => {
-                    if (a.status === 'PAID' && b.status !== 'PAID') return -1;
-                    if (a.status !== 'PAID' && b.status === 'PAID') return 1;
-                    return (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0);
-                });
-                const best = sorted[0];
-                if (['PAID', 'REFUNDED', 'CANCELED', 'REFUND_REQUESTED', 'WAITING_FOR_DEPOSIT', 'PENDING_PAYMENT'].includes(best.status)) {
-                    deduped.push(best);
-                }
+            allRegs.forEach(r => {
+                const oid = r.orderId || r.id;
+                if (!seenOrderIds.has(oid)) { seenOrderIds.add(oid); deduped.push(r); }
             });
             const fullFilteredData = deduped.filter(r => {
                 // 상태 필터

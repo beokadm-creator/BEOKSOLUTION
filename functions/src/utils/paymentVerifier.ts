@@ -26,8 +26,12 @@ export async function verifyPaymentAmount(
         const now = admin.firestore.Timestamp.now();
         const periods = regSettings.periods || [];
         const activePeriod = periods.find((p: any) => {
-            const start = p.start?.toDate ? p.start.toDate() : new Date(p.start);
-            const end = p.end?.toDate ? p.end.toDate() : new Date(p.end);
+            const s = p.startDate || p.start;
+            const e = p.endDate || p.end;
+            if (!s || !e) return false;
+
+            const start = s.toDate ? s.toDate() : new Date(s);
+            const end = e.toDate ? e.toDate() : new Date(e);
             return now.toDate() >= start && now.toDate() <= end;
         });
 
@@ -36,8 +40,13 @@ export async function verifyPaymentAmount(
         }
 
         // 3. Get Base Price for Tier
-        // Note: activePeriod.totalPrices is a map like { 'TierCode': 100000 }
-        const basePrice = activePeriod.totalPrices?.[tierId] ?? 0;
+        // Support both 'totalPrices' and 'prices' field names
+        const prices = activePeriod.totalPrices || activePeriod.prices || {};
+        const basePrice = prices[tierId] ?? 0;
+
+        if (basePrice === 0) {
+            console.warn(`[PaymentVerifier] Base price is 0 for tier: ${tierId}. Available tiers:`, Object.keys(prices));
+        }
 
         // 4. Calculate Options Total
         let optionsTotal = 0;

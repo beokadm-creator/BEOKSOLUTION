@@ -113,7 +113,7 @@ const UserHubPage: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     // [Fix-Step 350] Use Global Auth Context for Real-time Updates
-    const { auth } = useAuth('');
+    const { auth } = useAuth();
     const { user, loading: authLoading } = auth;
     // Fetch society data for dynamic name display
     const { society } = useSociety();
@@ -227,7 +227,7 @@ const UserHubPage: React.FC = () => {
 
         try {
             const snapSoc = await getDocs(collection(db, 'societies'));
-            setSocieties(snapSoc.docs.map(d => ({ id: d.id, ...d.data() })));
+            setSocieties(snapSoc.docs.map(d => ({ id: d.id, ...d.data() })) as any);
         } catch (socErr) {
             logger.error('UserHub', 'Societies fetch error', socErr);
         }
@@ -253,7 +253,7 @@ const UserHubPage: React.FC = () => {
                 ...d.data()
             }));
 
-            setAbstracts(userAbstracts);
+            setAbstracts(userAbstracts as any);
             logger.debug('UserHub', 'Abstracts fetched', { count: userAbstracts.length });
         } catch (absErr) {
             logger.error('UserHub', 'Abstracts fetch error', absErr);
@@ -473,6 +473,17 @@ const UserHubPage: React.FC = () => {
                             if (snap.exists()) societyCache.set(uniqueSocietyIds[i], snap.data());
                         });
 
+                        // [Fix] Fetch actual registration docs to ensure we have the real status
+                        // Since participations might not be updated when admin cancels
+                        const regDocs = await Promise.all(
+                            participationData.map(p => getDoc(doc(db, `conferences/${p.confSlug}/registrations/${p.docSnap.id}`)).catch(() => null))
+                        );
+                        const regCache = new Map<string, any>();
+                        regDocs.forEach(snap => {
+                            if (snap && snap.exists()) regCache.set(snap.id, snap.data());
+                        });
+
+
                         // [PERF] Step 4: Map registrations using cached data (no more per-item Firestore calls)
                         const loadedRegs: Array<UserReg | null> = participationData.map(({ docSnap, data, confSlug }) => {
                             const cData = confCache.get(confSlug) as ({ societyId?: string;[key: string]: unknown }) | undefined;
@@ -484,18 +495,18 @@ const UserHubPage: React.FC = () => {
                             let receiptConfig: ReceiptConfig | undefined = undefined;
 
                             if (cData) {
-                                realTitle = forceString(cData.title?.ko || cData.title?.en || cData.title || cData.slug);
+                                realTitle = forceString((cData as any).title?.ko || (cData as any).title?.en || (cData as any).title || (cData as any).slug);
 
-                                const dateStart = cData.dates?.start || cData.startDate || cData.dates?.startDate;
-                                const dateEnd = cData.dates?.end || cData.endDate;
+                                const dateStart = (cData as any).dates?.start || (cData as any).startDate || (cData as any).dates?.startDate;
+                                const dateEnd = (cData as any).dates?.end || (cData as any).endDate;
                                 const s = safeFormatDate(dateStart);
                                 const e = safeFormatDate(dateEnd);
                                 dates = s === e ? s : `${s} ~ ${e}`;
 
-                                const venueName = cData.venue?.name || cData.venueName;
-                                const venueAddress = cData.venue?.address || cData.venueAddress;
+                                const venueName = (cData as any).venue?.name || (cData as any).venueName;
+                                const venueAddress = (cData as any).venue?.address || (cData as any).venueAddress;
                                 loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : '장소 정보 없음');
-                                receiptConfig = cData.receipt as ReceiptConfig | undefined;
+                                receiptConfig = (cData as any).receipt as ReceiptConfig | undefined;
                             }
 
                             let societyId = data.societyId as string;
@@ -512,6 +523,10 @@ const UserHubPage: React.FC = () => {
                                 }
                             }
 
+                            const realReg = regCache.get(docSnap.id);
+                            const currentPaymentStatus = realReg?.paymentStatus || data.paymentStatus;
+                            const currentStatus = realReg?.status || data.status;
+
                             return {
                                 id: docSnap.id,
                                 conferenceName: realTitle,
@@ -521,14 +536,14 @@ const UserHubPage: React.FC = () => {
                                 societyId: forceString(data.societyId === 'unknown' ? cData?.societyId || societyId || DOMAIN_CONFIG.DEFAULT_SOCIETY : data.societyId || cData?.societyId || societyId || DOMAIN_CONFIG.DEFAULT_SOCIETY),
                                 location: loc,
                                 dates,
-                                paymentStatus: data.paymentStatus,
+                                paymentStatus: currentPaymentStatus,
                                 amount: data.amount,
                                 receiptNumber: data.id,
                                 names: data.names,
                                 paymentDate: data.createdAt || data.updatedAt || data.registeredAt,
                                 receiptConfig,
                                 userName: data.userName || user.name || (user as { displayName?: string }).displayName,
-                                status: data.status,
+                                status: currentStatus,
                                 virtualAccount: data.virtualAccount
                             } as UserReg;
                         });
@@ -547,16 +562,15 @@ const UserHubPage: React.FC = () => {
 
                         grouped.forEach((regs, slug) => {
                             // 1. Check for ANY PAID registration -> Show it
-                            // NOTE: In users/{uid}/participations, status=COMPLETED means
-                            // 'record created' and payment confirmed.
                             const paidReg = regs.find(r => {
                                 const p = (r.paymentStatus || '').toUpperCase();
                                 const s = (r.status || '').toUpperCase();
-                                const isCanceled = ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(p) ||
-                                    ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(s);
+                                const isCanceled = ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED', '결제취소', '취소', '환불'].some(c => p.includes(c) || s.includes(c));
                                 if (isCanceled) return false;
+                                // CRITICAL: Only trust 'PAID' labels. Including 'COMPLETED' but prioritizing 'PAID' from the actual registration record.
                                 return p === 'PAID' || s === 'PAID' || s === 'COMPLETED';
                             });
+
                             if (paidReg) {
                                 activeRegs.push(paidReg);
                                 return;
@@ -566,8 +580,7 @@ const UserHubPage: React.FC = () => {
                             const hasCancel = regs.some(r => {
                                 const p = (r.paymentStatus || '').toUpperCase();
                                 const s = (r.status || '').toUpperCase();
-                                return ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(p) ||
-                                    ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(s);
+                                return ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED', '결제취소', '취소', '환불'].some(c => p.includes(c) || s.includes(c));
                             });
 
                             if (hasCancel) return;
@@ -589,15 +602,19 @@ const UserHubPage: React.FC = () => {
                             const pStatus = (latest.paymentStatus || '').toUpperCase();
                             const status = (latest.status || '').toUpperCase();
 
-                            // WHITE-LIST STRATEGY: Only allow known valid unfinished statuses
-                            if (['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT', 'COMPLETED'].includes(pStatus) ||
+                            // WHITE-LIST STRATEGY: Only allow known valid unfinished/active statuses
+                            // NOTE: COMPLETED is included for legacy/confirmed registrations.
+                            const isPending = ['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT', 'COMPLETED'].includes(pStatus) ||
                                 ['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT', 'COMPLETED'].includes(status) ||
-                                pStatus === 'WAITING_FOR_DEPOSIT' || status === 'WAITING_FOR_DEPOSIT') {
+                                pStatus === 'WAITING_FOR_DEPOSIT' || status === 'WAITING_FOR_DEPOSIT';
+
+                            if (isPending) {
                                 activeRegs.push(latest);
                             } else {
                                 logger.debug('UserHub', `Hiding conference ${slug} - status not in allowlist: p=${pStatus}, s=${status}`);
                             }
                         });
+
 
                         setRegs(activeRegs);
                         setTotalPoints(activeRegs.reduce((acc, r) => acc + (r.earnedPoints ?? 0), 0));
@@ -660,17 +677,17 @@ const UserHubPage: React.FC = () => {
                         let receiptConfig: ReceiptConfig | undefined = undefined;
 
                         if (cData) {
-                            realTitle = forceString(cData.title?.ko || cData.title?.en || cData.title);
-                            const venueName = cData.venue?.name || cData.venueName;
-                            const venueAddress = cData.venue?.address || cData.venueAddress;
+                            realTitle = forceString((cData as any).title?.ko || (cData as any).title?.en || (cData as any).title);
+                            const venueName = (cData as any).venue?.name || (cData as any).venueName;
+                            const venueAddress = (cData as any).venue?.address || (cData as any).venueAddress;
                             loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : '장소 정보 없음');
 
-                            const dateStart = cData.dates?.start || cData.startDate || cData.dates?.startDate;
-                            const dateEnd = cData.dates?.end || cData.endDate;
+                            const dateStart = (cData as any).dates?.start || (cData as any).startDate || (cData as any).dates?.startDate;
+                            const dateEnd = (cData as any).dates?.end || (cData as any).endDate;
                             const s = safeFormatDate(dateStart);
                             const e = safeFormatDate(dateEnd);
                             dates = s === e ? s : `${s} ~ ${e}`;
-                            receiptConfig = cData.receipt as ReceiptConfig | undefined;
+                            receiptConfig = (cData as any).receipt as ReceiptConfig | undefined;
                         }
 
                         let societyId = data.societyId as string;
@@ -725,11 +742,12 @@ const UserHubPage: React.FC = () => {
                         const paidReg = regs.find(r => {
                             const p = (r.paymentStatus || '').toUpperCase();
                             const s = (r.status || '').toUpperCase();
-                            const isCanceled = ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(p) ||
-                                ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(s);
+                            const isCanceled = ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED', '결제취소', '취소', '환불'].some(c => p.includes(c) || s.includes(c));
                             if (isCanceled) return false;
+                            // CRITICAL: Only trust 'PAID' or 'COMPLETED' labels (if not canceled).
                             return p === 'PAID' || s === 'PAID' || s === 'COMPLETED';
                         });
+
                         if (paidReg) {
                             activeRegs.push(paidReg);
                             return;
@@ -739,8 +757,7 @@ const UserHubPage: React.FC = () => {
                         const hasCancel = regs.some(r => {
                             const p = (r.paymentStatus || '').toUpperCase();
                             const s = (r.status || '').toUpperCase();
-                            return ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(p) ||
-                                ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED'].includes(s);
+                            return ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED', '결제취소', '취소', '환불'].some(c => p.includes(c) || s.includes(c));
                         });
 
                         if (hasCancel) return;
@@ -762,15 +779,19 @@ const UserHubPage: React.FC = () => {
                         const pStatus = (latest.paymentStatus || '').toUpperCase();
                         const status = (latest.status || '').toUpperCase();
 
-                        // WHITE-LIST STRATEGY: Only allow known valid unfinished statuses
-                        if (['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT', 'COMPLETED'].includes(pStatus) ||
+                        // WHITE-LIST STRATEGY: Only allow known valid unfinished/active statuses
+                        // NOTE: COMPLETED is included for legacy/confirmed registrations.
+                        const isPending = ['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT', 'COMPLETED'].includes(pStatus) ||
                             ['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT', 'COMPLETED'].includes(status) ||
-                            pStatus === 'WAITING_FOR_DEPOSIT' || status === 'WAITING_FOR_DEPOSIT') {
+                            pStatus === 'WAITING_FOR_DEPOSIT' || status === 'WAITING_FOR_DEPOSIT';
+
+                        if (isPending) {
                             activeRegs.push(latest);
                         } else {
                             logger.debug('UserHub', `Hiding conference ${slug} - status not in allowlist: p=${pStatus}, s=${status}`);
                         }
                     });
+
                     setRegs(activeRegs);
                     setTotalPoints(activeRegs.reduce((acc, r) => acc + (r.earnedPoints ?? 0), 0));
 
@@ -1215,7 +1236,7 @@ const UserHubPage: React.FC = () => {
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="flex flex-col">
                                         <div className="text-xs font-bold text-eregi-600 mb-1 bg-eregi-50 inline-block px-2 py-0.5 rounded">
-                                            [{abs.confId?.toUpperCase() || 'UNKNOWN'}]
+                                            [(abs as any).confId?.toUpperCase() || 'UNKNOWN']
                                         </div>
                                         <h3 className="font-heading-3 text-slate-900 mt-2">
                                             {abs.title?.ko || abs.title?.en || 'Untitled'}
@@ -1246,7 +1267,7 @@ const UserHubPage: React.FC = () => {
                                                 e.stopPropagation();
                                                 // [Fix-Step 410-D] Correct Edit URL with proper query string
                                                 const currentHost = window.location.hostname;
-                                                const targetHost = `${abs.confId}.${DOMAIN_CONFIG.BASE_DOMAIN}`;
+                                                const targetHost = `${(abs as any).confId}.${DOMAIN_CONFIG.BASE_DOMAIN}`;
                                                 const token = getRootCookie('eregi_session');
 
                                                 // If we are on the same domain or localhost, use React Router if possible, 
@@ -1256,10 +1277,10 @@ const UserHubPage: React.FC = () => {
 
                                                 if (currentHost === targetHost || currentHost.includes('localhost') || currentHost === DOMAIN_CONFIG.BASE_DOMAIN) {
                                                     // Use the slug-based route we just confirmed in App.tsx: /:slug/abstracts
-                                                    navigate(`/${abs.confId}/abstracts?mode=edit&id=${abs.id}`);
+                                                    navigate(`/${(abs as any).confId}/abstracts?mode=edit&id=${abs.id}`);
                                                 } else {
                                                     // Cross-domain redirect
-                                                    const authUrl = `https://${targetHost}/${abs.confId}/abstracts?mode=edit&id=${abs.id}${token ? `&token=${token}` : ''}`;
+                                                    const authUrl = `https://${targetHost}/${(abs as any).confId}/abstracts?mode=edit&id=${abs.id}${token ? `&token=${token}` : ''}`;
                                                     window.location.href = authUrl;
                                                 }
                                             }}
@@ -1276,7 +1297,7 @@ const UserHubPage: React.FC = () => {
 
                                                 try {
                                                     const db = getFirestore();
-                                                    const confId = abs.confId;
+                                                    const confId = (abs as any).confId;
                                                     if (!confId) {
                                                         toast.error("유효하지 않은 컨퍼런스 ID입니다.");
                                                         return;

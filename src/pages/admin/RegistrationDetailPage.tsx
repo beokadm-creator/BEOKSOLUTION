@@ -196,6 +196,19 @@ const RegistrationDetailPage: React.FC = () => {
                 refundRequestedAt: Timestamp.now()
             });
 
+            // Update Participation if userId exists
+            if (data.userId && data.userId !== 'GUEST') {
+                try {
+                    const participationRef = doc(db, 'users', data.userId, 'participations', id);
+                    await updateDoc(participationRef, {
+                        status: 'REFUND_REQUESTED',
+                        updatedAt: Timestamp.now()
+                    });
+                } catch (pError) {
+                    console.error("Failed to update participation:", pError);
+                }
+            }
+
             await addDoc(collection(db, `conferences/${effectiveCid}/registrations/${id}/logs`), {
                 type: 'REFUND_REQUESTED',
                 timestamp: Timestamp.now(),
@@ -221,6 +234,19 @@ const RegistrationDetailPage: React.FC = () => {
                 paidAt: Timestamp.now(),
                 paymentMethod: 'ADMIN_MANUAL'
             });
+
+            // Update Participation if userId exists
+            if (data.userId && data.userId !== 'GUEST') {
+                try {
+                    const participationRef = doc(db, 'users', data.userId, 'participations', id);
+                    await updateDoc(participationRef, {
+                        status: 'PAID',
+                        updatedAt: Timestamp.now()
+                    });
+                } catch (pError) {
+                    console.error("Failed to update participation:", pError);
+                }
+            }
 
             await addDoc(collection(db, `conferences/${effectiveCid}/registrations/${id}/logs`), {
                 type: 'MANUAL_APPROVE',
