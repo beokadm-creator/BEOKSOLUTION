@@ -36,7 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.verifyPaymentAmount = verifyPaymentAmount;
 const admin = __importStar(require("firebase-admin"));
 async function verifyPaymentAmount(confId, tierId, selectedOptions, claimedAmount) {
-    var _a, _b;
+    var _a;
     const db = admin.firestore();
     try {
         // 1. Get Conference Registration Settings
@@ -49,17 +49,24 @@ async function verifyPaymentAmount(confId, tierId, selectedOptions, claimedAmoun
         const now = admin.firestore.Timestamp.now();
         const periods = regSettings.periods || [];
         const activePeriod = periods.find((p) => {
-            var _a, _b;
-            const start = ((_a = p.start) === null || _a === void 0 ? void 0 : _a.toDate) ? p.start.toDate() : new Date(p.start);
-            const end = ((_b = p.end) === null || _b === void 0 ? void 0 : _b.toDate) ? p.end.toDate() : new Date(p.end);
+            const s = p.startDate || p.start;
+            const e = p.endDate || p.end;
+            if (!s || !e)
+                return false;
+            const start = s.toDate ? s.toDate() : new Date(s);
+            const end = e.toDate ? e.toDate() : new Date(e);
             return now.toDate() >= start && now.toDate() <= end;
         });
         if (!activePeriod) {
             return { isValid: false, expectedAmount: 0, error: 'No active registration period' };
         }
         // 3. Get Base Price for Tier
-        // Note: activePeriod.totalPrices is a map like { 'TierCode': 100000 }
-        const basePrice = (_b = (_a = activePeriod.totalPrices) === null || _a === void 0 ? void 0 : _a[tierId]) !== null && _b !== void 0 ? _b : 0;
+        // Support both 'totalPrices' and 'prices' field names
+        const prices = activePeriod.totalPrices || activePeriod.prices || {};
+        const basePrice = (_a = prices[tierId]) !== null && _a !== void 0 ? _a : 0;
+        if (basePrice === 0) {
+            console.warn(`[PaymentVerifier] Base price is 0 for tier: ${tierId}. Available tiers:`, Object.keys(prices));
+        }
         // 4. Calculate Options Total
         let optionsTotal = 0;
         if (selectedOptions && selectedOptions.length > 0) {

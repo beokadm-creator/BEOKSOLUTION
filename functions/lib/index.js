@@ -123,6 +123,19 @@ exports.confirmNicePayment = functions
     if (!userData) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing user data for registration creation');
     }
+    // [Security] 중복 등록 방지: 동일 userId + 동일 학술대회에 PAID 등록이 있으면 차단
+    if (userData.userId && userData.userId !== 'GUEST' && confId) {
+        const existingRegsSnap = await admin.firestore()
+            .collection(`conferences/${confId}/registrations`)
+            .where('userId', '==', userData.userId)
+            .where('status', '==', 'PAID')
+            .limit(1)
+            .get();
+        if (!existingRegsSnap.empty) {
+            functions.logger.warn(`[DuplicateBlock] userId=${userData.userId} already has PAID registration in ${confId}`);
+            throw new functions.https.HttpsError('already-exists', '이미 해당 학술대회에 등록이 완료된 계정입니다. 동일 계정으로 중복 등록은 불가합니다.');
+        }
+    }
     try {
         // 1. Call NicePay API
         const approvalResult = await (0, nice_1.approveNicePayment)(tid, amt, mid, key);
@@ -245,7 +258,7 @@ exports.confirmNicePayment = functions
                             registeredAt: admin.firestore.FieldValue.serverTimestamp(),
                             paidAt: admin.firestore.FieldValue.serverTimestamp(),
                             amount: parseInt(amt, 10),
-                            status: 'COMPLETED'
+                            status: 'PAID'
                         }, { merge: true });
                         functions.logger.info(`[History Logged] Participation saved for user ${userData.userId}`);
                     }
@@ -291,6 +304,19 @@ exports.confirmTossPayment = functions
     }
     if (!userData) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing user data for registration creation');
+    }
+    // [Security] 중복 등록 방지: 동일 userId + 동일 학술대회에 PAID 등록이 있으면 차단
+    if (userData.userId && userData.userId !== 'GUEST' && confId) {
+        const existingRegsSnap = await admin.firestore()
+            .collection(`conferences/${confId}/registrations`)
+            .where('userId', '==', userData.userId)
+            .where('status', '==', 'PAID')
+            .limit(1)
+            .get();
+        if (!existingRegsSnap.empty) {
+            functions.logger.warn(`[DuplicateBlock] userId=${userData.userId} already has PAID registration in ${confId}`);
+            throw new functions.https.HttpsError('already-exists', '이미 해당 학술대회에 등록이 완료된 계정입니다. 동일 계정으로 중복 등록은 불가합니다.');
+        }
     }
     try {
         // [Modified] Fetch Secret Key from DB (Secure)
@@ -441,7 +467,7 @@ exports.confirmTossPayment = functions
                             registeredAt: admin.firestore.FieldValue.serverTimestamp(),
                             paidAt: admin.firestore.FieldValue.serverTimestamp(),
                             amount: amount,
-                            status: 'COMPLETED'
+                            status: 'PAID'
                         }, { merge: true });
                         functions.logger.info(`[History Logged] Participation saved for user ${userData.userId}`);
                     }
@@ -498,6 +524,20 @@ exports.confirmTossPaymentHttp = functions
         if (!userData) {
             res.status(400).json({ error: 'Missing user data for registration creation' });
             return;
+        }
+        // [Security] 중복 등록 방지: 동일 userId + 동일 학술대회에 PAID 등록이 있으면 차단
+        if (userData.userId && userData.userId !== 'GUEST' && confId) {
+            const existingRegsSnap = await admin.firestore()
+                .collection(`conferences/${confId}/registrations`)
+                .where('userId', '==', userData.userId)
+                .where('status', '==', 'PAID')
+                .limit(1)
+                .get();
+            if (!existingRegsSnap.empty) {
+                functions.logger.warn(`[DuplicateBlock-HTTP] userId=${userData.userId} already has PAID registration in ${confId}`);
+                res.status(409).json({ error: '이미 해당 학술대회에 등록이 완료된 계정입니다. 동일 계정으로 중복 등록은 불가합니다.' });
+                return;
+            }
         }
         try {
             // [Modified] Fetch Secret Key from DB (Secure)
@@ -646,7 +686,7 @@ exports.confirmTossPaymentHttp = functions
                                 registeredAt: admin.firestore.FieldValue.serverTimestamp(),
                                 paidAt: admin.firestore.FieldValue.serverTimestamp(),
                                 amount: amount,
-                                status: 'COMPLETED'
+                                status: 'PAID'
                             }, { merge: true });
                             functions.logger.info(`[History Logged] Participation saved for user ${userData.userId}`);
                         }
@@ -711,12 +751,29 @@ exports.cancelTossPayment = functions
         // 2. Update DB Status (Cancel)
         if (regId && (result.status === 'CANCELED' || result.status === 'PARTIAL_CANCELED')) {
             const regRef = db.collection(`conferences/${confId}/registrations`).doc(regId);
+            const regSnap = await regRef.get();
+            const regData = regSnap.data();
+            const userId = regData === null || regData === void 0 ? void 0 : regData.userId;
             await regRef.update({
                 status: 'CANCELED',
                 paymentStatus: 'CANCELED',
                 canceledAt: admin.firestore.FieldValue.serverTimestamp(),
                 cancelReason: cancelReason
             });
+            // Update Participation if userId exists
+            if (userId && userId !== 'GUEST') {
+                try {
+                    const participationRef = db.collection('users').doc(userId).collection('participations').doc(regId);
+                    await participationRef.update({
+                        status: 'CANCELED',
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                    });
+                    functions.logger.info(`[Participation Updated] Registration ${regId} canceled for user ${userId}`);
+                }
+                catch (pError) {
+                    functions.logger.error("Failed to update participation status:", pError);
+                }
+            }
             // Add Log
             await regRef.collection('logs').add({
                 type: 'PAYMENT_CANCELED',
