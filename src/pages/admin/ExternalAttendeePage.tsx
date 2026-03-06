@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useConference } from '../../hooks/useConference';
 import { useAuth } from '../../hooks/useAuth';
-import { collection, getDoc, getDocs, doc, setDoc, updateDoc, Timestamp, addDoc, query, where, onSnapshot, runTransaction, orderBy, limit } from 'firebase/firestore';
+import { collection, getDoc, getDocs, doc, updateDoc, Timestamp, addDoc, query, where, onSnapshot, runTransaction } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { safeFormatDate } from '../../utils/dateUtils';
 import { httpsCallable, getFunctions } from 'firebase/functions';
@@ -14,7 +14,7 @@ import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { UserPlus, Upload, Download, FileText, Badge, CheckCircle2, Trash2, Loader2, Eye, EyeOff, Copy, MessageCircle, RefreshCw, ExternalLink, AlertCircle, Printer, CheckSquare, Square } from 'lucide-react';
+import { UserPlus, Upload, Download, FileText, Badge, CheckCircle2, Trash2, Loader2, Eye, EyeOff, Copy, MessageCircle, RefreshCw, ExternalLink, AlertCircle, CheckSquare, Square } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ExternalAttendee } from '../../types/schema';
 import { useBixolon } from '../../hooks/useBixolon';
@@ -253,7 +253,32 @@ const ExternalAttendeePage: React.FC = () => {
         amount: 0,
         password: ''
     });
+    const [noEmail, setNoEmail] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+
+    // Update email when phone changes if noEmail is checked
+    useEffect(() => {
+        if (noEmail && formData.phone) {
+            const cleanPhone = formData.phone.replace(/[^0-9]/g, '');
+            if (cleanPhone) {
+                setFormData(prev => ({ ...prev, email: `${cleanPhone}@no-email.placeholder` }));
+            }
+        }
+    }, [formData.phone, noEmail]);
+
+    const handleNoEmailChange = (checked: boolean) => {
+        setNoEmail(checked);
+        if (checked) {
+            if (formData.phone) {
+                const cleanPhone = formData.phone.replace(/[^0-9]/g, '');
+                setFormData(prev => ({ ...prev, email: `${cleanPhone}@no-email.placeholder` }));
+            } else {
+                setFormData(prev => ({ ...prev, email: '' }));
+            }
+        } else {
+            setFormData(prev => ({ ...prev, email: '' }));
+        }
+    };
 
     // Bulk Upload
     const [bulkPreview, setBulkPreview] = useState<Array<{ name: string; email: string; phone: string; organization: string; licenseNumber?: string; amount?: number; password?: string }>>([]);
@@ -263,7 +288,7 @@ const ExternalAttendeePage: React.FC = () => {
     const [selectedAttendee, setSelectedAttendee] = useState<ExternalAttendee | null>(null);
 
     const { printBadge, printing: bixolonPrinting, error: bixolonError } = useBixolon();
-    const { exportToExcel, processing: exporting } = useExcel();
+    const { exportToExcel, importFromExcel } = useExcel();
 
     // Handle export to Excel (externalAttendees 전체는 onSnapshot으로 이미 수신 중)
     const handleExport = () => {
@@ -345,9 +370,22 @@ const ExternalAttendeePage: React.FC = () => {
 
     // Handle individual registration
     const handleIndividualRegister = async () => {
-        if (!formData.name || !formData.email || !formData.phone || !formData.organization) {
-            toast.error('모든 필수 항목을 입력해주세요.');
+        // Basic validation
+        if (!formData.name || !formData.phone || !formData.organization) {
+            toast.error('이름, 전화번호, 소속은 필수 항목입니다.');
             return;
+        }
+
+        // Email validation
+        if (!formData.email) {
+            if (noEmail && formData.phone) {
+                // Should have been set by effect, but double check
+                const cleanPhone = formData.phone.replace(/[^0-9]/g, '');
+                formData.email = `${cleanPhone}@no-email.placeholder`;
+            } else {
+                toast.error('이메일을 입력해주세요.');
+                return;
+            }
         }
 
         // Password validation
@@ -423,6 +461,7 @@ const ExternalAttendeePage: React.FC = () => {
                     if (authResult.data.success) {
                         toast.success('회원 계정이 자동으로 생성되었습니다.');
                         // Update local state with new userId
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         (attendeeData as any).userId = authResult.data.uid;
                     }
                 } catch (authError) {
@@ -433,6 +472,7 @@ const ExternalAttendeePage: React.FC = () => {
 
             setExternalAttendees(prev => [attendeeData, ...prev]);
             setFormData({ name: '', email: '', phone: '', organization: '', licenseNumber: '', amount: 0, password: '' });
+            setNoEmail(false);
             toast.success('외부 참석자가 등록되었습니다.');
         } catch (error) {
             console.error('Registration failed:', error);
@@ -442,38 +482,53 @@ const ExternalAttendeePage: React.FC = () => {
         }
     };
 
-    // Handle CSV file upload
-    const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Handle Excel/CSV file upload
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const text = event.target?.result as string;
-            const lines = text.split('\n');
-            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        try {
+            const rawData = await importFromExcel(file);
+            
+            // Map data supporting both English and Korean headers
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const mappedData = rawData.map((row: any) => {
+                const name = String(row.name || row['이름'] || row['성명'] || '').trim();
+                const phone = String(row.phone || row['전화번호'] || row['핸드폰'] || row['연락처'] || '').trim();
+                let email = String(row.email || row['이메일'] || '').trim();
 
-            const data = lines.slice(1).filter(line => line.trim()).map(line => {
-                const values = line.split(',');
-                const obj: Record<string, string> = {};
-                headers.forEach((header, index) => {
-                    obj[header] = values[index]?.trim() || '';
-                });
-                // Type assertion to match expected interface
+                // If email is missing but phone exists, generate placeholder email
+                if (!email && phone) {
+                    const cleanPhone = phone.replace(/[^0-9]/g, '');
+                    if (cleanPhone.length >= 8) { // Basic validation
+                        email = `${cleanPhone}@no-email.placeholder`;
+                    }
+                }
+
                 return {
-                    name: obj.name || '',
-                    email: obj.email || '',
-                    phone: obj.phone || '',
-                    organization: obj.organization || '',
-                    licenseNumber: obj.licensenumber,
-                    amount: obj.amount ? parseFloat(obj.amount) : 0,
-                    password: obj.password
-                } as { name: string; email: string; phone: string; organization: string; licenseNumber?: string; amount?: number; password?: string };
-            });
+                    name,
+                    email,
+                    phone,
+                    organization: String(row.organization || row['소속'] || row['직장'] || '').trim(),
+                    licenseNumber: String(row.licenseNumber || row['면허번호'] || '').trim(),
+                    amount: Number(row.amount || row['등록비'] || row['결제금액'] || 0),
+                    password: row.password || row['비밀번호'] ? String(row.password || row['비밀번호']) : undefined
+                };
+            }).filter(item => item.name && (item.email || item.phone)); // Valid rows only
 
-            setBulkPreview(data);
-        };
-        reader.readAsText(file);
+            if (mappedData.length === 0) {
+                toast.error('유효한 데이터가 없습니다. 파일의 컬럼명을 확인해주세요.');
+                return;
+            }
+
+            setBulkPreview(mappedData);
+            toast.success(`${mappedData.length}명의 데이터를 불러왔습니다.`);
+        } catch (error) {
+            console.error('File import failed:', error);
+            toast.error('파일을 읽는 중 오류가 발생했습니다.');
+        } finally {
+            if (e.target) e.target.value = ''; // Reset input
+        }
     };
 
     // Handle bulk registration
@@ -640,9 +695,9 @@ const ExternalAttendeePage: React.FC = () => {
             } else {
                 throw new Error('Failed to send notification');
             }
-        } catch (error: any) {
+        } catch (error) {
             console.error('Failed to delete attendee:', error);
-            toast.error(`Error: ${error.message || 'Unknown error'}`);
+            toast.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
         } finally {
             setIsProcessing(false);
         }
@@ -776,9 +831,9 @@ const ExternalAttendeePage: React.FC = () => {
             } else {
                 throw new Error('발급 처리에 실패했습니다.');
             }
-        } catch (err: any) {
+        } catch (err) {
             console.error('Failed to Issue Badge:', err);
-            toast.error(err.message || '처리 실패');
+            toast.error(err instanceof Error ? err.message : '처리 실패');
         } finally {
             setIsProcessing(false);
         }
@@ -815,7 +870,10 @@ const ExternalAttendeePage: React.FC = () => {
                             badgeLayout = cfgSnap.data().badgeLayout;
                         }
                     }
-                } catch (fetchErr) { }
+                } catch (fetchErr) {
+                    // Ignore error if slug lookup fails
+                    console.debug('Failed to fetch config by slug', fetchErr);
+                }
             }
 
             if (!badgeLayout) {
@@ -838,7 +896,8 @@ const ExternalAttendeePage: React.FC = () => {
             } else {
                 toast.error(bixolonError || '라벨 출력 실패', { id: 'bixolon-print', duration: 6000 });
             }
-        } catch (e) {
+        } catch (error) {
+            console.error('Bixolon print error:', error);
             toast.error("프린터 오류 발생", { id: 'bixolon-print' });
         }
     };
@@ -977,16 +1036,18 @@ const ExternalAttendeePage: React.FC = () => {
         }
     };
 
-    // Download CSV template
+    // Download Excel template
     const downloadTemplate = () => {
-        const template = 'name,email,phone,organization,licenseNumber,amount,password\n홍길동,hong@example.com,010-1234-5678,서울대학교,12345,0,mypassword123';
-        const blob = new Blob([template], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'external_attendees_template.csv';
-        a.click();
-        void URL.revokeObjectURL(url);
+        const templateData = [{
+            '이름': '홍길동',
+            '이메일': 'hong@example.com',
+            '전화번호': '010-1234-5678',
+            '소속': '서울대학교',
+            '면허번호': '12345',
+            '등록비': 0,
+            '비밀번호': 'mypassword123 (미입력시 전화번호 뒷4자리)'
+        }];
+        exportToExcel(templateData, 'external_attendees_template', 'Template');
     };
 
     if (loading) {
@@ -1041,12 +1102,26 @@ const ExternalAttendeePage: React.FC = () => {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>이메일 <span className="text-red-500">*</span></Label>
+                                        <div className="flex justify-between items-center">
+                                            <Label>이메일 <span className="text-red-500">*</span></Label>
+                                            <div className="flex items-center space-x-2">
+                                                <input
+                                                    type="checkbox"
+                                                    id="noEmail"
+                                                    checked={noEmail}
+                                                    onChange={(e) => handleNoEmailChange(e.target.checked)}
+                                                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                                />
+                                                <label htmlFor="noEmail" className="text-xs text-gray-500 cursor-pointer select-none">이메일 없음</label>
+                                            </div>
+                                        </div>
                                         <Input
                                             type="email"
                                             value={formData.email}
                                             onChange={e => setFormData({ ...formData, email: e.target.value })}
                                             placeholder="example@email.com"
+                                            disabled={noEmail}
+                                            className={noEmail ? 'bg-gray-100 text-gray-500' : ''}
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -1130,7 +1205,7 @@ const ExternalAttendeePage: React.FC = () => {
                                     대량 등록
                                 </CardTitle>
                                 <CardDescription>
-                                    CSV 파일로 외부 참석자를 일괄 등록합니다. <br />
+                                    엑셀(.xlsx) 또는 CSV 파일로 외부 참석자를 일괄 등록합니다. <br />
                                     <span className="text-blue-600 font-semibold">* 등록된 모든 참석자에 대해 회원 계정이 자동 생성됩니다.</span>
                                 </CardDescription>
                             </CardHeader>
@@ -1143,8 +1218,8 @@ const ExternalAttendeePage: React.FC = () => {
                                     <div className="flex-1">
                                         <Input
                                             type="file"
-                                            accept=".csv"
-                                            onChange={handleCsvUpload}
+                                            accept=".xlsx, .xls, .csv"
+                                            onChange={handleFileUpload}
                                             className="cursor-pointer"
                                         />
                                     </div>

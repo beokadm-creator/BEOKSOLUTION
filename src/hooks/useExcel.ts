@@ -20,14 +20,14 @@ export const useExcel = () => {
         }
     };
 
-    const importFromExcel = (file: File): Promise<Record<string, unknown>[]> => {
+    const importFromExcel = (file: File): Promise<unknown[]> => {
         setProcessing(true);
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
                     const data = e.target?.result;
-                    const wb = XLSX.read(data, { type: 'binary' });
+                    const wb = XLSX.read(data, { type: 'array' });
                     const sheetName = wb.SheetNames[0];
                     const sheet = wb.Sheets[sheetName];
                     const json = XLSX.utils.sheet_to_json(sheet);
@@ -43,7 +43,7 @@ export const useExcel = () => {
                 setProcessing(false);
                 reject(err);
             };
-            reader.readAsBinaryString(file);
+            reader.readAsArrayBuffer(file);
         });
     };
 
