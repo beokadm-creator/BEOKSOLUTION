@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { httpsCallable } from 'firebase/functions';
 import { getFunctions } from 'firebase/functions';
@@ -40,6 +40,7 @@ interface TokenValidationResult {
 
 const BadgePrepPage: React.FC = () => {
   const { slug, token } = useParams<{ slug: string; token: string }>();
+  const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [validating, setValidating] = useState(true);
@@ -158,12 +159,12 @@ const BadgePrepPage: React.FC = () => {
           <p className="text-gray-600 mb-6">
             {error || '이 링크는 만료되었거나 유효하지 않습니다.'}
           </p>
-          <a
-            href={`https://${hostname}/${slug.split('_')[1]}`}
+          <button
+            onClick={() => navigate(`/${slug && slug.includes('_') ? slug.split('_')[1] : slug || ''}`)}
             className="inline-block w-full py-3 px-6 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors text-center"
           >
             학술대회 홈페이지로 이동
-          </a>
+          </button>
         </div>
       </div>
     );
@@ -269,12 +270,12 @@ const BadgePrepPage: React.FC = () => {
           )}
 
           {/* Home Button */}
-          <a
-            href={`https://${hostname}/${slug}`}
+          <button
+            onClick={() => navigate(`/${slug && slug.includes('_') ? slug.split('_')[1] : slug || ''}`)}
             className="block w-full mt-4 py-3 px-6 bg-white text-amber-700 font-bold rounded-xl hover:bg-amber-50 transition-colors text-center border-2 border-amber-200 shadow-md"
           >
             학술대회 홈페이지
-          </a>
+          </button>
         </div>
       </div>
     );
@@ -481,12 +482,12 @@ const BadgePrepPage: React.FC = () => {
 
           {/* Home Button - Floating Bottom aesthetics */}
           <div className="mt-6 text-center">
-            <a
-              href={`https://${hostname}/${slug.split('_')[1]}`}
+            <button
+              onClick={() => navigate(`/${slug && slug.includes('_') ? slug.split('_')[1] : slug || ''}`)}
               className="inline-flex items-center justify-center py-3 px-8 bg-white/80 backdrop-blur-sm text-emerald-800 font-bold rounded-full hover:bg-white transition-colors border border-emerald-100 shadow-sm text-sm"
             >
               학술대회 홈페이지로 이동
-            </a>
+            </button>
           </div>
         </div>
       </div>

@@ -14,7 +14,7 @@ const StandAloneBadgePage: React.FC = () => {
     const { slug } = useParams();
     const navigate = useNavigate();
     const [status, setStatus] = useState("INIT"); // INIT, LOADING, READY, NO_AUTH, NO_DATA, REDIRECTING
-    const [ui, setUi] = useState<{ name: string, aff: string, id: string, issued: boolean, zone: string, time: string, license: string, status: string, badgeQr: string | null, receiptNumber?: string, sessionsCompleted?: number, sessionsTotal?: number, lastCheckIn?: any, baseMinutes?: number } | null>(null);
+    const [ui, setUi] = useState<{ name: string, aff: string, id: string, issued: boolean, zone: string, time: string, license: string, status: string, badgeQr: string | null, receiptNumber?: string, isCompleted?: boolean, lastCheckIn?: any, baseMinutes?: number } | null>(null);
     const [zones, setZones] = useState<any[]>([]);
     const [liveMinutes, setLiveMinutes] = useState<number>(0);
     const [badgeConfig, setBadgeConfig] = useState<any>(null);
@@ -147,8 +147,7 @@ const StandAloneBadgePage: React.FC = () => {
                     const uiStatus = String(d.attendanceStatus || 'OUTSIDE');
                     const uiBadgeQr = d.badgeQr || null;
                     const uiReceiptNumber = String(d.receiptNumber || '');
-                    const uiSessionsCompleted = d.sessionsCompleted ? Number(d.sessionsCompleted) : undefined;
-                    const uiSessionsTotal = d.sessionsTotal ? Number(d.sessionsTotal) : undefined;
+                    const uiIsCompleted = !!d.isCompleted;
                     const lastCheckIn = d.lastCheckIn;
                     const baseMinutes = Number(d.totalMinutes || 0);
 
@@ -163,8 +162,7 @@ const StandAloneBadgePage: React.FC = () => {
                         status: uiStatus,
                         badgeQr: uiBadgeQr,
                         receiptNumber: uiReceiptNumber,
-                        sessionsCompleted: uiSessionsCompleted,
-                        sessionsTotal: uiSessionsTotal,
+                        isCompleted: uiIsCompleted,
                         lastCheckIn,
                         baseMinutes
                     });
@@ -483,12 +481,12 @@ const StandAloneBadgePage: React.FC = () => {
                     )}
 
                     {/* Home Button */}
-                    <a
-                        href={`https://${hostname}/${slug && slug.includes('_') ? slug.split('_')[1] : slug || ''}`}
+                    <button
+                        onClick={() => navigate(`/${slug && slug.includes('_') ? slug.split('_')[1] : slug || ''}`)}
                         className="block w-full mt-4 py-3 px-6 bg-white text-amber-700 font-bold rounded-xl hover:bg-amber-50 transition-colors text-center border-2 border-amber-200 shadow-md"
                     >
                         학술대회 홈페이지
-                    </a>
+                    </button>
                 </div>
             </div>
         );
@@ -611,23 +609,19 @@ const StandAloneBadgePage: React.FC = () => {
                             {/* Sessions Tab */}
                             <TabsContent value="sessions" className="mt-2 p-1">
                                 <div className="bg-white rounded-2xl py-6 px-4 border border-gray-100 shadow-sm text-center">
-                                    <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                        <TrendingUp className="w-6 h-6 text-emerald-600" />
+                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${ui.isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-600'}`}>
+                                        {ui.isCompleted ? <CheckCircle className="w-6 h-6 text-emerald-600" /> : <TrendingUp className="w-6 h-6 text-gray-400" />}
                                     </div>
-                                    <p className="text-xs text-emerald-600 font-bold mb-1 uppercase tracking-wider">Session Progress</p>
-                                    <p className="text-sm text-gray-500 font-medium mb-4">평점 이수 현황</p>
+                                    <p className="text-xs text-gray-500 font-bold mb-1 uppercase tracking-wider">Session Progress</p>
+                                    <p className="text-sm text-gray-500 font-medium mb-4">평점(출결) 이수 현황</p>
 
-                                    <div className="flex items-baseline justify-center gap-1 mb-4">
-                                        <span className="text-4xl font-black text-gray-900 tracking-tight">
-                                            {ui.sessionsCompleted || 0}
+                                    <div className="flex flex-col items-center gap-1 mb-4">
+                                        <span className={`text-3xl font-black tracking-tight ${ui.isCompleted ? 'text-emerald-600' : 'text-gray-900'}`}>
+                                            {ui.isCompleted ? '이수 완료' : '진행 중'}
                                         </span>
-                                        <span className="text-xl text-gray-400 font-medium">/</span>
-                                        <span className="text-xl font-bold text-gray-400">
-                                            {ui.sessionsTotal || '-'}
+                                        <span className="text-sm font-bold text-gray-500 mt-2 bg-gray-50 px-4 py-2 rounded-lg">
+                                            누적 인정 시간: <span className="text-purple-600">{Math.floor(liveMinutes / 60)}시간 {liveMinutes % 60}분</span>
                                         </span>
-                                    </div>
-                                    <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                                        <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, (Number(ui.sessionsCompleted || 0) / Number(ui.sessionsTotal || 1)) * 100)}%` }}></div>
                                     </div>
                                 </div>
                             </TabsContent>
@@ -731,12 +725,12 @@ const StandAloneBadgePage: React.FC = () => {
 
                 {/* Home Button - Floating Bottom aesthetics */}
                 <div className="mt-6 text-center">
-                    <a
-                        href={`https://${hostname}/${slug && slug.includes('_') ? slug.split('_')[1] : slug || ''}`}
+                    <button
+                        onClick={() => navigate(`/${slug && slug.includes('_') ? slug.split('_')[1] : slug || ''}`)}
                         className="inline-flex items-center justify-center py-3 px-8 bg-white/80 backdrop-blur-sm text-emerald-800 font-bold rounded-full hover:bg-white transition-colors border border-emerald-100 shadow-sm text-sm"
                     >
                         학술대회 홈페이지로 이동
-                    </a>
+                    </button>
                 </div>
             </div>
         </div>
