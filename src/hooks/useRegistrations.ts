@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, doc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, updateDoc, Timestamp, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Registration, ConferenceUser } from '../types/schema';
 
@@ -19,12 +19,12 @@ export const useRegistrations = (conferenceId: string) => {
     const fetchRegistrations = useCallback(async () => {
         setLoading(true);
         try {
-            // 1. Fetch all registrations
+            // 1. Fetch PAID registrations only (결제 완료자만 — PENDING/FAILED 제외)
             const regRef = collection(db, `conferences/${conferenceId}/registrations`);
-            const regSnap = await getDocs(regRef);
-            
-            // 2. Fetch users to join data (Inefficient for large data, but okay for demo/MVP)
-            // In prod, duplicate user info into registration doc or use efficient indexing/functions
+            const regQuery = query(regRef, where('paymentStatus', '==', 'PAID'));
+            const regSnap = await getDocs(regQuery);
+
+            // 2. Fetch users to join data
             const regs = regSnap.docs.map(d => d.data() as Registration);
 
             // Parallel fetch optimization
@@ -47,11 +47,11 @@ export const useRegistrations = (conferenceId: string) => {
                     console.warn(`User not found for reg ${reg.id}`);
                 }
                 return {
-                     ...reg,
-                     userName: 'Unknown',
-                     userEmail: '',
-                     userPhone: '',
-                     userTier: 'UNKNOWN'
+                    ...reg,
+                    userName: 'Unknown',
+                    userEmail: '',
+                    userPhone: '',
+                    userTier: 'UNKNOWN'
                 } as RegistrationWithUser;
             });
 
@@ -77,17 +77,17 @@ export const useRegistrations = (conferenceId: string) => {
 
     // Refund Logic (Reused/Extended)
     const processRefund = async (regId: string, amount: number) => {
-         try {
+        try {
             // Mock API Call
             console.log(`[useRegistrations] Refund ${amount} for ${regId}`);
-            
+
             const regRef = doc(db, `conferences/${conferenceId}/registrations/${regId}`);
             await updateDoc(regRef, {
                 paymentStatus: amount > 0 ? 'PARTIAL_REFUNDED' : 'REFUNDED', // Logic check needed: if amount < total, partial.
                 refundAmount: amount, // Accumulate? Or set? For now set.
                 updatedAt: Timestamp.now()
             });
-            
+
             // Refresh
             fetchRegistrations();
             return true;

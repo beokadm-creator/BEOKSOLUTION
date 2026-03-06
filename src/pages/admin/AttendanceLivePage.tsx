@@ -242,12 +242,30 @@ const AttendanceLivePage: React.FC = () => {
                 lastCheckIn: now
             });
 
+            // [1] 서브컬렉션 로그 (개인별 상세 기록)
             await addDoc(collection(db, 'conferences', cid!, collectionName, regId, 'logs'), {
                 type: 'ENTER',
                 zoneId,
                 timestamp: now,
                 method: 'MANUAL_ADMIN'
             });
+
+            // [2] 루트 access_logs (통계용)
+            try {
+                const latestSnap = await getDoc(regRef);
+                const badgeQr = latestSnap.data()?.badgeQr || regId;
+                await addDoc(collection(db, `conferences/${cid}/access_logs`), {
+                    action: 'ENTRY',
+                    scannedQr: badgeQr,
+                    locationId: zoneId,
+                    timestamp: now,
+                    method: 'MANUAL_ADMIN',
+                    registrationId: regId,
+                    isExternal: reg?.isExternal || false,
+                });
+            } catch (e) {
+                console.warn('[AccessLog] Failed to write root access_log on ENTRY (admin):', e);
+            }
 
             toast.success("입장 처리됨 (Checked In)");
             refreshData();
@@ -324,15 +342,39 @@ const AttendanceLivePage: React.FC = () => {
                 lastCheckOut: Timestamp.now()
             });
 
+            const exitNow = Timestamp.now();
+
+            // [1] 서브컬렉션 로그 (개인별 상세 기록)
             await addDoc(collection(db, 'conferences', cid!, collectionName, regId, 'logs'), {
                 type: 'EXIT',
                 zoneId: currentZoneId,
-                timestamp: Timestamp.now(),
+                timestamp: exitNow,
                 method: 'MANUAL_ADMIN',
                 rawDuration: durationMinutes,
                 deduction,
                 recognizedMinutes: finalMinutes
             });
+
+            // [2] 루트 access_logs (통계용)
+            try {
+                const latestSnap = await getDoc(regRef);
+                const badgeQr = latestSnap.data()?.badgeQr || regId;
+                await addDoc(collection(db, `conferences/${cid}/access_logs`), {
+                    action: 'EXIT',
+                    scannedQr: badgeQr,
+                    locationId: currentZoneId,
+                    timestamp: exitNow,
+                    method: 'MANUAL_ADMIN',
+                    registrationId: regId,
+                    isExternal: reg?.isExternal || false,
+                    recognizedMinutes: finalMinutes,
+                    accumulatedTotal: newTotal,
+                    rawDuration: durationMinutes,
+                    deduction,
+                });
+            } catch (e) {
+                console.warn('[AccessLog] Failed to write root access_log on EXIT (admin):', e);
+            }
 
             if (!isSwitching) {
                 toast.success(`퇴장 완료 (+${finalMinutes}분 인정)`);

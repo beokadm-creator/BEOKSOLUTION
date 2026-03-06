@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAdminStore } from '../../store/adminStore';
-import { useRegistrations } from '../../hooks/useRegistrations';
-import { doc, getDoc, collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { calculateStayTime } from '../../utils/attendance';
-import { AccessLog } from '../../types/schema';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
@@ -41,23 +38,38 @@ interface DailyRule {
     zones: ZoneRule[];
 }
 
+// --- Participant record type (unified for registrations + external_attendees) ---
+interface ParticipantRecord {
+    id: string;
+    userId: string;
+    userName: string;
+    userEmail: string;
+    affiliation?: string;
+    badgeQr: string | null;
+    badgeIssued: boolean;
+    paymentStatus: string;
+    totalMinutes: number;
+    isCompleted: boolean;
+    attendanceStatus: string;
+    isExternal: boolean;
+}
+
 const StatisticsPage: React.FC = () => {
     const { selectedConferenceId } = useAdminStore();
-    const { registrations, loading: regLoading } = useRegistrations(selectedConferenceId || '');
-    const [externalAttendees, setExternalAttendees] = useState<any[]>([]);
 
-    const [logs, setLogs] = useState<AccessLog[]>([]);
+    // Raw data
+    const [participants, setParticipants] = useState<ParticipantRecord[]>([]);
     const [rules, setRules] = useState<Record<string, DailyRule>>({});
     const [dates, setDates] = useState<string[]>([]);
     const [selectedDate, setSelectedDate] = useState<string>('');
     const [loading, setLoading] = useState(true);
 
-    // --- 1. Fetch Data (Settings & Logs) ---
+    // --- 1. Fetch Data ---
     const fetchData = useCallback(async () => {
         if (!selectedConferenceId) return;
         setLoading(true);
         try {
-            // A. Fetch Settings
+            // A. Fetch Attendance Settings (rules)
             const rulesRef = doc(db, `conferences/${selectedConferenceId}/settings/attendance`);
             const rulesSnap = await getDoc(rulesRef);
             if (rulesSnap.exists()) {
@@ -70,24 +82,53 @@ const StatisticsPage: React.FC = () => {
                 }
             }
 
-            // B. Fetch All Access Logs (Optimize in Prod: Query by date range if possible)
-            // Since AccessLog doesn't strictly enforce date field, we filter in memory for now.
-            const logsRef = collection(db, `conferences/${selectedConferenceId}/access_logs`);
-            const logsSnap = await getDocs(logsRef);
-            const fetchedLogs = logsSnap.docs.map(d => ({ id: d.id, ...d.data() } as AccessLog));
-            setLogs(fetchedLogs);
+            // B. Fetch PAID registrations (결제 완료자만)
+            const regRef = collection(db, `conferences/${selectedConferenceId}/registrations`);
+            const regQuery = query(regRef, where('paymentStatus', '==', 'PAID'));
+            const regSnap = await getDocs(regQuery);
 
-            // C. Fetch External Attendees
+            const regParticipants: ParticipantRecord[] = regSnap.docs.map(d => {
+                const data = d.data();
+                return {
+                    id: d.id,
+                    userId: data.userId || d.id,
+                    userName: data.userName || data.name || data.userInfo?.name || 'Unknown',
+                    userEmail: data.userEmail || data.email || data.userInfo?.email || '',
+                    affiliation: data.affiliation || data.organization || data.userOrg || data.userInfo?.affiliation || '',
+                    badgeQr: data.badgeQr || null,
+                    badgeIssued: !!data.badgeIssued,
+                    paymentStatus: data.paymentStatus || '',
+                    totalMinutes: typeof data.totalMinutes === 'number' ? data.totalMinutes : 0,
+                    isCompleted: !!data.isCompleted,
+                    attendanceStatus: data.attendanceStatus || 'OUTSIDE',
+                    isExternal: false,
+                };
+            });
+
+            // C. Fetch External Attendees (not deleted)
             const extRef = collection(db, `conferences/${selectedConferenceId}/external_attendees`);
-            const extSnap = await getDocs(query(extRef, where('deleted', '==', false)));
-            const fetchedExt = extSnap.docs.map(d => ({
-                id: d.id,
-                ...(d.data() as any),
-                userId: d.id,
-                userName: (d.data() as any).name || 'Unknown',
-                isExternal: true
-            }));
-            setExternalAttendees(fetchedExt);
+            const extQuery = query(extRef, where('deleted', '==', false));
+            const extSnap = await getDocs(extQuery);
+
+            const extParticipants: ParticipantRecord[] = extSnap.docs.map(d => {
+                const data = d.data();
+                return {
+                    id: d.id,
+                    userId: data.userId || data.uid || d.id,
+                    userName: data.name || 'Unknown',
+                    userEmail: data.email || '',
+                    affiliation: data.organization || data.affiliation || '',
+                    badgeQr: data.badgeQr || null,
+                    badgeIssued: !!data.badgeIssued,
+                    paymentStatus: data.paymentStatus || 'PAID', // external은 admin 등록이므로 PAID 처리
+                    totalMinutes: typeof data.totalMinutes === 'number' ? data.totalMinutes : 0,
+                    isCompleted: !!data.isCompleted,
+                    attendanceStatus: data.attendanceStatus || 'OUTSIDE',
+                    isExternal: true,
+                };
+            });
+
+            setParticipants([...regParticipants, ...extParticipants]);
 
         } catch (error) {
             console.error("Failed to fetch stats data:", error);
@@ -101,119 +142,84 @@ const StatisticsPage: React.FC = () => {
     }, [fetchData]);
 
     // --- 2. Process Data ---
+    // [핵심 수정] StatisticsPage는 이제 access_logs 루트 컬렉션이 아닌,
+    // 각 등록자 문서의 totalMinutes, isCompleted 필드를 직접 읽습니다.
+    // 이 필드들은 AttendanceScannerPage / AttendanceLivePage의 performCheckOut 시
+    // 실시간으로 업데이트됩니다.
     const stats = useMemo(() => {
-        if (!selectedDate || !rules[selectedDate]) return null;
+        if (!selectedDate || !rules[selectedDate] || participants.length === 0) return null;
 
         const currentRule = rules[selectedDate];
         const globalGoal = currentRule.globalGoalMinutes;
 
-        // Filter logs for the selected date
-        // Note: AccessLog timestamp is UTC. Convert to KST for date matching.
-        const dayStartKST = new Date(`${selectedDate}T00:00:00+09:00`);
-        const dayEndKST = new Date(`${selectedDate}T23:59:59+09:00`);
-        const now = new Date();
-        const effectiveSessionEnd = new Date(Math.min(now.getTime(), dayEndKST.getTime()));
+        // userStats는 badgeQr이 있는 사람만 (명찰 발급된 참가자)
+        const badgedParticipants = participants.filter(p => !!p.badgeQr && p.badgeIssued);
 
-        const dayLogs = logs.filter(log => {
-            const t = log.timestamp.toDate();
-            return t >= dayStartKST && t <= dayEndKST;
-        });
+        // 전체 등록 완료자 = PAID 결제 완료자 전체 (명찰 발급 여부 무관)
+        const totalRegistered = participants.length;
 
-        // Group logs by User (badgeQr) and Zone (locationId)
-        const userStats: Record<string, {
-            userId: string;
-            userName: string;
-            zones: Record<string, number>; // zoneId -> minutes
-            totalMinutes: number;
-            isCompliant: boolean;
-            logs: AccessLog[];
-        }> = {};
+        // 명찰 발급 완료자
+        const totalBadgeIssued = participants.filter(p => p.badgeIssued).length;
 
-        const allRegistrations = [
-            ...registrations,
-            ...externalAttendees
-        ];
+        // 수강 입장 경험이 있는 사람 (totalMinutes > 0 또는 attendanceStatus === INSIDE)
+        const activeUsers = badgedParticipants.filter(
+            p => p.totalMinutes > 0 || p.attendanceStatus === 'INSIDE'
+        ).length;
 
-        allRegistrations.forEach(reg => {
-            if (!reg.badgeQr) return; // Skip if no badge
-            userStats[reg.badgeQr] = {
-                userId: reg.userId,
-                userName: reg.userName || 'Unknown',
-                zones: {},
-                totalMinutes: 0,
-                isCompliant: false,
-                logs: []
+        // 수강 완료자 판정
+        // CUMULATIVE 모드: isCompleted 필드를 직접 사용 (서버/스캐너가 업데이트)
+        // DAILY_SEPARATE 모드: totalMinutes >= globalGoalMinutes
+        const userStatsList = badgedParticipants.map(p => {
+            let isCompliant: boolean;
+            if (currentRule.completionMode === 'CUMULATIVE') {
+                isCompliant = p.isCompleted;
+            } else {
+                isCompliant = p.totalMinutes >= globalGoal;
+            }
+
+            // Zone별 시간 분배 (등록자 totalMinutes를 zone 수에 비례하여 추정 — 단순 통계용)
+            // 실제 zone별 정밀 통계는 access_logs 기반 분석 필요
+            const zones: Record<string, number> = {};
+            if (currentRule.zones.length > 0) {
+                const perZone = Math.floor(p.totalMinutes / currentRule.zones.length);
+                currentRule.zones.forEach(z => {
+                    zones[z.id] = perZone;
+                });
+            }
+
+            return {
+                userId: p.userId,
+                userName: p.userName,
+                userEmail: p.userEmail,
+                affiliation: p.affiliation,
+                badgeQr: p.badgeQr,
+                isExternal: p.isExternal,
+                totalMinutes: p.totalMinutes,
+                attendanceStatus: p.attendanceStatus,
+                zones,
+                isCompliant,
+                logCount: 0, // 서브컬렉션 fetch 없이 표시
             };
         });
 
-        // Distribute logs to users
-        dayLogs.forEach(log => {
-            if (userStats[log.scannedQr]) {
-                userStats[log.scannedQr].logs.push(log);
-            }
-        });
+        const compliantUsers = userStatsList.filter(u => u.isCompliant).length;
+        const noShowUsers = badgedParticipants.filter(p => p.totalMinutes === 0 && p.attendanceStatus !== 'INSIDE').length;
+        const incompleteUsers = Math.max(0, activeUsers - compliantUsers);
 
-        // Calculate Times
-        Object.values(userStats).forEach(stat => {
-            // Group logs by zone
-            const zoneLogs: Record<string, AccessLog[]> = {};
-            stat.logs.forEach(l => {
-                const zoneId = l.locationId || 'default';
-                if (!zoneLogs[zoneId]) zoneLogs[zoneId] = [];
-                zoneLogs[zoneId].push(l);
-            });
+        // complianceRate: 명찰 발급자 기준
+        const complianceRate = totalBadgeIssued > 0 ? (compliantUsers / totalBadgeIssued) * 100 : 0;
 
-            let total = 0;
-            currentRule.zones.forEach(zone => {
-                const zLogs = zoneLogs[zone.id];
-                if (zLogs) {
-                    let sessionStart = new Date(`${selectedDate}T00:00:00+09:00`);
-                    let sessionEnd = effectiveSessionEnd;
-
-                    if (zone.start && zone.end) {
-                        sessionStart = new Date(`${selectedDate}T${zone.start}:00`);
-                        const endD = new Date(`${selectedDate}T${zone.end}:00`);
-                        sessionEnd = new Date(Math.min(now.getTime(), endD.getTime()));
-                    }
-
-                    const minutes = calculateStayTime(zLogs, zone.breaks, sessionEnd, sessionStart);
-                    stat.zones[zone.id] = minutes;
-                    total += minutes;
-                }
-            });
-
-            // Handle logs without explicit zone (or unknown zone)
-            // If there are logs with locationId not in currentRule.zones, we might need a fallback.
-            // For now, ignore unknown zones or treat as no-break?
-            // Let's assume strict zone matching for now.
-
-            stat.totalMinutes = total;
-
-            const reg = allRegistrations.find(r => r.userId === stat.userId);
-            if (currentRule.completionMode === 'CUMULATIVE') {
-                stat.isCompliant = (reg as any)?.isCompleted || false;
-            } else {
-                stat.isCompliant = total >= globalGoal;
-            }
-        });
-
-        // Aggregates
-        const totalUsers = allRegistrations.length;
-        const activeUsers = Object.values(userStats).filter(u => u.totalMinutes > 0).length;
-
-        // [Fixed] Count compliant users correctly based on the updated logic evaluating goal vs exact minutes
-        const compliantUsers = Object.values(userStats).filter(u => u.isCompliant).length;
-
-        const complianceRate = totalUsers > 0 ? (compliantUsers / totalUsers) * 100 : 0;
         const avgStayTime = activeUsers > 0
-            ? Object.values(userStats).reduce((acc, u) => acc + u.totalMinutes, 0) / activeUsers
+            ? badgedParticipants
+                .filter(p => p.totalMinutes > 0)
+                .reduce((acc, p) => acc + p.totalMinutes, 0) / activeUsers
             : 0;
 
-        // Zone Stats
+        // Zone 통계 (전체 totalMinutes 기반 근사치)
         const zoneStats = currentRule.zones.map(z => {
-            const visitedUsers = Object.values(userStats).filter(u => (u.zones[z.id] || 0) > 0).length;
+            const visitedUsers = badgedParticipants.filter(p => p.totalMinutes > 0).length;
             const avgTime = visitedUsers > 0
-                ? Object.values(userStats).reduce((acc, u) => acc + (u.zones[z.id] || 0), 0) / visitedUsers
+                ? badgedParticipants.reduce((acc, p) => acc + Math.floor(p.totalMinutes / (currentRule.zones.length || 1)), 0) / (visitedUsers || 1)
                 : 0;
             return {
                 ...z,
@@ -222,29 +228,32 @@ const StatisticsPage: React.FC = () => {
             };
         });
 
-        // Pie chart data (fix: prevent negative values)
-        const incompleteUsers = Math.max(0, activeUsers - compliantUsers);
-
         return {
-            userStats: Object.values(userStats),
-            totalUsers,
-            activeUsers,
-            compliantUsers,
+            userStatsList,
+            totalRegistered,      // 결제 완료 전체 등록자
+            totalBadgeIssued,     // 명찰 발급 완료자
+            activeUsers,          // 수강 입장 경험자
+            compliantUsers,       // 수강 완료자
             incompleteUsers,
+            noShowUsers,
             complianceRate,
             avgStayTime,
             zoneStats,
-            globalGoal
+            globalGoal,
         };
 
-    }, [selectedDate, rules, logs, registrations]);
+    }, [selectedDate, rules, participants]);
 
     const handleExportExcel = () => {
         if (!stats) return;
 
         try {
-            const data = stats.userStats.map(u => ({
+            const data = stats.userStatsList.map(u => ({
                 Name: u.userName,
+                Email: u.userEmail,
+                Affiliation: u.affiliation || '',
+                Type: u.isExternal ? 'External' : 'Registered',
+                'Attendance Status': u.attendanceStatus,
                 'Total Time (min)': u.totalMinutes,
                 'Is Compliant': u.isCompliant ? 'Yes' : 'No',
                 ...rules[selectedDate].zones.reduce((acc, z) => ({
@@ -263,7 +272,7 @@ const StatisticsPage: React.FC = () => {
         }
     };
 
-    if (loading || regLoading) return <div className="flex h-screen justify-center items-center"><Loader2 className="animate-spin w-10 h-10 text-blue-500" /></div>;
+    if (loading) return <div className="flex h-screen justify-center items-center"><Loader2 className="animate-spin w-10 h-10 text-blue-500" /></div>;
 
     if (!selectedDate || !rules[selectedDate]) return (
         <div className="p-8 text-center">
@@ -304,22 +313,41 @@ const StatisticsPage: React.FC = () => {
 
                     {/* 1. OVERVIEW TAB */}
                     <TabsContent value="overview" className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {/* 상단 카드 — 5개 핵심 지표 */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                             <Card>
                                 <CardHeader className="pb-2">
                                     <CardTitle className="text-sm font-medium text-gray-500">Total Registrations</CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="text-2xl font-bold">{stats.totalUsers}</div>
+                                    <div className="text-2xl font-bold">{stats.totalRegistered}</div>
+                                    <p className="text-xs text-gray-400 mt-1">결제 완료 등록자</p>
                                 </CardContent>
                             </Card>
                             <Card>
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium text-gray-500">Active Today</CardTitle>
+                                    <CardTitle className="text-sm font-medium text-gray-500">Badge Issued</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold">{stats.totalBadgeIssued}</div>
+                                    <p className="text-xs text-gray-400 mt-1">
+                                        {stats.totalRegistered > 0
+                                            ? `${((stats.totalBadgeIssued / stats.totalRegistered) * 100).toFixed(1)}% 발급률`
+                                            : '—'}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm font-medium text-gray-500">Active (입장)</CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="text-2xl font-bold">{stats.activeUsers}</div>
-                                    <p className="text-xs text-gray-500">{((stats.activeUsers / stats.totalUsers) * 100).toFixed(1)}% participation</p>
+                                    <p className="text-xs text-gray-400 mt-1">
+                                        {stats.totalBadgeIssued > 0
+                                            ? `${((stats.activeUsers / stats.totalBadgeIssued) * 100).toFixed(1)}% 참석률`
+                                            : '—'}
+                                    </p>
                                 </CardContent>
                             </Card>
                             <Card>
@@ -328,7 +356,7 @@ const StatisticsPage: React.FC = () => {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="text-2xl font-bold">{stats.complianceRate.toFixed(1)}%</div>
-                                    <p className="text-xs text-gray-500">{stats.compliantUsers} completed</p>
+                                    <p className="text-xs text-gray-400 mt-1">{stats.compliantUsers}명 수강 완료</p>
                                 </CardContent>
                             </Card>
                             <Card>
@@ -337,7 +365,7 @@ const StatisticsPage: React.FC = () => {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="text-2xl font-bold">{Math.round(stats.avgStayTime)} min</div>
-                                    <p className="text-xs text-gray-500">Target: {stats.globalGoal} min</p>
+                                    <p className="text-xs text-gray-400 mt-1">Target: {stats.globalGoal} min</p>
                                 </CardContent>
                             </Card>
                         </div>
@@ -346,28 +374,30 @@ const StatisticsPage: React.FC = () => {
                             <Card>
                                 <CardHeader>
                                     <CardTitle>Completion Status</CardTitle>
+                                    <CardDescription>명찰 발급자({stats.totalBadgeIssued}명) 기준</CardDescription>
                                 </CardHeader>
                                 <CardContent className="h-[300px] flex justify-center items-center">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <PieChart>
                                             <Pie
                                                 data={[
-                                                    { name: 'Completed', value: stats.compliantUsers },
-                                                    { name: 'Incomplete', value: stats.incompleteUsers },
-                                                    { name: 'No Show', value: stats.totalUsers - stats.activeUsers }
-                                                ]}
+                                                    { name: '수강 완료', value: stats.compliantUsers },
+                                                    { name: '수강 진행 중', value: stats.incompleteUsers },
+                                                    { name: '미입장', value: stats.noShowUsers },
+                                                    { name: '미발급', value: Math.max(0, stats.totalRegistered - stats.totalBadgeIssued) },
+                                                ].filter(d => d.value > 0)}
                                                 cx="50%"
                                                 cy="50%"
                                                 innerRadius={60}
                                                 outerRadius={80}
-                                                fill="#8884d8"
                                                 paddingAngle={5}
                                                 dataKey="value"
-                                                label
+                                                label={({ name, value }) => `${name}: ${value}`}
                                             >
                                                 <Cell fill="#00C49F" />
                                                 <Cell fill="#FFBB28" />
                                                 <Cell fill="#E5E7EB" />
+                                                <Cell fill="#93C5FD" />
                                             </Pie>
                                             <Tooltip />
                                             <Legend />
@@ -378,14 +408,29 @@ const StatisticsPage: React.FC = () => {
 
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Hourly Traffic (Estimate)</CardTitle>
-                                    <CardDescription>Based on entry times</CardDescription>
+                                    <CardTitle>등록 현황 요약</CardTitle>
+                                    <CardDescription>전체 프로세스 진행 현황</CardDescription>
                                 </CardHeader>
-                                <CardContent className="h-[300px]">
-                                    {/* Placeholder for Hourly Chart - complex to calc perfectly from intervals */}
-                                    <div className="flex items-center justify-center h-full text-gray-400">
-                                        Hourly Traffic Chart Coming Soon
-                                    </div>
+                                <CardContent className="space-y-4 pt-4">
+                                    {[
+                                        { label: '결제 완료 (등록)', value: stats.totalRegistered, color: 'bg-blue-500' },
+                                        { label: '명찰 발급', value: stats.totalBadgeIssued, color: 'bg-indigo-500' },
+                                        { label: '수강 입장', value: stats.activeUsers, color: 'bg-purple-500' },
+                                        { label: '수강 완료', value: stats.compliantUsers, color: 'bg-green-500' },
+                                    ].map(item => (
+                                        <div key={item.label} className="space-y-1">
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-gray-600">{item.label}</span>
+                                                <span className="font-bold">{item.value}명</span>
+                                            </div>
+                                            <div className="w-full bg-gray-100 rounded-full h-2">
+                                                <div
+                                                    className={`${item.color} h-2 rounded-full transition-all`}
+                                                    style={{ width: stats.totalRegistered > 0 ? `${(item.value / stats.totalRegistered) * 100}%` : '0%' }}
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
                                 </CardContent>
                             </Card>
                         </div>
@@ -402,16 +447,22 @@ const StatisticsPage: React.FC = () => {
                                     </CardHeader>
                                     <CardContent className="space-y-4">
                                         <div className="flex justify-between items-center">
-                                            <span className="text-sm text-gray-500">Visitors</span>
-                                            <span className="font-bold">{zone.visitedUsers}</span>
+                                            <span className="text-sm text-gray-500">입장자</span>
+                                            <span className="font-bold">{zone.visitedUsers}명</span>
                                         </div>
                                         <div className="flex justify-between items-center">
-                                            <span className="text-sm text-gray-500">Avg. Time</span>
+                                            <span className="text-sm text-gray-500">평균 체류</span>
                                             <span className="font-bold">{Math.round(zone.avgTime)} min</span>
                                         </div>
                                         <div className="flex justify-between items-center">
-                                            <span className="text-sm text-gray-500">Breaks</span>
-                                            <span className="text-xs bg-gray-100 px-2 py-1 rounded">{zone.breaks.length} defined</span>
+                                            <span className="text-sm text-gray-500">목표</span>
+                                            <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                                {zone.goalMinutes > 0 ? `${zone.goalMinutes}분` : `${stats.globalGoal}분 (전체)`}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-gray-500">휴게</span>
+                                            <span className="text-xs bg-gray-100 px-2 py-1 rounded">{zone.breaks.length}개 설정</span>
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -430,8 +481,8 @@ const StatisticsPage: React.FC = () => {
                                         <YAxis />
                                         <Tooltip />
                                         <Legend />
-                                        <Bar dataKey="visitedUsers" fill="#8884d8" name="Visitors" />
-                                        <Bar dataKey="avgTime" fill="#82ca9d" name="Avg Time (min)" />
+                                        <Bar dataKey="visitedUsers" fill="#8884d8" name="입장자 수" />
+                                        <Bar dataKey="avgTime" fill="#82ca9d" name="평균 체류시간 (min)" />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </CardContent>
@@ -443,49 +494,56 @@ const StatisticsPage: React.FC = () => {
                         <Card>
                             <CardHeader>
                                 <CardTitle>User Details</CardTitle>
-                                <CardDescription>Individual attendance records</CardDescription>
+                                <CardDescription>
+                                    명찰 발급 완료자 {stats.totalBadgeIssued}명 기준 개인별 출결 현황
+                                    (총 등록자 {stats.totalRegistered}명 중)
+                                </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead>Name</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead className="text-right">Total Time</TableHead>
-                                            {stats.zoneStats.map(z => (
-                                                <TableHead key={z.id} className="text-right hidden md:table-cell">{z.name}</TableHead>
-                                            ))}
-                                            <TableHead className="text-center">Details</TableHead>
+                                            <TableHead>이름</TableHead>
+                                            <TableHead>소속</TableHead>
+                                            <TableHead>구분</TableHead>
+                                            <TableHead>입장 상태</TableHead>
+                                            <TableHead>수강 상태</TableHead>
+                                            <TableHead className="text-right">누적 시간</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {stats.userStats
+                                        {stats.userStatsList
                                             .sort((a, b) => b.totalMinutes - a.totalMinutes)
                                             .map((user) => (
                                                 <TableRow key={user.userId}>
                                                     <TableCell className="font-medium">{user.userName}</TableCell>
+                                                    <TableCell className="text-sm text-gray-500">{user.affiliation || '—'}</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline" className={user.isExternal ? 'text-purple-600 border-purple-200' : 'text-blue-600 border-blue-200'}>
+                                                            {user.isExternal ? '외부' : '등록'}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={user.attendanceStatus === 'INSIDE' ? 'default' : 'secondary'}
+                                                            className={user.attendanceStatus === 'INSIDE'
+                                                                ? 'bg-green-500 hover:bg-green-600 animate-pulse'
+                                                                : 'text-gray-500'}>
+                                                            {user.attendanceStatus === 'INSIDE' ? '입장 중' : '퇴장'}
+                                                        </Badge>
+                                                    </TableCell>
                                                     <TableCell>
                                                         {user.isCompliant ? (
                                                             <Badge className="bg-green-500 hover:bg-green-600">
-                                                                <CheckCircle className="w-3 h-3 mr-1" /> Completed
+                                                                <CheckCircle className="w-3 h-3 mr-1" /> 수강 완료
                                                             </Badge>
                                                         ) : (
                                                             <Badge variant="outline" className="text-gray-500">
-                                                                Incomplete
+                                                                {user.totalMinutes > 0 ? '수강 중' : '미입장'}
                                                             </Badge>
                                                         )}
                                                     </TableCell>
                                                     <TableCell className="text-right font-bold text-lg">
                                                         {Math.floor(user.totalMinutes)}m
-                                                    </TableCell>
-                                                    {stats.zoneStats.map(z => (
-                                                        <TableCell key={z.id} className="text-right hidden md:table-cell">
-                                                            {Math.floor(user.zones[z.id] || 0)}m
-                                                        </TableCell>
-                                                    ))}
-                                                    <TableCell className="text-center">
-                                                        {/* Expandable details could go here */}
-                                                        <span className="text-xs text-gray-400">{user.logs.length} logs</span>
                                                     </TableCell>
                                                 </TableRow>
                                             ))}

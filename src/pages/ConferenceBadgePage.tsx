@@ -160,11 +160,27 @@ const ConferenceBadgePage: React.FC = () => {
 
       const now = new Date();
       const start = uiData.lastCheckIn.toDate ? uiData.lastCheckIn.toDate() : new Date();
-      let durationMinutes = Math.floor((now.getTime() - start.getTime()) / 60000);
-      if (durationMinutes < 0) durationMinutes = 0;
+      let boundedStart = start;
+      let boundedEnd = now;
 
       const currentZoneId = uiData.zone;
       const zoneRule = zones.find(z => z.id === currentZoneId);
+
+      // Apply zone session boundaries to match backend GatePage calculation
+      if (zoneRule && zoneRule.start && zoneRule.end) {
+        const localDateStr = zoneRule.ruleDate || start.getFullYear() + "-" + String(start.getMonth() + 1).padStart(2, '0') + "-" + String(start.getDate()).padStart(2, '0');
+        const sessionStart = new Date(`${localDateStr}T${zoneRule.start}:00`);
+        const sessionEnd = new Date(`${localDateStr}T${zoneRule.end}:00`);
+
+        boundedStart = new Date(Math.max(start.getTime(), sessionStart.getTime()));
+        boundedEnd = new Date(Math.min(now.getTime(), sessionEnd.getTime()));
+      }
+
+      let diffMins = 0;
+      if (boundedEnd > boundedStart) {
+        diffMins = Math.floor((boundedEnd.getTime() - boundedStart.getTime()) / 60000);
+      }
+
       let deduction = 0;
 
       if (zoneRule && zoneRule.breaks && Array.isArray(zoneRule.breaks)) {
@@ -172,8 +188,8 @@ const ConferenceBadgePage: React.FC = () => {
           const localDateStr = zoneRule.ruleDate || start.getFullYear() + "-" + String(start.getMonth() + 1).padStart(2, '0') + "-" + String(start.getDate()).padStart(2, '0');
           const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
           const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
-          const overlapStart = Math.max(start.getTime(), breakStart.getTime());
-          const overlapEnd = Math.min(now.getTime(), breakEnd.getTime());
+          const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());
+          const overlapEnd = Math.min(boundedEnd.getTime(), breakEnd.getTime());
           if (overlapEnd > overlapStart) {
             const overlapMins = Math.floor((overlapEnd - overlapStart) / 60000);
             deduction += overlapMins;
@@ -181,7 +197,7 @@ const ConferenceBadgePage: React.FC = () => {
         });
       }
 
-      const activeMinutes = Math.max(0, durationMinutes - deduction);
+      const activeMinutes = Math.max(0, diffMins - deduction);
       setLiveMinutes((uiData.baseMinutes || 0) + activeMinutes);
     };
 

@@ -81,10 +81,21 @@ export const onRegistrationCreated = functions.firestore
       return null;
     }
 
-    // Skip if token already exists
-    if (regData.badgePrepToken) {
-      functions.logger.info(`[BadgeToken] Token already exists for ${regId}`);
-      return null;
+    // [FIX] Skip if active/issued token already exists in badge_tokens collection
+    // (Legacy: was checking regData.badgePrepToken which is now DEPRECATED)
+    try {
+      const db = admin.firestore();
+      const existingTokens = await db.collection(`conferences/${confId}/badge_tokens`)
+        .where('registrationId', '==', regId)
+        .where('status', 'in', ['ACTIVE', 'ISSUED'])
+        .limit(1)
+        .get();
+      if (!existingTokens.empty) {
+        functions.logger.info(`[BadgeToken] Active token already exists for ${regId}, skipping.`);
+        return null;
+      }
+    } catch (e) {
+      functions.logger.warn(`[BadgeToken] Could not check existing tokens for ${regId}:`, e);
     }
 
     try {
@@ -478,8 +489,10 @@ export const issueDigitalBadge = functions
         }
       }
 
-      // Log action
-      await db.collection(`conferences/${confId}/registrations`).doc(regId).collection('logs').add({
+      // Log action — external attendee 여부에 따라 컬렉션 분기
+      const isExternalReg = !regRef.path.includes('/registrations/');
+      const logCollectionName = isExternalReg ? 'external_attendees' : 'registrations';
+      await db.collection(`conferences/${confId}/${logCollectionName}`).doc(regId).collection('logs').add({
         type: 'BADGE_ISSUED',
         timestamp: now,
         method: 'KIOSK_INFODESK',
@@ -828,10 +841,25 @@ export const onExternalAttendeeCreated = functions.firestore
     const regData = snap.data();
     const { confId, regId } = context.params;
 
-    // Only generate token for PAID registrations
-    if (regData.paymentStatus !== 'PAID') {
-      functions.logger.info(`[BadgeToken-Ext] Skipping unpaid external registration ${regId}`);
-      return null;
+    // [FIX] External attendees are manually added by admin — skip PAID check.
+    // They always need a badge token regardless of paymentStatus.
+    // (Regular registrations require PAID, but external attendees bypass this.)
+    functions.logger.info(`[BadgeToken-Ext] Processing external attendee ${regId} (paymentStatus: ${regData.paymentStatus || 'N/A'})`);
+
+    // [FIX] Skip if active/issued token already exists
+    try {
+      const db = admin.firestore();
+      const existingTokens = await db.collection(`conferences/${confId}/badge_tokens`)
+        .where('registrationId', '==', regId)
+        .where('status', 'in', ['ACTIVE', 'ISSUED'])
+        .limit(1)
+        .get();
+      if (!existingTokens.empty) {
+        functions.logger.info(`[BadgeToken-Ext] Active token already exists for ${regId}, skipping.`);
+        return null;
+      }
+    } catch (e) {
+      functions.logger.warn(`[BadgeToken-Ext] Could not check existing tokens for ${regId}:`, e);
     }
 
     try {

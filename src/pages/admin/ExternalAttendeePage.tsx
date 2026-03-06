@@ -288,7 +288,7 @@ const ExternalAttendeePage: React.FC = () => {
     const [selectedAttendee, setSelectedAttendee] = useState<ExternalAttendee | null>(null);
 
     const { printBadge, printing: bixolonPrinting, error: bixolonError } = useBixolon();
-    const { exportToExcel, importFromExcel } = useExcel();
+    const { exportToExcel, importFromExcel, processing: exporting } = useExcel();
 
     // Handle export to Excel (externalAttendees 전체는 onSnapshot으로 이미 수신 중)
     const handleExport = () => {

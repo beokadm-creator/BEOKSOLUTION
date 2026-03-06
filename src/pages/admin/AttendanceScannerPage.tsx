@@ -250,14 +250,38 @@ const AttendanceScannerPage: React.FC = () => {
     const performCheckIn = async (id: string, zoneId: string, isExternal: boolean = false) => {
         if (!cid) return;
         const collectionName = isExternal ? 'external_attendees' : 'registrations';
+        const now = Timestamp.now();
+
+        // 등록자 상태 업데이트
         await updateDoc(doc(db, 'conferences', cid, collectionName, id), {
             attendanceStatus: 'INSIDE',
             currentZone: zoneId,
-            lastCheckIn: Timestamp.now()
+            lastCheckIn: now
         });
+
+        // [1] 서브컬렉션 로그 (개인별 상세 기록)
         await addDoc(collection(db, 'conferences', cid, collectionName, id, 'logs'), {
-            type: 'ENTER', zoneId, timestamp: Timestamp.now(), method: 'KIOSK'
+            type: 'ENTER', zoneId, timestamp: now, method: 'KIOSK'
         });
+
+        // [2] 루트 access_logs (StatisticsPage / 전체 통계용)
+        // scannedQr = badgeQr 값을 사용해야 하므로 등록자 데이터에서 조회
+        try {
+            const regRef = doc(db, 'conferences', cid, collectionName, id);
+            const regSnap = await getDoc(regRef);
+            const badgeQr = regSnap.data()?.badgeQr || id;
+            await addDoc(collection(db, `conferences/${cid}/access_logs`), {
+                action: 'ENTRY',
+                scannedQr: badgeQr,
+                locationId: zoneId,
+                timestamp: now,
+                method: 'KIOSK',
+                registrationId: id,
+                isExternal,
+            });
+        } catch (e) {
+            console.warn('[AccessLog] Failed to write root access_log on ENTRY:', e);
+        }
     };
 
     const performCheckOut = async (id: string, zoneId: string | null, lastIn: unknown, currentTotalMinutes: number = 0, isExternal: boolean = false) => {
@@ -325,10 +349,13 @@ const AttendanceScannerPage: React.FC = () => {
         const collectionName = isExternal ? 'external_attendees' : 'registrations';
         await updateDoc(doc(db, 'conferences', cid, collectionName, id), updatePayload);
 
+        const exitNow = Timestamp.now();
+
+        // [1] 서브컬렉션 로그 (개인별 상세 기록)
         await addDoc(collection(db, 'conferences', cid, collectionName, id, 'logs'), {
             type: 'EXIT',
             zoneId,
-            timestamp: Timestamp.now(),
+            timestamp: exitNow,
             method: 'KIOSK',
             recognizedMinutes: finalMinutes,
             evaluatedCompleted: isCompleted,
@@ -336,6 +363,28 @@ const AttendanceScannerPage: React.FC = () => {
             rawDuration: durationMinutes,
             deduction
         });
+
+        // [2] 루트 access_logs (StatisticsPage / 전체 통계용)
+        try {
+            const regRef = doc(db, 'conferences', cid, collectionName, id);
+            const regSnap = await getDoc(regRef);
+            const badgeQr = regSnap.data()?.badgeQr || id;
+            await addDoc(collection(db, `conferences/${cid}/access_logs`), {
+                action: 'EXIT',
+                scannedQr: badgeQr,
+                locationId: zoneId,
+                timestamp: exitNow,
+                method: 'KIOSK',
+                registrationId: id,
+                isExternal,
+                recognizedMinutes: finalMinutes,
+                accumulatedTotal: newTotal,
+                rawDuration: durationMinutes,
+                deduction,
+            });
+        } catch (e) {
+            console.warn('[AccessLog] Failed to write root access_log on EXIT:', e);
+        }
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
