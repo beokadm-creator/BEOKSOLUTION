@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, updateDoc, collection, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Button } from '../../components/ui/button';
-import { ArrowLeft, Printer, XCircle, CheckCircle, CreditCard } from 'lucide-react';
+import { ArrowLeft, Printer, XCircle, CheckCircle, CreditCard, Edit, Save, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Registration } from '../../types/schema';
 import { DOMAIN_CONFIG, extractSocietyFromHost } from '../../utils/domainHelper';
@@ -70,6 +70,16 @@ const RegistrationDetailPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [canceling, setCanceling] = useState(false);
     const [effectiveCid, setEffectiveCid] = useState<string | null>(null);
+
+    // Edit Mode State
+    const [isEditing, setIsEditing] = useState(false);
+    const [editData, setEditData] = useState({
+        userName: '',
+        userOrg: '',
+        userPhone: '',
+        licenseNumber: ''
+    });
+    const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -140,6 +150,13 @@ const RegistrationDetailPage: React.FC = () => {
                     }
 
                     setData(flattened);
+                    // Initialize edit data
+                    setEditData({
+                        userName: flattened.userName || '',
+                        userOrg: flattened.userOrg || flattened.affiliation || '',
+                        userPhone: flattened.userPhone || '',
+                        licenseNumber: flattened.licenseNumber || ''
+                    });
                 } else {
                     toast.error('등록 정보를 찾을 수 없습니다.');
                     navigate(-1);
@@ -262,6 +279,79 @@ const RegistrationDetailPage: React.FC = () => {
         }
     };
 
+    const handleSaveEdit = async () => {
+        if (!effectiveCid || !id || !data) return;
+        setIsSaving(true);
+        try {
+            // 1. Update Registration Document
+            const regRef = doc(db, 'conferences', effectiveCid, 'registrations', id);
+            const regUpdatePayload: any = {
+                userName: editData.userName,
+                userPhone: editData.userPhone,
+                affiliation: editData.userOrg,
+                organization: editData.userOrg,
+                licenseNumber: editData.licenseNumber,
+                updatedAt: Timestamp.now()
+            };
+
+            // Also update nested userInfo if it exists to keep structure consistent
+            if ((data as any).userInfo) {
+                regUpdatePayload['userInfo.name'] = editData.userName;
+                regUpdatePayload['userInfo.phone'] = editData.userPhone;
+                regUpdatePayload['userInfo.affiliation'] = editData.userOrg;
+                regUpdatePayload['userInfo.licenseNumber'] = editData.licenseNumber;
+            }
+
+            // Also update legacy fields if they existed
+            if ((data as any).userAffiliation) regUpdatePayload.userAffiliation = editData.userOrg;
+            if ((data as any).license) regUpdatePayload.license = editData.licenseNumber;
+
+            await updateDoc(regRef, regUpdatePayload);
+
+            // 2. Update Glob User Document (if valid user ID)
+            if (data.userId && data.userId !== 'GUEST' && !data.userId.startsWith('offline_')) {
+                try {
+                    const userRef = doc(db, 'users', data.userId);
+                    const userSnap = await getDoc(userRef);
+                    if (userSnap.exists()) {
+                        await updateDoc(userRef, {
+                            name: editData.userName,
+                            phone: editData.userPhone,
+                            organization: editData.userOrg,
+                            affiliation: editData.userOrg, // legacy support fallback
+                            licenseNumber: editData.licenseNumber,
+                        });
+                        console.log('User document successfully updated');
+                    }
+                } catch (uErr) {
+                    console.error('Failed to update user document:', uErr);
+                    // Non-blocking error. Continue
+                }
+            }
+
+            // Update local state
+            setData(prev => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    userName: editData.userName,
+                    userPhone: editData.userPhone,
+                    userOrg: editData.userOrg,
+                    affiliation: editData.userOrg,
+                    licenseNumber: editData.licenseNumber
+                };
+            });
+
+            toast.success('등록 정보가 수정되었습니다.\n(회원 정보 및 명찰에 즉시 반영됨)');
+            setIsEditing(false);
+        } catch (error) {
+            console.error('Error saving edits:', error);
+            toast.error('정보 수정에 실패했습니다.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     if (loading) return <div className="p-8">Loading...</div>;
     if (!data) return <div className="p-8">데이터가 없습니다.</div>;
 
@@ -301,33 +391,93 @@ const RegistrationDetailPage: React.FC = () => {
                     </span>
                 </div>
 
-                <div className="col-span-2 border-t my-2"></div>
+                <div className="col-span-2 flex justify-between items-center border-t py-2 my-2">
+                    <h2 className="text-lg font-bold">기본 정보 (Basic Information)</h2>
+                    {!isEditing ? (
+                        <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                            <Edit className="w-4 h-4 mr-2" /> 수정하기
+                        </Button>
+                    ) : (
+                        <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => {
+                                setIsEditing(false);
+                                setEditData({
+                                    userName: data.userName || '',
+                                    userOrg: data.userOrg || data.affiliation || '',
+                                    userPhone: data.userPhone || '',
+                                    licenseNumber: data.licenseNumber || ''
+                                });
+                            }} disabled={isSaving}>
+                                <X className="w-4 h-4 mr-2" /> 취소
+                            </Button>
+                            <Button variant="default" size="sm" onClick={handleSaveEdit} disabled={isSaving}>
+                                {isSaving ? '저장중...' : <><Save className="w-4 h-4 mr-2" /> 저장</>}
+                            </Button>
+                        </div>
+                    )}
+                </div>
 
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">이름 (Name)</h3>
-                    <p className="text-lg">{data.userName}</p>
+                    {isEditing ? (
+                        <input
+                            type="text"
+                            className="border p-2 rounded w-full border-blue-400 bg-blue-50"
+                            value={editData.userName}
+                            onChange={(e) => setEditData({ ...editData, userName: e.target.value })}
+                        />
+                    ) : (
+                        <p className="text-lg">{data.userName}</p>
+                    )}
                 </div>
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">소속 (Affiliation)</h3>
-                    <p className="text-lg">{data.userOrg || data.affiliation || '-'}</p>
+                    {isEditing ? (
+                        <input
+                            type="text"
+                            className="border p-2 rounded w-full border-blue-400 bg-blue-50"
+                            value={editData.userOrg}
+                            onChange={(e) => setEditData({ ...editData, userOrg: e.target.value })}
+                        />
+                    ) : (
+                        <p className="text-lg">{data.userOrg || data.affiliation || '-'}</p>
+                    )}
                 </div>
 
                 <div>
-                    <h3 className="text-sm font-bold text-gray-500 mb-1">이메일 (Email)</h3>
-                    <p className="text-lg">{data.userEmail}</p>
+                    <h3 className="text-sm font-bold text-gray-500 mb-1">이메일 (Email) <span className="text-xs font-normal">(수정불가)</span></h3>
+                    <p className="text-lg text-gray-600">{data.userEmail}</p>
                 </div>
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">전화번호 (Phone)</h3>
-                    <p className="text-lg">{data.userPhone}</p>
+                    {isEditing ? (
+                        <input
+                            type="text"
+                            className="border p-2 rounded w-full border-blue-400 bg-blue-50"
+                            value={editData.userPhone}
+                            onChange={(e) => setEditData({ ...editData, userPhone: e.target.value })}
+                        />
+                    ) : (
+                        <p className="text-lg">{data.userPhone}</p>
+                    )}
                 </div>
 
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">면허번호 (License)</h3>
-                    <p className="text-lg">{data.licenseNumber || data.userInfo?.licenseNumber || (data as Record<string, unknown>).userInfo?.licensenumber || (data as Record<string, unknown>).license || (data as Record<string, unknown>).formData?.licenseNumber || '-'}</p>
+                    {isEditing ? (
+                        <input
+                            type="text"
+                            className="border p-2 rounded w-full border-blue-400 bg-blue-50"
+                            value={editData.licenseNumber}
+                            onChange={(e) => setEditData({ ...editData, licenseNumber: e.target.value })}
+                        />
+                    ) : (
+                        <p className="text-lg">{data.licenseNumber || data.userInfo?.licenseNumber || (data as Record<string, unknown>).userInfo?.licensenumber || (data as Record<string, unknown>).license || (data as Record<string, unknown>).formData?.licenseNumber || '-'}</p>
+                    )}
                 </div>
                 <div>
-                    <h3 className="text-sm font-bold text-gray-500 mb-1">등록등급 (Grade)</h3>
-                    <p className="text-lg">{data.tier || data.userTier || data.categoryName || data.grade || '-'}</p>
+                    <h3 className="text-sm font-bold text-gray-500 mb-1">등록등급 (Grade) <span className="text-xs font-normal">(수정불가)</span></h3>
+                    <p className="text-lg text-gray-600">{data.tier || data.userTier || data.categoryName || data.grade || '-'}</p>
                 </div>
 
                 <div className="col-span-2 border-t my-2"></div>
