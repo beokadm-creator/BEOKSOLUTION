@@ -1684,10 +1684,20 @@ export const onTossWebhook = functions
         functions.logger.info(">>> [Toss Webhook] Received:", req.body);
 
         try {
-            const { status, orderId } = req.body;
+            let status = req.body.status;
+            let orderId = req.body.orderId;
+            let virtualAccount = req.body.virtualAccount;
+            const eventType = req.body.eventType;
+
+            // Handle new Toss Payments webhook format (PAYMENT_STATUS_CHANGED, etc)
+            if (eventType && req.body.data) {
+                status = req.body.data.status;
+                orderId = req.body.data.orderId;
+                virtualAccount = req.body.data.virtualAccount || virtualAccount;
+            }
 
             if (!status || !orderId) {
-                functions.logger.warn("[Toss Webhook] Missing status or orderId");
+                functions.logger.warn("[Toss Webhook] Missing status or orderId", { body: req.body });
                 res.status(400).json({ message: "Missing required fields" });
                 return;
             }
@@ -1730,7 +1740,7 @@ export const onTossWebhook = functions
                     paymentStatus: 'PAID',
                     paidAt: now,
                     updatedAt: now,
-                    virtualAccount: req.body.virtualAccount || regData.virtualAccount || null
+                    virtualAccount: virtualAccount || regData.virtualAccount || null
                 });
 
                 // 2. Lock Membership Code (if applicable)
@@ -1842,7 +1852,7 @@ export const onTossWebhook = functions
                     status: 'CANCELED',
                     paymentStatus: 'CANCELED',
                     canceledAt: admin.firestore.FieldValue.serverTimestamp(),
-                    cancelReason: req.body.cancels?.[0]?.cancelReason || 'Webhook Cancellation'
+                    cancelReason: (req.body.data?.cancels?.[0]?.cancelReason || req.body.cancels?.[0]?.cancelReason || 'Webhook Cancellation')
                 });
 
                 // Add Log
