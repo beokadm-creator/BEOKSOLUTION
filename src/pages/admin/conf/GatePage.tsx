@@ -64,6 +64,7 @@ const GatePage: React.FC = () => {
     });
     const inputRef = useRef<HTMLInputElement>(null);
     const [inputValue, setInputValue] = useState('');
+    const scanMemoryRef = useRef<Map<string, number>>(new Map());
 
     // Load Data
     useEffect(() => {
@@ -171,6 +172,21 @@ const GatePage: React.FC = () => {
 
         // Immediately clear input to allow next scan to be typed in by hardware
         setInputValue('');
+
+        // 10초 쿨타임 검사 로직 추가 (Debounce 따닥 스캔 방지)
+        const nowMs = Date.now();
+        const lastScanMs = scanMemoryRef.current.get(code);
+        if (lastScanMs && nowMs - lastScanMs < 10000) {
+            setScannerState({
+                status: 'ERROR',
+                message: '방금 처리되었습니다. (10초 후 다시 스캔해 주세요)',
+                lastScanned: code
+            });
+            setTimeout(() => {
+                setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE', message: 'Ready' });
+            }, 1000);
+            return;
+        }
 
         if (!selectedZoneId) {
             setScannerState({ status: 'ERROR', message: 'No Zone Selected', lastScanned: code });
@@ -323,6 +339,9 @@ const GatePage: React.FC = () => {
                     actionType = 'ENTER';
                 }
             }
+
+            // 쿨타임 기록 갱신 (성공했을 때만 1분 막기 적용)
+            scanMemoryRef.current.set(code, Date.now());
 
             // Success
             setScannerState({

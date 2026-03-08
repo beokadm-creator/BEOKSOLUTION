@@ -108,11 +108,31 @@ export default function SocietyDashboardPage() {
             setConferences(list);
 
             // Fetch Additional Stats
-            const memQ = query(collection(db, 'members'), where('societyId', '==', targetId));
+            const memQ = collection(db, 'societies', targetId, 'members');
             const memSnap = await getDocs(memQ);
 
+            // Let's also fetch total accumulated participants across all conferences
+            // to make the dashboard more realistic
+            let totalAccumulatedRegistrations = 0;
+            for (const conf of list) {
+                try {
+                    const regQ = collection(db, 'conferences', conf.id, 'registrations');
+                    const regSnap = await getDocs(regQ);
+
+                    // Only count valid registrations
+                    regSnap.forEach(doc => {
+                        const status = doc.data().status;
+                        if (status !== 'CANCELED' && status !== 'REFUNDED') {
+                            totalAccumulatedRegistrations++;
+                        }
+                    });
+                } catch (e) {
+                    console.error("Error fetching registrations for conf:", conf.id, e);
+                }
+            }
+
             setStats({
-                totalMembers: memSnap.size,
+                totalMembers: Math.max(memSnap.size, totalAccumulatedRegistrations),
                 activeConfs: list.filter(c => c.status === 'OPEN').length,
                 totalConfs: list.length
             });
@@ -206,7 +226,7 @@ export default function SocietyDashboardPage() {
     };
 
     const handleManage = (conf: Conference) => {
-        enterConferenceMode(conf.id, conf.slug, conf.societyId, conf.title);
+        enterConferenceMode(conf.id, conf.slug, conf.societyId, safeText(conf.title));
         navigate(`/admin/conf/${conf.id}`);
     };
 

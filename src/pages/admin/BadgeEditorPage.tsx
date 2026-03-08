@@ -203,7 +203,7 @@ const BadgeEditorPage: React.FC = () => {
                     />
 
                     {elements.map((el, idx) => (
-                        el.isVisible && (
+                        el.isVisible !== false && (
                             <DraggableNode
                                 key={idx}
                                 el={el}

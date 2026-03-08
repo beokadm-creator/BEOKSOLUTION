@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, updateDoc, collection, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Button } from '../../components/ui/button';
-import { ArrowLeft, Printer, XCircle, CheckCircle, CreditCard, Edit, Save, X } from 'lucide-react';
+import { ArrowLeft, Printer, XCircle, CheckCircle, CreditCard, Edit, Save, X, Loader2, AlertCircle, CheckCircle2, Copy, ExternalLink, MessageCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Registration } from '../../types/schema';
 import { DOMAIN_CONFIG, extractSocietyFromHost } from '../../utils/domainHelper';
@@ -62,6 +62,158 @@ const paymentMethodToKorean = (method: string | undefined): string => {
     }
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// VoucherLinkSection: badge_tokens를 조회해 실제 badge-prep URL을 표시
+// ─────────────────────────────────────────────────────────────────────────────
+interface VoucherLinkSectionProps {
+    registrationId: string;
+    confId: string | null;
+    confBaseUrl: string;
+    confSlug: string;
+    onResend: () => void;
+    isProcessing: boolean;
+}
+
+const VoucherLinkSection: React.FC<VoucherLinkSectionProps> = ({
+    registrationId, confId, confBaseUrl, confSlug, onResend, isProcessing
+}) => {
+    const [badgeToken, setBadgeToken] = React.useState<string | null>(null);
+    const [tokenStatus, setTokenStatus] = React.useState<'loading' | 'active' | 'expired' | 'issued' | 'none'>('loading');
+
+    React.useEffect(() => {
+        if (!confId || !registrationId) return;
+
+        const fetchToken = async () => {
+            try {
+                const { getDocs, collection: fsCol, query: fsQuery, where: fsWhere, orderBy: fsOrderBy, limit: fsLimit } = await import('firebase/firestore');
+                const { db: fsDb } = await import('../../firebase');
+                const q = fsQuery(
+                    fsCol(fsDb, "conferences/" + confId + "/badge_tokens"),
+                    fsWhere('registrationId', '==', registrationId),
+                    fsWhere('status', '==', 'ACTIVE'),
+                    fsOrderBy('createdAt', 'desc'),
+                    fsLimit(1)
+                );
+                const snapshot = await getDocs(q);
+                if (!snapshot.empty) {
+                    setBadgeToken(snapshot.docs[0].data().token);
+                    setTokenStatus('active');
+                } else {
+                    const qIssued = fsQuery(
+                        fsCol(fsDb, "conferences/" + confId + "/badge_tokens"),
+                        fsWhere('registrationId', '==', registrationId),
+                        fsWhere('status', '==', 'ISSUED'),
+                        fsOrderBy('createdAt', 'desc'),
+                        fsLimit(1)
+                    );
+                    const issuedSnap = await getDocs(qIssued);
+                    if (!issuedSnap.empty) {
+                        setBadgeToken(issuedSnap.docs[0].data().token);
+                        setTokenStatus('issued');
+                    } else {
+                        setTokenStatus('none');
+                    }
+                }
+            } catch (err) {
+                console.error('[VoucherLinkSection] Failed to fetch badge token:', err);
+                setTokenStatus('none');
+            }
+        };
+
+        const timer = setTimeout(fetchToken, 500); // delay to avoid too many requests
+        return () => clearTimeout(timer);
+    }, [registrationId, confId, isProcessing]);
+
+    const badgePrepUrl = badgeToken ? `${confBaseUrl}/${confSlug}/badge-prep/${badgeToken}` : null;
+
+    return (
+        <div className="p-5 border rounded-lg bg-white mt-6">
+            <h3 className="text-sm font-bold text-gray-500 uppercase mb-3">바우처 링크 (Badge Prep)</h3>
+
+            {tokenStatus === 'loading' && (
+                <div className="flex items-center gap-2 text-gray-500 text-sm">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    토큰 조회 중...
+                </div>
+            )}
+
+            {tokenStatus === 'none' && (
+                <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                        <p className="text-sm font-medium text-amber-800">발급된 바우처 토큰이 없습니다</p>
+                        <p className="text-xs text-amber-600 mt-1">알림톡을 발송하면 badge prep 토큰이 자동 생성됩니다.</p>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={onResend}
+                            disabled={isProcessing}
+                            className="mt-2 text-amber-700 border-amber-300 hover:bg-amber-50"
+                        >
+                            <MessageCircle className="w-4 h-4 mr-1" />
+                            알림톡 발송
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {(tokenStatus === 'active' || tokenStatus === 'issued' || tokenStatus === 'expired') && badgePrepUrl && (
+                <div className="space-y-3">
+                    <div className={"inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold " + (tokenStatus === 'active' ? 'bg-green-100 text-green-700' :
+                        tokenStatus === 'issued' ? 'bg-blue-100 text-blue-700' :
+                            'bg-gray-100 text-gray-500')
+                    }>
+                        <CheckCircle2 className="w-3 h-3" />
+                        {tokenStatus === 'active' ? '활성 토큰' : tokenStatus === 'issued' ? '명찰 발급 완료' : '만료됨'}
+                    </div>
+
+                    <div className="p-3 bg-gray-50 rounded-lg border">
+                        <p className="text-xs text-gray-500 mb-1.5">Badge Prep URL (사용자에게 직접 전달 시 복사)</p>
+                        <p className="text-xs font-mono text-gray-800 break-all bg-white p-2 border mt-1 select-all">{badgePrepUrl}</p>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                                navigator.clipboard.writeText(badgePrepUrl);
+                                toast.success('링크가 복사되었습니다.');
+                            }}
+                            className="flex-1"
+                        >
+                            <Copy className="w-4 h-4 mr-1" />
+                            링크 복사
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(badgePrepUrl, '_blank')}
+                            className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+                        >
+                            <ExternalLink className="w-4 h-4 mr-1" />
+                            바우처 열기
+                        </Button>
+                    </div>
+
+                    {tokenStatus === 'active' && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={onResend}
+                            disabled={isProcessing}
+                            className="w-full text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                        >
+                            <MessageCircle className="w-4 h-4 mr-1" />
+                            알림톡 재발송
+                        </Button>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const RegistrationDetailPage: React.FC = () => {
     const { cid, regId } = useParams<{ cid: string; regId: string }>();
     const id = regId;
@@ -80,6 +232,9 @@ const RegistrationDetailPage: React.FC = () => {
         licenseNumber: ''
     });
     const [isSaving, setIsSaving] = useState(false);
+
+    // Resend notification state
+    const [isResending, setIsResending] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -240,6 +395,37 @@ const RegistrationDetailPage: React.FC = () => {
         }
     };
 
+    const handleResendNotification = async () => {
+        if (!effectiveCid || !id || !data) return;
+        if (data.badgeIssued) {
+            toast.error("이미 명찰이 발급되었습니다.");
+            return;
+        }
+        if (!confirm(`${data.userName || '사용자'} 님의 알림톡을 재발송하시겠습니까?`)) return;
+
+        setIsResending(true);
+        try {
+            const { httpsCallable } = await import('firebase/functions');
+            const { functions } = await import('../../firebase');
+            const resendNotificationFn = httpsCallable(functions, 'resendBadgePrepToken');
+            const result = await resendNotificationFn({
+                confId: effectiveCid,
+                regId: id
+            }) as { data: { success: boolean } };
+
+            if (result?.data?.success) {
+                toast.success('알림톡이 발송되었습니다.');
+            } else {
+                throw new Error('Failed to send notification');
+            }
+        } catch (error: any) {
+            console.error('Failed to send notification:', error);
+            toast.error(`발송 실패: ${error.message || '알 수 없는 오류'}`);
+        } finally {
+            setIsResending(false);
+        }
+    };
+
     const handleManualApprove = async () => {
         if (!effectiveCid || !id || !data) return;
         if (!confirm('수동으로 결제 완료 처리하시겠습니까? (시스템 오류로 결제되었으나 반영되지 않은 경우 등)')) return;
@@ -248,8 +434,11 @@ const RegistrationDetailPage: React.FC = () => {
             const regRef = doc(db, 'conferences', effectiveCid, 'registrations', id);
             await updateDoc(regRef, {
                 status: 'PAID',
+                paymentStatus: 'PAID',
                 paidAt: Timestamp.now(),
-                paymentMethod: 'ADMIN_MANUAL'
+                paymentMethod: 'ADMIN_MANUAL',
+                'paymentDetails.status': 'DONE',
+                updatedAt: Timestamp.now()
             });
 
             // Update Participation if userId exists
@@ -357,7 +546,7 @@ const RegistrationDetailPage: React.FC = () => {
 
     const canCancel = data.status === 'PAID' && data.paymentKey;
     const canRequestRefund = data.status === 'PAID';
-    const canManualApprove = data.status === 'PENDING' || data.status === 'FAILED';
+    const canManualApprove = data.status === 'PENDING' || data.status === 'FAILED' || data.status === 'WAITING_FOR_DEPOSIT' || data.status === 'PENDING_PAYMENT';
 
     return (
         <div className="p-8 max-w-4xl mx-auto bg-white min-h-screen">
@@ -618,6 +807,18 @@ const RegistrationDetailPage: React.FC = () => {
                         </p>
                     </div>
                 </div>
+            )}
+
+            {/* 바우처 링크 복사 컴포넌트 추가 */}
+            {data && (
+                <VoucherLinkSection
+                    registrationId={id!}
+                    confId={effectiveCid}
+                    confBaseUrl={window.location.origin}
+                    confSlug={(effectiveCid || '').replace('kadd_', '')} // fallback slug
+                    onResend={handleResendNotification}
+                    isProcessing={isResending}
+                />
             )}
         </div>
     );

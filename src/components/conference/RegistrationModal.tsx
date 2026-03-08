@@ -81,13 +81,36 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
     const [showTermsModal, setShowTermsModal] = useState(false);
 
     // Get active period and prices - find the period that includes current date
+    // endDate is treated as end-of-day (23:59:59) to include the full date
     const activePeriod = pricing?.find(period => {
         if (!period.startDate || !period.endDate) return false;
         const now = new Date();
         const start = period.startDate.toDate();
         const end = period.endDate.toDate();
-        return now >= start && now <= end;
-    }) || pricing?.[0]; // Fallback to first period if no active period found
+        // Extend end to end-of-day (23:59:59.999) to include the full last day
+        const endOfDay = new Date(end);
+        endOfDay.setHours(23, 59, 59, 999);
+        return now >= start && now <= endOfDay;
+    });
+
+    // Determine registration type label based on active period type
+    const periodType = activePeriod?.type; // 'EARLY' | 'ONSITE'
+    const registrationLabel = periodType === 'ONSITE'
+        ? (lang === 'ko' ? '현장등록' : 'On-site Registration')
+        : (lang === 'ko' ? '사전등록' : 'Pre-Registration');
+
+    // Check if any period exists but none is active (outside all periods)
+    const hasAnyPeriod = (pricing?.length ?? 0) > 0;
+    const isOutsideAllPeriods = hasAnyPeriod && !activePeriod;
+
+    // Find the next upcoming period (if current time is before all periods)
+    const nextPeriod = isOutsideAllPeriods
+        ? pricing?.find(period => {
+            if (!period.startDate) return false;
+            const start = period.startDate.toDate();
+            return new Date() < start;
+        })
+        : null;
 
     // Set initial non-member type when gradesList is loaded
     useEffect(() => {
@@ -316,14 +339,85 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                         <div className="flex items-center justify-center py-12">
                             <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
                         </div>
+                    ) : isOutsideAllPeriods ? (
+                        /* 등록 기간 외 안내 */
+                        <div className="py-6 px-2">
+                            <DialogHeader className="mb-4">
+                                <DialogTitle className="text-xl sm:text-2xl font-bold text-slate-900 pr-8">
+                                    {lang === 'ko' ? '학술대회 등록' : 'Conference Registration'}
+                                </DialogTitle>
+                            </DialogHeader>
+                            <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 sm:p-6 text-center">
+                                <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <AlertCircle className="w-8 h-8 text-amber-500" />
+                                </div>
+                                <h3 className="text-lg font-bold text-amber-800 mb-2">
+                                    {lang === 'ko' ? '현재 등록 기간이 아닙니다' : 'Registration period is not active'}
+                                </h3>
+                                <p className="text-sm text-amber-700 leading-relaxed">
+                                    {nextPeriod
+                                        ? (lang === 'ko'
+                                            ? `다음 등록 기간은 ${nextPeriod.startDate.toDate().toLocaleDateString('ko-KR')}부터 시작됩니다.`
+                                            : `Next registration period starts on ${nextPeriod.startDate.toDate().toLocaleDateString('en-US')}.`)
+                                        : (lang === 'ko'
+                                            ? '등록이 마감되었습니다. 학회 사무국에 문의해 주세요.'
+                                            : 'Registration has closed. Please contact the organizing committee.')
+                                    }
+                                </p>
+                                {pricing && pricing.length > 0 && (
+                                    <div className="mt-4 pt-4 border-t border-amber-200">
+                                        <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-2">
+                                            {lang === 'ko' ? '등록 기간 안내' : 'Registration Periods'}
+                                        </p>
+                                        <div className="space-y-1.5">
+                                            {pricing.map((period, idx) => {
+                                                const pStart = period.startDate?.toDate();
+                                                const pEnd = period.endDate?.toDate();
+                                                const pEndOfDay = pEnd ? new Date(pEnd) : null;
+                                                if (pEndOfDay) pEndOfDay.setHours(23, 59, 59, 999);
+                                                const isActive = pStart && pEndOfDay && new Date() >= pStart && new Date() <= pEndOfDay;
+                                                const isPast = pEndOfDay && new Date() > pEndOfDay;
+                                                return (
+                                                    <div key={idx} className={`flex items-center justify-between text-xs px-3 py-1.5 rounded-lg ${isActive ? 'bg-green-100 text-green-700' :
+                                                            isPast ? 'bg-slate-100 text-slate-400 line-through' :
+                                                                'bg-white text-slate-600'
+                                                        }`}>
+                                                        <span className="font-medium">
+                                                            {typeof period.name === 'object' ? (period.name as { ko: string }).ko : period.name}
+                                                        </span>
+                                                        <span>
+                                                            {pStart?.toLocaleDateString(lang === 'ko' ? 'ko-KR' : 'en-US')} ~{' '}
+                                                            {pEnd?.toLocaleDateString(lang === 'ko' ? 'ko-KR' : 'en-US')}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     ) : (
                         <>
                             <DialogHeader>
                                 <DialogTitle className="text-xl sm:text-2xl font-bold text-slate-900 pr-8">
-                                    {lang === 'ko' ? '학술대회 등록' : 'Conference Registration'}
+                                    {registrationLabel}
                                 </DialogTitle>
                                 <DialogDescription className="text-sm sm:text-base">
-                                    {lang === 'ko' ? '회원 인증 또는 비회원으로 등록을 진행합니다.' : 'Register as a member or non-member.'}
+                                    {activePeriod && (
+                                        <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${periodType === 'ONSITE'
+                                                ? 'bg-orange-100 text-orange-700'
+                                                : 'bg-blue-100 text-blue-700'
+                                            }`}>
+                                            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
+                                            {typeof activePeriod.name === 'object'
+                                                ? (lang === 'ko' ? (activePeriod.name as { ko: string }).ko : (activePeriod.name as { en?: string }).en || (activePeriod.name as { ko: string }).ko)
+                                                : activePeriod.name
+                                            }
+                                            {' '}{lang === 'ko' ? '진행 중' : 'In Progress'}
+                                        </span>
+                                    )}
+                                    {' '}{lang === 'ko' ? '회원 인증 또는 비회원으로 등록을 진행합니다.' : 'Register as a member or non-member.'}
                                 </DialogDescription>
                             </DialogHeader>
 
@@ -511,9 +605,12 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
 
                                     <Button
                                         onClick={handleRegisterClick}
-                                        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold min-h-[44px] flex items-center justify-center"
+                                        className={`w-full text-white font-bold min-h-[44px] flex items-center justify-center ${periodType === 'ONSITE'
+                                                ? 'bg-orange-600 hover:bg-orange-700'
+                                                : 'bg-green-600 hover:bg-green-700'
+                                            }`}
                                     >
-                                        {lang === 'ko' ? '등록하기' : 'Register Now'}
+                                        {registrationLabel} {lang === 'ko' ? '진행하기' : '- Register Now'}
                                     </Button>
                                 </div>
                             )}
@@ -678,9 +775,12 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
 
                                     <Button
                                         onClick={handleRegisterClick}
-                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold min-h-[44px] flex items-center justify-center"
+                                        className={`w-full text-white font-bold min-h-[44px] flex items-center justify-center ${periodType === 'ONSITE'
+                                                ? 'bg-orange-600 hover:bg-orange-700'
+                                                : 'bg-blue-600 hover:bg-blue-700'
+                                            }`}
                                     >
-                                        {lang === 'ko' ? '등록하기' : 'Register Now'}
+                                        {registrationLabel} {lang === 'ko' ? '진행하기' : '- Register Now'}
                                     </Button>
                                 </div>
                             )}

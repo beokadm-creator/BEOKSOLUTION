@@ -226,6 +226,10 @@ const RegistrationListPage: React.FC = () => {
     // Action: Resend Notification (AlimTalk)
     const handleResendNotification = async (e: React.MouseEvent, reg: RootRegistration) => {
         e.stopPropagation();
+        if (reg.badgeIssued) {
+            toast.error("이미 명찰이 발급되었습니다.");
+            return;
+        }
         if (!confirm(`${reg.userName || '사용자'} 님에게 알림톡을 재발송하시겠습니까?`)) return;
         if (!conferenceId) return;
 
@@ -287,7 +291,11 @@ const RegistrationListPage: React.FC = () => {
 
         let targetIds: string[];
         if (mode === 'selected') {
-            targetIds = selectedIds;
+            // [Fix] Filter out already issued badges from selected ones
+            targetIds = registrations.filter(r => selectedIds.includes(r.id) && !r.badgeIssued).map(r => r.id);
+            if (targetIds.length !== selectedIds.length) {
+                toast.error(`선택된 인원 중 이미 명찰이 발급된 ${selectedIds.length - targetIds.length}명은 발송 대상에서 제외되었습니다.`, { duration: 4000 });
+            }
         } else {
             const toastId = toast.loading('전체 등록자 목록을 불러오는 중...');
             try {
@@ -317,7 +325,9 @@ const RegistrationListPage: React.FC = () => {
                             (r.orderId ?? '').toLowerCase().includes(searchTerm) ||
                             (r.id ?? '').toLowerCase().includes(searchTerm)
                             : true;
-                        return matchesStatus && matchesSearch;
+                        // [Fix] Exclude already issued badges
+                        const isNotIssued = !r.badgeIssued;
+                        return matchesStatus && matchesSearch && isNotIssued;
                     })
                     .map(r => r.id);
                 toast.dismiss(toastId);
@@ -391,17 +401,24 @@ const RegistrationListPage: React.FC = () => {
         toast.loading("라벨 프린터 전송 중...", { id: 'bixolon-print' });
 
         try {
-            // [Fix] info.badgeLayout이 null일 수 있음 (useConference 캐시/타이밍 문제)
-            // settings/badge_config에서 직접 로드 훈에 info.badgeLayout fallback
             let badgeLayout = null;
 
             if (conferenceId) {
                 console.log('[Bixolon] Fetching latest layout from settings/badge_config...');
                 try {
                     const cfgSnap = await getDoc(doc(db, `conferences/${conferenceId}/settings/badge_config`));
-                    if (cfgSnap.exists() && cfgSnap.data().badgeLayout) {
-                        badgeLayout = cfgSnap.data().badgeLayout;
-                        console.log('[Bixolon] 최신 로드 완료:', badgeLayout);
+                    if (cfgSnap.exists()) {
+                        const data = cfgSnap.data();
+                        // 인포데스크와 동일한 로직: 활성화 시에만 DB 레이아웃 사용
+                        if (data.badgeLayoutEnabled && data.badgeLayout) {
+                            badgeLayout = {
+                                width: data.badgeLayout.width || 800,
+                                height: data.badgeLayout.height || 1200,
+                                elements: data.badgeLayout.elements || [],
+                                enableCutting: data.badgeLayout.enableCutting || false
+                            };
+                            console.log('[Bixolon] 최신 로드 완료:', badgeLayout);
+                        }
                     }
                 } catch (fetchErr) {
                     console.error('[Bixolon] badge_config fetch failed:', fetchErr);
@@ -417,9 +434,16 @@ const RegistrationListPage: React.FC = () => {
                     if (!snap.empty) {
                         const cid = snap.docs[0].id;
                         const cfgSnap = await getDoc(doc(db, `conferences/${cid}/settings/badge_config`));
-                        if (cfgSnap.exists() && cfgSnap.data().badgeLayout) {
-                            badgeLayout = cfgSnap.data().badgeLayout;
-                            console.log('[Bixolon] slug 기반 로드 완료:', cid);
+                        if (cfgSnap.exists()) {
+                            const data = cfgSnap.data();
+                            if (data.badgeLayoutEnabled && data.badgeLayout) {
+                                badgeLayout = {
+                                    width: data.badgeLayout.width || 800,
+                                    height: data.badgeLayout.height || 1200,
+                                    elements: data.badgeLayout.elements || [],
+                                    enableCutting: data.badgeLayout.enableCutting || false
+                                };
+                            }
                         }
                     }
                 } catch (fetchErr) {
@@ -427,10 +451,16 @@ const RegistrationListPage: React.FC = () => {
                 }
             }
 
-            if (!badgeLayout) {
-                toast.error("배지 레이아웃이 설정되지 않았습니다. 명찰 편집기에서 저장 후 다시 시도하세요.", { id: 'bixolon-print', duration: 5000 });
-                return;
-            }
+            // Info Desk와 동일한 기본 레이아웃 폴백 (v356 로직 동기화)
+            const activeLayout = badgeLayout || {
+                width: 800,
+                height: 1200,
+                elements: [
+                    { x: 400, y: 150, fontSize: 6, isVisible: true, type: 'QR' } as any,
+                    { x: 400, y: 450, fontSize: 4, isVisible: true, type: 'NAME' } as any,
+                    { x: 400, y: 600, fontSize: 2, isVisible: true, type: 'ORG' } as any
+                ]
+            };
 
             let userName = reg.userName || '';
             let userAffiliation = reg.userOrg || reg.affiliation || '';
@@ -450,12 +480,16 @@ const RegistrationListPage: React.FC = () => {
                 }
             }
 
-            const printSuccess = await printBadge(badgeLayout, {
+            const displayAmount = reg.amount !== undefined
+                ? reg.amount
+                : (reg.baseAmount !== undefined ? ((reg.baseAmount || 0) + (reg.optionsTotal || 0)) : 0);
+
+            const printSuccess = await printBadge(activeLayout, {
                 name: userName,
                 org: userAffiliation,
                 category: displayTier(reg.tier),
                 license: reg.licenseNumber || '',
-                price: (reg.amount || 0).toLocaleString() + '원',
+                price: displayAmount.toLocaleString() + '원',
                 affiliation: userAffiliation,
                 qrData: qrData
             });

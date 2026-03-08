@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -58,12 +58,12 @@ const BadgeManagementPage: React.FC = () => {
 
         setSaving(true);
         try {
-            await updateDoc(doc(db, `conferences/${cid}/settings`, 'badge_config'), {
+            await setDoc(doc(db, `conferences/${cid}/settings`, 'badge_config'), {
                 materialsUrls,
                 translationUrl,
                 badgeLayoutEnabled,
                 updatedAt: Timestamp.now()
-            });
+            }, { merge: true });
 
             toast.success('명찰 설정이 저장되었습니다.');
         } catch (error) {
@@ -279,7 +279,7 @@ const BadgeManagementPage: React.FC = () => {
                                 </CardContent>
                             </Card>
 
-                    {/* Print Badge Preview */}
+                            {/* Print Badge Preview */}
                             <Card>
                                 <CardHeader>
                                     <CardTitle>출력 명찰 미리보기</CardTitle>
@@ -291,7 +291,7 @@ const BadgeManagementPage: React.FC = () => {
                                     <div className="flex justify-center bg-gray-100 p-8 rounded-xl overflow-auto min-h-[400px] items-center">
                                         {info?.badgeLayout ? (
                                             <div className="shadow-2xl bg-white transform scale-75 origin-center">
-                                                <BadgeTemplate 
+                                                <BadgeTemplate
                                                     data={{
                                                         registrationId: 'PREVIEW-123',
                                                         name: '홍길동',

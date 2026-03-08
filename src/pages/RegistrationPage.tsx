@@ -279,7 +279,10 @@ export default function RegistrationPage() {
                     const period = data.periods.find(p => {
                         const start = p.startDate.toDate();
                         const end = p.endDate.toDate();
-                        return now >= start && now <= end;
+                        // Extend end to end-of-day (23:59:59.999) to include the full last day
+                        const endOfDay = new Date(end);
+                        endOfDay.setHours(23, 59, 59, 999);
+                        return now >= start && now <= endOfDay;
                     });
                     if (period) setActivePeriod(period);
                 }
@@ -556,7 +559,7 @@ export default function RegistrationPage() {
         }
 
         // paymentMethodsInstanceRef is a ref and should not be in dependencies
-         
+
     }, [paymentWidget, totalPrice]);
 
     // Reset instance ref if widget changes
@@ -564,7 +567,7 @@ export default function RegistrationPage() {
         paymentMethodsInstanceRef.current = null;
 
         // paymentMethodsInstanceRef is a ref and should not be in dependencies
-         
+
     }, [paymentWidget]);
 
 

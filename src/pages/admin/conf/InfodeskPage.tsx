@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAdminStore } from '../../../store/adminStore';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { httpsCallable, getFunctions } from 'firebase/functions';
 import { CheckCircle, AlertCircle, Printer, X, Settings, Palette, Loader2 } from 'lucide-react';
@@ -62,6 +62,7 @@ const InfodeskPage: React.FC = () => {
     });
 
     const [badgeLayout, setBadgeLayout] = useState<{ width: number; height: number; elements: BadgeElement[]; enableCutting?: boolean } | null>(null);
+    const [attendeeCache, setAttendeeCache] = useState<Map<string, any>>(new Map());
     const inputRef = useRef<HTMLInputElement>(null);
     const [inputValue, setInputValue] = useState('');
 
@@ -94,6 +95,17 @@ const InfodeskPage: React.FC = () => {
                         });
                     }
                 }
+
+                // 3. Pre-fetch Attendees for O(1) Scan speed [v356]
+                const cache = new Map();
+                const [regsSnap, extsSnap] = await Promise.all([
+                    getDocs(collection(db, `conferences/${targetId}/registrations`)),
+                    getDocs(collection(db, `conferences/${targetId}/external_attendees`))
+                ]);
+                regsSnap.forEach(d => cache.set(d.id, { ...d.data(), id: d.id, isExternal: false }));
+                extsSnap.forEach(d => cache.set(d.id, { ...d.data(), id: d.id, isExternal: true }));
+                setAttendeeCache(cache);
+
             } catch (e) {
                 console.error(e);
                 toast.error("Failed to load kiosk config");
@@ -168,57 +180,39 @@ const InfodeskPage: React.FC = () => {
             if (regId.startsWith('VOUCHER-')) {
                 regId = regId.replace('VOUCHER-', '');
             }
-
-            // Check if external attendee (EXT- prefix)
-            const isExternalAttendee = regId.startsWith('EXT-');
-
-            let regSnap, extSnap;
-            if (isExternalAttendee) {
-                const extRef = doc(db, `conferences/${targetConferenceId}/external_attendees`, regId);
-                extSnap = await getDoc(extRef);
-                regSnap = { exists: () => false };
-            } else {
-                const regRef = doc(db, `conferences/${targetConferenceId}/registrations`, regId);
-                regSnap = await getDoc(regRef);
-                extSnap = { exists: () => false };
+            if (regId.startsWith('CONF-')) {
+                regId = regId.replace('CONF-', '');
             }
 
-            let regData: {
-                status?: string;
-                paymentStatus?: string;
-                name?: string;
-                userName?: string;
-                affiliation?: string;
-                organization?: string;
-                userOrg?: string;
-                userEmail?: string;
-                userTier?: string;
-                tier?: string;
-                amount?: number;
-                licenseNumber?: string;
-                userId?: string;
-                userInfo?: {
-                    name?: string;
-                    affiliation?: string;
-                    organization?: string;
-                    grade?: string;
-                    licenseNumber?: string;
-                };
-            } | null = null;
-            let isExternal = false;
+            // [Optimized] Use Cache first
+            let regData = attendeeCache.get(regId);
+            let isExternal = regId.startsWith('EXT-');
 
-            if (regSnap.exists()) {
-                regData = regSnap.data();
-                isExternal = false;
-            } else if (extSnap.exists()) {
-                regData = extSnap.data();
-                isExternal = true;
-            } else {
+            if (!regData) {
+                console.log(`[Cache Miss] Fetching ${regId} from Firestore`);
+                if (isExternal) {
+                    const extRef = doc(db, `conferences/${targetConferenceId}/external_attendees`, regId);
+                    const extSnap = await getDoc(extRef);
+                    if (extSnap.exists()) regData = { ...extSnap.data(), id: extSnap.id, isExternal: true };
+                } else {
+                    const regRef = doc(db, `conferences/${targetConferenceId}/registrations`, regId);
+                    const regSnap = await getDoc(regRef);
+                    if (regSnap.exists()) regData = { ...regSnap.data(), id: regSnap.id, isExternal: false };
+                }
+            }
+
+            if (!regData) {
                 throw new Error("등록되지 않은 명찰이거나 잘못된 QR코드입니다.");
             }
 
+            isExternal = regData.isExternal || isExternal;
+
             if (!isExternal && regData.status !== 'PAID' && regData.paymentStatus !== 'PAID') {
                 throw new Error("결제가 완료되지 않은 명찰입니다.");
+            }
+
+            if (regData.badgeIssued) {
+                throw new Error("이미 발급된 명찰입니다. 데스크에서 명찰을 수령해주세요");
             }
 
             let userName = isExternal ? (regData?.name || 'Unknown') : (regData?.userName || regData?.name || regData?.userInfo?.name || 'Unknown');
@@ -247,7 +241,7 @@ const InfodeskPage: React.FC = () => {
             }
 
             // Sync with regData snapshot to ensure consistency for other parts
-            const finalTier = isExternal ? '' : (regData.userTier || regData.userInfo?.grade || regData.tier || '');
+            const finalTier = isExternal ? '외부참석자' : (regData.userTier || regData.userInfo?.grade || regData.tier || '');
             const finalLicense = regData.licenseNumber || regData.userInfo?.licenseNumber || '';
 
             // Logic: Issue Badge using Cloud Function (supports both regular and external attendees)
@@ -280,12 +274,20 @@ const InfodeskPage: React.FC = () => {
                         ]
                     };
 
+                    const getDisplayAmount = () => {
+                        if (regData.amount !== undefined) return regData.amount;
+                        if (regData.baseAmount !== undefined) {
+                            return (regData.baseAmount || 0) + (regData.optionsTotal || 0);
+                        }
+                        return 0;
+                    };
+
                     const printSuccess = await printBadge(activeLayout, {
                         name: userName,
                         org: userAffiliation,
                         category: finalTier,
                         license: finalLicense,
-                        price: isExternal ? '' : `${regData.amount?.toLocaleString() || 0}원`,
+                        price: `${getDisplayAmount().toLocaleString()}원`,
                         affiliation: userAffiliation,
                         qrData: result.data.badgeQr
                     });
@@ -319,7 +321,7 @@ const InfodeskPage: React.FC = () => {
         setTimeout(() => {
             setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE', message: 'Ready' });
             setInputValue('');
-        }, 3000); // 3s delay
+        }, 1000); // 3000ms -> 1000ms 로 줄여 연속 발급 속도 향상
     };
 
 

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { httpsCallable } from 'firebase/functions';
 import { getFunctions } from 'firebase/functions';
+import { getFirestore, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { RefreshCw, AlertCircle, CheckCircle, Loader2, Clock, FileText, Calendar, Languages, Download, User, MapPin, TrendingUp } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { DOMAIN_CONFIG, extractSocietyFromHost } from '../utils/domainHelper';
@@ -27,6 +28,9 @@ interface TokenValidationResult {
     currentZone: string | null;
     totalMinutes: number;
     receiptNumber: string;
+    amount?: number;
+    lastCheckIn?: any;
+    isCompleted?: boolean;
     // Additional fields for enhanced badge
     sessionsCompleted?: number;
     sessionsTotal?: number;
@@ -47,6 +51,11 @@ const BadgePrepPage: React.FC = () => {
   const [result, setResult] = useState<TokenValidationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [badgeConfig, setBadgeConfig] = useState<any>(null);
+  const [zones, setZones] = useState<any[]>([]);
+  const [liveMinutes, setLiveMinutes] = useState<number>(0);
+  const [lastCheckIn, setLastCheckIn] = useState<any>(null);
+  const [isCompleted, setIsCompleted] = useState<boolean>(false);
 
   const voucherQrValue = useMemo(() => {
     if (!result?.registration) return '';
@@ -91,7 +100,24 @@ const BadgePrepPage: React.FC = () => {
       const validateBadgePrepTokenFn = httpsCallable(functions, 'validateBadgePrepToken');
 
       const confId = getConfIdToUse(slug);
-      const response = await validateBadgePrepTokenFn({ confId, token }) as { data: TokenValidationResult };
+
+      const [response, configSnap] = await Promise.all([
+        validateBadgePrepTokenFn({ confId, token }) as Promise<{ data: TokenValidationResult }>,
+        (async () => {
+          try {
+            const db = getFirestore();
+            const configRef = doc(db, `conferences/${confId}/settings/badge_config`);
+            return await getDoc(configRef);
+          } catch (err) {
+            console.error('[BadgePrepPage] Failed to load badge config', err);
+            return null;
+          }
+        })()
+      ]);
+
+      if (configSnap && configSnap.exists()) {
+        setBadgeConfig(configSnap.data());
+      }
 
       setResult(response.data);
       setLoading(false);
@@ -111,6 +137,145 @@ const BadgePrepPage: React.FC = () => {
     });
   }, [validateToken]);
 
+  // Load Zones for attendance calculation
+  useEffect(() => {
+    if (!result?.registration) return;
+    const db = getFirestore();
+    const confId = getConfIdToUse(slug);
+
+    const attendanceRef = doc(db, `conferences/${confId}/settings/attendance`);
+    getDoc(attendanceRef).then(snap => {
+      if (snap.exists()) {
+        const rules = snap.data().rules || {};
+        let allZones: any[] = [];
+        Object.entries(rules).forEach(([dateStr, rule]: [string, any]) => {
+          if (rule && rule.zones) {
+            rule.zones.forEach((z: any) => {
+              allZones.push({ ...z, ruleDate: dateStr });
+            });
+          }
+        });
+        setZones(allZones);
+      }
+    });
+  }, [result?.registration, slug, getConfIdToUse]);
+
+  const [liveAttendance, setLiveAttendance] = useState<{
+    status: 'INSIDE' | 'OUTSIDE';
+    totalMinutes: number;
+    lastCheckIn: any;
+    currentZone: string | null;
+  } | null>(null);
+
+  // Enhanced: Sync detailed registration data directly from Firestore
+  useEffect(() => {
+    if (!result?.registration?.id) return;
+    const db = getFirestore();
+    const confId = getConfIdToUse(slug);
+    const regId = result.registration.id;
+
+    const regRef = doc(db, `conferences/${confId}/registrations`, regId);
+    const extRef = doc(db, `conferences/${confId}/external_attendees`, regId);
+
+    let unsubscribeExt: (() => void) | null = null;
+    const processSnap = (snap: any) => {
+      if (snap.exists()) {
+        const d = snap.data();
+        setLiveAttendance({
+          status: d.attendanceStatus || 'OUTSIDE',
+          totalMinutes: d.totalMinutes || 0,
+          lastCheckIn: d.lastCheckIn,
+          currentZone: d.currentZone || null
+        });
+        setIsCompleted(!!d.isCompleted);
+      }
+    };
+
+    const unsubscribeReg = onSnapshot(regRef, (snap) => {
+      if (snap.exists()) {
+        processSnap(snap);
+      } else if (!unsubscribeExt) {
+        unsubscribeExt = onSnapshot(extRef, (extSnap) => {
+          processSnap(extSnap);
+        });
+      }
+    }, (err) => {
+      console.warn('[BadgePrepPage] Registration doc sync restricted:', err);
+    });
+
+    return () => {
+      unsubscribeReg();
+      if (unsubscribeExt) unsubscribeExt();
+    };
+  }, [result?.registration?.id, slug, getConfIdToUse]);
+
+  // Live Ticker Logic (calculates time passed precisely)
+  useEffect(() => {
+    // We prioritize liveAttendance from Firestore, fallback to result.registration
+    const reg = result?.registration;
+    if (!reg) return;
+
+    const updateLiveMinutes = () => {
+      // Step 1: Determine the base data
+      const status = liveAttendance ? liveAttendance.status : reg.attendanceStatus;
+      const baseMinutes = liveAttendance ? liveAttendance.totalMinutes : (reg.totalMinutes || 0);
+      const currentCheckIn = liveAttendance ? liveAttendance.lastCheckIn : reg.lastCheckIn;
+      const currentZoneId = liveAttendance ? liveAttendance.currentZone : reg.currentZone;
+
+      // Step 2: If not inside, just show base minutes
+      if (status !== 'INSIDE' || !currentCheckIn) {
+        setLiveMinutes(baseMinutes);
+        return;
+      }
+
+      // Step 3: Calculate the live duration for the current session
+      const now = new Date();
+      const start = currentCheckIn.toDate ? currentCheckIn.toDate() : new Date();
+      let sessionDuration = 0;
+      const zoneRule = zones.find(z => z.id === currentZoneId);
+      let deduction = 0;
+
+      let boundedStart = start;
+      let boundedEnd = now;
+
+      if (zoneRule && zoneRule.start && zoneRule.end) {
+        const localDateStr = zoneRule.ruleDate || start.getFullYear() + "-" + String(start.getMonth() + 1).padStart(2, '0') + "-" + String(start.getDate()).padStart(2, '0');
+        // Force strings to be interpreted as KST (+09:00)
+        const sessionStart = new Date(`${localDateStr}T${zoneRule.start}:00+09:00`);
+        const sessionEnd = new Date(`${localDateStr}T${zoneRule.end}:00+09:00`);
+
+        boundedStart = new Date(Math.max(start.getTime(), sessionStart.getTime()));
+        boundedEnd = new Date(Math.min(now.getTime(), sessionEnd.getTime()));
+      }
+
+      if (boundedEnd > boundedStart) {
+        sessionDuration = Math.floor((boundedEnd.getTime() - boundedStart.getTime()) / 60000);
+
+        if (zoneRule && zoneRule.breaks && Array.isArray(zoneRule.breaks)) {
+          zoneRule.breaks.forEach((brk: any) => {
+            const localDateStr = zoneRule.ruleDate || start.getFullYear() + "-" + String(start.getMonth() + 1).padStart(2, '0') + "-" + String(start.getDate()).padStart(2, '0');
+            // Force breaks to KST
+            const breakStart = new Date(`${localDateStr}T${brk.start}:00+09:00`);
+            const breakEnd = new Date(`${localDateStr}T${brk.end}:00+09:00`);
+            const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());
+            const overlapEnd = Math.min(boundedEnd.getTime(), breakEnd.getTime());
+            if (overlapEnd > overlapStart) {
+              const overlapMins = Math.floor((overlapEnd - overlapStart) / 60000);
+              deduction += overlapMins;
+            }
+          });
+        }
+      }
+
+      const activeSessionMinutes = Math.max(0, sessionDuration - deduction);
+      setLiveMinutes(baseMinutes + activeSessionMinutes);
+    };
+
+    updateLiveMinutes();
+    const ticker = setInterval(updateLiveMinutes, 30000);
+    return () => clearInterval(ticker);
+  }, [result?.registration, liveAttendance, zones]);
+
   // Get hostname for URL
   const hostname = window.location.hostname;
 
@@ -125,13 +290,13 @@ const BadgePrepPage: React.FC = () => {
   // Auto-refresh when badge is issued
   useEffect(() => {
     if (result?.valid && result.tokenStatus === 'ACTIVE') {
-      // Poll every 2 seconds to check if badge has been issued
-      // Faster polling for immediate switch after InfoDesk scan
+      // Poll every 10 seconds to check if badge has been issued
+      // Reduced polling frequency to prevent server overload
       const interval = setInterval(async () => {
         setRefreshing(true);
         await validateToken();
         setRefreshing(false);
-      }, 2000);
+      }, 10000);
 
       return () => clearInterval(interval);
     }
@@ -224,10 +389,11 @@ const BadgePrepPage: React.FC = () => {
               {/* Name */}
               <h2 className="text-3xl font-black text-gray-900 mb-4 tracking-tight">{reg.name}</h2>
 
-              {/* Receipt Number - Prominent */}
               <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl py-3 px-4 mb-4 border border-amber-200">
-                <p className="text-xs font-bold text-amber-600 uppercase mb-1">Receipt Number</p>
-                <p className="text-xl font-black text-amber-700 tracking-wider">{reg.receiptNumber}</p>
+                <div className="flex flex-col items-center">
+                  <p className="text-[10px] font-bold text-amber-600 uppercase mb-0.5">Receipt Number</p>
+                  <p className="text-xl font-black text-amber-700 tracking-wider">{reg.receiptNumber}</p>
+                </div>
               </div>
 
               {/* License Number */}
@@ -361,34 +527,37 @@ const BadgePrepPage: React.FC = () => {
 
                 {/* Status Tab */}
                 <TabsContent value="status" className="mt-2 p-1 space-y-2">
-                  <div className={`py-4 px-4 rounded-2xl font-bold text-center border shadow-sm transition-all ${reg.attendanceStatus === 'INSIDE'
+                  <div className={`py-4 px-4 rounded-2xl font-bold text-center border shadow-sm transition-all ${(liveAttendance?.status || reg.attendanceStatus) === 'INSIDE'
                     ? 'bg-green-100 text-green-700 border-green-200 ring-4 ring-green-50'
                     : 'bg-white text-gray-500 border-gray-200'
                     }`}>
                     <div className="flex items-center justify-center gap-2">
-                      {reg.attendanceStatus === 'INSIDE'
+                      {(liveAttendance?.status || reg.attendanceStatus) === 'INSIDE'
                         ? <><span className="w-3 h-3 bg-green-500 rounded-full animate-ping" /><span>입장 완료 (INSIDE)</span></>
                         : <><span className="w-3 h-3 bg-gray-300 rounded-full" /><span>퇴장 상태 (OUTSIDE)</span></>
                       }
                     </div>
                   </div>
 
-                  {reg.currentZone && (
+                  {(liveAttendance?.currentZone || reg.currentZone) && (liveAttendance?.status || reg.attendanceStatus) === 'INSIDE' && (
                     <div className="bg-blue-50/50 border border-blue-100 rounded-xl py-3 px-4 flex justify-between items-center">
                       <p className="text-xs text-blue-600 font-bold">현재 위치</p>
                       <p className="text-sm font-black text-blue-800 flex items-center gap-1">
                         <MapPin className="w-3 h-3 text-blue-500" />
-                        {reg.currentZone}
+                        {liveAttendance?.currentZone || reg.currentZone}
                       </p>
                     </div>
                   )}
 
-                  {reg.totalMinutes > 0 && (
+                  {liveMinutes > 0 && (
                     <div className="bg-purple-50/50 border border-purple-100 rounded-xl py-3 px-4 flex justify-between items-center">
-                      <p className="text-xs text-purple-600 font-bold">총 체류 시간</p>
+                      <div className="flex flex-col text-left">
+                        <p className="text-xs text-purple-600 font-bold">인정 수강 시간 (실시간)</p>
+                        {(liveAttendance?.status || reg.attendanceStatus) === 'INSIDE' && <p className="text-[10px] text-purple-400">현재 수강 시간 포함</p>}
+                      </div>
                       <p className="text-sm font-black text-purple-800 flex items-center gap-1">
                         <Clock className="w-3 h-3 text-purple-500" />
-                        {Math.floor(reg.totalMinutes / 60)}시간 {reg.totalMinutes % 60}분
+                        {Math.floor(liveMinutes / 60)}시간 {liveMinutes % 60}분
                       </p>
                     </div>
                   )}
@@ -397,57 +566,75 @@ const BadgePrepPage: React.FC = () => {
                 {/* Sessions Tab */}
                 <TabsContent value="sessions" className="mt-2 p-1">
                   <div className="bg-white rounded-2xl py-6 px-4 border border-gray-100 shadow-sm text-center">
-                    <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <TrendingUp className="w-6 h-6 text-emerald-600" />
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-600'}`}>
+                      {isCompleted ? <CheckCircle className="w-6 h-6 text-emerald-600" /> : <TrendingUp className="w-6 h-6 text-gray-400" />}
                     </div>
-                    <p className="text-xs text-emerald-600 font-bold mb-1 uppercase tracking-wider">Session Progress</p>
-                    <p className="text-sm text-gray-500 font-medium mb-4">평점 이수 현황</p>
+                    <p className="text-xs text-gray-500 font-bold mb-1 uppercase tracking-wider">Session Progress</p>
+                    <p className="text-sm text-gray-500 font-medium mb-4">평점(출결) 이수 현황</p>
 
-                    <div className="flex items-baseline justify-center gap-1 mb-4">
-                      <span className="text-4xl font-black text-gray-900 tracking-tight">
-                        {reg.sessionsCompleted || 0}
+                    <div className="flex flex-col items-center gap-1 mb-4">
+                      <span className={`text-3xl font-black tracking-tight ${isCompleted ? 'text-emerald-600' : 'text-gray-900'}`}>
+                        {isCompleted ? '이수 완료' : '진행 중'}
                       </span>
-                      <span className="text-xl text-gray-400 font-medium">/</span>
-                      <span className="text-xl font-bold text-gray-400">
-                        {reg.sessionsTotal || '-'}
+                      <span className="text-sm font-bold text-gray-500 mt-2 bg-gray-50 px-4 py-2 rounded-lg">
+                        누적 인정 시간: <span className="text-purple-600">{Math.floor(liveMinutes / 60)}시간 {liveMinutes % 60}분</span>
                       </span>
-                    </div>
-                    <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, (Number(reg.sessionsCompleted || 0) / Number(reg.sessionsTotal || 1)) * 100)}%` }}></div>
                     </div>
                   </div>
                 </TabsContent>
 
                 {/* Materials Tab */}
                 <TabsContent value="materials" className="mt-2 p-1 space-y-2">
-                  <a
-                    href={`https://${hostname}/${slug}/materials`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center p-4 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-xl transition-all group"
-                  >
-                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-blue-200 transition-colors">
-                      <Download className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-sm font-bold text-gray-900">강의 자료실</p>
-                      <p className="text-xs text-gray-500">발표자료 다운로드</p>
-                    </div>
-                  </a>
-                  <a
-                    href={`https://${hostname}/${slug}/abstracts`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center p-4 bg-white hover:bg-purple-50 border border-gray-200 hover:border-purple-200 rounded-xl transition-all group"
-                  >
-                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-purple-200 transition-colors">
-                      <FileText className="w-5 h-5 text-purple-600" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-sm font-bold text-gray-900">초록집 (Abstract)</p>
-                      <p className="text-xs text-gray-500">학술대회 초록 모음</p>
-                    </div>
-                  </a>
+                  {badgeConfig?.materialsUrls && badgeConfig.materialsUrls.length > 0 ? (
+                    badgeConfig.materialsUrls.map((mat: any, idx: number) => (
+                      <a
+                        key={idx}
+                        href={mat.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center p-4 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-xl transition-all group"
+                      >
+                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-blue-200 transition-colors">
+                          <Download className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-bold text-gray-900">{mat.name}</p>
+                          <p className="text-xs text-gray-500">자료실 이동</p>
+                        </div>
+                      </a>
+                    ))
+                  ) : (
+                    <>
+                      <a
+                        href={`https://${hostname}/${slug}/materials`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center p-4 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-xl transition-all group"
+                      >
+                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-blue-200 transition-colors">
+                          <Download className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-bold text-gray-900">강의 자료실</p>
+                          <p className="text-xs text-gray-500">발표자료 다운로드</p>
+                        </div>
+                      </a>
+                      <a
+                        href={`https://${hostname}/${slug}/abstracts`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center p-4 bg-white hover:bg-purple-50 border border-gray-200 hover:border-purple-200 rounded-xl transition-all group"
+                      >
+                        <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-purple-200 transition-colors">
+                          <FileText className="w-5 h-5 text-purple-600" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-bold text-gray-900">초록집 (Abstract)</p>
+                          <p className="text-xs text-gray-500">학술대회 초록 모음</p>
+                        </div>
+                      </a>
+                    </>
+                  )}
                 </TabsContent>
 
                 {/* Program Tab */}
@@ -470,11 +657,24 @@ const BadgePrepPage: React.FC = () => {
 
                 {/* Translation Tab */}
                 <TabsContent value="translation" className="mt-2 p-1">
-                  <div className="bg-gray-50 rounded-2xl py-12 px-4 border border-dashed border-gray-300 text-center">
-                    <Languages className="w-10 h-10 text-gray-300 mx-auto mb-4" />
-                    <p className="text-sm text-gray-900 font-bold mb-1">실시간 번역 서비스</p>
-                    <p className="text-xs text-gray-500">현재 준비 중입니다</p>
-                  </div>
+                  {badgeConfig?.translationUrl ? (
+                    <a href={badgeConfig.translationUrl} target="_blank" rel="noopener noreferrer" className="block w-full">
+                      <div className="bg-blue-50 rounded-2xl py-12 px-4 border border-blue-200 text-center hover:bg-blue-100 transition-colors cursor-pointer shadow-sm">
+                        <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 relative overflow-hidden">
+                          <Languages className="w-8 h-8 relative z-10" />
+                          <span className="absolute inset-0 bg-blue-400 opacity-20 animate-ping rounded-full" />
+                        </div>
+                        <p className="text-sm text-blue-900 font-bold mb-1">실시간 번역 서비스 연결</p>
+                        <p className="text-xs text-blue-600">클릭하면 번역 서비스로 이동합니다</p>
+                      </div>
+                    </a>
+                  ) : (
+                    <div className="bg-gray-50 rounded-2xl py-12 px-4 border border-dashed border-gray-300 text-center">
+                      <Languages className="w-10 h-10 text-gray-300 mx-auto mb-4" />
+                      <p className="text-sm text-gray-900 font-bold mb-1">실시간 번역 서비스</p>
+                      <p className="text-xs text-gray-500">현재 준비 중입니다</p>
+                    </div>
+                  )}
                 </TabsContent>
               </Tabs>
             </div>

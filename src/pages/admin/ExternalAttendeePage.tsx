@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useConference } from '../../hooks/useConference';
 import { useAuth } from '../../hooks/useAuth';
@@ -14,7 +14,7 @@ import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { UserPlus, Upload, Download, FileText, Badge, CheckCircle2, Trash2, Loader2, Eye, EyeOff, Copy, MessageCircle, RefreshCw, ExternalLink, AlertCircle, CheckSquare, Square } from 'lucide-react';
+import { UserPlus, Upload, Download, FileText, Badge, CheckCircle2, Trash2, Loader2, Eye, EyeOff, Copy, MessageCircle, RefreshCw, ExternalLink, AlertCircle, CheckSquare, Square, KeyRound } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ExternalAttendee } from '../../types/schema';
 import { useBixolon } from '../../hooks/useBixolon';
@@ -348,7 +348,8 @@ const ExternalAttendeePage: React.FC = () => {
             phone: data.phone,
             organization: data.organization,
             licenseNumber: data.licenseNumber || '',
-            password: data.password || undefined, // Store password for Firebase Auth creation
+            // Firestore는 undefined 값 저장 불가 → password가 있을 때만 필드 포함
+            ...(data.password ? { password: data.password } : {}),
             paymentStatus: 'PAID' as const,
             paymentMethod: 'ADMIN_FREE' as const,
             amount: data.amount || 0,
@@ -489,7 +490,7 @@ const ExternalAttendeePage: React.FC = () => {
 
         try {
             const rawData = await importFromExcel(file);
-            
+
             // Map data supporting both English and Korean headers
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const mappedData = rawData.map((row: any) => {
@@ -594,7 +595,7 @@ const ExternalAttendeePage: React.FC = () => {
                     });
 
                     // Auto-create Auth User
-                    const passwordToUse = attendee.password || (attendee.phone ? attendee.phone.slice(-4) : '123456');
+                    const passwordToUse = (attendee.password && attendee.password.length >= 6 ? attendee.password : (attendee.phone ? attendee.phone.replace(/[^0-9]/g, '').slice(-6).padStart(6, '0') : '123456'));
 
                     const functions = getFunctions();
                     const generateAuthUserFn = httpsCallable(functions, 'generateFirebaseAuthUserForExternalAttendee');
@@ -678,6 +679,10 @@ const ExternalAttendeePage: React.FC = () => {
 
     // Handle resend notification
     const handleResendNotification = async (attendee: ExternalAttendee) => {
+        if (attendee.badgeIssued) {
+            toast.error("이미 명찰이 발급되었습니다.");
+            return;
+        }
         if (!confirm(`${attendee.name} 님에게 바우처 알림톡을 재발송하시겠습니까?`)) return;
         if (!confId) return;
 
@@ -705,9 +710,16 @@ const ExternalAttendeePage: React.FC = () => {
 
     // Handle bulk resend notifications
     const handleBulkResendNotification = async (mode: 'selected' | 'all') => {
-        const targetAttendees = mode === 'selected'
+        let targetAttendees = mode === 'selected'
             ? externalAttendees.filter(a => selectedIds.includes(a.id))
             : externalAttendees;
+
+        const originalCount = targetAttendees.length;
+        targetAttendees = targetAttendees.filter(a => !a.badgeIssued);
+
+        if (originalCount > targetAttendees.length) {
+            toast.error(`이미 명찰이 발급된 ${originalCount - targetAttendees.length}명은 제외되었습니다.`, { duration: 4000 });
+        }
 
         if (targetAttendees.length === 0) {
             toast.error('발송할 대상을 선택해주세요.');
@@ -767,12 +779,12 @@ const ExternalAttendeePage: React.FC = () => {
 
     // Handle create account manually
     const handleCreateAccount = async (attendee: ExternalAttendee) => {
-        if (!confirm(`${attendee.name} 님의 회원 계정을 생성하시겠습니까?\n(비밀번호가 없으면 전화번호 뒷 4자리가 사용됩니다)`)) return;
+        if (!confirm(`${attendee.name} 님의 회원 계정을 생성하시겠습니까?\n(비밀번호가 없으면 전화번호 뒷 6자리가 사용됩니다)`)) return;
         if (!confId) return;
 
         setIsProcessing(true);
         try {
-            const passwordToUse = attendee.password || (attendee.phone ? attendee.phone.slice(-4) : '123456');
+            const passwordToUse = (attendee.password && attendee.password.length >= 6 ? attendee.password : (attendee.phone ? attendee.phone.replace(/[^0-9]/g, '').slice(-6).padStart(6, '0') : '123456'));
 
             const functions = getFunctions();
             const generateAuthUserFn = httpsCallable(functions, 'generateFirebaseAuthUserForExternalAttendee');
@@ -848,17 +860,28 @@ const ExternalAttendeePage: React.FC = () => {
         try {
             let badgeLayout = null;
 
+            // 1. Load Badge Layout from Settings
             if (confId) {
                 try {
                     const cfgSnap = await getDoc(doc(db, `conferences/${confId}/settings/badge_config`));
-                    if (cfgSnap.exists() && cfgSnap.data().badgeLayout) {
-                        badgeLayout = cfgSnap.data().badgeLayout;
+                    if (cfgSnap.exists()) {
+                        const data = cfgSnap.data();
+                        // 인포데스크와 동일하게 badgeLayoutEnabled가 true인 경우만 DB 레이아웃 사용
+                        if (data.badgeLayoutEnabled && data.badgeLayout) {
+                            badgeLayout = {
+                                width: data.badgeLayout.width || 800,
+                                height: data.badgeLayout.height || 1200,
+                                elements: data.badgeLayout.elements || [],
+                                enableCutting: data.badgeLayout.enableCutting || false
+                            };
+                        }
                     }
                 } catch (fetchErr) {
                     console.error('[Bixolon] badge_config fetch failed:', fetchErr);
                 }
             }
 
+            // 2. Fallback to Slug if still missing (Keep original logic but fix content)
             if (!badgeLayout && slug) {
                 try {
                     const q = query(collection(db, 'conferences'), where('slug', '==', slug));
@@ -866,22 +889,35 @@ const ExternalAttendeePage: React.FC = () => {
                     if (!snap.empty) {
                         const cid = snap.docs[0].id;
                         const cfgSnap = await getDoc(doc(db, `conferences/${cid}/settings/badge_config`));
-                        if (cfgSnap.exists() && cfgSnap.data().badgeLayout) {
-                            badgeLayout = cfgSnap.data().badgeLayout;
+                        if (cfgSnap.exists()) {
+                            const data = cfgSnap.data();
+                            if (data.badgeLayoutEnabled && data.badgeLayout) {
+                                badgeLayout = {
+                                    width: data.badgeLayout.width || 800,
+                                    height: data.badgeLayout.height || 1200,
+                                    elements: data.badgeLayout.elements || [],
+                                    enableCutting: data.badgeLayout.enableCutting || false
+                                };
+                            }
                         }
                     }
                 } catch (fetchErr) {
-                    // Ignore error if slug lookup fails
                     console.debug('Failed to fetch config by slug', fetchErr);
                 }
             }
 
-            if (!badgeLayout) {
-                toast.error("배지 레이아웃이 설정되지 않았습니다. 설정이나 명찰 편집기 확인", { id: 'bixolon-print', duration: 5000 });
-                return;
-            }
+            // 3. Info Desk와 동일한 기본 레이아웃 폴백 적용 (v356 로직 동기화)
+            const activeLayout = badgeLayout || {
+                width: 800,
+                height: 1200,
+                elements: [
+                    { x: 400, y: 150, fontSize: 6, isVisible: true, type: 'QR' } as any,
+                    { x: 400, y: 450, fontSize: 4, isVisible: true, type: 'NAME' } as any,
+                    { x: 400, y: 600, fontSize: 2, isVisible: true, type: 'ORG' } as any
+                ]
+            };
 
-            const printSuccess = await printBadge(badgeLayout, {
+            const printSuccess = await printBadge(activeLayout, {
                 name: attendee.name || '',
                 org: attendee.organization || '',
                 category: '외부참석자',
@@ -931,7 +967,7 @@ const ExternalAttendeePage: React.FC = () => {
 
                 await Promise.all(chunk.map(async (attendee) => {
                     try {
-                        const passwordToUse = attendee.password || (attendee.phone ? attendee.phone.slice(-4) : '123456');
+                        const passwordToUse = (attendee.password && attendee.password.length >= 6 ? attendee.password : (attendee.phone ? attendee.phone.replace(/[^0-9]/g, '').slice(-6).padStart(6, '0') : '123456'));
                         const functions = getFunctions();
                         const generateAuthUserFn = httpsCallable(functions, 'generateFirebaseAuthUserForExternalAttendee');
 
@@ -974,6 +1010,83 @@ const ExternalAttendeePage: React.FC = () => {
         }
     };
 
+    // Handle batch password reset for attendees with short passwords (<6 chars)
+    const handleBatchResetPassword = async () => {
+        // 계정은 있지만 비밀번호가 6자 미만인 대상자 필터링
+        const targetAttendees = externalAttendees.filter(a => {
+            const hasAccount = a.authCreated || (a.userId && !a.userId.startsWith('EXT-'));
+            const hasShortPassword = a.password && a.password.length < 6;
+            return hasAccount && hasShortPassword;
+        });
+
+        if (targetAttendees.length === 0) {
+            toast('비밀번호를 재설정할 대상이 없습니다.', { icon: 'ℹ️' });
+            return;
+        }
+
+        if (!confirm(`비밀번호가 6자 미만인 ${targetAttendees.length}명의 비밀번호를 전화번호 뒤 6자리로 재설정하시겠습니까?`)) return;
+
+        setIsProcessing(true);
+        let successCount = 0;
+        let failCount = 0;
+
+        try {
+            const chunkSize = 5;
+            for (let i = 0; i < targetAttendees.length; i += chunkSize) {
+                const chunk = targetAttendees.slice(i, i + chunkSize);
+                setProgress(Math.round(((i + chunk.length) / targetAttendees.length) * 100));
+
+                await Promise.all(chunk.map(async (attendee) => {
+                    try {
+                        // 전화번호 뒤 6자리로 대체 (클라우드 함수에서도 동일 처리)
+                        const newPassword = attendee.phone
+                            ? attendee.phone.replace(/[^0-9]/g, '').slice(-6).padStart(6, '0')
+                            : '000000';
+
+                        const fns = getFunctions();
+                        const generateAuthUserFn = httpsCallable(fns, 'generateFirebaseAuthUserForExternalAttendee');
+                        const authResult = await generateAuthUserFn({
+                            confId,
+                            externalId: attendee.id,
+                            password: newPassword, // 6자리 전달 → 클라우드 함수가 updateUser 호출
+                            email: attendee.email,
+                            name: attendee.name,
+                            phone: attendee.phone,
+                            organization: attendee.organization,
+                            licenseNumber: attendee.licenseNumber
+                        }) as { data: { success: boolean; uid: string; message: string } };
+
+                        if (authResult.data.success) {
+                            // Firestore의 password 필드도 6자리로 업데이트
+                            await updateDoc(doc(db, `conferences/${confId}/external_attendees`, attendee.id), {
+                                password: newPassword,
+                                updatedAt: Timestamp.now()
+                            });
+                            successCount++;
+                        } else {
+                            failCount++;
+                        }
+                    } catch (err) {
+                        console.error(`Failed reset password for ${attendee.name}:`, err);
+                        failCount++;
+                    }
+                }));
+            }
+
+            if (failCount > 0) {
+                toast(`${successCount}명 재설정 완료, ${failCount}명 실패.`, { icon: '⚠️' });
+            } else {
+                toast.success(`${successCount}명의 비밀번호가 전화번호 뒤 6자리로 재설정되었습니다.`);
+            }
+        } catch (error) {
+            console.error('Batch reset failed:', error);
+            toast.error('일괄 비밀번호 재설정 중 오류가 발생했습니다.');
+        } finally {
+            setIsProcessing(false);
+            setProgress(0);
+        }
+    };
+
     // [REMOVED] handleRestoreData - 더 이상 사용하지 않는 데이터 복구 기능 제거
 
     // Handle sync participations (fix for missing My Page entries)
@@ -993,7 +1106,7 @@ const ExternalAttendeePage: React.FC = () => {
 
                 await Promise.all(chunk.map(async (attendee) => {
                     try {
-                        const passwordToUse = attendee.password || (attendee.phone ? attendee.phone.slice(-4) : '123456');
+                        const passwordToUse = (attendee.password && attendee.password.length >= 6 ? attendee.password : (attendee.phone ? attendee.phone.replace(/[^0-9]/g, '').slice(-6).padStart(6, '0') : '123456'));
                         const functions = getFunctions();
                         const generateAuthUserFn = httpsCallable(functions, 'generateFirebaseAuthUserForExternalAttendee');
 
@@ -1045,7 +1158,7 @@ const ExternalAttendeePage: React.FC = () => {
             '소속': '서울대학교',
             '면허번호': '12345',
             '등록비': 0,
-            '비밀번호': 'mypassword123 (미입력시 전화번호 뒷4자리)'
+            '비밀번호': 'mypassword123 (미입력시 전화번호 뒷 6자리)'
         }];
         exportToExcel(templateData, 'external_attendees_template', 'Template');
     };
@@ -1088,7 +1201,7 @@ const ExternalAttendeePage: React.FC = () => {
                                 </CardTitle>
                                 <CardDescription>
                                     외부 참석자를 한 명씩 수동으로 등록합니다. <br />
-                                    <span className="text-blue-600 font-semibold">* 등록 시 회원 계정이 자동으로 생성됩니다. (비밀번호 미입력 시 전화번호 뒷 4자리)</span>
+                                    <span className="text-blue-600 font-semibold">* 등록 시 회원 계정이 자동으로 생성됩니다. (비밀번호 미입력 시 전화번호 뒷 6자리)</span>
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
@@ -1164,7 +1277,7 @@ const ExternalAttendeePage: React.FC = () => {
                                                 type={showPassword ? 'text' : 'password'}
                                                 value={formData.password}
                                                 onChange={e => setFormData({ ...formData, password: e.target.value })}
-                                                placeholder="미입력 시 전화번호 뒷 4자리"
+                                                placeholder="미입력 시 전화번호 뒷 6자리"
                                             />
                                             <button
                                                 type="button"
@@ -1344,6 +1457,34 @@ const ExternalAttendeePage: React.FC = () => {
                                         {isProcessing && progress > 0 && (
                                             <div
                                                 className="absolute bottom-0 left-0 top-0 bg-blue-100 transition-all duration-300"
+                                                style={{ width: `${progress}%`, zIndex: 0 }}
+                                            />
+                                        )}
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleBatchResetPassword}
+                                        disabled={isProcessing}
+                                        className="mr-2 text-orange-600 border-orange-200 hover:bg-orange-50 relative overflow-hidden"
+                                        title="비밀번호가 6자 미만인 기존 계정의 비밀번호를 전화번호 뒤 6자리로 재설정합니다."
+                                    >
+                                        <span className="relative z-10 flex items-center">
+                                            {isProcessing && progress > 0 ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                    처리중 {progress}%
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <KeyRound className="w-4 h-4 mr-2" />
+                                                    PW 일괄 재설정
+                                                </>
+                                            )}
+                                        </span>
+                                        {isProcessing && progress > 0 && (
+                                            <div
+                                                className="absolute bottom-0 left-0 top-0 bg-orange-100 transition-all duration-300"
                                                 style={{ width: `${progress}%`, zIndex: 0 }}
                                             />
                                         )}

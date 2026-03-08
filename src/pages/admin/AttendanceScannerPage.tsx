@@ -38,6 +38,7 @@ const AttendanceScannerPage: React.FC = () => {
     });
     const inputRef = useRef<HTMLInputElement>(null);
     const [inputValue, setInputValue] = useState('');
+    const scanMemoryRef = useRef<Map<string, number>>(new Map());
 
     // Load Data
     useEffect(() => {
@@ -99,6 +100,23 @@ const AttendanceScannerPage: React.FC = () => {
     // PROCESS SCAN
     const processScan = async (code: string) => {
         if (scannerState.status === 'PROCESSING') return;
+
+        // 10초 쿨타임 검사 로직 추가 (Debounce 따닥 스캔 방지)
+        const nowMs = Date.now();
+        const lastScanMs = scanMemoryRef.current.get(code);
+        if (lastScanMs && nowMs - lastScanMs < 10000) {
+            setScannerState({
+                status: 'ERROR',
+                message: '방금 처리되었습니다. (10초 후 다시 스캔해 주세요)',
+                lastScanned: code
+            });
+            setTimeout(() => {
+                setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE', message: 'Ready' });
+                setInputValue('');
+            }, 1000);
+            return;
+        }
+
         if (!selectedZoneId) {
             setScannerState({ status: 'ERROR', message: 'No Zone Selected', lastScanned: code });
             return;
@@ -232,6 +250,9 @@ const AttendanceScannerPage: React.FC = () => {
                 userData: { name: userName, affiliation: userAffiliation }
             });
 
+            // 쿨타임 기록 갱신 (성공했을 때만 10초 막기 적용)
+            scanMemoryRef.current.set(code, Date.now());
+
         } catch (e) {
             console.error(e);
             setScannerState({
@@ -244,7 +265,7 @@ const AttendanceScannerPage: React.FC = () => {
         setTimeout(() => {
             setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE', message: 'Ready' });
             setInputValue('');
-        }, 3000); // 3s delay for readability
+        }, 1000); // 1s delay for readability and speed
     };
 
     const performCheckIn = async (id: string, zoneId: string, isExternal: boolean = false) => {
@@ -296,8 +317,9 @@ const AttendanceScannerPage: React.FC = () => {
         let boundedEnd = now;
 
         if (zoneRule && zoneRule.start && zoneRule.end && zoneRule.ruleDate) {
-            const sessionStart = new Date(`${zoneRule.ruleDate}T${zoneRule.start}:00`);
-            const sessionEnd = new Date(`${zoneRule.ruleDate}T${zoneRule.end}:00`);
+            // Force KST for session boundaries
+            const sessionStart = new Date(`${zoneRule.ruleDate}T${zoneRule.start}:00+09:00`);
+            const sessionEnd = new Date(`${zoneRule.ruleDate}T${zoneRule.end}:00+09:00`);
             boundedStart = new Date(Math.max(start.getTime(), sessionStart.getTime()));
             boundedEnd = new Date(Math.min(now.getTime(), sessionEnd.getTime()));
         }
@@ -308,8 +330,9 @@ const AttendanceScannerPage: React.FC = () => {
             if (zoneRule && Array.isArray(zoneRule.breaks)) {
                 zoneRule.breaks.forEach((brk: { start: string; end: string }) => {
                     const localDateStr = zoneRule.ruleDate;
-                    const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
-                    const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
+                    // Force KST for break boundaries
+                    const breakStart = new Date(`${localDateStr}T${brk.start}:00+09:00`);
+                    const breakEnd = new Date(`${localDateStr}T${brk.end}:00+09:00`);
                     const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());
                     const overlapEnd = Math.min(boundedEnd.getTime(), breakEnd.getTime());
                     if (overlapEnd > overlapStart) {
@@ -336,11 +359,13 @@ const AttendanceScannerPage: React.FC = () => {
             }
         }
 
+        const exitNow = Timestamp.now();
+
         const updatePayload: any = {
             attendanceStatus: 'OUTSIDE',
             currentZone: null,
-            totalMinutes: increment(finalMinutes), // 휴게 시간 차감된 값
-            lastCheckOut: Timestamp.now()
+            totalMinutes: newTotal, // Idempotent: use absolute calculated total to prevent offline queue multiplication
+            lastCheckOut: exitNow
         };
         if (zoneRule) {
             updatePayload.isCompleted = isCompleted;
@@ -348,8 +373,6 @@ const AttendanceScannerPage: React.FC = () => {
 
         const collectionName = isExternal ? 'external_attendees' : 'registrations';
         await updateDoc(doc(db, 'conferences', cid, collectionName, id), updatePayload);
-
-        const exitNow = Timestamp.now();
 
         // [1] 서브컬렉션 로그 (개인별 상세 기록)
         await addDoc(collection(db, 'conferences', cid, collectionName, id, 'logs'), {
