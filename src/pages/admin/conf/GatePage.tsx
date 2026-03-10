@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAdminStore } from '../../../store/adminStore';
-import { doc, getDoc, updateDoc, Timestamp, addDoc, collection, increment } from 'firebase/firestore';
+import { doc, getDoc, Timestamp, addDoc, collection, runTransaction } from 'firebase/firestore';
 import { db } from '../../../firebase';
-import { Loader2, ArrowLeft, AlertCircle, CheckCircle, X, Settings, Palette } from 'lucide-react';
+import { Loader2, ArrowLeft, AlertCircle, CheckCircle, X, Palette, MapPin, LogIn } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Registration } from '../../../types/schema';
+import { cn } from '../../../lib/utils';
 
 interface ScannerState {
     status: 'IDLE' | 'PROCESSING' | 'SUCCESS' | 'ERROR';
@@ -20,43 +20,21 @@ interface ScannerState {
     actionType?: 'ENTER' | 'EXIT';
 }
 
-interface DesignConfig {
-    bgImage: string | null;
-    textColor: string;
-    fontSize: 'normal' | 'large';
-}
-
 const GatePage: React.FC = () => {
     const navigate = useNavigate();
     const { cid } = useParams<{ cid: string }>();
-    const { selectedConferenceId, selectedConferenceSlug } = useAdminStore();
+    const { selectedConferenceId } = useAdminStore();
     const [loading, setLoading] = useState(true);
 
-    // Config
-    const [zones, setZones] = useState<Array<{
-        id: string; name: string; start: string; end: string;
-        goalMinutes: number; autoCheckout: boolean;
-        breaks: Array<{ label: string; start: string; end: string }>;
-        points: number;
-        ruleDate: string;
-        globalGoalMinutes: number;
-        completionMode: 'DAILY_SEPARATE' | 'CUMULATIVE';
-        cumulativeGoalMinutes: number;
-    }>>([]);
+    const [zones, setZones] = useState<any[]>([]);
     const [selectedZoneId, setSelectedZoneId] = useState<string>('');
     const [mode, setMode] = useState<'ENTER_ONLY' | 'EXIT_ONLY' | 'AUTO'>('ENTER_ONLY');
     const [conferenceTitle, setConferenceTitle] = useState('');
     const [conferenceSubtitle, setConferenceSubtitle] = useState('');
-    const [selectedDate] = useState<string>(new Date().toISOString().slice(0, 10)); // 현재 날짜 기본
 
-    // Design State
     const [showSettings, setShowSettings] = useState(false);
-    const [design, setDesign] = useState<DesignConfig>(() => {
-        const saved = localStorage.getItem('kiosk_design');
-        return saved ? JSON.parse(saved) : { bgImage: null, textColor: '#000000', fontSize: 'normal' };
-    });
+    const [design, setDesign] = useState<{ textColor: string }>({ textColor: '#000000' });
 
-    // Scanner State
     const [scannerState, setScannerState] = useState<ScannerState>({
         status: 'IDLE',
         message: 'Ready to Scan',
@@ -66,32 +44,31 @@ const GatePage: React.FC = () => {
     const [inputValue, setInputValue] = useState('');
     const scanMemoryRef = useRef<Map<string, number>>(new Map());
 
-    // Load Data
     useEffect(() => {
-        if (!selectedConferenceId) return;
+        const confId = cid || selectedConferenceId;
+        if (!confId) return;
+
         const init = async () => {
             try {
-                // 1. Conf Info
-                const confRef = doc(db, 'conferences', selectedConferenceId);
+                const confRef = doc(db, 'conferences', confId);
                 const confSnap = await getDoc(confRef);
                 if (confSnap.exists()) {
                     setConferenceTitle(confSnap.data().title?.ko || 'Conference');
                     setConferenceSubtitle(confSnap.data().subtitle || '');
                 }
 
-                // 2. Fetch ALL Zones from ALL Dates (Flattened)
-                const rulesRef = doc(db, `conferences/${selectedConferenceId}/settings/attendance`);
+                const rulesRef = doc(db, `conferences/${confId}/settings/attendance`);
                 const rulesSnap = await getDoc(rulesRef);
                 if (rulesSnap.exists()) {
                     const allRules = rulesSnap.data().rules || {};
-                    let allZones: Array<any> = [];
+                    let allZones: any[] = [];
                     Object.entries(allRules).forEach(([dateStr, rule]: [string, any]) => {
-                        if (rule.zones) {
+                        if (rule?.zones) {
                             rule.zones.forEach((z: any) => {
                                 allZones.push({
                                     ...z,
                                     ruleDate: dateStr,
-                                    globalGoalMinutes: rule.globalGoalMinutes ?? 0,
+                                    globalGoalMinutes: rule.globalGoalMinutes || 0,
                                     completionMode: rule.completionMode || 'DAILY_SEPARATE',
                                     cumulativeGoalMinutes: rule.cumulativeGoalMinutes || 0
                                 });
@@ -99,572 +76,256 @@ const GatePage: React.FC = () => {
                         }
                     });
 
-                    // Deduplicate by ID
                     const uniqueZones = Array.from(new Map(allZones.map(item => [item.id, item])).values());
                     setZones(uniqueZones);
 
-                    // Load Unified Settings [v356]
-                    let savedZoneId = '';
-                    if (cid) {
-                        const saved = localStorage.getItem(`eregi_conf_${cid}_settings`);
-                        if (saved) {
-                            try {
-                                const parsed = JSON.parse(saved);
-                                if (parsed.gate?.design) setDesign(parsed.gate.design);
-                                if (parsed.gate?.mode) setMode(parsed.gate.mode);
-                                if (parsed.gate?.zoneId) savedZoneId = parsed.gate.zoneId;
-                            } catch (e) {
-                                console.error("Failed to parse settings", e);
-                            }
+                    const key = `eregi_conf_${confId}_settings`;
+                    const saved = localStorage.getItem(key);
+                    if (saved) {
+                        try {
+                            const parsed = JSON.parse(saved);
+                            if (parsed.gate?.mode) setMode(parsed.gate.mode);
+                            if (parsed.gate?.zoneId) setSelectedZoneId(parsed.gate.zoneId);
+                        } catch (e) {
+                            console.error("Failed to parse settings", e);
                         }
                     }
 
-                    if (savedZoneId && uniqueZones.find(z => z.id === savedZoneId)) {
-                        setSelectedZoneId(savedZoneId);
-                    } else if (uniqueZones.length > 0) {
+                    if (uniqueZones.length > 0 && !selectedZoneId) {
                         setSelectedZoneId(uniqueZones[0].id);
                     }
                 }
             } catch (e) {
                 console.error(e);
-                toast.error("Failed to load scanner config");
+                toast.error("Failed to load config");
             } finally {
                 setLoading(false);
             }
         };
         init();
-
         setTimeout(() => inputRef.current?.focus(), 500);
     }, [selectedConferenceId, cid]);
 
-    // Save Unified Settings [v356]
     useEffect(() => {
-        if (!cid) return;
-        const key = `eregi_conf_${cid}_settings`;
-        try {
-            const saved = localStorage.getItem(key);
-            const parsed = saved ? JSON.parse(saved) : {};
+        const confId = cid || selectedConferenceId;
+        if (!confId) return;
+        const key = `eregi_conf_${confId}_settings`;
+        const currentSettings = { gate: { mode, zoneId: selectedZoneId } };
+        localStorage.setItem(key, JSON.stringify(currentSettings));
+    }, [mode, selectedZoneId, cid, selectedConferenceId]);
 
-            const newSettings = {
-                ...parsed,
-                gate: {
-                    design,
-                    mode,
-                    zoneId: selectedZoneId
-                }
-            };
-            localStorage.setItem(key, JSON.stringify(newSettings));
-        } catch (e) {
-            console.error("Failed to save settings", e);
-        }
-    }, [design, mode, selectedZoneId, cid]);
-
-    // Keep focus
     const handleBlur = () => {
-        if (!showSettings) {
-            setTimeout(() => inputRef.current?.focus(), 100);
-        }
+        if (!showSettings) setTimeout(() => inputRef.current?.focus(), 100);
     };
 
-    // PROCESS SCAN
     const processScan = async (code: string) => {
         if (scannerState.status === 'PROCESSING') return;
-
-        // Immediately clear input to allow next scan to be typed in by hardware
         setInputValue('');
 
-        // 10초 쿨타임 검사 로직 추가 (Debounce 따닥 스캔 방지)
         const nowMs = Date.now();
         const lastScanMs = scanMemoryRef.current.get(code);
         if (lastScanMs && nowMs - lastScanMs < 10000) {
-            setScannerState({
-                status: 'ERROR',
-                message: '방금 처리되었습니다. (10초 후 다시 스캔해 주세요)',
-                lastScanned: code
-            });
-            setTimeout(() => {
-                setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE', message: 'Ready' });
-            }, 1000);
+            setScannerState({ status: 'ERROR', message: '너무 빠릅니다. 10초 대기.', lastScanned: code });
+            setTimeout(() => setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE' }), 1000);
             return;
         }
 
-        if (!selectedZoneId) {
-            setScannerState({ status: 'ERROR', message: 'No Zone Selected', lastScanned: code });
-            return;
-        }
         const confId = cid || selectedConferenceId;
-        if (!confId) {
-            setScannerState({ status: 'ERROR', message: '입장 정보를 처리할 컨퍼런스가 선택되지 않았습니다.', lastScanned: code });
+        if (!confId || !selectedZoneId) {
+            setScannerState({ status: 'ERROR', message: '설정 미완료', lastScanned: code });
             return;
         }
 
         setScannerState({ status: 'PROCESSING', message: '확인 중...', lastScanned: code });
 
         try {
-            // Function to handle Hangul typos from Korean keyboard barcode scanners
-            const decodeKoreanTypo = (str: string) => {
-                const korToEng: Record<string, string> = {
-                    'ㅂ': 'q', 'ㅈ': 'w', 'ㄷ': 'e', 'ㄱ': 'r', 'ㅅ': 't', 'ㅛ': 'y', 'ㅕ': 'u', 'ㅑ': 'i', 'ㅐ': 'o', 'ㅔ': 'p',
-                    'ㅁ': 'a', 'ㄴ': 's', 'ㅇ': 'd', 'ㄹ': 'f', 'ㅎ': 'g', 'ㅗ': 'h', 'ㅓ': 'j', 'ㅏ': 'k', 'ㅣ': 'l',
-                    'ㅋ': 'z', 'ㅌ': 'x', 'ㅊ': 'c', 'ㅍ': 'v', 'ㅠ': 'b', 'ㅜ': 'n', 'ㅡ': 'm',
-                    'ㅃ': 'Q', 'ㅉ': 'W', 'ㄸ': 'E', 'ㄲ': 'R', 'ㅆ': 'T', 'ㅒ': 'O', 'ㅖ': 'P',
-                    // Additional common typos if needed
-                };
-                // Ensure we only keep English alphanumeric and standard prefixes
-                return str.split('').map(char => korToEng[char] || char).join('').replace(/[^a-zA-Z0-9-]/g, '');
+            const decodeTypos = (s: string) => {
+                const map: any = { 'ㅂ': 'q', 'ㅈ': 'w', 'ㄷ': 'e', 'ㄱ': 'r', 'ㅅ': 't', 'ㅛ': 'y', 'ㅕ': 'u', 'ㅑ': 'i', 'ㅐ': 'o', 'ㅔ': 'p', 'ㅁ': 'a', 'ㄴ': 's', 'ㅇ': 'd', 'ㄹ': 'f', 'ㅎ': 'g', 'ㅗ': 'h', 'ㅓ': 'j', 'ㅏ': 'k', 'ㅣ': 'l', 'ㅋ': 'z', 'ㅌ': 'x', 'ㅊ': 'c', 'ㅍ': 'v', 'ㅠ': 'b', 'ㅜ': 'n', 'ㅡ': 'm' };
+                return s.split('').map(c => map[c] || c).join('').replace(/[^a-zA-Z0-9-]/g, '');
             };
 
-            // Extract registration ID from QR code (remove BADGE- prefix if exists)
-            // Scanner might output korean chars if PC keyboard is in Hangul mode.
-            let rawCode = decodeKoreanTypo(code).trim();
-            let regId = rawCode;
+            let raw = decodeTypos(code).trim();
+            let id = raw;
+            if (raw.toUpperCase().startsWith('BADGE-')) id = raw.substring(6);
 
-            // Allow case-insensitive prefix match to be safer
-            if (rawCode.toUpperCase().startsWith('BADGE-')) {
-                regId = rawCode.substring(6);
-            } else if (rawCode.toUpperCase().startsWith('VOUCHER-')) {
-                throw new Error("등록 교환권입니다. 명찰(Badge) QR을 스캔해 주세요.");
-            }
+            const isExt = id.startsWith('EXT-');
+            const res = await processAttendance(id, selectedZoneId, isExt, mode);
 
-            // Check if external attendee (EXT- prefix)
-            const isExternalAttendee = regId.startsWith('EXT-');
-
-            let regData: any;
-            let userName: string;
-            let userAffiliation: string;
-            let currentStatus: string;
-            let currentZone: string | null;
-
-            if (isExternalAttendee) {
-                // External attendee path
-                const extRef = doc(db, `conferences/${confId}/external_attendees`, regId);
-                const extSnap = await getDoc(extRef);
-
-                if (!extSnap.exists()) {
-                    throw new Error("등록되지 않은 명찰이거나 잘못된 QR코드입니다.");
-                }
-
-                regData = extSnap.data();
-                if (regData.status !== 'PAID' && regData.paymentStatus !== 'PAID') {
-                    throw new Error("결제가 완료되지 않은 명찰입니다.");
-                }
-
-                userName = regData.name || 'Unknown';
-                userAffiliation = regData.organization || regData.email || '';
-                currentStatus = regData.attendanceStatus || 'OUTSIDE';
-                currentZone = regData.currentZone;
-            } else {
-                // Regular registration path
-                const regRef = doc(db, `conferences/${confId}/registrations`, regId);
-                const regSnap = await getDoc(regRef);
-
-                if (!regSnap.exists()) {
-                    throw new Error("등록되지 않은 명찰이거나 잘못된 QR코드입니다.");
-                }
-
-                regData = regSnap.data();
-                if (regData.status !== 'PAID' && regData.paymentStatus !== 'PAID') {
-                    throw new Error("결제가 완료되지 않은 명찰입니다.");
-                }
-                // Removed strict redundant slug check as we already queried the specific conference subcollection.
-                // Depending on data import methods, old registrations might lack the slug field.
-
-                userName = regData.userName || regData.name || regData.userInfo?.name || '';
-                userAffiliation = regData.userOrg || regData.organization || regData.affiliation || regData.userInfo?.affiliation || regData.userInfo?.organization || regData.userEmail || '';
-
-                if (!userName || userName === 'Unknown' || (!userAffiliation || userAffiliation.includes('@'))) {
-                    try {
-                        if (regData.userId && confId) {
-                            const userRef = doc(db, `conferences/${confId}/users`, regData.userId);
-                            const userSnap = await getDoc(userRef);
-                            if (userSnap.exists()) {
-                                const userData = userSnap.data();
-                                userName = userName || userData.name || 'Unknown';
-                                if (!userAffiliation || userAffiliation.includes('@')) {
-                                    userAffiliation = userData.organization || userData.affiliation || userAffiliation;
-                                }
-                            }
-                        }
-                    } catch (err) {
-                        console.error('Failed to fetch user data for fallback', err);
-                    }
-                }
-
-                if (!userName) userName = 'Unknown';
-
-                currentStatus = regData.attendanceStatus || 'OUTSIDE';
-                currentZone = regData.currentZone;
-            }
-
-            // 2. Logic Switch
-            let actionText = '';
-            let actionType: 'ENTER' | 'EXIT' = 'ENTER';
-            const currentTotalMinutes = typeof (regData as any).totalMinutes === 'number' ? (regData as any).totalMinutes : 0;
-
-            if (mode === 'ENTER_ONLY') {
-                if (currentStatus === 'INSIDE') {
-                    if (currentZone === selectedZoneId) throw new Error(`${userName}님은 이미 입장 상태입니다.`);
-                    // Auto-Switch
-                    await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee, currentTotalMinutes);
-                    await performCheckIn(regId, selectedZoneId, isExternalAttendee);
-                    actionText = 'Switch & ENTER';
-                    actionType = 'ENTER';
-                } else {
-                    await performCheckIn(regId, selectedZoneId, isExternalAttendee);
-                    actionText = '입장 완료 (ENTER)';
-                    actionType = 'ENTER';
-                }
-            }
-            else if (mode === 'EXIT_ONLY') {
-                if (currentStatus !== 'INSIDE') throw new Error(`${userName}님은 입장 기록이 없습니다.`);
-                await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee, currentTotalMinutes);
-                actionText = '퇴장 완료 (EXIT)';
-                actionType = 'EXIT';
-            }
-            else if (mode === 'AUTO') {
-                if (currentStatus === 'INSIDE') {
-                    if (currentZone !== selectedZoneId) {
-                        await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee, currentTotalMinutes);
-                        await performCheckIn(regId, selectedZoneId, isExternalAttendee);
-                        actionText = 'Zone Switched';
-                        actionType = 'ENTER';
-                    } else {
-                        await performCheckOut(regId, currentZone, regData.lastCheckIn, isExternalAttendee, currentTotalMinutes);
-                        actionText = '퇴장 완료 (EXIT)';
-                        actionType = 'EXIT';
-                    }
-                } else {
-                    await performCheckIn(regId, selectedZoneId, isExternalAttendee);
-                    actionText = '입장 완료 (ENTER)';
-                    actionType = 'ENTER';
-                }
-            }
-
-            // 쿨타임 기록 갱신 (성공했을 때만 1분 막기 적용)
             scanMemoryRef.current.set(code, Date.now());
-
-            // Success
             setScannerState({
                 status: 'SUCCESS',
-                message: actionText,
-                subMessage: userName,
-                lastScanned: regId,
-                userData: { name: userName, affiliation: userAffiliation },
-                actionType
+                message: res.actionText,
+                subMessage: res.userName,
+                lastScanned: id,
+                userData: { name: res.userName, affiliation: res.affiliation },
+                actionType: res.actionType
             });
-
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            const errorMessage = e instanceof Error ? e.message : 'Scan Failed';
-            setScannerState({
-                status: 'ERROR',
-                message: errorMessage,
-                lastScanned: code
-            });
+            setScannerState({ status: 'ERROR', message: e.message || 'Scan Failed', lastScanned: code });
+        } finally {
+            setTimeout(() => setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE' }), 1200);
         }
-
-        setTimeout(() => {
-            setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE', message: 'Ready' });
-        }, 1200); // Reduced delay for faster throughput
     };
 
-    const performCheckIn = async (id: string, zoneId: string, isExternal: boolean = false) => {
-        if (!selectedConferenceId) return;
-        const collectionPath = isExternal ? 'external_attendees' : 'registrations';
-        await updateDoc(doc(db, `conferences/${selectedConferenceId}/${collectionPath}/${id}`), {
-            attendanceStatus: 'INSIDE',
-            currentZone: zoneId,
-            lastCheckIn: Timestamp.now()
-        });
-        await addDoc(collection(db, `conferences/${selectedConferenceId}/${collectionPath}/${id}/logs`), {
-            type: 'ENTER', zoneId, timestamp: Timestamp.now(), method: 'KIOSK'
-        });
-    };
+    const processAttendance = async (id: string, targetZoneId: string, isExt: boolean, currentMode: string) => {
+        const confId = cid || selectedConferenceId;
+        const col = isExt ? 'external_attendees' : 'registrations';
+        const regRef = doc(db, `conferences/${confId}/${col}/${id}`);
 
-    const performCheckOut = async (id: string, zoneId: string | null, lastIn: { toDate: () => Date } | null | undefined, isExternal: boolean = false, currentTotalMinutes: number = 0) => {
-        if (!selectedConferenceId) return;
-        const collectionPath = isExternal ? 'external_attendees' : 'registrations';
-        const now = new Date();
-        const start = lastIn?.toDate() || now;
-        let boundedStart = start;
-        let boundedEnd = now;
-        const zoneRule = zones.find(z => z.id === zoneId);
-        let deduction = 0;
-        let diffMins = 0;
+        return await runTransaction(db, async (tx) => {
+            const snap = await tx.get(regRef);
+            if (!snap.exists()) throw new Error('Data not found');
+            const data = snap.data();
 
-        // 수강 시작/종료 시간 내로 제한 (bounded start and end)
-        if (zoneRule && zoneRule.start && zoneRule.end) {
-            const localDateStr = zoneRule.ruleDate || start.getFullYear() + "-" + String(start.getMonth() + 1).padStart(2, '0') + "-" + String(start.getDate()).padStart(2, '0');
-            const sessionStart = new Date(`${localDateStr}T${zoneRule.start}:00`);
-            const sessionEnd = new Date(`${localDateStr}T${zoneRule.end}:00`);
+            if (data.status !== 'PAID' && data.paymentStatus !== 'PAID') throw new Error("결제 미완료");
 
-            boundedStart = new Date(Math.max(start.getTime(), sessionStart.getTime()));
-            boundedEnd = new Date(Math.min(now.getTime(), sessionEnd.getTime()));
-        }
+            const name = data.userName || data.name || data.userInfo?.name || 'Unknown';
+            const aff = data.userOrg || data.organization || data.affiliation || data.userInfo?.affiliation || data.userInfo?.organization || data.userEmail || '';
+            const status = data.attendanceStatus || 'OUTSIDE';
+            const curZoneId = data.currentZone;
+            const lastIn = data.lastCheckIn?.toDate();
+            const totalMins = data.totalMinutes || 0;
 
-        if (boundedEnd > boundedStart) {
-            diffMins = Math.floor((boundedEnd.getTime() - boundedStart.getTime()) / 60000);
+            let action: 'ENTER' | 'EXIT' = 'ENTER';
+            let text = '';
+            let minsToAdd = 0;
+            const tsNow = Timestamp.now();
+            const now = new Date();
 
-            // 휴게 시간 차감 로직 추가
-            if (zoneRule && zoneRule.breaks && zoneRule.breaks.length > 0) {
-                zoneRule.breaks.forEach(brk => {
-                    const localDateStr = zoneRule.ruleDate || start.getFullYear() + "-" + String(start.getMonth() + 1).padStart(2, '0') + "-" + String(start.getDate()).padStart(2, '0');
-                    const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
-                    const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
-                    const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());
-                    const overlapEnd = Math.min(boundedEnd.getTime(), breakEnd.getTime());
-                    if (overlapEnd > overlapStart) {
-                        const overlapMins = Math.floor((overlapEnd - overlapStart) / 60000);
-                        deduction += overlapMins;
-                    }
-                });
+            if (currentMode === 'ENTER_ONLY') {
+                if (status === 'INSIDE' && curZoneId === targetZoneId) throw new Error('이미 입장 상태');
+                action = 'ENTER'; text = status === 'INSIDE' ? 'Zone Switch' : '입장 완료';
+            } else if (currentMode === 'EXIT_ONLY') {
+                if (status !== 'INSIDE') throw new Error('입장 기록 없음');
+                action = 'EXIT'; text = '퇴장 완료';
+            } else { // AUTO
+                if (status === 'INSIDE') {
+                    if (curZoneId !== targetZoneId) { action = 'ENTER'; text = 'Zone Switch'; }
+                    else { action = 'EXIT'; text = '퇴장 완료'; }
+                } else { action = 'ENTER'; text = '입장 완료'; }
             }
-        }
 
-        const finalMinutes = Math.max(0, diffMins - deduction); // 휴게 시간 차감 후 저장
-        const newTotal = currentTotalMinutes + finalMinutes;
-
-        // "수강완료" 판정 (Goal check)
-        let isCompleted = false;
-        if (zoneRule) {
-            const goal = zoneRule.completionMode === 'CUMULATIVE' && zoneRule.cumulativeGoalMinutes
-                ? zoneRule.cumulativeGoalMinutes
-                : (zoneRule.goalMinutes && zoneRule.goalMinutes > 0)
-                    ? zoneRule.goalMinutes
-                    : (zoneRule.globalGoalMinutes || 0);
-
-            if (goal > 0 && newTotal >= goal) {
-                isCompleted = true;
-            }
-        }
-
-        // Only update isCompleted if it's evaluated to true, to avoid overriding previously completed status. 
-        // If it was already completed but now evaluated to false (e.g., config changes), maybe it's fine to rely on what live page does, but let's be safe and always update it if completed. Let's just update the value to what we computed, as live page does.
-        const updatePayload: any = {
-            attendanceStatus: 'OUTSIDE',
-            currentZone: null,
-            totalMinutes: increment(finalMinutes), // 휴게 시간 차감된 값
-            lastCheckOut: Timestamp.now()
-        };
-        // Always set isCompleted if goal allows evaluation
-        if (zoneRule) {
-            updatePayload.isCompleted = isCompleted;
-        }
-
-        await updateDoc(doc(db, `conferences/${selectedConferenceId}/${collectionPath}/${id}`), updatePayload);
-
-        await addDoc(collection(db, `conferences/${selectedConferenceId}/${collectionPath}/${id}/logs`), {
-            type: 'EXIT', zoneId, timestamp: Timestamp.now(), method: 'KIOSK', rawDuration: diffMins, deduction, recognizedMinutes: finalMinutes, evaluatedCompleted: isCompleted, accumulatedTotal: newTotal
-        });
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            if (inputValue.trim()) {
-                processScan(inputValue.trim());
-            }
-        }
-    };
-
-    const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                if (ev.target?.result) {
-                    setDesign(prev => ({ ...prev, bgImage: ev.target!.result as string }));
+            if (status === 'INSIDE' && (action === 'EXIT' || text === 'Zone Switch')) {
+                const rule = zones.find(z => z.id === curZoneId);
+                let bS = lastIn || now, bE = now;
+                if (rule && rule.start && rule.end) {
+                    const ds = rule.ruleDate || bS.toISOString().split('T')[0];
+                    bS = new Date(Math.max(bS.getTime(), new Date(`${ds}T${rule.start}:00+09:00`).getTime()));
+                    bE = new Date(Math.min(now.getTime(), new Date(`${ds}T${rule.end}:00+09:00`).getTime()));
                 }
-            };
-            reader.readAsDataURL(e.target.files[0]);
-        }
+                if (bE > bS) {
+                    let diff = Math.floor((bE.getTime() - bS.getTime()) / 60000);
+                    let ded = 0;
+                    if (rule?.breaks) {
+                        rule.breaks.forEach((b: any) => {
+                            const ds = rule.ruleDate || bS.toISOString().split('T')[0];
+                            const bsS = new Date(`${ds}T${b.start}:00+09:00`), bsE = new Date(`${ds}T${b.end}:00+09:00`);
+                            const oS = Math.max(bS.getTime(), bsS.getTime()), oE = Math.min(bE.getTime(), bsE.getTime());
+                            if (oE > oS) ded += Math.floor((oE - oS) / 60000);
+                        });
+                    }
+                    minsToAdd = Math.max(0, diff - ded);
+                }
+            }
+
+            const newTotal = totalMins + minsToAdd;
+            const ruleForGoal = zones.find(z => z.id === (action === 'ENTER' ? targetZoneId : curZoneId));
+            let isComp = data.isCompleted || false;
+            if (ruleForGoal) {
+                const goal = ruleForGoal.completionMode === 'CUMULATIVE' ? ruleForGoal.cumulativeGoalMinutes : (ruleForGoal.goalMinutes || ruleForGoal.globalGoalMinutes || 0);
+                if (goal > 0 && newTotal >= goal) isComp = true;
+            }
+
+            tx.update(regRef, {
+                attendanceStatus: action === 'ENTER' ? 'INSIDE' : 'OUTSIDE',
+                currentZone: action === 'ENTER' ? targetZoneId : null,
+                totalMinutes: newTotal,
+                isCompleted: isComp,
+                [action === 'ENTER' ? 'lastCheckIn' : 'lastCheckOut']: tsNow
+            });
+
+            const logRef = doc(collection(db, `conferences/${confId}/${col}/${id}/logs`));
+            tx.set(logRef, { type: action, zoneId: action === 'ENTER' ? targetZoneId : curZoneId, timestamp: tsNow, method: 'KIOSK', recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
+
+            const accRef = doc(collection(db, `conferences/${confId}/access_logs`));
+            tx.set(accRef, { action: action === 'ENTER' ? 'ENTRY' : 'EXIT', scannedQr: data.badgeQr || id, locationId: action === 'ENTER' ? targetZoneId : curZoneId, timestamp: tsNow, method: 'KIOSK_GATE', registrationId: id, isExternal: isExt, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
+
+            return { actionText: text, actionType: action, userName: name, affiliation: aff };
+        });
     };
 
-    if (loading) return <div>Loading Kiosk...</div>;
+    const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter' && inputValue.trim()) processScan(inputValue.trim()); };
 
-    const getModeColor = () => {
-        if (scannerState.status === 'SUCCESS') {
-            return scannerState.actionType === 'ENTER' ? 'bg-blue-600' : 'bg-orange-600';
-        }
-        if (mode === 'ENTER_ONLY') return 'bg-blue-600';
-        if (mode === 'EXIT_ONLY') return 'bg-red-600';
-        return 'bg-purple-600';
-    };
+    if (loading) return <div className="p-10 text-center font-bold">Loading...</div>;
 
-    const activeZoneName = zones.find(z => z.id === selectedZoneId)?.name || 'No Zone Selected';
+    const activeZone = zones.find(z => z.id === selectedZoneId);
 
     return (
-        <div
-            className="fixed inset-0 z-[99999] flex flex-col font-sans transition-colors duration-500 bg-white"
-            style={{
-                backgroundImage: design.bgImage ? `url(${design.bgImage})` : 'none',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                color: design.textColor
-            }}
-        >
-            {/* Top Admin Console (Always on top, semi-transparent) */}
-            <div className="fixed top-0 left-0 right-0 bg-black/80 text-white p-3 z-[10000] flex justify-between items-center backdrop-blur-md shadow-lg">
-                <div className="flex items-center gap-4">
-                    <select
-                        value={selectedZoneId}
-                        onChange={e => setSelectedZoneId(e.target.value)}
-                        className="bg-gray-700 border-none text-white text-sm p-2 rounded w-48"
-                    >
-                        {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
-                        {zones.length === 0 && <option>No Zones Found</option>}
-                    </select>
-
-                    <div className="flex bg-gray-700 rounded p-1">
+        <div className="fixed inset-0 z-[9999] bg-white flex flex-col font-sans overflow-hidden">
+            <div className="bg-slate-900 text-white px-6 py-3 flex justify-between items-center z-[100]">
+                <div className="flex items-center gap-6">
+                    <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="text-slate-400">
+                        <ArrowLeft className="w-4 h-4 mr-2" /> Exit
+                    </Button>
+                    <div className="flex items-center gap-2">
+                        <select value={selectedZoneId} onChange={e => setSelectedZoneId(e.target.value)} className="bg-slate-800 border-none rounded px-2 py-1 text-sm font-bold">
+                            {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex gap-1 bg-slate-800 p-1 rounded">
                         {(['ENTER_ONLY', 'EXIT_ONLY', 'AUTO'] as const).map(m => (
-                            <button
-                                key={m}
-                                onClick={() => setMode(m)}
-                                className={`px-3 py-1 rounded text-xs font-bold transition-colors ${mode === m ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
-                                    }`}
-                            >
-                                {m === 'ENTER_ONLY' ? 'IN' : m === 'EXIT_ONLY' ? 'OUT' : 'AUTO'}
-                            </button>
+                            <button key={m} onClick={() => setMode(m)} className={`px-3 py-1 rounded text-[10px] font-bold ${mode === m ? 'bg-blue-600' : 'text-slate-500'}`}>{m}</button>
                         ))}
                     </div>
                 </div>
-
-                <div className="flex gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => setShowSettings(!showSettings)} className="text-gray-300 hover:text-white hover:bg-white/10">
-                        <Palette className="w-4 h-4 mr-2" /> Style
-                    </Button>
-                    <Button variant="destructive" size="sm" onClick={() => navigate(-1)} className="text-xs">
-                        <X className="w-4 h-4 mr-1" /> Exit
-                    </Button>
-                </div>
+                <Button variant="ghost" size="sm" onClick={() => setShowSettings(!showSettings)} className="text-slate-400"><Palette className="w-4 h-4" /></Button>
             </div>
 
-            {/* Design Settings Modal */}
-            {showSettings && (
-                <div className="fixed top-16 right-4 bg-white text-black p-4 rounded-lg shadow-xl z-[10001] w-80 border border-gray-200 animate-in fade-in slide-in-from-top-2">
-                    <h3 className="font-bold mb-4 flex items-center gap-2">
-                        <Settings className="w-4 h-4" /> Kiosk Design
-                    </h3>
+            <div className="flex-1 flex flex-col items-center justify-center p-8 relative">
+                <div className="text-center mb-10 z-10">
+                    <h1 className="text-4xl font-black text-slate-900 mb-2">{conferenceTitle}</h1>
+                    <p className="text-slate-500 text-xl">{conferenceSubtitle}</p>
+                    <div className="mt-4 inline-flex items-center gap-2 bg-slate-100 px-4 py-1 rounded-full text-slate-600 font-bold"><MapPin className="w-4 h-4" /> {activeZone?.name}</div>
+                </div>
 
-                    <div className="space-y-4">
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 block mb-1">Background Image</label>
-                            <input type="file" accept="image/*" onChange={handleBgUpload} className="text-sm w-full" />
-                            {design.bgImage && (
-                                <Button variant="outline" size="sm" className="mt-2 w-full text-xs" onClick={() => setDesign(prev => ({ ...prev, bgImage: null }))}>
-                                    Clear Image
-                                </Button>
-                            )}
+                <div className="w-full max-w-2xl bg-white rounded-[40px] shadow-2xl border border-slate-100 overflow-hidden z-10">
+                    <div className="p-16 flex flex-col items-center">
+                        <div className="mb-10 p-8 rounded-full bg-slate-50">
+                            {scannerState.status === 'IDLE' && <LogIn className="w-16 h-16 text-slate-200" />}
+                            {scannerState.status === 'PROCESSING' && <Loader2 className="w-16 h-16 animate-spin text-blue-500" />}
+                            {scannerState.status === 'SUCCESS' && <CheckCircle className="w-16 h-16 text-green-500" />}
+                            {scannerState.status === 'ERROR' && <AlertCircle className="w-16 h-16 text-red-500" />}
                         </div>
+                        <h2 className={cn("text-5xl font-black mb-4", scannerState.status === 'ERROR' ? "text-red-600" : scannerState.status === 'SUCCESS' ? "text-green-600" : "text-slate-900")}>
+                            {scannerState.message}
+                        </h2>
+                        {scannerState.subMessage && <p className="text-3xl font-bold text-slate-700">{scannerState.subMessage}</p>}
+                        {scannerState.userData && <p className="text-xl text-slate-400 font-medium mt-2">{scannerState.userData.affiliation}</p>}
+                    </div>
+                </div>
 
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 block mb-1">Text Color</label>
-                            <div className="flex gap-2">
-                                <input
-                                    type="color"
-                                    value={design.textColor}
-                                    onChange={(e) => setDesign(prev => ({ ...prev, textColor: e.target.value }))}
-                                    className="h-8 w-16 p-0 border-0"
-                                />
-                                <div className="flex-1 flex gap-1">
-                                    <button onClick={() => setDesign(prev => ({ ...prev, textColor: '#000000' }))} className="w-8 h-8 bg-black rounded-full border border-gray-200" />
-                                    <button onClick={() => setDesign(prev => ({ ...prev, textColor: '#ffffff' }))} className="w-8 h-8 bg-white rounded-full border border-gray-200" />
-                                </div>
+                <div className="mt-12 flex items-center gap-2 text-slate-300 font-bold uppercase tracking-widest animate-pulse">
+                    Scan QR
+                </div>
+
+                <input ref={inputRef} value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={handleKeyDown} onBlur={handleBlur} className="absolute opacity-0 pointer-events-none" autoFocus />
+            </div>
+
+            {showSettings && (
+                <div className="fixed inset-0 z-[200] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-6">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8">
+                        <h3 className="font-black text-xl mb-6">Settings</h3>
+                        <div className="space-y-6">
+                            <div>
+                                <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Text Color</label>
+                                <input type="color" value={design.textColor} onChange={e => setDesign(p => ({ ...p, textColor: e.target.value }))} className="w-full h-10 p-1 rounded border-none" />
                             </div>
+                            <Button className="w-full font-bold" onClick={() => setShowSettings(false)}>Close</Button>
                         </div>
                     </div>
                 </div>
             )}
-
-            {/* Main Content Area */}
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative mt-16">
-
-                {/* Header */}
-                <div className="mb-12 drop-shadow-lg">
-                    <h1 className="text-5xl md:text-7xl font-bold mb-4 tracking-tight" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
-                        {conferenceTitle}
-                    </h1>
-                    <p className="text-2xl md:text-3xl opacity-90 font-light">{conferenceSubtitle}</p>
-
-                    {/* Zone Badge */}
-                    <div className="mt-6 inline-block bg-white/20 backdrop-blur-md border border-white/30 px-6 py-2 rounded-full text-xl font-bold shadow-sm">
-                        📍 {activeZoneName}
-                    </div>
-                </div>
-
-                {/* Main Instruction Card */}
-                <div className={`p-10 rounded-3xl w-full max-w-3xl shadow-2xl backdrop-blur-sm border transition-all duration-500 ${design.bgImage ? 'bg-black/40 border-white/20 text-white' :
-                    mode === 'ENTER_ONLY' ? 'bg-blue-50 border-blue-200 text-blue-900' :
-                        mode === 'EXIT_ONLY' ? 'bg-red-50 border-red-200 text-red-900' :
-                            'bg-purple-50 border-purple-200 text-purple-900'
-                    }`}>
-                    <h2 className="text-5xl font-black mb-6">
-                        {mode === 'ENTER_ONLY' && '입장 모드 (CHECK-IN)'}
-                        {mode === 'EXIT_ONLY' && '퇴장 모드 (CHECK-OUT)'}
-                        {mode === 'AUTO' && '자동 모드 (AUTO)'}
-                    </h2>
-
-                    <p className="opacity-80 mb-8 text-2xl font-medium">
-                        명찰의 QR코드를 스캐너에 인식시켜주세요.
-                        <br />(Please scan your QR code)
-                    </p>
-
-                    <div className="animate-pulse mt-8">
-                        <ArrowLeft className="w-12 h-12 mx-auto rotate-[-90deg] opacity-50" />
-                    </div>
-                </div>
-
-                {/* Processing Indicator */}
-                {scannerState.status === 'PROCESSING' && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-[50000] backdrop-blur-sm">
-                        <div className="bg-white p-8 rounded-2xl flex flex-col items-center">
-                            <Loader2 className="w-16 h-16 animate-spin text-blue-600 mb-4" />
-                            <p className="text-xl font-bold text-gray-800">Processing...</p>
-                        </div>
-                    </div>
-                )}
-
-                {/* Result Overlay (Success/Error) */}
-                {(scannerState.status === 'SUCCESS' || scannerState.status === 'ERROR') && (
-                    <div className={`absolute inset-0 z-[60000] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200 ${scannerState.status === 'SUCCESS' ? getModeColor() : 'bg-red-600'
-                        } text-white`}>
-                        {scannerState.status === 'SUCCESS' ? (
-                            <div className="flex flex-col items-center">
-                                <CheckCircle className="w-40 h-40 mb-4 drop-shadow-lg" />
-                                <div className="text-4xl font-black uppercase tracking-widest opacity-80 mb-4">
-                                    {scannerState.actionType === 'ENTER' ? 'Check-In Success' : 'Check-Out Success'}
-                                </div>
-                            </div>
-                        ) : (
-                            <AlertCircle className="w-40 h-40 mb-8 drop-shadow-lg" />
-                        )}
-
-                        <h2 className="text-6xl font-black mb-4 drop-shadow-md">{scannerState.message}</h2>
-
-                        {scannerState.userData && (
-                            <div className="mt-12 text-center bg-white/10 p-12 rounded-3xl backdrop-blur-md border border-white/20 w-full max-w-4xl shadow-2xl">
-                                <div className="text-7xl font-black mb-6 tracking-tight">{scannerState.userData.name}</div>
-                                <div className="text-4xl opacity-90 font-light">{scannerState.userData.affiliation}</div>
-                            </div>
-                        )}
-
-                        {scannerState.status === 'ERROR' && (
-                            <div className="mt-6 text-3xl opacity-90 font-medium bg-black/20 px-8 py-4 rounded-xl">
-                                {scannerState.message}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Hidden Input */}
-                <input
-                    ref={inputRef}
-                    value={inputValue}
-                    onChange={e => setInputValue(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    onBlur={handleBlur}
-                    className="absolute opacity-0 w-1 h-1 top-0 left-0"
-                    autoFocus
-                />
-            </div>
         </div>
     );
 };

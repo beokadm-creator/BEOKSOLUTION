@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
-import { doc, getDoc, updateDoc, Timestamp, addDoc, collection, increment, query, where, getDocs, limit, type QueryDocumentSnapshot } from 'firebase/firestore';
+import { useParams, useNavigate } from 'react-router-dom';
+import { doc, getDoc, Timestamp, addDoc, collection, runTransaction } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { Loader2, AlertCircle, CheckCircle, X } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle, X, MapPin, LogIn } from 'lucide-react';
 import { Button } from '../../components/ui/button';
-import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { cn } from '../../lib/utils';
 
 interface ScannerState {
     status: 'IDLE' | 'PROCESSING' | 'SUCCESS' | 'ERROR';
@@ -16,6 +16,7 @@ interface ScannerState {
         name: string;
         affiliation: string;
     };
+    actionType?: 'ENTER' | 'EXIT';
 }
 
 const AttendanceScannerPage: React.FC = () => {
@@ -23,14 +24,12 @@ const AttendanceScannerPage: React.FC = () => {
     const { cid } = useParams<{ cid: string }>();
     const [loading, setLoading] = useState(true);
 
-    // Config
     const [zones, setZones] = useState<any[]>([]);
     const [selectedZoneId, setSelectedZoneId] = useState<string>('');
     const [mode, setMode] = useState<'ENTER_ONLY' | 'EXIT_ONLY' | 'AUTO'>('ENTER_ONLY');
     const [conferenceTitle, setConferenceTitle] = useState('');
     const [conferenceSubtitle, setConferenceSubtitle] = useState('');
 
-    // Scanner State
     const [scannerState, setScannerState] = useState<ScannerState>({
         status: 'IDLE',
         message: 'Ready to Scan',
@@ -40,12 +39,10 @@ const AttendanceScannerPage: React.FC = () => {
     const [inputValue, setInputValue] = useState('');
     const scanMemoryRef = useRef<Map<string, number>>(new Map());
 
-    // Load Data
     useEffect(() => {
         if (!cid) return;
         const init = async () => {
             try {
-                // 1. Conf Info
                 const confRef = doc(db, 'conferences', cid);
                 const confSnap = await getDoc(confRef);
                 if (confSnap.exists()) {
@@ -53,15 +50,14 @@ const AttendanceScannerPage: React.FC = () => {
                     setConferenceSubtitle(confSnap.data().subtitle || '');
                 }
 
-                // 2. Fetch ALL Zones from ALL Dates (Flattened)
                 const rulesRef = doc(db, `conferences/${cid}/settings/attendance`);
                 const rulesSnap = await getDoc(rulesRef);
                 if (rulesSnap.exists()) {
                     const allRules = rulesSnap.data().rules || {};
-                    let allZones: unknown[] = [];
+                    let allZones: any[] = [];
                     Object.entries(allRules).forEach(([dateStr, rule]: [string, any]) => {
-                        if (rule && typeof rule === 'object' && 'zones' in rule) {
-                            (rule.zones as unknown[]).forEach((z: any) => {
+                        if (rule?.zones) {
+                            rule.zones.forEach((z: any) => {
                                 allZones.push({
                                     ...z,
                                     ruleDate: dateStr,
@@ -73,12 +69,9 @@ const AttendanceScannerPage: React.FC = () => {
                         }
                     });
 
-                    // Deduplicate by ID
-                    const uniqueZones = Array.from(new Map(allZones.map((item: unknown) => [typeof item === 'object' && item !== null && 'id' in item ? item.id : '', item])).values());
+                    const uniqueZones = Array.from(new Map(allZones.map((item: any) => [item.id, item])).values());
                     setZones(uniqueZones);
-                    if (uniqueZones.length > 0 && typeof uniqueZones[0] === 'object' && uniqueZones[0] !== null && 'id' in uniqueZones[0]) {
-                        setSelectedZoneId((uniqueZones[0] as { id: string }).id);
-                    }
+                    if (uniqueZones.length > 0) setSelectedZoneId(uniqueZones[0].id);
                 }
             } catch (e) {
                 console.error(e);
@@ -88,453 +81,193 @@ const AttendanceScannerPage: React.FC = () => {
             }
         };
         init();
-
         setTimeout(() => inputRef.current?.focus(), 500);
     }, [cid]);
 
-    // Keep focus
-    const handleBlur = () => {
-        setTimeout(() => inputRef.current?.focus(), 100);
-    };
+    const handleBlur = () => setTimeout(() => inputRef.current?.focus(), 100);
 
-    // PROCESS SCAN
     const processScan = async (code: string) => {
         if (scannerState.status === 'PROCESSING') return;
+        setInputValue('');
 
-        // 10초 쿨타임 검사 로직 추가 (Debounce 따닥 스캔 방지)
         const nowMs = Date.now();
         const lastScanMs = scanMemoryRef.current.get(code);
         if (lastScanMs && nowMs - lastScanMs < 10000) {
-            setScannerState({
-                status: 'ERROR',
-                message: '방금 처리되었습니다. (10초 후 다시 스캔해 주세요)',
-                lastScanned: code
-            });
-            setTimeout(() => {
-                setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE', message: 'Ready' });
-                setInputValue('');
-            }, 1000);
+            setScannerState({ status: 'ERROR', message: '너무 빠릅니다. (10초 대기)', lastScanned: code });
+            setTimeout(() => setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE' }), 1000);
             return;
         }
 
-        if (!selectedZoneId) {
-            setScannerState({ status: 'ERROR', message: 'No Zone Selected', lastScanned: code });
-            return;
-        }
+        if (!selectedZoneId || !cid) { setScannerState({ status: 'ERROR', message: '설정 미완료', lastScanned: code }); return; }
 
-        setScannerState({ status: 'PROCESSING', message: 'Verifying...', lastScanned: code });
+        setScannerState({ status: 'PROCESSING', message: '확인 중...', lastScanned: code });
 
         try {
-            if (!cid) {
-                console.error("Conference ID is missing.");
-                setScannerState({
-                    status: 'ERROR',
-                    message: 'Conference Not Selected (System Error)',
-                    lastScanned: code
-                });
-                return;
-            }
+            const decodeTypos = (s: string) => {
+                const map: any = { 'ㅂ': 'q', 'ㅈ': 'w', 'ㄷ': 'e', 'ㄱ': 'r', 'ㅅ': 't', 'ㅛ': 'y', 'ㅕ': 'u', 'ㅑ': 'i', 'ㅐ': 'o', 'ㅔ': 'p', 'ㅁ': 'a', 'ㄴ': 's', 'ㅇ': 'd', 'ㄹ': 'f', 'ㅎ': 'g', 'ㅗ': 'h', 'ㅓ': 'j', 'ㅏ': 'k', 'ㅣ': 'l', 'ㅋ': 'z', 'ㅌ': 'x', 'ㅊ': 'c', 'ㅍ': 'v', 'ㅠ': 'b', 'ㅜ': 'n', 'ㅡ': 'm' };
+                return s.split('').map(c => map[c] || c).join('').replace(/[^a-zA-Z0-9-]/g, '');
+            };
 
-            // === CHANGED: 명찰 QR로 조회 (badgeQr = UUID) ===
-            // 1. registrations 컬렉션에서 badgeQr 검색
-            const regQuery = query(
-                collection(db, `conferences/${cid}/registrations`),
-                where('badgeQr', '==', code),
-                limit(1)
-            );
-            const regSnap = await getDocs(regQuery);
+            let raw = decodeTypos(code).trim();
+            let id = raw;
+            if (raw.toUpperCase().startsWith('BADGE-')) id = raw.substring(6);
 
-            let regDoc: QueryDocumentSnapshot | null = null;
+            const isExt = id.startsWith('EXT-');
+            const res = await runAttendanceTransaction(id, selectedZoneId, isExt, mode);
 
-            let isExternal = false;
-            if (!regSnap.empty) {
-                regDoc = regSnap.docs[0];
-                isExternal = false;
-            } else {
-                // 2. external_attendees 컬렉션에서 badgeQr 검색
-                const extQuery = query(
-                    collection(db, `conferences/${cid}/external_attendees`),
-                    where('badgeQr', '==', code),
-                    limit(1)
-                );
-                const extSnap = await getDocs(extQuery);
-
-                if (!extSnap.empty) {
-                    regDoc = extSnap.docs[0];
-                    isExternal = true;
-                }
-            }
-
-            // 3. 명찰 QR을 찾지 못함
-            if (!regDoc) {
-                throw new Error("❌ Invalid Badge QR\n\n명찰이 발급되지 않았습니다.\n인포데스크에서 명찰 발급을 먼저 받으세요.");
-            }
-
-            const regData = regDoc.data();
-
-            // === NEW: 보안 검증 (명찰 발급 여부) ===
-            if (!regData.badgeIssued) {
-                throw new Error("❌ Badge Not Issued\n\n인포데스크에서 명찰 발급이 필요합니다.\n바우처 QR로는 입장할 수 없습니다.");
-            }
-            // === END NEW ===
-
-            if (regData.status !== 'PAID' && regData.paymentStatus !== 'PAID') {
-                throw new Error("결제가 완료되지 않은 명찰입니다.");
-            }
-
-            const regId = regDoc.id; // Use registration ID from query result
-
-            let userName = isExternal ? (regData.name || 'Unknown') : (regData.userName || regData.name || regData.userInfo?.name || 'Unknown');
-            let userAffiliation = regData.userOrg || regData.affiliation || regData.organization || regData.userInfo?.affiliation || regData.userInfo?.organization || regData.userEmail || '';
-
-            // Ensure we fetch from user doc if missing or is an email
-            if (!isExternal && (userName === 'Unknown' || !userAffiliation || userAffiliation.includes('@')) && regData.userId) {
-                try {
-                    const userRef = doc(db, `conferences/${cid}/users`, regData.userId);
-                    const userSnap = await getDoc(userRef);
-                    if (userSnap.exists()) {
-                        const userData = userSnap.data();
-                        userAffiliation = userData.organization || userData.affiliation || userAffiliation;
-                        userName = userName !== 'Unknown' ? userName : (userData.name || 'Unknown');
-                    }
-                } catch (err) {
-                    console.error("Failed to fetch user doc for affiliation fallback:", err);
-                }
-            }
-            const currentStatus = regData.attendanceStatus || 'OUTSIDE';
-            const currentZone = regData.currentZone;
-            const currentTotalMinutes = typeof regData.totalMinutes === 'number' ? regData.totalMinutes : 0;
-
-            // 2. Logic Switch
-            let action = '';
-
-            if (mode === 'ENTER_ONLY') {
-                if (currentStatus === 'INSIDE') {
-                    if (currentZone === selectedZoneId) throw new Error(`${userName}님은 이미 입장 상태입니다.`);
-                    // Auto-Switch
-                    await performCheckOut(regId, currentZone, regData.lastCheckIn, currentTotalMinutes, isExternal);
-                    await performCheckIn(regId, selectedZoneId, isExternal);
-                    action = 'Switched & Checked In';
-                } else {
-                    await performCheckIn(regId, selectedZoneId, isExternal);
-                    action = '입장 완료 (Checked In)';
-                }
-            }
-            else if (mode === 'EXIT_ONLY') {
-                if (currentStatus !== 'INSIDE') throw new Error(`${userName}님은 입장 기록이 없습니다.`);
-                await performCheckOut(regId, currentZone, regData.lastCheckIn, currentTotalMinutes, isExternal);
-                action = '퇴장 완료 (Checked Out)';
-            }
-            else if (mode === 'AUTO') {
-                if (currentStatus === 'INSIDE') {
-                    if (currentZone !== selectedZoneId) {
-                        await performCheckOut(regId, currentZone, regData.lastCheckIn, currentTotalMinutes, isExternal);
-                        await performCheckIn(regId, selectedZoneId, isExternal);
-                        action = 'Zone Switched';
-                    } else {
-                        await performCheckOut(regId, currentZone, regData.lastCheckIn, currentTotalMinutes, isExternal);
-                        action = '퇴장 완료 (Checked Out)';
-                    }
-                } else {
-                    await performCheckIn(regId, selectedZoneId, isExternal);
-                    action = '입장 완료 (Checked In)';
-                }
-            }
-
-            // Success
+            scanMemoryRef.current.set(code, Date.now());
             setScannerState({
                 status: 'SUCCESS',
-                message: action,
-                subMessage: userName,
-                lastScanned: code,
-                userData: { name: userName, affiliation: userAffiliation }
+                message: res.actionText,
+                subMessage: res.userName,
+                lastScanned: id,
+                userData: { name: res.userName, affiliation: res.affiliation },
+                actionType: res.actionType
             });
-
-            // 쿨타임 기록 갱신 (성공했을 때만 10초 막기 적용)
-            scanMemoryRef.current.set(code, Date.now());
-
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            setScannerState({
-                status: 'ERROR',
-                message: e instanceof Error ? e.message : 'Scan Failed',
-                lastScanned: code
-            });
-        }
-
-        setTimeout(() => {
-            setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE', message: 'Ready' });
-            setInputValue('');
-        }, 1000); // 1s delay for readability and speed
-    };
-
-    const performCheckIn = async (id: string, zoneId: string, isExternal: boolean = false) => {
-        if (!cid) return;
-        const collectionName = isExternal ? 'external_attendees' : 'registrations';
-        const now = Timestamp.now();
-
-        // 등록자 상태 업데이트
-        await updateDoc(doc(db, 'conferences', cid, collectionName, id), {
-            attendanceStatus: 'INSIDE',
-            currentZone: zoneId,
-            lastCheckIn: now
-        });
-
-        // [1] 서브컬렉션 로그 (개인별 상세 기록)
-        await addDoc(collection(db, 'conferences', cid, collectionName, id, 'logs'), {
-            type: 'ENTER', zoneId, timestamp: now, method: 'KIOSK'
-        });
-
-        // [2] 루트 access_logs (StatisticsPage / 전체 통계용)
-        // scannedQr = badgeQr 값을 사용해야 하므로 등록자 데이터에서 조회
-        try {
-            const regRef = doc(db, 'conferences', cid, collectionName, id);
-            const regSnap = await getDoc(regRef);
-            const badgeQr = regSnap.data()?.badgeQr || id;
-            await addDoc(collection(db, `conferences/${cid}/access_logs`), {
-                action: 'ENTRY',
-                scannedQr: badgeQr,
-                locationId: zoneId,
-                timestamp: now,
-                method: 'KIOSK',
-                registrationId: id,
-                isExternal,
-            });
-        } catch (e) {
-            console.warn('[AccessLog] Failed to write root access_log on ENTRY:', e);
+            setScannerState({ status: 'ERROR', message: e.message || 'Error', lastScanned: code });
+        } finally {
+            setTimeout(() => setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE' }), 1200);
         }
     };
 
-    const performCheckOut = async (id: string, zoneId: string | null, lastIn: unknown, currentTotalMinutes: number = 0, isExternal: boolean = false) => {
-        if (!cid) return;
-        const now = new Date();
-        const start = lastIn && typeof lastIn === 'object' && 'toDate' in lastIn ? (lastIn as { toDate: () => Date }).toDate() : now;
-        const zoneRule = zones.find(z => typeof z === 'object' && z !== null && 'id' in z && (z as { id: string }).id === zoneId) as any;
+    const runAttendanceTransaction = async (id: string, targetZoneId: string, isExt: boolean, curMode: string) => {
+        const col = isExt ? 'external_attendees' : 'registrations';
+        const regRef = doc(db, `conferences/${cid}/${col}/${id}`);
 
-        let durationMinutes = 0;
-        let deduction = 0;
-        let boundedStart = start;
-        let boundedEnd = now;
+        return await runTransaction(db, async (tx) => {
+            const snap = await tx.get(regRef);
+            if (!snap.exists()) throw new Error('Data not found');
+            const data = snap.data();
 
-        if (zoneRule && zoneRule.start && zoneRule.end && zoneRule.ruleDate) {
-            // Force KST for session boundaries
-            const sessionStart = new Date(`${zoneRule.ruleDate}T${zoneRule.start}:00+09:00`);
-            const sessionEnd = new Date(`${zoneRule.ruleDate}T${zoneRule.end}:00+09:00`);
-            boundedStart = new Date(Math.max(start.getTime(), sessionStart.getTime()));
-            boundedEnd = new Date(Math.min(now.getTime(), sessionEnd.getTime()));
-        }
+            if (data.status !== 'PAID' && data.paymentStatus !== 'PAID') throw new Error('결제 미완료');
 
-        if (boundedEnd > boundedStart) {
-            durationMinutes = Math.floor((boundedEnd.getTime() - boundedStart.getTime()) / 60000);
+            const name = data.userName || data.name || data.userInfo?.name || 'Unknown';
+            const aff = data.userOrg || data.organization || data.affiliation || data.userInfo?.affiliation || data.userInfo?.organization || data.userEmail || '';
+            const status = data.attendanceStatus || 'OUTSIDE';
+            const curZoneId = data.currentZone;
+            const lastIn = data.lastCheckIn?.toDate();
+            const totalMins = data.totalMinutes || 0;
 
-            if (zoneRule && Array.isArray(zoneRule.breaks)) {
-                zoneRule.breaks.forEach((brk: { start: string; end: string }) => {
-                    const localDateStr = zoneRule.ruleDate;
-                    // Force KST for break boundaries
-                    const breakStart = new Date(`${localDateStr}T${brk.start}:00+09:00`);
-                    const breakEnd = new Date(`${localDateStr}T${brk.end}:00+09:00`);
-                    const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());
-                    const overlapEnd = Math.min(boundedEnd.getTime(), breakEnd.getTime());
-                    if (overlapEnd > overlapStart) {
-                        deduction += Math.floor((overlapEnd - overlapStart) / 60000);
+            let action: 'ENTER' | 'EXIT' = 'ENTER';
+            let actionText = '';
+            let minsToAdd = 0;
+            const tsNow = Timestamp.now();
+            const now = new Date();
+
+            if (curMode === 'ENTER_ONLY') {
+                if (status === 'INSIDE' && curZoneId === targetZoneId) throw new Error('이미 입장 상태');
+                action = 'ENTER'; actionText = status === 'INSIDE' ? 'Zone Switch' : '입장 완료';
+            } else if (curMode === 'EXIT_ONLY') {
+                if (status !== 'INSIDE') throw new Error('입장 기록 없음');
+                action = 'EXIT'; actionText = '퇴장 완료';
+            } else { // AUTO
+                if (status === 'INSIDE') {
+                    if (curZoneId !== targetZoneId) { action = 'ENTER'; actionText = 'Zone Switch'; }
+                    else { action = 'EXIT'; actionText = '퇴장 완료'; }
+                } else { action = 'ENTER'; actionText = '입장 완료'; }
+            }
+
+            if (status === 'INSIDE' && (action === 'EXIT' || actionText === 'Zone Switch')) {
+                const rule = zones.find(z => z.id === curZoneId);
+                let bS = lastIn || now, bE = now;
+                if (rule && rule.start && rule.end) {
+                    const ds = rule.ruleDate || bS.toISOString().split('T')[0];
+                    bS = new Date(Math.max(bS.getTime(), new Date(`${ds}T${rule.start}:00+09:00`).getTime()));
+                    bE = new Date(Math.min(now.getTime(), new Date(`${ds}T${rule.end}:00+09:00`).getTime()));
+                }
+                if (bE > bS) {
+                    let diff = Math.floor((bE.getTime() - bS.getTime()) / 60000);
+                    let ded = 0;
+                    if (rule?.breaks) {
+                        rule.breaks.forEach((b: any) => {
+                            const ds = rule.ruleDate || bS.toISOString().split('T')[0];
+                            const bsS = new Date(`${ds}T${b.start}:00+09:00`), bsE = new Date(`${ds}T${b.end}:00+09:00`);
+                            const oS = Math.max(bS.getTime(), bsS.getTime()), oE = Math.min(bE.getTime(), bsE.getTime());
+                            if (oE > oS) ded += Math.floor((oE - oS) / 60000);
+                        });
                     }
-                });
+                    minsToAdd = Math.max(0, diff - ded);
+                }
             }
-        }
 
-        const finalMinutes = Math.max(0, durationMinutes - deduction); // 휴게 시간 차감 후 저장
-        const newTotal = currentTotalMinutes + finalMinutes;
-
-        // "수강완료" 판정 (Goal check)
-        let isCompleted = false;
-        if (zoneRule) {
-            const goal = zoneRule.completionMode === 'CUMULATIVE' && zoneRule.cumulativeGoalMinutes
-                ? zoneRule.cumulativeGoalMinutes
-                : (zoneRule.goalMinutes && zoneRule.goalMinutes > 0)
-                    ? zoneRule.goalMinutes
-                    : (zoneRule.globalGoalMinutes || 0);
-
-            if (goal > 0 && newTotal >= goal) {
-                isCompleted = true;
+            const newTotal = totalMins + minsToAdd;
+            const ruleForGoal = zones.find(z => z.id === (action === 'ENTER' ? targetZoneId : curZoneId));
+            let isComp = data.isCompleted || false;
+            if (ruleForGoal) {
+                const goal = ruleForGoal.completionMode === 'CUMULATIVE' ? ruleForGoal.cumulativeGoalMinutes : (ruleForGoal.goalMinutes || ruleForGoal.globalGoalMinutes || 0);
+                if (goal > 0 && newTotal >= goal) isComp = true;
             }
-        }
 
-        const exitNow = Timestamp.now();
-
-        const updatePayload: any = {
-            attendanceStatus: 'OUTSIDE',
-            currentZone: null,
-            totalMinutes: newTotal, // Idempotent: use absolute calculated total to prevent offline queue multiplication
-            lastCheckOut: exitNow
-        };
-        if (zoneRule) {
-            updatePayload.isCompleted = isCompleted;
-        }
-
-        const collectionName = isExternal ? 'external_attendees' : 'registrations';
-        await updateDoc(doc(db, 'conferences', cid, collectionName, id), updatePayload);
-
-        // [1] 서브컬렉션 로그 (개인별 상세 기록)
-        await addDoc(collection(db, 'conferences', cid, collectionName, id, 'logs'), {
-            type: 'EXIT',
-            zoneId,
-            timestamp: exitNow,
-            method: 'KIOSK',
-            recognizedMinutes: finalMinutes,
-            evaluatedCompleted: isCompleted,
-            accumulatedTotal: newTotal,
-            rawDuration: durationMinutes,
-            deduction
-        });
-
-        // [2] 루트 access_logs (StatisticsPage / 전체 통계용)
-        try {
-            const regRef = doc(db, 'conferences', cid, collectionName, id);
-            const regSnap = await getDoc(regRef);
-            const badgeQr = regSnap.data()?.badgeQr || id;
-            await addDoc(collection(db, `conferences/${cid}/access_logs`), {
-                action: 'EXIT',
-                scannedQr: badgeQr,
-                locationId: zoneId,
-                timestamp: exitNow,
-                method: 'KIOSK',
-                registrationId: id,
-                isExternal,
-                recognizedMinutes: finalMinutes,
-                accumulatedTotal: newTotal,
-                rawDuration: durationMinutes,
-                deduction,
+            tx.update(regRef, {
+                attendanceStatus: action === 'ENTER' ? 'INSIDE' : 'OUTSIDE',
+                currentZone: action === 'ENTER' ? targetZoneId : null,
+                totalMinutes: newTotal,
+                isCompleted: isComp,
+                [action === 'ENTER' ? 'lastCheckIn' : 'lastCheckOut']: tsNow
             });
-        } catch (e) {
-            console.warn('[AccessLog] Failed to write root access_log on EXIT:', e);
-        }
+
+            const logRef = doc(collection(db, `conferences/${cid}/${col}/${id}/logs`));
+            tx.set(logRef, { type: action, zoneId: action === 'ENTER' ? targetZoneId : curZoneId, timestamp: tsNow, method: 'KIOSK', recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
+
+            const accRef = doc(collection(db, `conferences/${cid}/access_logs`));
+            tx.set(accRef, { action: action === 'ENTER' ? 'ENTRY' : 'EXIT', scannedQr: data.badgeQr || id, locationId: action === 'ENTER' ? targetZoneId : curZoneId, timestamp: tsNow, method: 'KIOSK_DESK', registrationId: id, isExternal: isExt, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
+
+            return { actionText, actionType: action, userName: name, affiliation: aff };
+        });
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            if (inputValue.trim()) {
-                processScan(inputValue.trim());
-            }
-        }
-    };
+    const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter' && inputValue.trim()) processScan(inputValue.trim()); };
 
-    if (loading) return <div>Loading Kiosk...</div>;
-
-    const getModeColor = () => {
-        if (mode === 'ENTER_ONLY') return 'bg-blue-600';
-        if (mode === 'EXIT_ONLY') return 'bg-red-600';
-        return 'bg-purple-600';
-    };
+    if (loading) return <div className="p-20 text-center font-bold animate-pulse">Initializing Kiosk...</div>;
 
     return (
         <div className="fixed inset-0 z-[9999] bg-white flex flex-col font-sans">
-            {/* Top Control Bar (Admin Only) */}
-            <div className="bg-gray-100 p-2 flex justify-between items-center border-b">
-                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="text-gray-500">
-                    <X className="w-4 h-4 mr-1" /> Exit Kiosk
-                </Button>
-                <div className="flex gap-2">
-                    <select
-                        value={selectedZoneId}
-                        onChange={e => setSelectedZoneId(e.target.value)}
-                        className="text-sm border rounded p-1"
-                    >
+            <div className="bg-slate-100 p-3 flex justify-between items-center border-b shadow-sm">
+                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="text-slate-500"><X className="w-4 h-4 mr-1" /> Close</Button>
+                <div className="flex gap-4 items-center">
+                    <select value={selectedZoneId} onChange={e => setSelectedZoneId(e.target.value)} className="bg-white border rounded p-1 font-bold text-sm">
                         {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
                     </select>
+                    <div className="flex bg-white rounded p-0.5 border shadow-inner">
+                        {(['ENTER_ONLY', 'EXIT_ONLY', 'AUTO'] as const).map(m => (
+                            <button key={m} onClick={() => setMode(m)} className={`px-4 py-1 rounded text-[10px] font-black transition-all ${mode === m ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}>{m}</button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
-            {/* Main Content */}
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative">
-
-                {/* Header */}
-                <div className="mb-12">
-                    <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-2">{conferenceTitle}</h1>
-                    <p className="text-2xl text-gray-500">{conferenceSubtitle}</p>
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
+                <div className="mb-12 pointer-events-none">
+                    <h1 className="text-4xl font-black text-slate-900 mb-2">{conferenceTitle}</h1>
+                    <p className="text-slate-500 text-xl font-medium">{conferenceSubtitle}</p>
+                    <div className="mt-4 inline-flex items-center gap-2 bg-slate-100 px-4 py-1 rounded-full text-slate-600 font-bold border border-slate-200"><MapPin className="w-4 h-4" /> {zones.find(z => z.id === selectedZoneId)?.name}</div>
                 </div>
 
-                {/* Mode Display */}
-                <div className={`p-8 rounded-3xl w-full max-w-2xl shadow-2xl transition-colors duration-500 ${mode === 'ENTER_ONLY' ? 'bg-blue-50 border-4 border-blue-200' :
-                    mode === 'EXIT_ONLY' ? 'bg-red-50 border-4 border-red-200' :
-                        'bg-purple-50 border-4 border-purple-200'
-                    }`}>
-                    <h2 className={`text-4xl font-black mb-4 ${mode === 'ENTER_ONLY' ? 'text-blue-700' :
-                        mode === 'EXIT_ONLY' ? 'text-red-700' :
-                            'text-purple-700'
-                        }`}>
-                        {mode === 'ENTER_ONLY' && '입장 모드 (CHECK-IN)'}
-                        {mode === 'EXIT_ONLY' && '퇴장 모드 (CHECK-OUT)'}
-                        {mode === 'AUTO' && '자동 모드 (AUTO)'}
+                <div className={cn("mb-10 px-8 py-3 rounded-full text-white font-black tracking-widest shadow-2xl animate-pulse", mode === 'ENTER_ONLY' ? 'bg-blue-600' : mode === 'EXIT_ONLY' ? 'bg-red-600' : 'bg-purple-600')}>
+                    {mode} MODE
+                </div>
+
+                <div className="w-full max-w-2xl bg-white rounded-[50px] shadow-[0_40px_80px_rgba(0,0,0,0.1)] border border-slate-50 p-16 flex flex-col items-center">
+                    <div className="mb-10 p-10 rounded-full bg-slate-50 shadow-inner">
+                        {scannerState.status === 'IDLE' && <LogIn className="w-16 h-16 text-slate-200" />}
+                        {scannerState.status === 'PROCESSING' && <Loader2 className="w-16 h-16 animate-spin text-blue-500" />}
+                        {scannerState.status === 'SUCCESS' && <CheckCircle className="w-16 h-16 text-green-500 animate-in zoom-in duration-300" />}
+                        {scannerState.status === 'ERROR' && <AlertCircle className="w-16 h-16 text-red-500 animate-in shake-in duration-300" />}
+                    </div>
+                    <h2 className={cn("text-6xl font-black mb-6 transition-all", scannerState.status === 'ERROR' ? 'text-red-600' : scannerState.status === 'SUCCESS' ? 'text-green-600' : 'text-slate-900')}>
+                        {scannerState.message}
                     </h2>
-
-                    <p className="text-gray-500 mb-8 text-lg">
-                        명찰의 QR 코드를 스캐너에 대주세요.
-                        <br />(Please scan your QR code)
-                    </p>
-
-                    {/* Mode Toggle Buttons */}
-                    <div className="flex justify-center gap-4">
-                        {mode !== 'ENTER_ONLY' && (
-                            <Button
-                                onClick={() => setMode('ENTER_ONLY')}
-                                className="bg-white text-blue-600 border border-blue-200 hover:bg-blue-50 h-12 text-lg"
-                            >
-                                입장 모드로 변경 (Switch to Enter)
-                            </Button>
-                        )}
-                        {mode !== 'EXIT_ONLY' && (
-                            <Button
-                                onClick={() => setMode('EXIT_ONLY')}
-                                className="bg-white text-red-600 border border-red-200 hover:bg-red-50 h-12 text-lg"
-                            >
-                                퇴장 모드로 변경 (Switch to Exit)
-                            </Button>
-                        )}
-                    </div>
+                    {scannerState.subMessage && <p className="text-3xl font-bold text-slate-700">{scannerState.subMessage}</p>}
+                    {scannerState.userData && <p className="text-xl text-slate-400 mt-4 font-bold">{scannerState.userData.affiliation}</p>}
                 </div>
 
-                {/* Processing Indicator */}
-                {scannerState.status === 'PROCESSING' && (
-                    <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-40">
-                        <Loader2 className="w-24 h-24 animate-spin text-gray-400" />
-                    </div>
-                )}
+                <div className="mt-12 flex items-center gap-3 text-slate-300 font-black uppercase tracking-[0.3em]">
+                    <div className="w-2 h-2 rounded-full bg-slate-200 animate-ping" /> SCAN QR
+                </div>
 
-                {/* Result Overlay */}
-                {(scannerState.status === 'SUCCESS' || scannerState.status === 'ERROR') && (
-                    <div className={`absolute inset-0 z-50 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200 ${scannerState.status === 'SUCCESS' ? getModeColor() : 'bg-red-600'
-                        } text-white`}>
-                        {scannerState.status === 'SUCCESS' ? (
-                            <CheckCircle className="w-32 h-32 mb-8" />
-                        ) : (
-                            <AlertCircle className="w-32 h-32 mb-8" />
-                        )}
-
-                        <h2 className="text-5xl font-bold mb-4">{scannerState.message}</h2>
-
-                        {scannerState.userData && (
-                            <div className="mt-8 text-center bg-white/10 p-8 rounded-xl backdrop-blur-sm w-full max-w-3xl">
-                                <div className="text-6xl font-black mb-4">{scannerState.userData.name}</div>
-                                <div className="text-3xl opacity-90">{scannerState.userData.affiliation}</div>
-                            </div>
-                        )}
-
-                        {scannerState.status === 'ERROR' && (
-                            <div className="mt-4 text-2xl opacity-80">{scannerState.message}</div>
-                        )}
-                    </div>
-                )}
-
-                {/* Hidden Input */}
-                <input
-                    ref={inputRef}
-                    value={inputValue}
-                    onChange={e => setInputValue(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    onBlur={handleBlur}
-                    className="absolute opacity-0 w-1 h-1 top-0 left-0"
-                    autoFocus
-                />
+                <input ref={inputRef} value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={handleKeyDown} onBlur={handleBlur} className="absolute opacity-0 pointer-events-none" autoFocus />
             </div>
         </div>
     );
