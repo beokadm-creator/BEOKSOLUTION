@@ -16,14 +16,6 @@ export default function VendorPortalLayout() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Extract vendorId from URL if present
-    useEffect(() => {
-        const match = location.pathname.match(/\/partner\/([^\/]+)/);
-        if (match && match[1] !== 'login' && match[1] !== 'scanner' && match[1] !== 'profile' && match[1] !== 'staff' && match[1] !== 'notification') {
-            setActiveVendorId(match[1]);
-        }
-    }, [location.pathname]);
-
     const isCameraMode = location.pathname.includes('/scanner/camera');
 
     useEffect(() => {
@@ -44,7 +36,11 @@ export default function VendorPortalLayout() {
                 const [snap1, snap2, snap3] = await Promise.all([getDocs(vQuery1), getDocs(vQuery2), getDocs(vQuery3)]);
 
                 const combined = [...snap1.docs, ...snap2.docs, ...snap3.docs];
-                const uniqueVendors = Array.from(new Map(combined.map(d => [d.id, { id: d.id, ...d.data() }])).values());
+                // Get the actual document IDs (not Firebase Auth UIDs)
+                const uniqueVendors = combined.map(doc => ({
+                    id: doc.id,  // This is the actual Firestore document ID
+                    ...doc.data()
+                }));
 
                 if (uniqueVendors.length > 0) {
                     setVendors(uniqueVendors);
@@ -53,9 +49,11 @@ export default function VendorPortalLayout() {
                     setActiveVendorId(currentVendorId);
                     setAuthorized(true);
 
-                    // Redirect to first vendor if no vendorId in URL or if using auth UID
+                    // Redirect to first vendor if no valid vendorId in URL
                     const urlVendorId = location.pathname.match(/\/partner\/([^\/]+)/)?.[1];
-                    if (!urlVendorId || urlVendorId === 'login' || urlVendorId === 'scanner' || urlVendorId === 'profile' || urlVendorId === 'staff' || urlVendorId === 'notification') {
+                    const isValidVendorId = urlVendorId && uniqueVendors.some(v => v.id === urlVendorId);
+
+                    if (!isValidVendorId) {
                         navigate(`/partner/${uniqueVendors[0].id}`, { replace: true });
                     }
                 } else {
@@ -118,7 +116,7 @@ export default function VendorPortalLayout() {
 
                         <nav className="space-y-1 px-2">
                             <NavLink
-                                to={`/partner/${activeVendorId}`}
+                                to="/partner"
                                 end
                                 className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
                             >
@@ -127,7 +125,7 @@ export default function VendorPortalLayout() {
                             </NavLink>
 
                             <NavLink
-                                to={`/partner/${activeVendorId}/scanner`}
+                                to="/partner/scanner"
                                 className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
                             >
                                 <QrCode className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
@@ -135,7 +133,7 @@ export default function VendorPortalLayout() {
                             </NavLink>
 
                             <NavLink
-                                to={`/partner/${activeVendorId}/profile`}
+                                to="/partner/profile"
                                 className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
                             >
                                 <Settings className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
@@ -143,7 +141,7 @@ export default function VendorPortalLayout() {
                             </NavLink>
 
                             <NavLink
-                                to={`/partner/${activeVendorId}/staff`}
+                                to="/partner/staff"
                                 className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
                             >
                                 <Users className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
@@ -151,7 +149,7 @@ export default function VendorPortalLayout() {
                             </NavLink>
 
                             <NavLink
-                                to={`/partner/${activeVendorId}/notification`}
+                                to="/partner/notification"
                                 className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
                             >
                                 <Bell className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
