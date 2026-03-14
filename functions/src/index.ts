@@ -14,6 +14,7 @@ import { dailyErrorReport, weeklyPerformanceReport } from './monitoring/schedule
 import { resolveDataIntegrityAlert } from './monitoring/resolveAlert';
 // import { checkAlimTalkConfig, checkAlimTalkConfigHttp } from './alimtalk/checkConfig';
 import { scheduledAutoCheckout, manualAutoCheckout } from './attendance/autoCheckout';
+import { sendVendorAlimTalk } from './vendor/sendAlimTalk';
 
 
 export const corsHandler = cors({ origin: true });
@@ -38,6 +39,7 @@ export {
     resolveDataIntegrityAlert,
     scheduledAutoCheckout,
     manualAutoCheckout,
+    sendVendorAlimTalk,
     // healthCheck,
     // scheduledHealthCheck,
     // checkAlimTalkConfig,

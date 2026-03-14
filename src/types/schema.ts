@@ -587,7 +587,9 @@ export type NotificationEventType =
   | 'ABSTRACT_REJECTED'       // 초록 반려
   | 'PAYMENT_COMPLETE'        // 결제 완료
   | 'CHECKIN_COMPLETE'        // 체크인 완료
-  | 'DIGITAL_BADGE_ISSUED';   // 디지털 명찰 발행
+  | 'DIGITAL_BADGE_ISSUED'    // 디지털 명찰 발행
+  | 'BOOTH_VISIT'             // 부스 방문 (파트너 전용)
+  | 'GUESTBOOK_SIGN';         // 방명록 작성 (파트너 전용)
 
 /**
  * Notification channels
@@ -810,6 +812,31 @@ export const EVENT_TYPE_PRESETS: Record<NotificationEventType, EventTypeConfig> 
       { key: 'digitalBadgeQrUrl', label: '디지털 명찰 QR URL', description: '디지털 명찰 내 QR이 담긴 URL (출결 시스템 인식용, 회원별)', example: 'https://kadd.eregi.co.kr/my-badge/...' },
       { key: 'issuedAt', label: '발행 시각', description: '디지털 명찰 발행 시간', example: '2026-03-15 09:00' },
       { key: 'venue', label: '장소', description: '행사 장소', example: '서울 코엑스' }
+    ]
+  },
+  BOOTH_VISIT: {
+    type: 'BOOTH_VISIT',
+    label: { ko: '부스 방문', en: 'Booth Visit' },
+    description: { ko: '참가자가 파트너 부스를 방문했을 때', en: 'When a participant visits a partner booth' },
+    variables: [
+      { key: 'visitorName', label: '방문자 이름', description: '부스를 방문한 참가자 성명', example: '홍길동' },
+      { key: 'visitorOrg', label: '소속', description: '방문자의 소속 기관', example: '서울대학교 치의대학원' },
+      { key: 'partnerName', label: '파트너명', description: '부스를 운영하는 파트너/스폰서 이름', example: '삼성메디슨' },
+      { key: 'eventName', label: '행사명', description: '학술대회 제목', example: '제00회 학술대회' },
+      { key: 'visitTime', label: '방문 시각', description: '부스 방문 시간', example: '2026-03-15 14:30' }
+    ]
+  },
+  GUESTBOOK_SIGN: {
+    type: 'GUESTBOOK_SIGN',
+    label: { ko: '방명록 작성', en: 'Guestbook Sign' },
+    description: { ko: '참가자가 파트너 방명록에 서명했을 때', en: 'When a participant signs the guestbook' },
+    variables: [
+      { key: 'visitorName', label: '방문자 이름', description: '방명록에 서명한 참가자 성명', example: '홍길동' },
+      { key: 'visitorOrg', label: '소속', description: '서명자의 소속 기관', example: '서울대학교 치의대학원' },
+      { key: 'partnerName', label: '파트너명', description: '방명록을 운영하는 파트너/스폰서 이름', example: '삼성메디슨' },
+      { key: 'eventName', label: '행사명', description: '학술대회 제목', example: '제00회 학술대회' },
+      { key: 'signTime', label: '서명 시각', description: '방명록 서명 시간', example: '2026-03-15 14:30' },
+      { key: 'message', label: '메시지', description: '방명록에 남긴 메시지 (선택)', example: '좋은 제품이었습니다.' }
     ]
   }
 };

@@ -43,7 +43,7 @@ export interface AlimTalkResult {
  * AlimTalk Provider 인터페이스
  */
 export interface IAlimTalkProvider {
-    send(params: AlimTalkParams, societyId?: string): Promise<AlimTalkResult>;
+    send(params: AlimTalkParams, entityId?: string, entityType?: 'society' | 'vendor'): Promise<AlimTalkResult>;
     getProviderName(): string;
 }
 
@@ -56,19 +56,22 @@ class NHNProvider implements IAlimTalkProvider {
         return 'nhn';
     }
 
-    async send(params: AlimTalkParams, societyId?: string): Promise<AlimTalkResult> {
+    async send(params: AlimTalkParams, entityId?: string, entityType: 'society' | 'vendor' = 'society'): Promise<AlimTalkResult> {
         try {
             // Firestore에서 NHN Cloud 설정 가져오기
             const admin = require('firebase-admin');
             const db = admin.firestore();
 
-            if (!societyId) {
-                throw new Error('societyId is required for NHN Cloud AlimTalk');
+            if (!entityId) {
+                throw new Error('entityId is required for NHN Cloud AlimTalk');
             }
 
+            // Determine collection path based on entity type
+            const collectionPath = entityType === 'vendor' ? 'vendors' : 'societies';
+
             const infraSnap = await db
-                .collection('societies')
-                .doc(societyId)
+                .collection(collectionPath)
+                .doc(entityId)
                 .collection('settings')
                 .doc('infrastructure')
                 .get();
@@ -84,9 +87,10 @@ class NHNProvider implements IAlimTalkProvider {
             const appKey = 'Ik6GEBC22p5Qliqk';
             const secretKey = 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme';
 
-            // senderKey만 학회별로 상이 (Firestore에서 조회)
+            // senderKey만 entity별로 상이 (Firestore에서 조회)
             if (!nhnConfig?.senderKey) {
-                throw new Error('NHN Cloud senderKey not configured for this society. Please configure in Admin > Infrastructure settings.');
+                const entityName = entityType === 'vendor' ? 'partner' : 'society';
+                throw new Error(`NHN Cloud senderKey not configured for this ${entityName}. Please configure in Notification settings.`);
             }
 
             const senderKey = nhnConfig.senderKey;
@@ -166,7 +170,7 @@ export class NotificationService {
     /**
      * AlimTalk 전송
      */
-    async sendAlimTalk(params: AlimTalkParams, societyId: string): Promise<AlimTalkResult> {
+    async sendAlimTalk(params: AlimTalkParams, entityId: string, entityType: 'society' | 'vendor' = 'society'): Promise<AlimTalkResult> {
         // 전화번호 정제 (숫자만 남김)
         const cleanParams = {
             ...params,
@@ -177,12 +181,13 @@ export class NotificationService {
 
         functions.logger.info('Sending AlimTalk', {
             provider: provider.getProviderName(),
-            societyId,
+            entityId,
+            entityType,
             phone: cleanParams.phone,
             templateCode: cleanParams.templateCode,
         });
 
-        const result = await provider.send(cleanParams, societyId);
+        const result = await provider.send(cleanParams, entityId, entityType);
 
         if (result.success) {
             functions.logger.info('AlimTalk sent successfully', {
@@ -208,7 +213,7 @@ export class NotificationService {
 }
 
 // 편의 함수
-export async function sendAlimTalk(params: AlimTalkParams, societyId: string): Promise<AlimTalkResult> {
+export async function sendAlimTalk(params: AlimTalkParams, entityId: string, entityType: 'society' | 'vendor' = 'society'): Promise<AlimTalkResult> {
     const service = NotificationService.getInstance();
-    return service.sendAlimTalk(params, societyId);
+    return service.sendAlimTalk(params, entityId, entityType);
 }

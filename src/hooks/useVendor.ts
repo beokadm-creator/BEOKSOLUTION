@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { doc, getDoc, setDoc, collection, addDoc, query, where, getDocs, Timestamp, orderBy, limit, collectionGroup } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import toast from 'react-hot-toast';
-import { db, auth } from '../firebase';
+import { db, auth, functions } from '../firebase';
 import { ConferenceUser, Registration } from '../types/schema';
 import { useNavigate } from 'react-router-dom';
 
@@ -228,6 +229,65 @@ export const useVendor = (vid: string | undefined) => {
                 vendorName: vendor.name,
                 timestamp: Timestamp.now()
             });
+
+            // Send AlimTalk if consent was given
+            if (agreed && leadData.visitorPhone) {
+                try {
+                    // Fetch vendor's notification settings
+                    const infraSnap = await getDoc(doc(db, `vendors/${vendor.id}/settings/infrastructure`));
+                    const infraData = infraSnap.data();
+                    const nhnConfig = infraData?.notification?.nhnAlimTalk;
+
+                    if (nhnConfig?.enabled && nhnConfig.senderKey) {
+                        // Fetch active template for BOOTH_VISIT
+                        const templatesQuery = query(
+                            collection(db, `vendors/${vendor.id}/notification-templates`),
+                            where('eventType', '==', 'BOOTH_VISIT'),
+                            where('isActive', '==', true),
+                            limit(1)
+                        );
+                        const templatesSnap = await getDocs(templatesQuery);
+
+                        if (!templatesSnap.empty) {
+                            const template = templatesSnap.docs[0].data();
+                            const templateCode = template.channels.kakao?.kakaoTemplateCode;
+
+                            if (templateCode) {
+                                // Prepare template variables
+                                const visitorOrg = leadData.visitorOrg as string || '';
+                                const variables = {
+                                    visitorName: scanResult.user.name || 'Unknown',
+                                    visitorOrg: visitorOrg,
+                                    partnerName: vendor.name || 'Partner',
+                                    eventName: conferenceId, // You might want to fetch actual conference name
+                                    visitTime: new Date().toLocaleString('ko-KR', {
+                                        year: 'numeric',
+                                        month: '2-digit',
+                                        day: '2-digit',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    })
+                                };
+
+                                // Call Cloud Function to send AlimTalk
+                                const sendAlimTalkFn = httpsCallable(functions, 'sendVendorAlimTalk');
+                                await sendAlimTalkFn({
+                                    vendorId: vendor.id,
+                                    phone: leadData.visitorPhone as string,
+                                    templateCode: templateCode,
+                                    variables: variables
+                                });
+
+                                toast.success('알림톡을 발송했습니다.');
+                            }
+                        }
+                    }
+                } catch (alimError) {
+                    console.error('Failed to send AlimTalk:', alimError);
+                    // Don't fail the entire process if AlimTalk fails
+                    toast.error('알림톡 발송에 실패했습니다. (방문 기록은 저장됨)');
+                }
+            }
 
             setScanResult(null);
             await fetchVisits(vendor.id);

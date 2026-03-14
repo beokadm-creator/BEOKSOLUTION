@@ -58,18 +58,20 @@ class NHNProvider {
     getProviderName() {
         return 'nhn';
     }
-    async send(params, societyId) {
+    async send(params, entityId, entityType = 'society') {
         var _a, _b;
         try {
             // Firestore에서 NHN Cloud 설정 가져오기
             const admin = require('firebase-admin');
             const db = admin.firestore();
-            if (!societyId) {
-                throw new Error('societyId is required for NHN Cloud AlimTalk');
+            if (!entityId) {
+                throw new Error('entityId is required for NHN Cloud AlimTalk');
             }
+            // Determine collection path based on entity type
+            const collectionPath = entityType === 'vendor' ? 'vendors' : 'societies';
             const infraSnap = await db
-                .collection('societies')
-                .doc(societyId)
+                .collection(collectionPath)
+                .doc(entityId)
                 .collection('settings')
                 .doc('infrastructure')
                 .get();
@@ -81,9 +83,10 @@ class NHNProvider {
             // NHN Cloud 공통 설정 (모든 학회 동일)
             const appKey = 'Ik6GEBC22p5Qliqk';
             const secretKey = 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme';
-            // senderKey만 학회별로 상이 (Firestore에서 조회)
+            // senderKey만 entity별로 상이 (Firestore에서 조회)
             if (!(nhnConfig === null || nhnConfig === void 0 ? void 0 : nhnConfig.senderKey)) {
-                throw new Error('NHN Cloud senderKey not configured for this society. Please configure in Admin > Infrastructure settings.');
+                const entityName = entityType === 'vendor' ? 'partner' : 'society';
+                throw new Error(`NHN Cloud senderKey not configured for this ${entityName}. Please configure in Notification settings.`);
             }
             const senderKey = nhnConfig.senderKey;
             // NHN Cloud API 호출
@@ -152,7 +155,7 @@ class NotificationService {
     /**
      * AlimTalk 전송
      */
-    async sendAlimTalk(params, societyId) {
+    async sendAlimTalk(params, entityId, entityType = 'society') {
         // 전화번호 정제 (숫자만 남김)
         const cleanParams = {
             ...params,
@@ -161,11 +164,12 @@ class NotificationService {
         const provider = await this.getProvider();
         functions.logger.info('Sending AlimTalk', {
             provider: provider.getProviderName(),
-            societyId,
+            entityId,
+            entityType,
             phone: cleanParams.phone,
             templateCode: cleanParams.templateCode,
         });
-        const result = await provider.send(cleanParams, societyId);
+        const result = await provider.send(cleanParams, entityId, entityType);
         if (result.success) {
             functions.logger.info('AlimTalk sent successfully', {
                 provider: result.provider,
@@ -189,8 +193,8 @@ class NotificationService {
 }
 exports.NotificationService = NotificationService;
 // 편의 함수
-async function sendAlimTalk(params, societyId) {
+async function sendAlimTalk(params, entityId, entityType = 'society') {
     const service = NotificationService.getInstance();
-    return service.sendAlimTalk(params, societyId);
+    return service.sendAlimTalk(params, entityId, entityType);
 }
 //# sourceMappingURL=notificationService.js.map

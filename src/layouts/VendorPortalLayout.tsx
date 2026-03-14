@@ -5,7 +5,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { Button } from '../components/ui/button';
-import { LogOut, Building2, PanelLeftClose, PanelLeft, LayoutDashboard, QrCode, FileSpreadsheet, Settings, Users } from 'lucide-react';
+import { LogOut, Building2, PanelLeftClose, PanelLeft, LayoutDashboard, QrCode, FileSpreadsheet, Settings, Users, Bell } from 'lucide-react';
 
 export default function VendorPortalLayout() {
     const [loading, setLoading] = useState(true);
@@ -132,6 +132,14 @@ export default function VendorPortalLayout() {
                             >
                                 <Users className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
                                 {sidebarOpen && 'Staff Management'}
+                            </NavLink>
+
+                            <NavLink
+                                to="/partner/notification"
+                                className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
+                            >
+                                <Bell className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
+                                {sidebarOpen && 'Notification'}
                             </NavLink>
                         </nav>
                     </div>
