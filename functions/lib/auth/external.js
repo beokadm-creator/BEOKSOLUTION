@@ -80,22 +80,32 @@ exports.generateFirebaseAuthUserForExternalAttendee = functions
         if (!attendeeData.email || !attendeeData.password) {
             throw new functions.https.HttpsError('invalid-argument', 'Email and Password are required for Account Creation');
         }
+        // 비밀번호가 6자 미만이면 전화번호 뒤 6자리로 자동 대체 (Firebase Auth 최소 6자 요건)
+        const rawPassword = attendeeData.password || '';
+        const safePassword = rawPassword.length >= 6
+            ? rawPassword
+            : (attendeeData.phone
+                ? attendeeData.phone.replace(/[^0-9]/g, '').slice(-6).padStart(6, '0')
+                : '000000');
+        functions.logger.info(`[ExternalAuth] Using password length: ${safePassword.length} (original: ${rawPassword.length})`);
         // 1. Create or Get Auth User
         let uid = '';
         let isNew = false;
         try {
             const userRecord = await auth.getUserByEmail(attendeeData.email);
             uid = userRecord.uid;
-            functions.logger.info(`[ExternalAuth] User already exists: ${uid}`);
+            // 기존 계정이 있어도 비밀번호를 최신 값으로 업데이트
+            await auth.updateUser(uid, { password: safePassword });
+            functions.logger.info(`[ExternalAuth] User already exists & password updated: ${uid}`);
         }
         catch (e) {
             if (typeof e === 'object' && e !== null && 'code' in e && e.code === 'auth/user-not-found') {
                 // Create new user
                 const userRecord = await auth.createUser({
                     email: attendeeData.email,
-                    password: attendeeData.password,
+                    password: safePassword,
                     displayName: attendeeData.name,
-                    emailVerified: true // Auto-verify external attendees? Maybe.
+                    emailVerified: true
                 });
                 uid = userRecord.uid;
                 isNew = true;

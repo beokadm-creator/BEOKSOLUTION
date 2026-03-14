@@ -191,6 +191,8 @@ async function sendBadgeNotification(db, conference, regId, regData, token) {
                     registrationId: regId,
                     startDate: startDate,
                     venue: venueName,
+                    amount: (regData.amount || 0).toLocaleString() + '원',
+                    price: (regData.amount || 0).toLocaleString() + '원',
                 };
                 // Send (NHN AlimTalk via NotificationService)
                 const recipientPhone = regData.phone || ((_p = regData.userInfo) === null || _p === void 0 ? void 0 : _p.phone);
@@ -221,6 +223,7 @@ async function sendBadgeNotification(db, conference, regId, regData, token) {
  */
 exports.validateBadgePrepToken = functions
     .runWith({
+    minInstances: 1,
     enforceAppCheck: false,
     ingressSettings: 'ALLOW_ALL'
 })
@@ -357,7 +360,8 @@ exports.validateBadgePrepToken = functions
                 attendanceStatus: regData.attendanceStatus || 'OUTSIDE',
                 currentZone: regData.currentZone,
                 totalMinutes: regData.totalMinutes || 0,
-                receiptNumber: regData.receiptNumber
+                receiptNumber: regData.receiptNumber,
+                amount: regData.amount || 0
             }
         };
     }
@@ -471,6 +475,10 @@ exports.resendBadgePrepToken = functions
         // [FIX] External attendees are manually added by admin, so they bypass PAID check
         if (!isExternalAttendee && regData.paymentStatus !== 'PAID' && regData.status !== 'PAID') {
             throw new Error('Registration not paid');
+        }
+        // [Fix] Prevent resending token for already issued badges
+        if (regData.badgeIssued) {
+            throw new functions.https.HttpsError('failed-precondition', '이미 발급된 명찰입니다.');
         }
         // Get conference for expiry date
         const confSnap = await db.collection('conferences').doc(confId).get();
@@ -626,6 +634,9 @@ exports.bulkSendNotifications = functions
                 const regData = regSnap.data();
                 if (!isExternal && regData.paymentStatus !== 'PAID' && regData.status !== 'PAID')
                     return null;
+                // [Fix] Prevent generating token for already issued badges during bulk send
+                if (regData.badgeIssued)
+                    return null;
                 const phone = (regData.phone || ((_a = regData.userInfo) === null || _a === void 0 ? void 0 : _a.phone) || '').replace(/[^0-9]/g, '');
                 if (!phone)
                     return null;
@@ -664,6 +675,8 @@ exports.bulkSendNotifications = functions
                         registrationId: regId,
                         startDate,
                         venue: venueName,
+                        amount: (regData.amount || 0).toLocaleString() + '원',
+                        price: (regData.amount || 0).toLocaleString() + '원',
                     }
                 };
             }

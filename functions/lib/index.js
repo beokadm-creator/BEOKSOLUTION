@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.healthCheck = exports.onTossWebhook = exports.logPerformance = exports.logError = exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.confirmTossPaymentHttp = exports.confirmTossPayment = exports.confirmNicePayment = exports.prepareNicePayment = exports.resolveDataIntegrityAlert = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.bulkSendNotifications = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.corsHandler = void 0;
+exports.healthCheck = exports.onTossWebhook = exports.logPerformance = exports.logError = exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.confirmTossPaymentHttp = exports.confirmTossPayment = exports.confirmNicePayment = exports.prepareNicePayment = exports.manualAutoCheckout = exports.scheduledAutoCheckout = exports.resolveDataIntegrityAlert = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.bulkSendNotifications = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.corsHandler = void 0;
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -63,8 +63,10 @@ Object.defineProperty(exports, "dailyErrorReport", { enumerable: true, get: func
 Object.defineProperty(exports, "weeklyPerformanceReport", { enumerable: true, get: function () { return scheduledReports_1.weeklyPerformanceReport; } });
 const resolveAlert_1 = require("./monitoring/resolveAlert");
 Object.defineProperty(exports, "resolveDataIntegrityAlert", { enumerable: true, get: function () { return resolveAlert_1.resolveDataIntegrityAlert; } });
-// import { healthCheck, scheduledHealthCheck } from './health';
 // import { checkAlimTalkConfig, checkAlimTalkConfigHttp } from './alimtalk/checkConfig';
+const autoCheckout_1 = require("./attendance/autoCheckout");
+Object.defineProperty(exports, "scheduledAutoCheckout", { enumerable: true, get: function () { return autoCheckout_1.scheduledAutoCheckout; } });
+Object.defineProperty(exports, "manualAutoCheckout", { enumerable: true, get: function () { return autoCheckout_1.manualAutoCheckout; } });
 exports.corsHandler = (0, cors_1.default)({ origin: true });
 admin.initializeApp();
 // import { sendAlimTalkTest } from './alimtalk/sendTest';
@@ -799,18 +801,40 @@ exports.getNhnAlimTalkTemplates = functions
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onCall(async (data, context) => {
-    var _a, _b;
+    var _a, _b, _c;
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
-    const { senderKey } = data;
-    if (!senderKey) {
-        throw new functions.https.HttpsError('invalid-argument', 'senderKey is required');
+    const { senderKey, societyId } = data;
+    if (!senderKey || !societyId) {
+        throw new functions.https.HttpsError('invalid-argument', 'senderKey and societyId are required');
     }
     try {
-        const result = await (0, nhnAlimTalk_1.getTemplates)(senderKey);
+        // NHN Cloud 공통 설정 (모든 학회 동일)
+        const appKey = 'Ik6GEBC22p5Qliqk';
+        const secretKey = 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme';
+        // senderKey는 Firestore에서 조회 (학회별 상이)
+        const db = admin.firestore();
+        const infraSnap = await db
+            .collection('societies')
+            .doc(societyId)
+            .collection('settings')
+            .doc('infrastructure')
+            .get();
+        if (!infraSnap.exists) {
+            throw new functions.https.HttpsError('not-found', 'Infrastructure settings not found for this society');
+        }
+        const infraData = infraSnap.data();
+        const nhnConfig = (_a = infraData === null || infraData === void 0 ? void 0 : infraData.notification) === null || _a === void 0 ? void 0 : _a.nhnAlimTalk;
+        const firestoreSenderKey = nhnConfig === null || nhnConfig === void 0 ? void 0 : nhnConfig.senderKey;
+        // senderKey는 함수 파라미터 또는 Firestore 설정 사용
+        const finalSenderKey = senderKey || firestoreSenderKey;
+        if (!finalSenderKey) {
+            throw new functions.https.HttpsError('failed-precondition', 'NHN Cloud senderKey not configured. Please configure in Admin > Infrastructure settings.');
+        }
+        const result = await (0, nhnAlimTalk_1.getTemplates)({ appKey, secretKey }, finalSenderKey);
         // Filter only APPROVED templates
-        if (result.success && ((_b = (_a = result.data) === null || _a === void 0 ? void 0 : _a.templateListResponse) === null || _b === void 0 ? void 0 : _b.templates)) {
+        if (result.success && ((_c = (_b = result.data) === null || _b === void 0 ? void 0 : _b.templateListResponse) === null || _c === void 0 ? void 0 : _c.templates)) {
             const approvedTemplates = result.data.templateListResponse.templates.filter((template) => template.templateStatus === 'APR');
             functions.logger.info(`[NHN Templates] Total: ${result.data.templateListResponse.templates.length}, Approved: ${approvedTemplates.length}`);
             return {
@@ -828,6 +852,9 @@ exports.getNhnAlimTalkTemplates = functions
     }
     catch (error) {
         functions.logger.error("Error in getNhnAlimTalkTemplates:", error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
         throw new functions.https.HttpsError('internal', errorMessage);
     }
@@ -1540,27 +1567,49 @@ exports.onTossWebhook = functions
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onRequest(async (req, res) => {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f, _g;
     // Log webhook payload
     functions.logger.info(">>> [Toss Webhook] Received:", req.body);
     try {
-        const { status, orderId } = req.body;
+        let status = req.body.status;
+        let orderId = req.body.orderId;
+        let virtualAccount = req.body.virtualAccount;
+        const eventType = req.body.eventType;
+        // Handle new Toss Payments webhook format (PAYMENT_STATUS_CHANGED, etc)
+        if (eventType && req.body.data) {
+            status = req.body.data.status;
+            orderId = req.body.data.orderId;
+            virtualAccount = req.body.data.virtualAccount || virtualAccount;
+        }
         if (!status || !orderId) {
-            functions.logger.warn("[Toss Webhook] Missing status or orderId");
+            functions.logger.warn("[Toss Webhook] Missing status or orderId", { body: req.body });
             res.status(400).json({ message: "Missing required fields" });
             return;
         }
         const db = admin.firestore();
-        // Find Registration Document by orderId (using Collection Group Query)
-        // Note: orderId must be unique across all conferences
-        const regQuery = await db.collectionGroup('registrations').where('orderId', '==', orderId).limit(1).get();
-        if (regQuery.empty) {
-            functions.logger.warn(`[Toss Webhook] Registration not found for orderId: ${orderId}`);
+        // Find Registration Document by orderId
+        // [FIX-20260310] Use iterative search across conferences to avoid FAILED_PRECONDITION (missing collection group index)
+        functions.logger.info(`[Toss Webhook] Searching for orderId: ${orderId} in all conferences...`);
+        let regDoc = null;
+        // 1. Get List of all conferences
+        const conferencesSnap = await db.collection('conferences').get();
+        // 2. Iterate through each conference to find the matching registration
+        for (const confDoc of conferencesSnap.docs) {
+            const q = await confDoc.ref.collection('registrations')
+                .where('orderId', '==', orderId)
+                .limit(1)
+                .get();
+            if (!q.empty) {
+                regDoc = q.docs[0];
+                break;
+            }
+        }
+        if (!regDoc) {
+            functions.logger.warn(`[Toss Webhook] Registration not found for orderId: ${orderId} after searching all conferences.`);
             // Return 200 to acknowledge webhook (prevent retry loop) even if not found
             res.status(200).json({ message: "Registration not found" });
             return;
         }
-        const regDoc = regQuery.docs[0];
         const regData = regDoc.data();
         const regRef = regDoc.ref;
         const confId = regData.conferenceId;
@@ -1581,7 +1630,7 @@ exports.onTossWebhook = functions
                 paymentStatus: 'PAID',
                 paidAt: now,
                 updatedAt: now,
-                virtualAccount: req.body.virtualAccount || regData.virtualAccount || null
+                virtualAccount: virtualAccount || regData.virtualAccount || null
             });
             // 2. Lock Membership Code (if applicable)
             try {
@@ -1676,7 +1725,7 @@ exports.onTossWebhook = functions
                 status: 'CANCELED',
                 paymentStatus: 'CANCELED',
                 canceledAt: admin.firestore.FieldValue.serverTimestamp(),
-                cancelReason: ((_d = (_c = req.body.cancels) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.cancelReason) || 'Webhook Cancellation'
+                cancelReason: (((_e = (_d = (_c = req.body.data) === null || _c === void 0 ? void 0 : _c.cancels) === null || _d === void 0 ? void 0 : _d[0]) === null || _e === void 0 ? void 0 : _e.cancelReason) || ((_g = (_f = req.body.cancels) === null || _f === void 0 ? void 0 : _f[0]) === null || _g === void 0 ? void 0 : _g.cancelReason) || 'Webhook Cancellation')
             });
             // Add Log
             await regRef.collection('logs').add({

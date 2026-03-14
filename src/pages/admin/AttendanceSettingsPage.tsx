@@ -7,7 +7,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Card, CardContent } from '../../components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
-import { Plus, Trash2, Save, Clock, MapPin, AlertCircle, CalendarDays, Coffee, ArrowRight } from 'lucide-react';
+import { Plus, Trash2, Save, Clock, MapPin, AlertCircle, CalendarDays, Coffee, ArrowRight, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../../lib/utils';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -531,17 +531,32 @@ const AttendanceSettingsPage: React.FC = () => {
                                                         </div>
 
                                                         <div className="flex items-center justify-between pt-2">
-                                                            <div className="flex items-center gap-2">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    id={`auto-checkout-${zone.id}`}
-                                                                    checked={!!zone.autoCheckout}
-                                                                    onChange={(e) => updateZone(zone.id, 'autoCheckout', e.target.checked)}
-                                                                    className="h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
-                                                                />
-                                                                <label htmlFor={`auto-checkout-${zone.id}`} className="text-sm font-medium text-slate-700 cursor-pointer select-none">
-                                                                    자동 퇴장 처리 (Auto-Checkout)
-                                                                </label>
+                                                            <div className="flex flex-col gap-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        id={`auto-checkout-${zone.id}`}
+                                                                        checked={!!zone.autoCheckout}
+                                                                        onChange={(e) => updateZone(zone.id, 'autoCheckout', e.target.checked)}
+                                                                        className="h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                                                                    />
+                                                                    <label htmlFor={`auto-checkout-${zone.id}`} className="text-sm font-medium text-slate-700 cursor-pointer select-none">
+                                                                        자동 퇴장 처리
+                                                                    </label>
+                                                                    <div className="group relative">
+                                                                        <Info className="w-4 h-4 text-slate-400 cursor-help" />
+                                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
+                                                                            운영 종료 시간({zone.end})이 지나면 자동으로 퇴장 처리됩니다.
+                                                                            <br />
+                                                                            5분마다 스케줄러가 확인하여 처리합니다.
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                {zone.autoCheckout && (
+                                                                    <p className="text-xs text-blue-600 pl-6">
+                                                                        ⏰ {zone.end} 이후 자동 퇴장 예정
+                                                                    </p>
+                                                                )}
                                                             </div>
                                                             <Button
                                                                 variant="outline"

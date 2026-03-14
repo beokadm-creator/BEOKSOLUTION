@@ -10,36 +10,29 @@ exports.getMessageResult = getMessageResult;
 exports.getMessageList = getMessageList;
 exports.getSenderCategories = getSenderCategories;
 const axios_1 = __importDefault(require("axios"));
-/**
- * NHN Cloud AlimTalk API Configuration
- * URL: https://api-alimtalk.cloud.toast.com
- */
-const NHN_ALIMTALK_CONFIG = {
-    baseUrl: 'https://api-alimtalk.cloud.toast.com',
-    appKey: 'Ik6GEBC22p5Qliqk',
-    secretKey: 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme',
-};
+const BASE_URL = 'https://api-alimtalk.cloud.toast.com';
 /**
  * NHN Cloud API 공통 헤더 생성
  */
-function getHeaders() {
+function getHeaders(secretKey) {
     return {
         'Content-Type': 'application/json;charset=UTF-8',
-        'X-Secret-Key': NHN_ALIMTALK_CONFIG.secretKey,
+        'X-Secret-Key': secretKey,
     };
 }
 /**
  * 템플릿 목록 조회
+ * @param config - NHN Cloud 설정 (appKey, secretKey)
  * @param senderKey - 발신 프로필 키 (카카오톡 채널의 발신 프로필 키)
  * @returns Promise<TemplateListResponse>
  *
  * API 문서: https://docs.toast.com/ko/Notification/KakaoTalk%20Bizmessage/ko/alimtalk-api-guide/#_7
  */
-async function getTemplates(senderKey) {
+async function getTemplates(config, senderKey) {
     try {
-        const url = `${NHN_ALIMTALK_CONFIG.baseUrl}/alimtalk/v2.3/appkeys/${NHN_ALIMTALK_CONFIG.appKey}/senders/${senderKey}/templates`;
+        const url = `${BASE_URL}/alimtalk/v2.3/appkeys/${config.appKey}/senders/${senderKey}/templates`;
         const response = await axios_1.default.get(url, {
-            headers: getHeaders(),
+            headers: getHeaders(config.secretKey),
             params: {
             // 선택적 파라미터
             // templateCode: 'TEMPLATE001', // 특정 템플릿만 조회
@@ -64,15 +57,16 @@ async function getTemplates(senderKey) {
 }
 /**
  * 특정 템플릿 상세 조회
+ * @param config - NHN Cloud 설정 (appKey, secretKey)
  * @param senderKey - 발신 프로필 키
  * @param templateCode - 템플릿 코드
  * @returns Promise<TemplateDetailResponse>
  */
-async function getTemplateDetail(senderKey, templateCode) {
+async function getTemplateDetail(config, senderKey, templateCode) {
     try {
-        const url = `${NHN_ALIMTALK_CONFIG.baseUrl}/alimtalk/v2.3/appkeys/${NHN_ALIMTALK_CONFIG.appKey}/senders/${senderKey}/templates/${templateCode}`;
+        const url = `${BASE_URL}/alimtalk/v2.3/appkeys/${config.appKey}/senders/${senderKey}/templates/${templateCode}`;
         const response = await axios_1.default.get(url, {
-            headers: getHeaders(),
+            headers: getHeaders(config.secretKey),
         });
         return {
             success: true,
@@ -87,9 +81,9 @@ async function getTemplateDetail(senderKey, templateCode) {
         };
     }
 }
-async function sendAlimTalk(params) {
+async function sendAlimTalk(config, params) {
     try {
-        const url = `${NHN_ALIMTALK_CONFIG.baseUrl}/alimtalk/v2.3/appkeys/${NHN_ALIMTALK_CONFIG.appKey}/messages`;
+        const url = `${BASE_URL}/alimtalk/v2.3/appkeys/${config.appKey}/messages`;
         const requestBody = {
             senderKey: params.senderKey,
             templateCode: params.templateCode,
@@ -112,7 +106,7 @@ async function sendAlimTalk(params) {
             ],
         };
         const response = await axios_1.default.post(url, requestBody, {
-            headers: getHeaders(),
+            headers: getHeaders(config.secretKey),
         });
         return {
             success: true,
@@ -133,16 +127,17 @@ async function sendAlimTalk(params) {
 }
 /**
  * 발송 결과 조회
+ * @param config - NHN Cloud 설정 (appKey, secretKey)
  * @param requestId - 요청 ID (발송 시 받은 requestId)
  * @returns Promise<QueryResponse>
  *
  * API 문서: https://docs.toast.com/ko/Notification/KakaoTalk%20Bizmessage/ko/alimtalk-api-guide/#_39
  */
-async function getMessageResult(requestId) {
+async function getMessageResult(config, requestId) {
     try {
-        const url = `${NHN_ALIMTALK_CONFIG.baseUrl}/alimtalk/v2.3/appkeys/${NHN_ALIMTALK_CONFIG.appKey}/messages/${requestId}`;
+        const url = `${BASE_URL}/alimtalk/v2.3/appkeys/${config.appKey}/messages/${requestId}`;
         const response = await axios_1.default.get(url, {
-            headers: getHeaders(),
+            headers: getHeaders(config.secretKey),
         });
         return {
             success: true,
@@ -157,11 +152,11 @@ async function getMessageResult(requestId) {
         };
     }
 }
-async function getMessageList(params = {}) {
+async function getMessageList(config, params = {}) {
     try {
-        const url = `${NHN_ALIMTALK_CONFIG.baseUrl}/alimtalk/v2.3/appkeys/${NHN_ALIMTALK_CONFIG.appKey}/messages`;
+        const url = `${BASE_URL}/alimtalk/v2.3/appkeys/${config.appKey}/messages`;
         const response = await axios_1.default.get(url, {
-            headers: getHeaders(),
+            headers: getHeaders(config.secretKey),
             params: {
                 pageNum: params.pageNum || 1,
                 pageSize: params.pageSize || 15,
@@ -183,13 +178,14 @@ async function getMessageList(params = {}) {
 }
 /**
  * 발신 프로필 카테고리 조회
+ * @param config - NHN Cloud 설정 (appKey, secretKey)
  * @returns Promise<CategoryResponse>
  */
-async function getSenderCategories() {
+async function getSenderCategories(config) {
     try {
-        const url = `${NHN_ALIMTALK_CONFIG.baseUrl}/alimtalk/v2.3/appkeys/${NHN_ALIMTALK_CONFIG.appKey}/sender/categories`;
+        const url = `${BASE_URL}/alimtalk/v2.3/appkeys/${config.appKey}/sender/categories`;
         const response = await axios_1.default.get(url, {
-            headers: getHeaders(),
+            headers: getHeaders(config.secretKey),
         });
         return {
             success: true,
@@ -211,6 +207,5 @@ exports.default = {
     getMessageResult,
     getMessageList,
     getSenderCategories,
-    config: NHN_ALIMTALK_CONFIG,
 };
 //# sourceMappingURL=nhnAlimTalk.js.map

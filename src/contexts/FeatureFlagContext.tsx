@@ -7,7 +7,10 @@ import { useAuth } from '../hooks/useAuth';
 interface FeatureFlags {
   optional_addons_enabled: boolean;
   optional_addons_rollout_percentage: number;
-  [key: string]: boolean | number;
+  auto_checkout_enabled: boolean;
+  auto_checkout_dry_run: boolean;
+  auto_checkout_whitelist: string; // JSON string array of conference IDs
+  [key: string]: boolean | number | string;
 }
 
 interface FeatureFlagContextValue {
@@ -40,6 +43,9 @@ export function FeatureFlagProvider({ children }: FeatureFlagProviderProps) {
   const [flags, setFlags] = useState<FeatureFlags>({
     optional_addons_enabled: false,
     optional_addons_rollout_percentage: 0,
+    auto_checkout_enabled: false,
+    auto_checkout_dry_run: true,
+    auto_checkout_whitelist: '[]',
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +74,9 @@ export function FeatureFlagProvider({ children }: FeatureFlagProviderProps) {
         rc.defaultConfig = {
           optional_addons_enabled: false,
           optional_addons_rollout_percentage: 0,
+          auto_checkout_enabled: false,
+          auto_checkout_dry_run: true,
+          auto_checkout_whitelist: '[]',
         };
 
         // Store remote config instance for later use (if needed)
@@ -81,10 +90,16 @@ export function FeatureFlagProvider({ children }: FeatureFlagProviderProps) {
         // Get flag values
         const addonsEnabled = getValue(rc, 'optional_addons_enabled').asBoolean();
         const rolloutPercentage = getValue(rc, 'optional_addons_rollout_percentage').asNumber();
+        const autoCheckoutEnabled = getValue(rc, 'auto_checkout_enabled').asBoolean();
+        const autoCheckoutDryRun = getValue(rc, 'auto_checkout_dry_run').asBoolean();
+        const autoCheckoutWhitelist = getValue(rc, 'auto_checkout_whitelist').asString();
 
         setFlags({
           optional_addons_enabled: addonsEnabled,
           optional_addons_rollout_percentage: rolloutPercentage,
+          auto_checkout_enabled: autoCheckoutEnabled,
+          auto_checkout_dry_run: autoCheckoutDryRun,
+          auto_checkout_whitelist: autoCheckoutWhitelist,
         });
 
         setError(null);

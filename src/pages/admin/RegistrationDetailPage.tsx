@@ -546,7 +546,7 @@ const RegistrationDetailPage: React.FC = () => {
 
     const canCancel = data.status === 'PAID' && data.paymentKey;
     const canRequestRefund = data.status === 'PAID';
-    const canManualApprove = data.status === 'PENDING' || data.status === 'FAILED' || data.status === 'WAITING_FOR_DEPOSIT' || data.status === 'PENDING_PAYMENT';
+    const canManualApprove = data.status === 'PENDING' || data.status === 'FAILED' || data.status === 'WAITING_FOR_DEPOSIT' || data.status === 'PENDING_PAYMENT' || (data.status === 'PAID' && (data as any).paymentStatus !== 'PAID');
 
     return (
         <div className="p-8 max-w-4xl mx-auto bg-white min-h-screen">
@@ -800,7 +800,7 @@ const RegistrationDetailPage: React.FC = () => {
                             className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
                         >
                             <CheckCircle className="w-4 h-4" />
-                            수동 결제 완료 처리 (Force Approve)
+                            {data.status === 'PAID' ? '결제 상태 강제 정정 (Fix Payment Status)' : '수동 결제 완료 처리 (Force Approve)'}
                         </Button>
                         <p className="text-sm text-blue-600 ml-2">
                             * 실제 결제가 되었으나 시스템 오류로 대기 상태인 경우 사용하세요.

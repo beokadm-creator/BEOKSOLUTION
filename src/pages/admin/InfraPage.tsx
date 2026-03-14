@@ -69,8 +69,6 @@ const defaultSettings: InfraSettings = {
 
         nhnAlimTalk: {
             enabled: false,
-            appKey: '',
-            secretKey: '',
             senderKey: '',
             resendSendNo: '',
         },
@@ -440,54 +438,15 @@ export default function InfraPage() {
                                         <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                                         <div className="text-xs text-blue-900 leading-relaxed">
                                             <p className="font-bold mb-1">Society-Specific Configuration</p>
-                                            Each society must configure its own NHN Cloud credentials. Obtain appKey and secretKey from NHN Cloud Console, and senderKey from your KakaoTalk channel registration.
+                                            Only <span className="font-bold">senderKey</span> is society-specific. The appKey and secretKey are system-wide common settings managed by the administrator. Obtain senderKey from your KakaoTalk channel registration in NHN Cloud Console.
                                         </div>
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase">App Key</Label>
-                                        <Input
-                                            value={settings.notification.nhnAlimTalk?.appKey || ''}
-                                            onChange={(e) => setSettings(prev => ({
-                                                ...prev,
-                                                notification: {
-                                                    ...prev.notification,
-                                                    nhnAlimTalk: {
-                                                        ...prev.notification.nhnAlimTalk!,
-                                                        appKey: e.target.value
-                                                    }
-                                                }
-                                            }))}
-                                            placeholder="e.g., Ik6GEBC22p5Qliqk"
-                                            className="h-11 font-mono text-sm bg-slate-50 border-slate-200 rounded-xl"
-                                            type="password"
-                                        />
-                                        <p className="text-[11px] text-slate-400 pl-1">NHN Cloud Console → Project Settings</p>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase">Secret Key</Label>
-                                        <Input
-                                            value={settings.notification.nhnAlimTalk?.secretKey || ''}
-                                            onChange={(e) => setSettings(prev => ({
-                                                ...prev,
-                                                notification: {
-                                                    ...prev.notification,
-                                                    nhnAlimTalk: {
-                                                        ...prev.notification.nhnAlimTalk!,
-                                                        secretKey: e.target.value
-                                                    }
-                                                }
-                                            }))}
-                                            placeholder="NHN Cloud secret key"
-                                            className="h-11 font-mono text-sm bg-slate-50 border-slate-200 rounded-xl tracking-widest"
-                                            type="password"
-                                        />
-                                        <p className="text-[11px] text-slate-400 pl-1">Keep this secret! Never share publicly.</p>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase">Sender Profile Key</Label>
+                                        <div className="flex items-center gap-2">
+                                            <Label className="text-xs font-bold text-slate-500 uppercase">Sender Profile Key</Label>
+                                            <Badge className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5">Required</Badge>
+                                        </div>
                                         <Input
                                             value={settings.notification.nhnAlimTalk?.senderKey || ''}
                                             onChange={(e) => setSettings(prev => ({
@@ -501,13 +460,16 @@ export default function InfraPage() {
                                                 }
                                             }))}
                                             placeholder="e.g., 514116f024d8e322cc2a82a3503bb2eb178370f3"
-                                            className="h-11 font-mono text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                            className="h-11 font-mono text-sm bg-amber-50 border-amber-200 focus:ring-amber-500/20 rounded-xl"
                                         />
-                                        <p className="text-[11px] text-slate-400 pl-1">40-character hexadecimal string from NHN Cloud console</p>
+                                        <p className="text-[11px] text-slate-400 pl-1"><span className="font-bold text-amber-600">Society-specific:</span> 40-character hexadecimal string from NHN Cloud console</p>
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase">Resend Phone Number (Optional)</Label>
+                                        <div className="flex items-center gap-2">
+                                            <Label className="text-xs font-bold text-slate-500 uppercase">Resend Phone Number</Label>
+                                            <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Optional</Badge>
+                                        </div>
                                         <Input
                                             value={settings.notification.nhnAlimTalk?.resendSendNo || ''}
                                             onChange={(e) => setSettings(prev => ({

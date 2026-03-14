@@ -59,7 +59,7 @@ class NHNProvider {
         return 'nhn';
     }
     async send(params, societyId) {
-        var _a;
+        var _a, _b;
         try {
             // Firestore에서 NHN Cloud 설정 가져오기
             const admin = require('firebase-admin');
@@ -77,15 +77,15 @@ class NHNProvider {
                 throw new Error('Infrastructure settings not found');
             }
             const infraData = infraSnap.data();
-            const nhnConfig = infraData === null || infraData === void 0 ? void 0 : infraData.notification;
-            // Fallback to systemic keys if not provided in society-specific settings
-            // NHN Cloud handles authentication via appKey/secretKey
-            const appKey = (nhnConfig === null || nhnConfig === void 0 ? void 0 : nhnConfig.appKey) || 'Ik6GEBC22p5Qliqk';
-            const secretKey = (nhnConfig === null || nhnConfig === void 0 ? void 0 : nhnConfig.secretKey) || 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme';
-            const senderKey = nhnConfig === null || nhnConfig === void 0 ? void 0 : nhnConfig.senderKey;
-            if (!appKey || !secretKey || !senderKey) {
-                throw new Error('NHN Cloud configuration is incomplete');
+            const nhnConfig = (_a = infraData === null || infraData === void 0 ? void 0 : infraData.notification) === null || _a === void 0 ? void 0 : _a.nhnAlimTalk;
+            // NHN Cloud 공통 설정 (모든 학회 동일)
+            const appKey = 'Ik6GEBC22p5Qliqk';
+            const secretKey = 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme';
+            // senderKey만 학회별로 상이 (Firestore에서 조회)
+            if (!(nhnConfig === null || nhnConfig === void 0 ? void 0 : nhnConfig.senderKey)) {
+                throw new Error('NHN Cloud senderKey not configured for this society. Please configure in Admin > Infrastructure settings.');
             }
+            const senderKey = nhnConfig.senderKey;
             // NHN Cloud API 호출
             const { sendAlimTalk } = require('../utils/nhnCloud');
             const result = await sendAlimTalk({
@@ -120,7 +120,7 @@ class NHNProvider {
                 success: false,
                 error: error.message,
                 provider: 'nhn',
-                rawResponse: (_a = error.response) === null || _a === void 0 ? void 0 : _a.data
+                rawResponse: (_b = error.response) === null || _b === void 0 ? void 0 : _b.data
             };
         }
     }

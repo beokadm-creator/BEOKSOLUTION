@@ -1,0 +1,4 @@
+Checking registrations paid after: 2026-03-12T00:00:00
+Error: Unable to detect a Project Id in the current environment. 
+To learn more about authentication and Google APIs, visit: 
+https://cloud.google.com/docs/authentication/getting-started

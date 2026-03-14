@@ -1,0 +1,18 @@
+Checking registrations paid after: 2026-03-11T15:00:00.000Z
+Error: Unable to detect a Project Id in the current environment. 
+To learn more about authentication and Google APIs, visit: 
+https://cloud.google.com/docs/authentication/getting-started
+    at GoogleAuth.findAndCacheProjectId (C:\Users\whhol\Documents\trae_projects\eRegi\functions\node_modules\google-auth-library\build\src\auth\googleauth.js:124:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Firestore.initializeIfNeeded (C:\Users\whhol\Documents\trae_projects\eRegi\functions\node_modules\@google-cloud\firestore\build\src\index.js:1185:35)
+Caused by: Error
+    at CollectionReference._get (C:\Users\whhol\Documents\trae_projects\eRegi\functions\node_modules\@google-cloud\firestore\build\src\reference.js:1738:23)
+    at CollectionReference.get (C:\Users\whhol\Documents\trae_projects\eRegi\functions\node_modules\@google-cloud\firestore\build\src\reference.js:1726:21)
+    at findRecentPayments (C:\Users\whhol\Documents\trae_projects\eRegi\functions\check_recent_payments.js:17:64)
+    at Object.<anonymous> (C:\Users\whhol\Documents\trae_projects\eRegi\functions\check_recent_payments.js:37:1)
+    at Module._compile (node:internal/modules/cjs/loader:1761:14)
+    at Object..js (node:internal/modules/cjs/loader:1893:10)
+    at Module.load (node:internal/modules/cjs/loader:1481:32)
+    at Module._load (node:internal/modules/cjs/loader:1300:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
