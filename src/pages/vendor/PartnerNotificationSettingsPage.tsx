@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useOutletContext } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
 import { Bell, MessageSquare, Settings } from 'lucide-react';
 import PartnerInfraSettings from './PartnerInfraSettings';
 import PartnerTemplatesPage from './PartnerTemplatesPage';
 
 export default function PartnerNotificationSettingsPage() {
-    const { activeVendorId } = useParams();
+    const { activeVendorId } = useOutletContext<{ activeVendorId: string }>();
     const [activeTab, setActiveTab] = useState('infrastructure');
 
     if (!activeVendorId) {
