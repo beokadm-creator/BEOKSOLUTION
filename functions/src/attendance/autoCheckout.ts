@@ -18,11 +18,11 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { batchCreateExitLogs } from './exitLogger';
 
-// Use admin.firestore() directly - initialization is handled in index.ts
-const db = admin.firestore();
-
 // Custom logger with context
 const logger = functions.logger;
+
+// Get Firestore instance - called inside functions to ensure initialization
+const getDb = () => admin.firestore();
 
 /**
  * Configuration for auto checkout behavior
@@ -41,6 +41,7 @@ interface AutoCheckoutConfig {
  */
 async function getAutoCheckoutConfig(): Promise<AutoCheckoutConfig> {
   try {
+    const db = getDb();
     const configDoc = await db
       .collection('settings')
       .doc('auto_checkout')
@@ -89,6 +90,7 @@ async function getAttendanceRules(
   }>;
 } | null> {
   try {
+    const db = getDb();
     const rulesDoc = await db
       .doc(`conferences/${confId}/settings/attendance`)
       .get();
@@ -110,6 +112,7 @@ async function getAttendanceRules(
  */
 async function getActiveConferences(): Promise<string[]> {
   try {
+    const db = getDb();
     const snapshot = await db
       .collection('conferences')
       .where('status', '==', 'active')

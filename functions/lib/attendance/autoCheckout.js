@@ -52,10 +52,10 @@ exports.manualAutoCheckout = exports.scheduledAutoCheckout = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const exitLogger_1 = require("./exitLogger");
-// Use admin.firestore() directly - initialization is handled in index.ts
-const db = admin.firestore();
 // Custom logger with context
 const logger = functions.logger;
+// Get Firestore instance - called inside functions to ensure initialization
+const getDb = () => admin.firestore();
 /**
  * Gets feature flag configuration from Firestore
  *
@@ -65,6 +65,7 @@ const logger = functions.logger;
 async function getAutoCheckoutConfig() {
     var _a, _b;
     try {
+        const db = getDb();
         const configDoc = await db
             .collection('settings')
             .doc('auto_checkout')
@@ -98,6 +99,7 @@ async function getAutoCheckoutConfig() {
 async function getAttendanceRules(confId, date) {
     var _a;
     try {
+        const db = getDb();
         const rulesDoc = await db
             .doc(`conferences/${confId}/settings/attendance`)
             .get();
@@ -117,6 +119,7 @@ async function getAttendanceRules(confId, date) {
  */
 async function getActiveConferences() {
     try {
+        const db = getDb();
         const snapshot = await db
             .collection('conferences')
             .where('status', '==', 'active')
