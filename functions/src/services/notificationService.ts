@@ -80,13 +80,15 @@ class NHNProvider implements IAlimTalkProvider {
             const infraData = infraSnap.data();
             const nhnConfig = infraData?.notification?.nhnAlimTalk;
 
-            // 학회별 NHN Cloud 설정 (폴백 없음 - 반드시 학회에서 설정해야 함)
-            if (!nhnConfig?.appKey || !nhnConfig?.secretKey || !nhnConfig?.senderKey) {
-                throw new Error('NHN Cloud AlimTalk not configured for this society. Please configure in Admin > Infrastructure settings.');
+            // NHN Cloud 공통 설정 (모든 학회 동일)
+            const appKey = 'Ik6GEBC22p5Qliqk';
+            const secretKey = 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme';
+
+            // senderKey만 학회별로 상이 (Firestore에서 조회)
+            if (!nhnConfig?.senderKey) {
+                throw new Error('NHN Cloud senderKey not configured for this society. Please configure in Admin > Infrastructure settings.');
             }
 
-            const appKey = nhnConfig.appKey;
-            const secretKey = nhnConfig.secretKey;
             const senderKey = nhnConfig.senderKey;
 
             // NHN Cloud API 호출

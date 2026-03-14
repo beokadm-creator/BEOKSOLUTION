@@ -860,7 +860,11 @@ export const getNhnAlimTalkTemplates = functions
         }
 
         try {
-            // Firestore에서 학회별 NHN Cloud 설정 가져오기
+            // NHN Cloud 공통 설정 (모든 학회 동일)
+            const appKey = 'Ik6GEBC22p5Qliqk';
+            const secretKey = 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme';
+
+            // senderKey는 Firestore에서 조회 (학회별 상이)
             const db = admin.firestore();
             const infraSnap = await db
                 .collection('societies')
@@ -875,14 +879,18 @@ export const getNhnAlimTalkTemplates = functions
 
             const infraData = infraSnap.data();
             const nhnConfig = infraData?.notification?.nhnAlimTalk;
+            const firestoreSenderKey = nhnConfig?.senderKey;
 
-            if (!nhnConfig?.appKey || !nhnConfig?.secretKey) {
-                throw new functions.https.HttpsError('failed-precondition', 'NHN Cloud AlimTalk is not configured for this society. Please configure in Admin > Infrastructure settings.');
+            // senderKey는 함수 파라미터 또는 Firestore 설정 사용
+            const finalSenderKey = senderKey || firestoreSenderKey;
+
+            if (!finalSenderKey) {
+                throw new functions.https.HttpsError('failed-precondition', 'NHN Cloud senderKey not configured. Please configure in Admin > Infrastructure settings.');
             }
 
             const result = await getTemplates(
-                { appKey: nhnConfig.appKey, secretKey: nhnConfig.secretKey },
-                senderKey
+                { appKey, secretKey },
+                finalSenderKey
             );
 
             // Filter only APPROVED templates

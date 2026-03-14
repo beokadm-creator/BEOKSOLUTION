@@ -33,8 +33,6 @@ interface InfraSettings {
         // channelId removed (legacy Aligo)
         nhnAlimTalk?: {
             enabled: boolean;
-            appKey: string; // NHN Cloud 앱 키 (학회별)
-            secretKey: string; // NHN Cloud 시크릿 키 (학회별)
             senderKey: string; // NHN Cloud 발신 프로필 키 (학회별로 다름)
             resendSendNo?: string; // 대체 발송용 발신번호
         };
