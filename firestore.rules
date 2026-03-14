@@ -83,5 +83,74 @@ service cloud.firestore {
        allow read: if isAuthenticated() && (resource.data.vendorId == request.auth.uid || resource.data.vendorId == request.auth.token.vendorId);
        allow write: if isAuthenticated();
     }
+
+    // Vendors (Partners/Sponsors)
+    match /vendors/{vendorId} {
+      // Vendor profile access: owner, admin (by email), or staff (by email)
+      allow read: if isSuperAdmin() ||
+                     isAuthenticated() && (
+                       request.auth.uid == vendorId ||
+                       request.auth.uid == resource.data.ownerUid ||
+                       request.auth.token.email == resource.data.adminEmail ||
+                       request.auth.token.email in resource.data.staffEmails
+                     );
+      allow write: if isSuperAdmin() ||
+                      isAuthenticated() && (
+                        request.auth.uid == vendorId ||
+                        request.auth.uid == resource.data.ownerUid ||
+                        request.auth.token.email == resource.data.adminEmail
+                      );
+
+      // Vendor settings (infrastructure, notification configs)
+      match /settings/{document=**} {
+        allow read: if isSuperAdmin() ||
+                       isAuthenticated() && (
+                         request.auth.uid == vendorId ||
+                         request.auth.uid == resource.data.ownerUid ||
+                         request.auth.token.email == resource.data.adminEmail ||
+                         request.auth.token.email in resource.data.staffEmails
+                       );
+        allow write: if isSuperAdmin() ||
+                        isAuthenticated() && (
+                          request.auth.uid == vendorId ||
+                          request.auth.uid == resource.data.ownerUid ||
+                          request.auth.token.email == resource.data.adminEmail
+                        );
+      }
+
+      // Vendor notification templates
+      match /notification-templates/{templateId} {
+        allow read: if isSuperAdmin() ||
+                       isAuthenticated() && (
+                         request.auth.uid == vendorId ||
+                         request.auth.uid == resource.data.ownerUid ||
+                         request.auth.token.email == resource.data.adminEmail ||
+                         request.auth.token.email in resource.data.staffEmails
+                       );
+        allow write: if isSuperAdmin() ||
+                        isAuthenticated() && (
+                          request.auth.uid == vendorId ||
+                          request.auth.uid == resource.data.ownerUid ||
+                          request.auth.token.email == resource.data.adminEmail
+                        );
+      }
+
+      // Vendor leads (booth visit records)
+      match /leads/{leadId} {
+        allow read: if isSuperAdmin() ||
+                       isAuthenticated() && (
+                         request.auth.uid == vendorId ||
+                         request.auth.uid == resource.data.ownerUid ||
+                         request.auth.token.email == resource.data.adminEmail ||
+                         request.auth.token.email in resource.data.staffEmails
+                       );
+        allow write: if isSuperAdmin() ||
+                        isAuthenticated() && (
+                          request.auth.uid == vendorId ||
+                          request.auth.uid == resource.data.ownerUid ||
+                          request.auth.token.email == resource.data.adminEmail
+                        );
+      }
+    }
   }
 }
