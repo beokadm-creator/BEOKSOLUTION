@@ -53,8 +53,9 @@ export default function VendorPortalLayout() {
                     setActiveVendorId(currentVendorId);
                     setAuthorized(true);
 
-                    // Redirect to first vendor if no vendorId in URL
-                    if (!location.pathname.match(/\/partner\/([^\/]+)/)) {
+                    // Redirect to first vendor if no vendorId in URL or if using auth UID
+                    const urlVendorId = location.pathname.match(/\/partner\/([^\/]+)/)?.[1];
+                    if (!urlVendorId || urlVendorId === 'login' || urlVendorId === 'scanner' || urlVendorId === 'profile' || urlVendorId === 'staff' || urlVendorId === 'notification') {
                         navigate(`/partner/${uniqueVendors[0].id}`, { replace: true });
                     }
                 } else {

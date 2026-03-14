@@ -90,22 +90,26 @@ service cloud.firestore {
       function isVendorAuthorized() {
         return isSuperAdmin() ||
                isAuthenticated() && (
-                 request.auth.uid == vendorId ||
-                 // For document reads, check resource.data; for writes/checks, it may not exist yet
-                 (resource != null && request.auth.uid == resource.data.ownerUid) ||
-                 (resource != null && request.auth.token.email == resource.data.adminEmail) ||
-                 (resource != null && request.auth.token.email in resource.data.staffEmails)
+                 // Check if the vendor document has this user's email as adminEmail
+                 request.auth.token.email == resource.data.adminEmail ||
+                 request.auth.token.email in resource.data.staffEmails ||
+                 // Also check by UID for owner
+                 request.auth.uid == resource.data.ownerUid
                );
       }
 
       function isVendorAdmin() {
         return isSuperAdmin() ||
                isAuthenticated() && (
-                 request.auth.uid == vendorId ||
-                 (resource != null && request.auth.uid == resource.data.ownerUid) ||
-                 (resource != null && request.auth.token.email == resource.data.adminEmail)
+                 // Check if the vendor document has this user's email as adminEmail
+                 request.auth.token.email == resource.data.adminEmail ||
+                 // Also check by UID for owner
+                 request.auth.uid == resource.data.ownerUid
                );
       }
+
+      // Allow list collection for querying (needed for VendorPortalLayout)
+      // But restrict actual document access
 
       // Vendor profile access
       allow read: if isVendorAuthorized();
