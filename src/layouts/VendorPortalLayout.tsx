@@ -16,6 +16,14 @@ export default function VendorPortalLayout() {
     const navigate = useNavigate();
     const location = useLocation();
 
+    // Extract vendorId from URL if present
+    useEffect(() => {
+        const match = location.pathname.match(/\/partner\/([^\/]+)/);
+        if (match && match[1] !== 'login' && match[1] !== 'scanner' && match[1] !== 'profile' && match[1] !== 'staff' && match[1] !== 'notification') {
+            setActiveVendorId(match[1]);
+        }
+    }, [location.pathname]);
+
     const isCameraMode = location.pathname.includes('/scanner/camera');
 
     useEffect(() => {
@@ -40,8 +48,15 @@ export default function VendorPortalLayout() {
 
                 if (uniqueVendors.length > 0) {
                     setVendors(uniqueVendors);
-                    setActiveVendorId(uniqueVendors[0].id); // Default to first
+                    // Default to first vendor if none selected
+                    const currentVendorId = activeVendorId || uniqueVendors[0].id;
+                    setActiveVendorId(currentVendorId);
                     setAuthorized(true);
+
+                    // Redirect to first vendor if no vendorId in URL
+                    if (!location.pathname.match(/\/partner\/([^\/]+)/)) {
+                        navigate(`/partner/${uniqueVendors[0].id}`, { replace: true });
+                    }
                 } else {
                     setAuthorized(false);
                 }
@@ -90,7 +105,7 @@ export default function VendorPortalLayout() {
                                 <label className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2 block">Active Partner</label>
                                 <select
                                     value={activeVendorId || ''}
-                                    onChange={(e) => setActiveVendorId(e.target.value)}
+                                    onChange={(e) => navigate(`/partner/${e.target.value}`)}
                                     className="w-full bg-indigo-800 border-none rounded text-sm py-2 px-3 text-white focus:ring-0"
                                 >
                                     {vendors.map(v => (
@@ -102,7 +117,7 @@ export default function VendorPortalLayout() {
 
                         <nav className="space-y-1 px-2">
                             <NavLink
-                                to="/partner"
+                                to={`/partner/${activeVendorId}`}
                                 end
                                 className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
                             >
@@ -111,7 +126,7 @@ export default function VendorPortalLayout() {
                             </NavLink>
 
                             <NavLink
-                                to="/partner/scanner"
+                                to={`/partner/${activeVendorId}/scanner`}
                                 className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
                             >
                                 <QrCode className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
@@ -119,7 +134,7 @@ export default function VendorPortalLayout() {
                             </NavLink>
 
                             <NavLink
-                                to="/partner/profile"
+                                to={`/partner/${activeVendorId}/profile`}
                                 className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
                             >
                                 <Settings className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
@@ -127,7 +142,7 @@ export default function VendorPortalLayout() {
                             </NavLink>
 
                             <NavLink
-                                to="/partner/staff"
+                                to={`/partner/${activeVendorId}/staff`}
                                 className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
                             >
                                 <Users className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
@@ -135,7 +150,7 @@ export default function VendorPortalLayout() {
                             </NavLink>
 
                             <NavLink
-                                to="/partner/notification"
+                                to={`/partner/${activeVendorId}/notification`}
                                 className={({ isActive }) => `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive ? 'bg-indigo-800 text-white' : 'text-indigo-300 hover:bg-indigo-800 hover:text-white'}`}
                             >
                                 <Bell className={`flex-shrink-0 w-5 h-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
