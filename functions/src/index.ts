@@ -12,8 +12,8 @@ import { migrateRegistrationsForOptions, migrateRegistrationsForOptionsCallable 
 import { monitorRegistrationIntegrity, monitorMemberCodeIntegrity } from './monitoring/dataIntegrity';
 import { dailyErrorReport, weeklyPerformanceReport } from './monitoring/scheduledReports';
 import { resolveDataIntegrityAlert } from './monitoring/resolveAlert';
-// import { healthCheck, scheduledHealthCheck } from './health';
 // import { checkAlimTalkConfig, checkAlimTalkConfigHttp } from './alimtalk/checkConfig';
+import { scheduledAutoCheckout, manualAutoCheckout } from './attendance/autoCheckout';
 
 
 export const corsHandler = cors({ origin: true });
@@ -36,6 +36,8 @@ export {
     dailyErrorReport,
     weeklyPerformanceReport,
     resolveDataIntegrityAlert,
+    scheduledAutoCheckout,
+    manualAutoCheckout,
     // healthCheck,
     // scheduledHealthCheck,
     // checkAlimTalkConfig,
@@ -851,14 +853,37 @@ export const getNhnAlimTalkTemplates = functions
             throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
         }
 
-        const { senderKey } = data;
+        const { senderKey, societyId } = data;
 
-        if (!senderKey) {
-            throw new functions.https.HttpsError('invalid-argument', 'senderKey is required');
+        if (!senderKey || !societyId) {
+            throw new functions.https.HttpsError('invalid-argument', 'senderKey and societyId are required');
         }
 
         try {
-            const result = await getTemplates(senderKey);
+            // Firestore에서 학회별 NHN Cloud 설정 가져오기
+            const db = admin.firestore();
+            const infraSnap = await db
+                .collection('societies')
+                .doc(societyId)
+                .collection('settings')
+                .doc('infrastructure')
+                .get();
+
+            if (!infraSnap.exists) {
+                throw new functions.https.HttpsError('not-found', 'Infrastructure settings not found for this society');
+            }
+
+            const infraData = infraSnap.data();
+            const nhnConfig = infraData?.notification?.nhnAlimTalk;
+
+            if (!nhnConfig?.appKey || !nhnConfig?.secretKey) {
+                throw new functions.https.HttpsError('failed-precondition', 'NHN Cloud AlimTalk is not configured for this society. Please configure in Admin > Infrastructure settings.');
+            }
+
+            const result = await getTemplates(
+                { appKey: nhnConfig.appKey, secretKey: nhnConfig.secretKey },
+                senderKey
+            );
 
             // Filter only APPROVED templates
             if (result.success && result.data?.templateListResponse?.templates) {
@@ -883,7 +908,11 @@ export const getNhnAlimTalkTemplates = functions
             return result;
         } catch (error: unknown) {
             functions.logger.error("Error in getNhnAlimTalkTemplates:", error);
-            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
+            if (error instanceof functions.https.HttpsError) {
+                throw error;
+            }
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+            throw new functions.https.HttpsError('internal', errorMessage);
         }
     });
 
@@ -1704,18 +1733,33 @@ export const onTossWebhook = functions
 
             const db = admin.firestore();
 
-            // Find Registration Document by orderId (using Collection Group Query)
-            // Note: orderId must be unique across all conferences
-            const regQuery = await db.collectionGroup('registrations').where('orderId', '==', orderId).limit(1).get();
+            // Find Registration Document by orderId
+            // [FIX-20260310] Use iterative search across conferences to avoid FAILED_PRECONDITION (missing collection group index)
+            functions.logger.info(`[Toss Webhook] Searching for orderId: ${orderId} in all conferences...`);
+            let regDoc: any = null;
 
-            if (regQuery.empty) {
-                functions.logger.warn(`[Toss Webhook] Registration not found for orderId: ${orderId}`);
+            // 1. Get List of all conferences
+            const conferencesSnap = await db.collection('conferences').get();
+
+            // 2. Iterate through each conference to find the matching registration
+            for (const confDoc of conferencesSnap.docs) {
+                const q = await confDoc.ref.collection('registrations')
+                    .where('orderId', '==', orderId)
+                    .limit(1)
+                    .get();
+
+                if (!q.empty) {
+                    regDoc = q.docs[0];
+                    break;
+                }
+            }
+
+            if (!regDoc) {
+                functions.logger.warn(`[Toss Webhook] Registration not found for orderId: ${orderId} after searching all conferences.`);
                 // Return 200 to acknowledge webhook (prevent retry loop) even if not found
                 res.status(200).json({ message: "Registration not found" });
                 return;
             }
-
-            const regDoc = regQuery.docs[0];
             const regData = regDoc.data();
             const regRef = regDoc.ref;
             const confId = regData.conferenceId;

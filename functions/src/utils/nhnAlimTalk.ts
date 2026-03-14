@@ -3,36 +3,42 @@ import axios from 'axios';
 /**
  * NHN Cloud AlimTalk API Configuration
  * URL: https://api-alimtalk.cloud.toast.com
+ * 
+ * NOTE: appKey and secretKey are now passed per-request from Firestore settings.
+ * Each society configures its own credentials in Admin > Infrastructure.
  */
-const NHN_ALIMTALK_CONFIG = {
-    baseUrl: 'https://api-alimtalk.cloud.toast.com',
-    appKey: 'Ik6GEBC22p5Qliqk',
-    secretKey: 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme',
-};
+
+export interface NHNAlimTalkConfig {
+    appKey: string;
+    secretKey: string;
+}
+
+const BASE_URL = 'https://api-alimtalk.cloud.toast.com';
 
 /**
  * NHN Cloud API 공통 헤더 생성
  */
-function getHeaders() {
+function getHeaders(secretKey: string) {
     return {
         'Content-Type': 'application/json;charset=UTF-8',
-        'X-Secret-Key': NHN_ALIMTALK_CONFIG.secretKey,
+        'X-Secret-Key': secretKey,
     };
 }
 
 /**
  * 템플릿 목록 조회
+ * @param config - NHN Cloud 설정 (appKey, secretKey)
  * @param senderKey - 발신 프로필 키 (카카오톡 채널의 발신 프로필 키)
  * @returns Promise<TemplateListResponse>
  * 
  * API 문서: https://docs.toast.com/ko/Notification/KakaoTalk%20Bizmessage/ko/alimtalk-api-guide/#_7
  */
-export async function getTemplates(senderKey: string) {
+export async function getTemplates(config: NHNAlimTalkConfig, senderKey: string) {
     try {
-        const url = `${NHN_ALIMTALK_CONFIG.baseUrl}/alimtalk/v2.3/appkeys/${NHN_ALIMTALK_CONFIG.appKey}/senders/${senderKey}/templates`;
+        const url = `${BASE_URL}/alimtalk/v2.3/appkeys/${config.appKey}/senders/${senderKey}/templates`;
 
         const response = await axios.get(url, {
-            headers: getHeaders(),
+            headers: getHeaders(config.secretKey),
             params: {
                 // 선택적 파라미터
                 // templateCode: 'TEMPLATE001', // 특정 템플릿만 조회
@@ -58,16 +64,17 @@ export async function getTemplates(senderKey: string) {
 
 /**
  * 특정 템플릿 상세 조회
+ * @param config - NHN Cloud 설정 (appKey, secretKey)
  * @param senderKey - 발신 프로필 키
  * @param templateCode - 템플릿 코드
  * @returns Promise<TemplateDetailResponse>
  */
-export async function getTemplateDetail(senderKey: string, templateCode: string) {
+export async function getTemplateDetail(config: NHNAlimTalkConfig, senderKey: string, templateCode: string) {
     try {
-        const url = `${NHN_ALIMTALK_CONFIG.baseUrl}/alimtalk/v2.3/appkeys/${NHN_ALIMTALK_CONFIG.appKey}/senders/${senderKey}/templates/${templateCode}`;
+        const url = `${BASE_URL}/alimtalk/v2.3/appkeys/${config.appKey}/senders/${senderKey}/templates/${templateCode}`;
 
         const response = await axios.get(url, {
-            headers: getHeaders(),
+            headers: getHeaders(config.secretKey),
         });
 
         return {
@@ -85,6 +92,7 @@ export async function getTemplateDetail(senderKey: string, templateCode: string)
 
 /**
  * 알림톡 발송
+ * @param config - NHN Cloud 설정 (appKey, secretKey)
  * @param params - 발송 파라미터
  * @returns Promise<SendResponse>
  * 
@@ -121,9 +129,9 @@ export interface AlimTalkSendParams {
     recipientSeq?: number;                // 수신자 순번
 }
 
-export async function sendAlimTalk(params: AlimTalkSendParams) {
+export async function sendAlimTalk(config: NHNAlimTalkConfig, params: AlimTalkSendParams) {
     try {
-        const url = `${NHN_ALIMTALK_CONFIG.baseUrl}/alimtalk/v2.3/appkeys/${NHN_ALIMTALK_CONFIG.appKey}/messages`;
+        const url = `${BASE_URL}/alimtalk/v2.3/appkeys/${config.appKey}/messages`;
 
         const requestBody = {
             senderKey: params.senderKey,
@@ -148,7 +156,7 @@ export async function sendAlimTalk(params: AlimTalkSendParams) {
         };
 
         const response = await axios.post(url, requestBody, {
-            headers: getHeaders(),
+            headers: getHeaders(config.secretKey),
         });
 
         return {
@@ -170,17 +178,18 @@ export async function sendAlimTalk(params: AlimTalkSendParams) {
 
 /**
  * 발송 결과 조회
+ * @param config - NHN Cloud 설정 (appKey, secretKey)
  * @param requestId - 요청 ID (발송 시 받은 requestId)
  * @returns Promise<QueryResponse>
  * 
  * API 문서: https://docs.toast.com/ko/Notification/KakaoTalk%20Bizmessage/ko/alimtalk-api-guide/#_39
  */
-export async function getMessageResult(requestId: string) {
+export async function getMessageResult(config: NHNAlimTalkConfig, requestId: string) {
     try {
-        const url = `${NHN_ALIMTALK_CONFIG.baseUrl}/alimtalk/v2.3/appkeys/${NHN_ALIMTALK_CONFIG.appKey}/messages/${requestId}`;
+        const url = `${BASE_URL}/alimtalk/v2.3/appkeys/${config.appKey}/messages/${requestId}`;
 
         const response = await axios.get(url, {
-            headers: getHeaders(),
+            headers: getHeaders(config.secretKey),
         });
 
         return {
@@ -198,6 +207,7 @@ export async function getMessageResult(requestId: string) {
 
 /**
  * 발송 내역 조회 (날짜 범위)
+ * @param config - NHN Cloud 설정 (appKey, secretKey)
  * @param params - 조회 파라미터
  * @returns Promise<QueryListResponse>
  */
@@ -218,12 +228,12 @@ export interface MessageQueryParams {
     pageSize?: number;              // 조회 건수 (기본: 15, 최대: 1000)
 }
 
-export async function getMessageList(params: MessageQueryParams = {}) {
+export async function getMessageList(config: NHNAlimTalkConfig, params: MessageQueryParams = {}) {
     try {
-        const url = `${NHN_ALIMTALK_CONFIG.baseUrl}/alimtalk/v2.3/appkeys/${NHN_ALIMTALK_CONFIG.appKey}/messages`;
+        const url = `${BASE_URL}/alimtalk/v2.3/appkeys/${config.appKey}/messages`;
 
         const response = await axios.get(url, {
-            headers: getHeaders(),
+            headers: getHeaders(config.secretKey),
             params: {
                 pageNum: params.pageNum || 1,
                 pageSize: params.pageSize || 15,
@@ -246,14 +256,15 @@ export async function getMessageList(params: MessageQueryParams = {}) {
 
 /**
  * 발신 프로필 카테고리 조회
+ * @param config - NHN Cloud 설정 (appKey, secretKey)
  * @returns Promise<CategoryResponse>
  */
-export async function getSenderCategories() {
+export async function getSenderCategories(config: NHNAlimTalkConfig) {
     try {
-        const url = `${NHN_ALIMTALK_CONFIG.baseUrl}/alimtalk/v2.3/appkeys/${NHN_ALIMTALK_CONFIG.appKey}/sender/categories`;
+        const url = `${BASE_URL}/alimtalk/v2.3/appkeys/${config.appKey}/sender/categories`;
 
         const response = await axios.get(url, {
-            headers: getHeaders(),
+            headers: getHeaders(config.secretKey),
         });
 
         return {
@@ -276,5 +287,4 @@ export default {
     getMessageResult,
     getMessageList,
     getSenderCategories,
-    config: NHN_ALIMTALK_CONFIG,
 };

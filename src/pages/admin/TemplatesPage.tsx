@@ -77,7 +77,7 @@ export default function TemplatesPage() {
             }
 
             const getNhnTemplatesFn = httpsCallable(functions, 'getNhnAlimTalkTemplates');
-            const result = await getNhnTemplatesFn({ senderKey });
+            const result = await getNhnTemplatesFn({ senderKey, societyId: targetSocietyId });
             const data = result.data as { success: boolean; data?: { templateListResponse?: { templates?: unknown[] } } };
 
             if (data.success && data.data?.templateListResponse?.templates) {

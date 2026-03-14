@@ -33,6 +33,8 @@ interface InfraSettings {
         // channelId removed (legacy Aligo)
         nhnAlimTalk?: {
             enabled: boolean;
+            appKey: string; // NHN Cloud 앱 키 (학회별)
+            secretKey: string; // NHN Cloud 시크릿 키 (학회별)
             senderKey: string; // NHN Cloud 발신 프로필 키 (학회별로 다름)
             resendSendNo?: string; // 대체 발송용 발신번호
         };
@@ -69,6 +71,8 @@ const defaultSettings: InfraSettings = {
 
         nhnAlimTalk: {
             enabled: false,
+            appKey: '',
+            secretKey: '',
             senderKey: '',
             resendSendNo: '',
         },
@@ -438,8 +442,50 @@ export default function InfraPage() {
                                         <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                                         <div className="text-xs text-blue-900 leading-relaxed">
                                             <p className="font-bold mb-1">Society-Specific Configuration</p>
-                                            Each society has its own NHN Cloud sender profile key. Enter the sender key provided by NHN Cloud console for this society.
+                                            Each society must configure its own NHN Cloud credentials. Obtain appKey and secretKey from NHN Cloud Console, and senderKey from your KakaoTalk channel registration.
                                         </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold text-slate-500 uppercase">App Key</Label>
+                                        <Input
+                                            value={settings.notification.nhnAlimTalk?.appKey || ''}
+                                            onChange={(e) => setSettings(prev => ({
+                                                ...prev,
+                                                notification: {
+                                                    ...prev.notification,
+                                                    nhnAlimTalk: {
+                                                        ...prev.notification.nhnAlimTalk!,
+                                                        appKey: e.target.value
+                                                    }
+                                                }
+                                            }))}
+                                            placeholder="e.g., Ik6GEBC22p5Qliqk"
+                                            className="h-11 font-mono text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                            type="password"
+                                        />
+                                        <p className="text-[11px] text-slate-400 pl-1">NHN Cloud Console → Project Settings</p>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold text-slate-500 uppercase">Secret Key</Label>
+                                        <Input
+                                            value={settings.notification.nhnAlimTalk?.secretKey || ''}
+                                            onChange={(e) => setSettings(prev => ({
+                                                ...prev,
+                                                notification: {
+                                                    ...prev.notification,
+                                                    nhnAlimTalk: {
+                                                        ...prev.notification.nhnAlimTalk!,
+                                                        secretKey: e.target.value
+                                                    }
+                                                }
+                                            }))}
+                                            placeholder="NHN Cloud secret key"
+                                            className="h-11 font-mono text-sm bg-slate-50 border-slate-200 rounded-xl tracking-widest"
+                                            type="password"
+                                        />
+                                        <p className="text-[11px] text-slate-400 pl-1">Keep this secret! Never share publicly.</p>
                                     </div>
 
                                     <div className="space-y-2">
