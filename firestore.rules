@@ -86,70 +86,47 @@ service cloud.firestore {
 
     // Vendors (Partners/Sponsors)
     match /vendors/{vendorId} {
-      // Vendor profile access: owner, admin (by email), or staff (by email)
-      allow read: if isSuperAdmin() ||
-                     isAuthenticated() && (
-                       request.auth.uid == vendorId ||
-                       request.auth.uid == resource.data.ownerUid ||
-                       request.auth.token.email == resource.data.adminEmail ||
-                       request.auth.token.email in resource.data.staffEmails
-                     );
-      allow write: if isSuperAdmin() ||
-                      isAuthenticated() && (
-                        request.auth.uid == vendorId ||
-                        request.auth.uid == resource.data.ownerUid ||
-                        request.auth.token.email == resource.data.adminEmail
-                      );
+      // Helper function to check if user is authorized for this vendor
+      function isVendorAuthorized() {
+        return isSuperAdmin() ||
+               isAuthenticated() && (
+                 request.auth.uid == vendorId ||
+                 // For document reads, check resource.data; for writes/checks, it may not exist yet
+                 (resource != null && request.auth.uid == resource.data.ownerUid) ||
+                 (resource != null && request.auth.token.email == resource.data.adminEmail) ||
+                 (resource != null && request.auth.token.email in resource.data.staffEmails)
+               );
+      }
+
+      function isVendorAdmin() {
+        return isSuperAdmin() ||
+               isAuthenticated() && (
+                 request.auth.uid == vendorId ||
+                 (resource != null && request.auth.uid == resource.data.ownerUid) ||
+                 (resource != null && request.auth.token.email == resource.data.adminEmail)
+               );
+      }
+
+      // Vendor profile access
+      allow read: if isVendorAuthorized();
+      allow write: if isVendorAdmin();
 
       // Vendor settings (infrastructure, notification configs)
       match /settings/{document=**} {
-        allow read: if isSuperAdmin() ||
-                       isAuthenticated() && (
-                         request.auth.uid == vendorId ||
-                         request.auth.uid == resource.data.ownerUid ||
-                         request.auth.token.email == resource.data.adminEmail ||
-                         request.auth.token.email in resource.data.staffEmails
-                       );
-        allow write: if isSuperAdmin() ||
-                        isAuthenticated() && (
-                          request.auth.uid == vendorId ||
-                          request.auth.uid == resource.data.ownerUid ||
-                          request.auth.token.email == resource.data.adminEmail
-                        );
+        allow read: if isVendorAuthorized();
+        allow write: if isVendorAdmin();
       }
 
       // Vendor notification templates
       match /notification-templates/{templateId} {
-        allow read: if isSuperAdmin() ||
-                       isAuthenticated() && (
-                         request.auth.uid == vendorId ||
-                         request.auth.uid == resource.data.ownerUid ||
-                         request.auth.token.email == resource.data.adminEmail ||
-                         request.auth.token.email in resource.data.staffEmails
-                       );
-        allow write: if isSuperAdmin() ||
-                        isAuthenticated() && (
-                          request.auth.uid == vendorId ||
-                          request.auth.uid == resource.data.ownerUid ||
-                          request.auth.token.email == resource.data.adminEmail
-                        );
+        allow read: if isVendorAuthorized();
+        allow write: if isVendorAdmin();
       }
 
       // Vendor leads (booth visit records)
       match /leads/{leadId} {
-        allow read: if isSuperAdmin() ||
-                       isAuthenticated() && (
-                         request.auth.uid == vendorId ||
-                         request.auth.uid == resource.data.ownerUid ||
-                         request.auth.token.email == resource.data.adminEmail ||
-                         request.auth.token.email in resource.data.staffEmails
-                       );
-        allow write: if isSuperAdmin() ||
-                        isAuthenticated() && (
-                          request.auth.uid == vendorId ||
-                          request.auth.uid == resource.data.ownerUid ||
-                          request.auth.token.email == resource.data.adminEmail
-                        );
+        allow read: if isVendorAuthorized();
+        allow write: if isVendorAdmin();
       }
     }
   }
