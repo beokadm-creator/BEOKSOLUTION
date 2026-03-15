@@ -94,6 +94,7 @@ service cloud.firestore {
     // Vendors (Partners/Sponsors)
     match /vendors/{vendorId} {
       // Helper function to check if user is authorized for this vendor
+      // Uses resource.data for direct vendor document access
       function isVendorAuthorized() {
         return isSuperAdmin() ||
                isAuthenticated() && (
@@ -115,30 +116,52 @@ service cloud.firestore {
                );
       }
 
-      // Allow list collection for querying (needed for VendorPortalLayout)
-      // But restrict actual document access
+      // Helper function for subcollections - fetches parent vendor document
+      function getVendorData() {
+        return get(/databases/$(database)/documents/vendors/$(vendorId));
+      }
 
-      // Vendor profile access
+      function isVendorAuthorizedForSubcollection() {
+        let vendorData = getVendorData();
+        return isSuperAdmin() ||
+               isAuthenticated() && (
+                 request.auth.token.email == vendorData.data().adminEmail ||
+                 request.auth.token.email in vendorData.data().staffEmails ||
+                 request.auth.uid == vendorData.data().ownerUid
+               );
+      }
+
+      function isVendorAdminForSubcollection() {
+        let vendorData = getVendorData();
+        return isSuperAdmin() ||
+               isAuthenticated() && (
+                 request.auth.token.email == vendorData.data().adminEmail ||
+                 request.auth.uid == vendorData.data().ownerUid
+               );
+      }
+
+      // Vendor profile access (uses resource.data directly)
       allow read: if isVendorAuthorized();
       allow write: if isVendorAdmin();
 
       // Vendor settings (infrastructure, notification configs)
+      // Uses get() to fetch parent vendor document for authorization
       match /settings/{document=**} {
-        allow read: if isVendorAuthorized();
-        allow write: if isVendorAdmin();
+        allow read: if isVendorAuthorizedForSubcollection();
+        allow write: if isVendorAdminForSubcollection();
       }
 
       // Vendor notification templates
       match /notification-templates/{templateId} {
-        allow read: if isVendorAuthorized();
-        allow write: if isVendorAdmin();
+        allow read: if isVendorAuthorizedForSubcollection();
+        allow write: if isVendorAdminForSubcollection();
       }
 
       // Vendor leads (방문자 기록)
       match /leads/{leadId} {
-        allow read: if isVendorAuthorized();
-        allow create: if isVendorAuthorized();
-        allow update, delete: if isVendorAdmin();
+        allow read: if isVendorAuthorizedForSubcollection();
+        allow create: if isVendorAuthorizedForSubcollection();
+        allow update, delete: if isVendorAdminForSubcollection();
       }
     }
   }
