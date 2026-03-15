@@ -134,10 +134,11 @@ service cloud.firestore {
         allow write: if isVendorAdmin();
       }
 
-      // Vendor leads (booth visit records)
+      // Vendor leads (방문자 기록)
       match /leads/{leadId} {
         allow read: if isVendorAuthorized();
-        allow write: if isVendorAdmin();
+        allow create: if isVendorAuthorized();
+        allow update, delete: if isVendorAdmin();
       }
     }
   }
