@@ -104,39 +104,48 @@ service cloud.firestore {
 
     // Vendors (Partners/Sponsors)
     match /vendors/{vendorId} {
-      // Helper: Check if user is authorized for this vendor (for subcollections)
-      // Uses get() to fetch parent vendor document
-      function isVendorAdminForSubcollection() {
-        let vendorDoc = get(/databases/$(database)/documents/vendors/$(vendorId));
-        return isSuperAdmin() ||
-               (isAuthenticated() && vendorDoc.exists && 
-                vendorDoc.data.adminEmail == request.auth.token.email);
-      }
-
       // Vendor profile
       // - list: Allow authenticated users to query (for login page)
-      // - get: Only authorized admin can read document content
+      // - get/write: Only authorized admin can access
       allow list: if isAuthenticated();
-      allow get: if isSuperAdmin() ||
-                  (isAuthenticated() && 
-                   resource.data.adminEmail == request.auth.token.email);
-      allow write: if isSuperAdmin() ||
-                    (isAuthenticated() && 
-                     resource.data.adminEmail == request.auth.token.email);
+      allow get, write: if isSuperAdmin() ||
+                        (isAuthenticated() && 
+                         resource.data.adminEmail == request.auth.token.email);
 
-      // Subcollections - use get() to check parent vendor document
+      // Subcollections - check parent vendor document
+      // Using get() to fetch parent document for authorization
       match /settings/{document=**} {
-        allow read, write: if isVendorAdminForSubcollection();
+        allow read, write: if isSuperAdmin() ||
+          (isAuthenticated() && 
+           get(/databases/$(database)/documents/vendors/$(vendorId)).data.adminEmail == request.auth.token.email);
       }
 
       match /notification-templates/{templateId} {
-        allow read, write: if isVendorAdminForSubcollection();
+        allow read, write: if isSuperAdmin() ||
+          (isAuthenticated() && 
+           get(/databases/$(database)/documents/vendors/$(vendorId)).data.adminEmail == request.auth.token.email);
       }
 
       // Leads contain PII - strict access control
       match /leads/{leadId} {
-        allow read, create, update, delete: if isVendorAdminForSubcollection();
+        allow read, create, update, delete: if isSuperAdmin() ||
+          (isAuthenticated() && 
+           get(/databases/$(database)/documents/vendors/$(vendorId)).data.adminEmail == request.auth.token.email);
       }
+
+      // Audit logs for vendor operations
+      match /audit_logs/{logId} {
+        allow read: if isSuperAdmin() ||
+          (isAuthenticated() && 
+           get(/databases/$(database)/documents/vendors/$(vendorId)).data.adminEmail == request.auth.token.email);
+        allow create: if isAuthenticated();
+        allow update, delete: if isSuperAdmin();
+      }
+    }
+
+    // Global audit logs (Super Admin only)
+    match /audit_logs/{logId} {
+      allow read, write: if isSuperAdmin();
     }
   }
 }

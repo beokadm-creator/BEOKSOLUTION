@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions';
 import { NotificationService } from '../services/notificationService';
+import { createAuditLogEntry } from '../audit/logAuditEvent';
 
 /**
  * Cloud Function: sendVendorAlimTalk
@@ -50,12 +51,49 @@ export const sendVendorAlimTalk = functions.https.onCall(async (data, context) =
         );
 
         if (result.success) {
+            // Create audit log for successful AlimTalk
+            await createAuditLogEntry({
+                action: 'ALIMTALK_SENT',
+                entityType: 'ALIMTALK',
+                entityId: result.messageId || 'unknown',
+                vendorId: vendorId,
+                conferenceId: variables.eventName || undefined,
+                details: {
+                    phone: phone,
+                    templateCode: templateCode,
+                    visitorName: variables.visitorName,
+                },
+                result: 'SUCCESS',
+                actorId: context.auth.uid,
+                actorEmail: context.auth.token?.email,
+                actorType: 'VENDOR_ADMIN',
+            });
+
             return {
                 success: true,
                 messageId: result.messageId,
                 provider: result.provider,
             };
         } else {
+            // Create audit log for failed AlimTalk
+            await createAuditLogEntry({
+                action: 'ALIMTALK_FAILED',
+                entityType: 'ALIMTALK',
+                entityId: 'failed',
+                vendorId: vendorId,
+                conferenceId: variables.eventName || undefined,
+                details: {
+                    phone: phone,
+                    templateCode: templateCode,
+                    visitorName: variables.visitorName,
+                },
+                result: 'FAILURE',
+                errorMessage: result.error || 'Failed to send AlimTalk',
+                actorId: context.auth.uid,
+                actorEmail: context.auth.token?.email,
+                actorType: 'VENDOR_ADMIN',
+            });
+
             throw new functions.https.HttpsError(
                 'internal',
                 result.error || 'Failed to send AlimTalk'

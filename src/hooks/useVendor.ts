@@ -211,6 +211,8 @@ export const useVendor = (vid: string | undefined) => {
                 visitorName,
                 timestamp: Timestamp.now(),
                 isConsentAgreed: agreed,
+                consentStatus: agreed ? 'ACTIVE' : 'ACTIVE', // Start as ACTIVE, can be withdrawn later
+                retentionPeriodDays: agreed ? 1095 : 1825, // 3 years for PII, 5 years for anonymous
             };
 
             if (agreed) {

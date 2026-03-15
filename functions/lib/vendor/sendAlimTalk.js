@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendVendorAlimTalk = void 0;
 const functions = __importStar(require("firebase-functions"));
 const notificationService_1 = require("../services/notificationService");
+const logAuditEvent_1 = require("../audit/logAuditEvent");
 /**
  * Cloud Function: sendVendorAlimTalk
  *
@@ -53,6 +54,7 @@ const notificationService_1 = require("../services/notificationService");
  * - error?: string
  */
 exports.sendVendorAlimTalk = functions.https.onCall(async (data, context) => {
+    var _a, _b;
     // Authentication check
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated to send AlimTalk');
@@ -71,6 +73,23 @@ exports.sendVendorAlimTalk = functions.https.onCall(async (data, context) => {
         }, vendorId, 'vendor' // entityType
         );
         if (result.success) {
+            // Create audit log for successful AlimTalk
+            await (0, logAuditEvent_1.createAuditLogEntry)({
+                action: 'ALIMTALK_SENT',
+                entityType: 'ALIMTALK',
+                entityId: result.messageId || 'unknown',
+                vendorId: vendorId,
+                conferenceId: variables.eventName || undefined,
+                details: {
+                    phone: phone,
+                    templateCode: templateCode,
+                    visitorName: variables.visitorName,
+                },
+                result: 'SUCCESS',
+                actorId: context.auth.uid,
+                actorEmail: (_a = context.auth.token) === null || _a === void 0 ? void 0 : _a.email,
+                actorType: 'VENDOR_ADMIN',
+            });
             return {
                 success: true,
                 messageId: result.messageId,
@@ -78,6 +97,24 @@ exports.sendVendorAlimTalk = functions.https.onCall(async (data, context) => {
             };
         }
         else {
+            // Create audit log for failed AlimTalk
+            await (0, logAuditEvent_1.createAuditLogEntry)({
+                action: 'ALIMTALK_FAILED',
+                entityType: 'ALIMTALK',
+                entityId: 'failed',
+                vendorId: vendorId,
+                conferenceId: variables.eventName || undefined,
+                details: {
+                    phone: phone,
+                    templateCode: templateCode,
+                    visitorName: variables.visitorName,
+                },
+                result: 'FAILURE',
+                errorMessage: result.error || 'Failed to send AlimTalk',
+                actorId: context.auth.uid,
+                actorEmail: (_b = context.auth.token) === null || _b === void 0 ? void 0 : _b.email,
+                actorType: 'VENDOR_ADMIN',
+            });
             throw new functions.https.HttpsError('internal', result.error || 'Failed to send AlimTalk');
         }
     }

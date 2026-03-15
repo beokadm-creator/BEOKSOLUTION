@@ -976,3 +976,115 @@ export interface RegistrationOption {
   createdAt: Timestamp;
 }
 
+// ==========================================
+// 8. Vendor/Partner Collections (NEW)
+// ==========================================
+
+/**
+ * Collection: `vendors/{vendorId}/leads/{leadId}`
+ * Partner booth visitor leads with consent management
+ */
+export interface VendorLead {
+  id: string;
+  conferenceId: string;
+  visitorId: string;           // User ID or registration ID
+  visitorName: string;          // "Anonymous (별칭)" if consent denied
+  visitorOrg?: string;          // Only if consent agreed
+  visitorPhone?: string;        // Only if consent agreed (PII)
+  visitorEmail?: string;        // Only if consent agreed (PII)
+  timestamp: Timestamp;
+  isConsentAgreed: boolean;
+  
+  // Consent withdrawal support
+  consentStatus: 'ACTIVE' | 'WITHDRAWN';
+  consentWithdrawnAt?: Timestamp;
+  
+  // Data retention policy
+  retentionPeriodDays?: number; // Default: 1095 (3 years for PII)
+  scheduledDeletionAt?: Timestamp;
+}
+
+/**
+ * Collection: `conferences/{confId}/stamps/{stampId}`
+ * Stamp tour records for gamification
+ */
+export interface StampRecord {
+  id: string;
+  userId: string;
+  vendorId: string;
+  vendorName: string;
+  conferenceId: string;
+  timestamp: Timestamp;
+  
+  // Data retention
+  retentionPeriodDays?: number; // Default: 730 (2 years)
+  scheduledDeletionAt?: Timestamp;
+}
+
+// ==========================================
+// 9. Audit Logging (NEW)
+// ==========================================
+
+/**
+ * Audit action types for partner operations
+ */
+export type AuditAction =
+  | 'LEAD_CREATED'
+  | 'LEAD_VIEWED'
+  | 'LEAD_EXPORTED'
+  | 'LEAD_DELETED'
+  | 'STAMP_CREATED'
+  | 'ALIMTALK_SENT'
+  | 'ALIMTALK_FAILED'
+  | 'CONSENT_WITHDRAWN'
+  | 'VENDOR_LOGIN'
+  | 'VENDOR_SETTINGS_CHANGED';
+
+/**
+ * Actor types for audit logging
+ */
+export type AuditActorType = 'VENDOR_ADMIN' | 'SYSTEM' | 'PARTICIPANT' | 'SUPER_ADMIN';
+
+/**
+ * Entity types for audit logging
+ */
+export type AuditEntityType = 'LEAD' | 'STAMP' | 'ALIMTALK' | 'CONSENT' | 'VENDOR';
+
+/**
+ * Collection: `audit_logs/{logId}` (Global - Super Admin only)
+ * Collection: `vendors/{vendorId}/audit_logs/{logId}` (Vendor-scoped)
+ * 
+ * Comprehensive audit logging for compliance and security
+ */
+export interface AuditLog {
+  id: string;
+  
+  // WHO performed the action
+  actorId: string;
+  actorEmail?: string;
+  actorType: AuditActorType;
+  
+  // WHAT action was performed
+  action: AuditAction;
+  entityType: AuditEntityType;
+  entityId: string;
+  
+  // CONTEXT - where the action occurred
+  vendorId?: string;
+  conferenceId?: string;
+  
+  // DETAILS - action-specific information (PII should be masked)
+  details: Record<string, unknown>;
+  
+  // RESULT of the action
+  result: 'SUCCESS' | 'FAILURE';
+  errorMessage?: string;
+  
+  // WHEN the action occurred
+  timestamp: Timestamp;
+  
+  // Optional metadata
+  ipAddress?: string;
+  userAgent?: string;
+}
+

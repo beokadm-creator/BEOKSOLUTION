@@ -79,6 +79,7 @@ import VendorScannerIntroPage from './pages/vendor/VendorScannerIntroPage';
 import VendorSettingsPage from './pages/vendor/VendorSettingsPage';
 import VendorStaffPage from './pages/vendor/VendorStaffPage';
 import PartnerNotificationSettingsPage from './pages/vendor/PartnerNotificationSettingsPage';
+import VendorAuditLogsPage from './pages/vendor/VendorAuditLogsPage';
 
 const App: React.FC = () => {
   const { subdomain } = useSubdomain();
@@ -390,8 +391,9 @@ const App: React.FC = () => {
                   </Route>
                   <Route path="profile" element={<VendorSettingsPage />} />
                   <Route path="staff" element={<VendorStaffPage />} />
-                  <Route path="notification" element={<PartnerNotificationSettingsPage />} />
-                </Route>
+                   <Route path="notification" element={<PartnerNotificationSettingsPage />} />
+                   <Route path="audit-logs" element={<VendorAuditLogsPage />} />
+                 </Route>
               </Route>
 
               {/* --- PRIORITY 1: GLOBAL AUTH --- */}

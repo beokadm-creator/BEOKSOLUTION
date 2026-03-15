@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.healthCheck = exports.onTossWebhook = exports.logPerformance = exports.logError = exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.confirmTossPaymentHttp = exports.confirmTossPayment = exports.confirmNicePayment = exports.prepareNicePayment = exports.sendVendorAlimTalk = exports.manualAutoCheckout = exports.scheduledAutoCheckout = exports.resolveDataIntegrityAlert = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.bulkSendNotifications = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.corsHandler = void 0;
+exports.healthCheck = exports.onTossWebhook = exports.logPerformance = exports.logError = exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.confirmTossPaymentHttp = exports.confirmTossPayment = exports.confirmNicePayment = exports.prepareNicePayment = exports.manualDataCleanup = exports.scheduledDataCleanup = exports.withdrawConsent = exports.logAuditEvent = exports.sendVendorAlimTalk = exports.manualAutoCheckout = exports.scheduledAutoCheckout = exports.resolveDataIntegrityAlert = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.bulkSendNotifications = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.corsHandler = void 0;
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -69,6 +69,13 @@ Object.defineProperty(exports, "scheduledAutoCheckout", { enumerable: true, get:
 Object.defineProperty(exports, "manualAutoCheckout", { enumerable: true, get: function () { return autoCheckout_1.manualAutoCheckout; } });
 const sendAlimTalk_1 = require("./vendor/sendAlimTalk");
 Object.defineProperty(exports, "sendVendorAlimTalk", { enumerable: true, get: function () { return sendAlimTalk_1.sendVendorAlimTalk; } });
+const logAuditEvent_1 = require("./audit/logAuditEvent");
+Object.defineProperty(exports, "logAuditEvent", { enumerable: true, get: function () { return logAuditEvent_1.logAuditEvent; } });
+const withdrawConsent_1 = require("./vendor/withdrawConsent");
+Object.defineProperty(exports, "withdrawConsent", { enumerable: true, get: function () { return withdrawConsent_1.withdrawConsent; } });
+const dataCleanup_1 = require("./scheduled/dataCleanup");
+Object.defineProperty(exports, "scheduledDataCleanup", { enumerable: true, get: function () { return dataCleanup_1.scheduledDataCleanup; } });
+Object.defineProperty(exports, "manualDataCleanup", { enumerable: true, get: function () { return dataCleanup_1.manualDataCleanup; } });
 exports.corsHandler = (0, cors_1.default)({ origin: true });
 admin.initializeApp();
 // import { sendAlimTalkTest } from './alimtalk/sendTest';
