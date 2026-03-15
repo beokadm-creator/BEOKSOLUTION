@@ -51,6 +51,12 @@ service cloud.firestore {
         allow write: if isSuperAdmin();
       }
 
+      // Sponsors: Allow collection group queries
+      match /sponsors/{sponsorId} {
+        allow read: if true;
+        allow write: if isSuperAdmin();
+      }
+
       // Registrations: Restricted read/write
       match /registrations/{userId} {
         allow read: if isOwner(userId) || isSuperAdmin();
@@ -75,6 +81,11 @@ service cloud.firestore {
       }
     }
 
+    // Collection Group Query Rules
+    match /{path=**}/sponsors/{sponsorId} {
+      allow read: if true;
+    }
+
     // User Profile
     match /users/{userId} {
       allow read, write: if isOwner(userId) || isSuperAdmin();
@@ -93,75 +104,30 @@ service cloud.firestore {
 
     // Vendors (Partners/Sponsors)
     match /vendors/{vendorId} {
-      // Helper function to check if user is authorized for this vendor
-      // Uses resource.data for direct vendor document access
-      function isVendorAuthorized() {
-        return isSuperAdmin() ||
-               isAuthenticated() && (
-                 // Check if the vendor document has this user's email as adminEmail
-                 request.auth.token.email == resource.data.adminEmail ||
-                 request.auth.token.email in resource.data.staffEmails ||
-                 // Also check by UID for owner
-                 request.auth.uid == resource.data.ownerUid
-               );
-      }
-
+      // Helper: Check if user is authorized for this vendor
+      // Uses get() to avoid undefined field issues
       function isVendorAdmin() {
+        let vendorDoc = get(/databases/$(database)/documents/vendors/$(vendorId));
         return isSuperAdmin() ||
-               isAuthenticated() && (
-                 // Check if the vendor document has this user's email as adminEmail
-                 request.auth.token.email == resource.data.adminEmail ||
-                 // Also check by UID for owner
-                 request.auth.uid == resource.data.ownerUid
-               );
+               (isAuthenticated() && vendorDoc.exists && 
+                vendorDoc.data.adminEmail == request.auth.token.email);
       }
 
-      // Helper function for subcollections - fetches parent vendor document
-      function getVendorData() {
-        return get(/databases/$(database)/documents/vendors/$(vendorId));
-      }
+      // Vendor profile - only authorized admin can access
+      allow read, write: if isVendorAdmin();
 
-      function isVendorAuthorizedForSubcollection() {
-        let vendorData = getVendorData();
-        return isSuperAdmin() ||
-               isAuthenticated() && (
-                 request.auth.token.email == vendorData.data().adminEmail ||
-                 request.auth.token.email in vendorData.data().staffEmails ||
-                 request.auth.uid == vendorData.data().ownerUid
-               );
-      }
-
-      function isVendorAdminForSubcollection() {
-        let vendorData = getVendorData();
-        return isSuperAdmin() ||
-               isAuthenticated() && (
-                 request.auth.token.email == vendorData.data().adminEmail ||
-                 request.auth.uid == vendorData.data().ownerUid
-               );
-      }
-
-      // Vendor profile access (uses resource.data directly)
-      allow read: if isVendorAuthorized();
-      allow write: if isVendorAdmin();
-
-      // Vendor settings (infrastructure, notification configs)
-      // Uses get() to fetch parent vendor document for authorization
+      // Subcollections - only authorized admin can access
       match /settings/{document=**} {
-        allow read: if isVendorAuthorizedForSubcollection();
-        allow write: if isVendorAdminForSubcollection();
+        allow read, write: if isVendorAdmin();
       }
 
-      // Vendor notification templates
       match /notification-templates/{templateId} {
-        allow read: if isVendorAuthorizedForSubcollection();
-        allow write: if isVendorAdminForSubcollection();
+        allow read, write: if isVendorAdmin();
       }
 
-      // Vendor leads (방문자 기록)
+      // Leads contain PII - strict access control
       match /leads/{leadId} {
-        allow read: if isVendorAuthorizedForSubcollection();
-        allow create: if isVendorAuthorizedForSubcollection();
-        allow update, delete: if isVendorAdminForSubcollection();
+        allow read, create, update, delete: if isVendorAdmin();
       }
     }
   }
