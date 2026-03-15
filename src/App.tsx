@@ -381,14 +381,17 @@ const App: React.FC = () => {
               <Route path="/partner/login" element={<VendorLoginPage />} />
               <Route path="/partner" element={<VendorPortalLayout />}>
                 <Route index element={<VendorDashboardPage />} />
-                <Route path="scanner">
-                  <Route index element={<VendorScannerIntroPage />} />
-                  <Route path="camera" element={<VendorScannerPage mode="camera" />} />
-                  <Route path="external" element={<VendorScannerPage mode="external" />} />
+                <Route path=":vendorId">
+                  <Route index element={<VendorDashboardPage />} />
+                  <Route path="scanner">
+                    <Route index element={<VendorScannerIntroPage />} />
+                    <Route path="camera" element={<VendorScannerPage mode="camera" />} />
+                    <Route path="external" element={<VendorScannerPage mode="external" />} />
+                  </Route>
+                  <Route path="profile" element={<VendorSettingsPage />} />
+                  <Route path="staff" element={<VendorStaffPage />} />
+                  <Route path="notification" element={<PartnerNotificationSettingsPage />} />
                 </Route>
-                <Route path="profile" element={<VendorSettingsPage />} />
-                <Route path="staff" element={<VendorStaffPage />} />
-                <Route path="notification" element={<PartnerNotificationSettingsPage />} />
               </Route>
 
               {/* --- PRIORITY 1: GLOBAL AUTH --- */}

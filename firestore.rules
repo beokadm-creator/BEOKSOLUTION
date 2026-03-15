@@ -66,6 +66,13 @@ service cloud.firestore {
       match /external_attendees/{attendeeId} {
         allow read, write: if isSuperAdmin();
       }
+
+      // Stamps: Stamp Tour (인증된 사용자면 생성 가능)
+      match /stamps/{stampId} {
+        allow read: if true;
+        allow create: if isAuthenticated();
+        allow update, delete: if isSuperAdmin();
+      }
     }
 
     // User Profile

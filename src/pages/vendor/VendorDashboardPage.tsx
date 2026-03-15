@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useVendor } from '../../hooks/useVendor';
 import * as XLSX from 'xlsx';
 import { Button } from '../../components/ui/button';
@@ -8,10 +8,10 @@ import { BarChart3, Users, Clock, Download, QrCode, Search, Building2, Phone, Ma
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 export default function VendorDashboardPage() {
-    const { activeVendorId } = useOutletContext<{ activeVendorId: string }>();
+    const { vendorId } = useParams<{ vendorId: string }>();
     const navigate = useNavigate();
 
-    const vendorLogic = useVendor(activeVendorId);
+    const vendorLogic = useVendor(vendorId);
     const { vendor, loading, error, conferences, visits } = vendorLogic;
 
     const [selectedConfId, setSelectedConfId] = useState<string>('all');

@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
 import { Bell, MessageSquare, Settings } from 'lucide-react';
 import PartnerInfraSettings from './PartnerInfraSettings';
 import PartnerTemplatesPage from './PartnerTemplatesPage';
 
 export default function PartnerNotificationSettingsPage() {
-    const { activeVendorId } = useOutletContext<{ activeVendorId: string }>();
+    const { vendorId } = useParams<{ vendorId: string }>();
     const [activeTab, setActiveTab] = useState('infrastructure');
 
-    if (!activeVendorId) {
+    if (!vendorId) {
         return (
             <div className="flex items-center justify-center min-h-[50vh]">
                 <div className="text-center">
@@ -52,11 +52,11 @@ export default function PartnerNotificationSettingsPage() {
                 </TabsList>
 
                 <TabsContent value="infrastructure" className="mt-0">
-                    <PartnerInfraSettings vendorId={activeVendorId} />
+                    <PartnerInfraSettings vendorId={vendorId} />
                 </TabsContent>
 
                 <TabsContent value="templates" className="mt-0">
-                    <PartnerTemplatesPage vendorId={activeVendorId} />
+                    <PartnerTemplatesPage vendorId={vendorId} />
                 </TabsContent>
             </Tabs>
         </div>

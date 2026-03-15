@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useVendor } from '../../hooks/useVendor';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Button } from '../../components/ui/button';
@@ -8,8 +8,8 @@ import { QrCode, Camera, Keyboard, AlertCircle, CheckCircle2, Monitor, ChevronLe
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external' }) {
-    const { activeVendorId } = useOutletContext<{ activeVendorId: string }>();
-    const vendorLogic = useVendor(activeVendorId);
+    const { vendorId } = useParams<{ vendorId: string }>();
+    const vendorLogic = useVendor(vendorId);
 
     const {
         vendor,

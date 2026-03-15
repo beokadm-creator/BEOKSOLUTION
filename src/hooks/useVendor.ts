@@ -221,14 +221,19 @@ export const useVendor = (vid: string | undefined) => {
 
             await addDoc(collection(db, `vendors/${vendor.id}/leads`), leadData);
 
-            // STAMP TOUR: Write to /conferences/{confId}/stamps (Gamification Validation)
-            // Even if denied, grant the stamp for the tour.
-            await addDoc(collection(db, `conferences/${conferenceId}/stamps`), {
-                userId: scanResult.user.id,
-                vendorId: vendor.id,
-                vendorName: vendor.name,
-                timestamp: Timestamp.now()
-            });
+            // STAMP TOUR: 스탬프 투어 참가 업체만 stamps 저장
+            // conferences/{confId}/sponsors/{vendorId}에서 isStampTourParticipant 확인
+            const sponsorSnap = await getDoc(doc(db, `conferences/${conferenceId}/sponsors/${vendor.id}`));
+            const sponsorData = sponsorSnap.exists() ? sponsorSnap.data() : null;
+
+            if (sponsorData?.isStampTourParticipant === true) {
+                await addDoc(collection(db, `conferences/${conferenceId}/stamps`), {
+                    userId: scanResult.user.id,
+                    vendorId: vendor.id,
+                    vendorName: vendor.name,
+                    timestamp: Timestamp.now()
+                });
+            }
 
             // Send AlimTalk if consent was given
             if (agreed && leadData.visitorPhone) {
