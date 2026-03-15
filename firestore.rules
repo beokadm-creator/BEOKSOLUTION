@@ -104,30 +104,38 @@ service cloud.firestore {
 
     // Vendors (Partners/Sponsors)
     match /vendors/{vendorId} {
-      // Helper: Check if user is authorized for this vendor
-      // Uses get() to avoid undefined field issues
-      function isVendorAdmin() {
+      // Helper: Check if user is authorized for this vendor (for subcollections)
+      // Uses get() to fetch parent vendor document
+      function isVendorAdminForSubcollection() {
         let vendorDoc = get(/databases/$(database)/documents/vendors/$(vendorId));
         return isSuperAdmin() ||
                (isAuthenticated() && vendorDoc.exists && 
                 vendorDoc.data.adminEmail == request.auth.token.email);
       }
 
-      // Vendor profile - only authorized admin can access
-      allow read, write: if isVendorAdmin();
+      // Vendor profile
+      // - list: Allow authenticated users to query (for login page)
+      // - get: Only authorized admin can read document content
+      allow list: if isAuthenticated();
+      allow get: if isSuperAdmin() ||
+                  (isAuthenticated() && 
+                   resource.data.adminEmail == request.auth.token.email);
+      allow write: if isSuperAdmin() ||
+                    (isAuthenticated() && 
+                     resource.data.adminEmail == request.auth.token.email);
 
-      // Subcollections - only authorized admin can access
+      // Subcollections - use get() to check parent vendor document
       match /settings/{document=**} {
-        allow read, write: if isVendorAdmin();
+        allow read, write: if isVendorAdminForSubcollection();
       }
 
       match /notification-templates/{templateId} {
-        allow read, write: if isVendorAdmin();
+        allow read, write: if isVendorAdminForSubcollection();
       }
 
       // Leads contain PII - strict access control
       match /leads/{leadId} {
-        allow read, create, update, delete: if isVendorAdmin();
+        allow read, create, update, delete: if isVendorAdminForSubcollection();
       }
     }
   }
