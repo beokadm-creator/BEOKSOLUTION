@@ -815,7 +815,11 @@ const RegistrationDetailPage: React.FC = () => {
                     registrationId={id!}
                     confId={effectiveCid}
                     confBaseUrl={window.location.origin}
-                    confSlug={(effectiveCid || '').replace('kadd_', '')} // fallback slug
+                    confSlug={
+                        (effectiveCid || '').includes('_')
+                            ? (effectiveCid || '').split('_').slice(1).join('_')
+                            : (effectiveCid || '')
+                    }
                     onResend={handleResendNotification}
                     isProcessing={isResending}
                 />

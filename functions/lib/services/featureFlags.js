@@ -8,10 +8,8 @@
  * 사용 예시:
  * ```typescript
  * const flags = await getFeatureFlags();
- * if (flags.useNHNAlimTalk) {
- *   await sendNHNAlimTalk(...);
- * } else {
- *   await sendAligoAlimTalk(...);
+ * if (flags.enableMonitoring) {
+ *   await startMonitoring(...);
  * }
  * ```
  */
@@ -57,8 +55,7 @@ exports.clearFeatureFlagsCache = clearFeatureFlagsCache;
 const admin = __importStar(require("firebase-admin"));
 // 기본값 (안전한 설정)
 const DEFAULT_FLAGS = {
-    useNHNAlimTalk: false,
-    useAligoAlimTalk: true,
+    useNHNAlimTalk: true,
     enableExternalAttendee: true,
     enableExternalAttendeeMigration: false,
     enableMonitoring: true,

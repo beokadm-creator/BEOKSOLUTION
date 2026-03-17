@@ -2,8 +2,6 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { createAuditLogEntry } from '../audit/logAuditEvent';
 
-const db = admin.firestore();
-
 /**
  * Cloud Function: withdrawConsent
  *
@@ -51,6 +49,7 @@ export const withdrawConsent = functions.https.onCall(async (data, context) => {
 
     try {
         const timestamp = admin.firestore.Timestamp.now();
+        const db = admin.firestore();
         let withdrawnCount = 0;
         const maxBatchSize = 500;
 

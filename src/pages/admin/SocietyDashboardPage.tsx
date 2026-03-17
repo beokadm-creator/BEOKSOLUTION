@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { collection, getDocs, query, where, doc, setDoc, Timestamp, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAdminStore } from '../../store/adminStore';
@@ -26,6 +26,8 @@ import {
 import toast from 'react-hot-toast';
 import { safeText } from '../../utils/safeText';
 import { safeFormatDate } from '../../utils/dateUtils';
+import { getAuth } from 'firebase/auth';
+import { resolveSocietyByIdentifier } from '../../utils/societyResolver';
 
 interface Conference {
     id: string;
@@ -37,12 +39,25 @@ interface Conference {
     status: 'SETUP' | 'PLANNING' | 'OPEN' | 'CLOSED';
 }
 
+interface VendorRequest {
+    id: string;
+    vendorId: string;
+    vendorName?: string;
+    requesterEmail?: string;
+    conferenceId: string;
+    conferenceTitle?: string;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    requestedAt?: Timestamp;
+}
+
 export default function SocietyDashboardPage() {
     const navigate = useNavigate();
     const { selectedSocietyId, enterConferenceMode } = useAdminStore();
     const [conferences, setConferences] = useState<Conference[]>([]);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({ totalMembers: 0, activeConfs: 0, totalConfs: 0 });
+    const [vendorRequests, setVendorRequests] = useState<VendorRequest[]>([]);
+    const [loadingVendorRequests, setLoadingVendorRequests] = useState(false);
 
     // Create Dialog State
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -54,6 +69,8 @@ export default function SocietyDashboardPage() {
     const [newSlug, setNewSlug] = useState('');
     const [newStart, setNewStart] = useState('');
     const [newEnd, setNewEnd] = useState('');
+    const [resolvedSocietyId, setResolvedSocietyId] = useState<string | null>(null);
+    const [resolvedDomainCode, setResolvedDomainCode] = useState<string | null>(null);
 
     const getSocietyId = () => {
         // ✅ 0순위: adminStore에서 선택된 societyId
@@ -77,17 +94,66 @@ export default function SocietyDashboardPage() {
     };
 
     const targetId = getSocietyId();
+    const effectiveSocietyDocId = resolvedSocietyId || targetId;
+    const effectiveDomainCode = (resolvedDomainCode || resolvedSocietyId || targetId || '').toLowerCase();
+    const conferenceSocietyKeys = useMemo(() => {
+        return Array.from(
+            new Set([effectiveDomainCode, effectiveSocietyDocId, targetId].filter(Boolean))
+        ) as string[];
+    }, [effectiveDomainCode, effectiveSocietyDocId, targetId]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const resolveSociety = async () => {
+            if (!targetId) {
+                setResolvedSocietyId(null);
+                setResolvedDomainCode(null);
+                return;
+            }
+
+            try {
+                const resolved = await resolveSocietyByIdentifier(targetId);
+                if (cancelled) return;
+
+                if (resolved) {
+                    setResolvedSocietyId(resolved.id);
+                    setResolvedDomainCode(
+                        (resolved.data.domainCode as string | undefined) || resolved.id
+                    );
+                    return;
+                }
+            } catch (error) {
+                console.error("[SocietyDashboard] Failed to resolve society:", error);
+            }
+
+            if (!cancelled) {
+                setResolvedSocietyId(targetId);
+                setResolvedDomainCode(targetId);
+            }
+        };
+
+        resolveSociety();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [targetId]);
 
     const fetchConferences = useCallback(async () => {
-        if (!targetId) return;
+        if (!conferenceSocietyKeys.length || !effectiveSocietyDocId) {
+            setLoading(false);
+            setConferences([]);
+            setStats({ totalMembers: 0, activeConfs: 0, totalConfs: 0 });
+            return;
+        }
         setLoading(true);
         try {
-            const q = query(
-                collection(db, 'conferences'),
-                where('societyId', '==', targetId)
-            );
+            const q = conferenceSocietyKeys.length === 1
+                ? query(collection(db, 'conferences'), where('societyId', '==', conferenceSocietyKeys[0]))
+                : query(collection(db, 'conferences'), where('societyId', 'in', conferenceSocietyKeys.slice(0, 10)));
             const snapshot = await getDocs(q);
-            const list = snapshot.docs.map(doc => {
+            const rawList = snapshot.docs.map(doc => {
                 const data = doc.data();
                 return {
                     id: doc.id,
@@ -100,6 +166,28 @@ export default function SocietyDashboardPage() {
                 } as Conference;
             });
 
+            // Normalize duplicates by slug: prefer canonical id `${domainCode}_${slug}`
+            const bySlug = new Map<string, Conference[]>();
+            rawList.forEach((conf) => {
+                const slugKey = (conf.slug || '').toLowerCase();
+                const prev = bySlug.get(slugKey) || [];
+                prev.push(conf);
+                bySlug.set(slugKey, prev);
+            });
+
+            const list: Conference[] = [];
+            bySlug.forEach((group) => {
+                if (group.length === 1) {
+                    list.push(group[0]);
+                    return;
+                }
+                const canonicalId = `${effectiveDomainCode}_${group[0].slug}`.toLowerCase();
+                const preferred = group.find((c) => c.id.toLowerCase() === canonicalId)
+                    || group.find((c) => (c.societyId || '').toLowerCase() === effectiveDomainCode)
+                    || group[0];
+                list.push(preferred);
+            });
+
             list.sort((a, b) => {
                 const dateA = a.dates.start && typeof a.dates.start === 'object' && 'toDate' in a.dates.start ? (a.dates.start as { toDate: () => Date }).toDate() : new Date(0);
                 const dateB = b.dates.start && typeof b.dates.start === 'object' && 'toDate' in b.dates.start ? (b.dates.start as { toDate: () => Date }).toDate() : new Date(0);
@@ -108,7 +196,7 @@ export default function SocietyDashboardPage() {
             setConferences(list);
 
             // Fetch Additional Stats
-            const memQ = collection(db, 'societies', targetId, 'members');
+            const memQ = collection(db, 'societies', effectiveSocietyDocId, 'members');
             const memSnap = await getDocs(memQ);
 
             // Let's also fetch total accumulated participants across all conferences
@@ -143,11 +231,49 @@ export default function SocietyDashboardPage() {
         } finally {
             setLoading(false);
         }
-    }, [targetId]);
+    }, [conferenceSocietyKeys, effectiveSocietyDocId]);
+
+    const fetchVendorRequests = useCallback(async (confList: Conference[]) => {
+        setLoadingVendorRequests(true);
+        try {
+            const entries: VendorRequest[] = [];
+            for (const conf of confList) {
+                const reqSnap = await getDocs(collection(db, 'conferences', conf.id, 'vendor_requests'));
+                reqSnap.docs.forEach(d => {
+                    const data = d.data() as VendorRequest;
+                    entries.push({
+                        id: d.id,
+                        vendorId: data.vendorId || d.id,
+                        vendorName: data.vendorName,
+                        requesterEmail: data.requesterEmail,
+                        conferenceId: conf.id,
+                        conferenceTitle: safeText(conf.title),
+                        status: data.status || 'PENDING',
+                        requestedAt: data.requestedAt
+                    });
+                });
+            }
+
+            setVendorRequests(entries);
+        } catch (error) {
+            console.error("Error fetching vendor requests:", error);
+            toast.error("Failed to load vendor requests.");
+        } finally {
+            setLoadingVendorRequests(false);
+        }
+    }, []);
 
     useEffect(() => {
         fetchConferences();
     }, [fetchConferences]);
+
+    useEffect(() => {
+        if (conferences.length > 0) {
+            fetchVendorRequests(conferences);
+        } else {
+            setVendorRequests([]);
+        }
+    }, [conferences, fetchVendorRequests]);
 
     const handleCreate = async () => {
         if (!newTitleKo || !newSlug || !newStart || !newEnd) {
@@ -155,7 +281,7 @@ export default function SocietyDashboardPage() {
             return;
         }
 
-        if (!targetId) {
+        if (!effectiveSocietyDocId || !effectiveDomainCode) {
             toast.error("Critical Error: Society ID is missing.");
             return;
         }
@@ -168,8 +294,22 @@ export default function SocietyDashboardPage() {
 
         setIsCreating(true);
         try {
-            const docId = `${targetId}_${safeSlug}`;
+            const docId = `${effectiveDomainCode}_${safeSlug}`;
             const docRef = doc(db, 'conferences', docId);
+
+            const existingQ = conferenceSocietyKeys.length === 1
+                ? query(collection(db, 'conferences'), where('societyId', '==', conferenceSocietyKeys[0]))
+                : query(collection(db, 'conferences'), where('societyId', 'in', conferenceSocietyKeys.slice(0, 10)));
+            const existingSnap = await getDocs(existingQ);
+            const hasSameSlug = existingSnap.docs.some((d) => {
+                const data = d.data() as { slug?: string };
+                return (data.slug || '').toLowerCase() === safeSlug;
+            });
+            if (hasSameSlug) {
+                toast.error(`A conference with slug '${safeSlug}' already exists.`);
+                setIsCreating(false);
+                return;
+            }
 
             const checkSnap = await getDoc(docRef);
             if (checkSnap.exists()) {
@@ -179,7 +319,7 @@ export default function SocietyDashboardPage() {
             }
 
             const newConfData = {
-                societyId: targetId,
+                societyId: effectiveDomainCode,
                 slug: safeSlug,
                 title: { ko: newTitleKo, en: newTitleEn },
                 dates: {
@@ -225,9 +365,57 @@ export default function SocietyDashboardPage() {
         }
     };
 
+    const handleApproveRequest = async (req: VendorRequest) => {
+        try {
+            const vendorSnap = await getDoc(doc(db, 'vendors', req.vendorId));
+            const vendorData = vendorSnap.exists() ? vendorSnap.data() as { name?: string; description?: string; logoUrl?: string; homeUrl?: string } : {};
+
+            await setDoc(doc(db, `conferences/${req.conferenceId}/sponsors/${req.vendorId}`), {
+                name: vendorData.name || req.vendorName || req.vendorId,
+                logoUrl: vendorData.logoUrl || '',
+                description: vendorData.description || '',
+                websiteUrl: vendorData.homeUrl || '',
+                isActive: true,
+                vendorId: req.vendorId,
+                isStampTourParticipant: false,
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+            }, { merge: true });
+
+            await updateDoc(doc(db, `conferences/${req.conferenceId}/vendor_requests/${req.vendorId}`), {
+                status: 'APPROVED',
+                reviewedAt: Timestamp.now(),
+                reviewedBy: getAuth().currentUser?.email || 'society_admin'
+            });
+
+            toast.success("Request approved.");
+            fetchVendorRequests(conferences);
+        } catch (e) {
+            console.error("Approve failed:", e);
+            toast.error("Failed to approve request");
+        }
+    };
+
+    const handleRejectRequest = async (req: VendorRequest) => {
+        try {
+            await updateDoc(doc(db, `conferences/${req.conferenceId}/vendor_requests/${req.vendorId}`), {
+                status: 'REJECTED',
+                reviewedAt: Timestamp.now(),
+                reviewedBy: getAuth().currentUser?.email || 'society_admin'
+            });
+            toast.success("Request rejected.");
+            fetchVendorRequests(conferences);
+        } catch (e) {
+            console.error("Reject failed:", e);
+            toast.error("Failed to reject request");
+        }
+    };
+
     const handleManage = (conf: Conference) => {
-        enterConferenceMode(conf.id, conf.slug, conf.societyId, safeText(conf.title));
-        navigate(`/admin/conf/${conf.id}`);
+        const canonicalCid = `${effectiveDomainCode}_${conf.slug}`.toLowerCase();
+        const targetCid = conf.id.toLowerCase() === canonicalCid ? conf.id : canonicalCid;
+        enterConferenceMode(targetCid, conf.slug, conf.societyId, safeText(conf.title));
+        navigate(`/admin/conf/${targetCid}`);
     };
 
     const formatDate = (ts: any) => {
@@ -258,7 +446,7 @@ export default function SocietyDashboardPage() {
                         </div>
                         <div>
                             <h1 className="text-lg font-bold text-slate-900 leading-tight">Society Dashboard</h1>
-                            <p className="text-[11px] text-slate-500 font-medium">Overview for <span className="text-blue-600 uppercase">{targetId}</span></p>
+                            <p className="text-[11px] text-slate-500 font-medium">Overview for <span className="text-blue-600 uppercase">{effectiveDomainCode}</span></p>
                         </div>
                     </div>
                 </div>
@@ -271,6 +459,48 @@ export default function SocietyDashboardPage() {
                     <StatCard label="Active Events" value={stats.activeConfs} icon={<Activity className="text-emerald-600" />} subtext="Currently Live" />
                     <StatCard label="Total Events" value={stats.totalConfs} icon={<BarChart3 className="text-purple-600" />} subtext="Historical Data" />
                 </div>
+
+                {/* Sponsor Requests */}
+                <Card className="border border-slate-200 shadow-sm">
+                    <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div>
+                            <CardTitle>스폰서 참여 요청</CardTitle>
+                            <p className="text-sm text-slate-500">학회 담당이 스폰서 요청을 승인/거절합니다.</p>
+                        </div>
+                        {loadingVendorRequests && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {vendorRequests.filter(r => r.status === 'PENDING').length === 0 ? (
+                            <div className="text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-4">
+                                처리할 요청이 없습니다.
+                            </div>
+                        ) : (
+                            vendorRequests.filter(r => r.status === 'PENDING').map(req => {
+                                return (
+                                    <div key={key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border border-slate-200 rounded-xl p-4 bg-white">
+                                        <div>
+                                            <div className="font-semibold text-slate-900">{req.vendorName || req.vendorId}</div>
+                                            <div className="text-xs text-slate-500">
+                                                학술대회: <span className="font-mono">{req.conferenceTitle || req.conferenceId}</span>
+                                                {req.requesterEmail ? ` · ${req.requesterEmail}` : ''}
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col md:flex-row md:items-center gap-3">
+                                            <div className="flex items-center gap-2">
+                                                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleApproveRequest(req)}>
+                                                    승인
+                                                </Button>
+                                                <Button size="sm" variant="outline" onClick={() => handleRejectRequest(req)}>
+                                                    거절
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </CardContent>
+                </Card>
 
                 {/* Conferences Section */}
                 <div className="space-y-6">
@@ -325,7 +555,7 @@ export default function SocietyDashboardPage() {
                                         <Label className="text-xs font-semibold uppercase text-slate-500">URL Identifier (Slug)</Label>
                                         <div className="relative flex items-center">
                                             <div className="absolute left-3 text-slate-400 text-sm font-mono flex items-center gap-1">
-                                                <Globe size={14} /> /{targetId}/
+                                                <Globe size={14} /> /{effectiveDomainCode}/
                                             </div>
                                             <Input
                                                 placeholder="2026spring"
@@ -335,7 +565,7 @@ export default function SocietyDashboardPage() {
                                             />
                                         </div>
                                         <p className="text-[11px] text-slate-400">
-                                            Full URL: https://{targetId}.eregi.co.kr/{newSlug || 'slug'}
+                                            Full URL: https://{effectiveDomainCode}.eregi.co.kr/{newSlug || 'slug'}
                                         </p>
                                     </div>
 
@@ -439,11 +669,11 @@ export default function SocietyDashboardPage() {
                                     <CardFooter className="p-4 bg-slate-50 border-t grid grid-cols-2 gap-3">
                                         <Button
                                             variant="ghost"
-                                            className="w-full text-slate-500 hover:text-blue-600 hover:bg-blue-50 h-10 text-xs font-semibold"
+                                                    className="w-full text-slate-500 hover:text-blue-600 hover:bg-blue-50 h-10 text-xs font-semibold"
                                             onClick={() => {
                                                 const url = window.location.origin.includes('localhost')
                                                     ? `/${conf.slug}`
-                                                    : `https://${targetId}.eregi.co.kr/${conf.slug}`;
+                                                    : `https://${effectiveDomainCode}.eregi.co.kr/${conf.slug}`;
                                                 window.open(url, '_blank');
                                             }}
                                         >

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useOutletContext } from 'react-router-dom';
 import { useVendor, VendorProfile } from '../../hooks/useVendor';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -10,8 +10,10 @@ import { Settings, Building2, Link as LinkIcon, Image as ImageIcon, Save, AlertC
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 export default function VendorSettingsPage() {
-    const { vendorId } = useParams<{ vendorId: string }>();
-    const vendorLogic = useVendor(vendorId);
+    const { vendorId: paramVendorId } = useParams<{ vendorId: string }>();
+    const { activeVendorId } = useOutletContext<{ activeVendorId?: string | null }>();
+    const resolvedVendorId = activeVendorId || paramVendorId;
+    const vendorLogic = useVendor(resolvedVendorId);
 
     const { vendor, loading, updateVendorProfile, error } = vendorLogic;
 

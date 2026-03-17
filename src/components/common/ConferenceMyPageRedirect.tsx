@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { getRootCookie } from '../../utils/cookie';
 import LoadingSpinner from './LoadingSpinner';
 import { Skeleton } from '../ui/skeleton';
+import { DOMAIN_CONFIG, extractSocietyFromHost } from '../../utils/domainHelper';
 
 export const ConferenceMyPageRedirect: React.FC = () => {
     const { slug } = useParams<{ slug: string }>();
@@ -13,8 +14,11 @@ export const ConferenceMyPageRedirect: React.FC = () => {
             // We redirect to the main MyPage (UserHub)
             // Ideally, we should stay on the same domain if possible, or go to kadd.eregi.co.kr
 
-            const targetDomain = 'kadd.eregi.co.kr'; // Primary Domain
             const currentHost = window.location.hostname;
+            const hostSociety = extractSocietyFromHost(currentHost);
+            const targetDomain = hostSociety
+                ? `${hostSociety}.${DOMAIN_CONFIG.BASE_DOMAIN}`
+                : currentHost;
             const token = getRootCookie('eregi_session');
 
             let targetUrl = '/mypage';
@@ -31,7 +35,12 @@ export const ConferenceMyPageRedirect: React.FC = () => {
 
             // We can append ?highlight=slug to maybe auto-filter or highlight the conference in the future
             if (slug) {
-                targetUrl += `?highlight=${slug}`;
+                const params = new URLSearchParams();
+                params.set('highlight', slug);
+                if (hostSociety) {
+                    params.set('scopeSociety', hostSociety);
+                }
+                targetUrl += `?${params.toString()}`;
             }
 
             window.location.href = targetUrl;

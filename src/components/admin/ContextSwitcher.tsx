@@ -15,6 +15,7 @@ import { Button } from '../ui/button';
 import { ChevronsUpDown, Building2, Calendar, Plus } from 'lucide-react';
 import { safeText } from '../../utils/safeText';
 import { cn } from '../../lib/utils';
+import { resolveSocietyByIdentifier } from '../../utils/societyResolver';
 
 interface ConferenceOption {
   id: string;
@@ -57,7 +58,14 @@ export default function ContextSwitcher() {
     const fetchConferences = async () => {
       setLoading(true);
       try {
-        const q = query(collection(db, 'conferences'), where('societyId', '==', targetId));
+        const resolved = await resolveSocietyByIdentifier(targetId);
+        const docId = resolved?.id || targetId;
+        const domainCode = String((resolved?.data.domainCode as string | undefined) || docId).toLowerCase();
+        const societyKeys = Array.from(new Set([domainCode, docId, targetId].filter(Boolean)));
+
+        const q = societyKeys.length === 1
+          ? query(collection(db, 'conferences'), where('societyId', '==', societyKeys[0]))
+          : query(collection(db, 'conferences'), where('societyId', 'in', societyKeys.slice(0, 10)));
         const snapshot = await getDocs(q);
         const list = snapshot.docs.map(doc => ({
           id: doc.id,

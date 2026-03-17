@@ -7,10 +7,8 @@
  * 사용 예시:
  * ```typescript
  * const flags = await getFeatureFlags();
- * if (flags.useNHNAlimTalk) {
- *   await sendNHNAlimTalk(...);
- * } else {
- *   await sendAligoAlimTalk(...);
+ * if (flags.enableMonitoring) {
+ *   await startMonitoring(...);
  * }
  * ```
  */
@@ -20,7 +18,6 @@ import * as admin from 'firebase-admin';
 export interface FeatureFlags {
     // AlimTalk 관련
     useNHNAlimTalk: boolean;
-    useAligoAlimTalk: boolean;
 
     // 외부 참석자 관련
     enableExternalAttendee: boolean;
@@ -40,8 +37,7 @@ export interface FeatureFlags {
 
 // 기본값 (안전한 설정)
 const DEFAULT_FLAGS: FeatureFlags = {
-    useNHNAlimTalk: false,
-    useAligoAlimTalk: true,
+    useNHNAlimTalk: true,
     enableExternalAttendee: true,
     enableExternalAttendeeMigration: false,
     enableMonitoring: true,

@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebase';
 import { useLocation, useParams } from 'react-router-dom';
 import { SUPER_ADMINS } from '../constants/defaults';
+import { resolveSocietyByIdentifier } from '../utils/societyResolver';
 
 const EMPTY_ADMIN_STATE = { isAdmin: false, loading: false, permissions: null, isSocietyAdmin: false };
 
@@ -52,14 +51,13 @@ export const useSocietyAdmin = (societyId: string | undefined, userEmail: string
                     return;
                 }
 
-                const socRef = doc(db, 'societies', societyId);
-                const socSnap = await getDoc(socRef);
-                
-                if (socSnap.exists()) {
-                    const data = socSnap.data();
+                const resolved = await resolveSocietyByIdentifier(societyId);
+
+                if (resolved) {
+                    const data = resolved.data;
                     const isAuthorized = data.adminEmails && Array.isArray(data.adminEmails) && data.adminEmails.includes(userEmail);
                     
-                    console.log('🛡️ [useSocietyAdmin] Society data:', { societyId, isAuthorized });
+                    console.log('🛡️ [useSocietyAdmin] Society data:', { societyId, resolvedSocietyId: resolved.id, isAuthorized });
                     
                     setIsSocietyAdmin(isAuthorized);
                 } else {

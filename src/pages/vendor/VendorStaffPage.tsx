@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useOutletContext } from 'react-router-dom';
 import { useVendor } from '../../hooks/useVendor';
 import { getAuth } from 'firebase/auth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
@@ -11,8 +11,10 @@ import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 export default function VendorStaffPage() {
-    const { vendorId } = useParams<{ vendorId: string }>();
-    const vendorLogic = useVendor(vendorId);
+    const { vendorId: paramVendorId } = useParams<{ vendorId: string }>();
+    const { activeVendorId } = useOutletContext<{ activeVendorId?: string | null }>();
+    const resolvedVendorId = activeVendorId || paramVendorId;
+    const vendorLogic = useVendor(resolvedVendorId);
 
     const { vendor, loading, updateVendorProfile } = vendorLogic;
     const [newEmail, setNewEmail] = useState('');

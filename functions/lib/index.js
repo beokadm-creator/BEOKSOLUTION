@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.healthCheck = exports.onTossWebhook = exports.logPerformance = exports.logError = exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.confirmTossPaymentHttp = exports.confirmTossPayment = exports.confirmNicePayment = exports.prepareNicePayment = exports.manualDataCleanup = exports.scheduledDataCleanup = exports.withdrawConsent = exports.logAuditEvent = exports.sendVendorAlimTalk = exports.manualAutoCheckout = exports.scheduledAutoCheckout = exports.resolveDataIntegrityAlert = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.bulkSendNotifications = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.corsHandler = void 0;
+exports.healthCheck = exports.onTossWebhook = exports.logPerformance = exports.logError = exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.confirmTossPaymentHttp = exports.confirmTossPayment = exports.confirmNicePayment = exports.prepareNicePayment = exports.requestStampReward = exports.manualDataCleanup = exports.scheduledDataCleanup = exports.withdrawConsent = exports.logAuditEvent = exports.sendVendorAlimTalk = exports.manualAutoCheckout = exports.scheduledAutoCheckout = exports.resolveDataIntegrityAlert = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.bulkSendNotifications = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.corsHandler = void 0;
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -76,6 +76,8 @@ Object.defineProperty(exports, "withdrawConsent", { enumerable: true, get: funct
 const dataCleanup_1 = require("./scheduled/dataCleanup");
 Object.defineProperty(exports, "scheduledDataCleanup", { enumerable: true, get: function () { return dataCleanup_1.scheduledDataCleanup; } });
 Object.defineProperty(exports, "manualDataCleanup", { enumerable: true, get: function () { return dataCleanup_1.manualDataCleanup; } });
+const requestStampReward_1 = require("./stampTour/requestStampReward");
+Object.defineProperty(exports, "requestStampReward", { enumerable: true, get: function () { return requestStampReward_1.requestStampReward; } });
 exports.corsHandler = (0, cors_1.default)({ origin: true });
 admin.initializeApp();
 // import { sendAlimTalkTest } from './alimtalk/sendTest';
@@ -1010,7 +1012,7 @@ exports.sendAuthCode = functions
     if (!phone || !code) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing phone number or code');
     }
-    // In a real implementation, this would call an SMS/AlimTalk provider API (e.g., Aligo, Twilio, Solapi)
+    // In a real implementation, this would call an SMS/AlimTalk provider API (e.g., Twilio, Solapi)
     // For now, we just log it as requested.
     functions.logger.info(`[SMS MOCK] Sending AlimTalk to ${phone}: [e-Regi] 가입인증번호 입니다. #${code}`);
     return { success: true, message: "Code sent successfully (MOCK)" };

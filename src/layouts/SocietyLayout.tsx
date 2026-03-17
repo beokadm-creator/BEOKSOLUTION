@@ -4,12 +4,12 @@ import { Outlet, useParams, Link, useLocation } from 'react-router-dom';
 import { SocietyProvider } from '../contexts/SocietyContext';
 import { useSubdomain } from '../hooks/useSubdomain';
 import { DEFAULT_SOCIETY_FEATURES, APP_VERSION } from '../constants/defaults';
-import { doc, getDoc } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { auth } from '../firebase';
 import { Button } from '../components/ui/button';
 import { LayoutDashboard, Settings, Users, Mail, ShieldCheck, LogOut, Building2, CreditCard, Globe } from 'lucide-react';
 import { cn } from '../lib/utils';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import { resolveSocietyByIdentifier } from '../utils/societyResolver';
 
 
 // ✅ DEV 환경용 URL 파라미터 생성 함수
@@ -66,13 +66,11 @@ export default function SocietyLayout() {
 
     const fetchSociety = async () => {
       try {
-        const docRef = doc(db, 'societies', stableSid);
-        const docSnap = await getDoc(docRef);
-        console.log('[SocietyLayout] Doc exists:', docSnap.exists());
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          console.log('[SocietyLayout] Society data:', data);
-          setSociety({ id: docSnap.id, ...data });
+        const resolved = await resolveSocietyByIdentifier(stableSid);
+        console.log('[SocietyLayout] Resolved society:', !!resolved);
+        if (resolved) {
+          console.log('[SocietyLayout] Society data:', resolved.data);
+          setSociety({ id: resolved.id, ...resolved.data });
         } else {
           console.error('[SocietyLayout] Society not found for sid:', stableSid);
         }

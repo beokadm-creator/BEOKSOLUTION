@@ -79,96 +79,143 @@ const LandingPage: React.FC = () => {
         });
     };
 
+    const formatDateRange = (dates?: { start: unknown; end: unknown }) => {
+        if (!dates?.start && !dates?.end) return '일정 추후 공지';
+        const start = formatDate(dates?.start);
+        const end = formatDate(dates?.end);
+        if (!dates?.end || start === end) return start;
+        return `${start} - ${end}`;
+    };
+
+    const getStatusMeta = (status?: string) => {
+        const s = (status || '').toUpperCase();
+        if (s.includes('LIVE') || s.includes('OPEN') || s.includes('ONGOING') || s.includes('ACTIVE')) {
+            return {
+                label: '진행중',
+                className: 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+            };
+        }
+        if (s.includes('PREP') || s.includes('COMING') || s.includes('READY') || s.includes('DRAFT')) {
+            return {
+                label: '준비중',
+                className: 'bg-amber-50 text-amber-700 border border-amber-100'
+            };
+        }
+        if (s.includes('CLOSE') || s.includes('END') || s.includes('FINISH')) {
+            return {
+                label: '종료',
+                className: 'bg-slate-100 text-slate-600 border border-slate-200'
+            };
+        }
+        return {
+            label: '운영중',
+            className: 'bg-blue-50 text-blue-700 border border-blue-100'
+        };
+    };
+
     return (
-        <div className="min-h-screen bg-white font-sans text-slate-900 overflow-x-hidden">
+        <div className="min-h-screen bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_40%,#f8fafc_100%)] font-sans text-slate-900 overflow-x-hidden">
             {/* 1. HEADER */}
             <EregiNavigation transparent />
 
             {/* 2. HERO SECTION */}
-            <section className="pt-40 pb-20 px-6">
-                <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
-                    <div className="space-y-8 animate-in slide-in-from-left duration-700">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-eregi-50 text-eregi-600 border border-eregi-100 text-xs font-bold uppercase tracking-wider">
-                            <ShieldCheck size={14} /> Reliable Conference Infrastructure
+            <section className="pt-32 pb-16 px-4 sm:px-6">
+                <div className="max-w-7xl mx-auto grid lg:grid-cols-[1.2fr_.8fr] gap-8 lg:gap-10 items-center">
+                    <div className="space-y-6 animate-in slide-in-from-left duration-700">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-xs font-bold tracking-wider">
+                            <ShieldCheck size={14} /> TRUSTED CONFERENCE PLATFORM
                         </div>
-                        <h1 className="text-5xl lg:text-7xl font-extrabold text-slate-900 leading-[1.1] tracking-tight">
-                            The Next Era of <br />
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-eregi-600 to-indigo-600">Event Intelligence</span>
+                        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 leading-[1.12] tracking-tight">
+                            학술대회 운영을
+                            <br />
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-cyan-600">
+                                한 화면에서 단순하게
+                            </span>
                         </h1>
-                        <p className="text-lg text-slate-500 leading-relaxed max-w-xl">
-                            학술대회 등록부터 실시간 이수 관리까지. <br />
-                            운영 솔루션, eRegi와 함께하세요.
+                        <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-2xl">
+                            학회별 독립 도메인, 등록/결제, 명찰, 방명록 동의 관리, 실시간 운영 대시보드까지
+                            eRegi에서 통합 제공합니다.
                         </p>
-                        <div className="flex flex-wrap gap-4">
+                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                             <EregiButton
                                 onClick={() => navigate('/auth')}
-                                className="px-8 py-4 text-lg h-auto rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all"
+                                className="w-full sm:w-auto px-7 py-4 text-base h-auto rounded-2xl shadow-lg hover:shadow-xl transition-all"
                             >
-                                Get Started <ArrowRight size={20} className="ml-2" />
+                                시작하기 <ArrowRight size={18} className="ml-2" />
                             </EregiButton>
 
-                            <button onClick={() => window.open('https://pf.kakao.com/_wxexmxgn/chat', '_blank')} className="bg-white border border-slate-200 text-slate-700 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-slate-50 transition transform hover:-translate-y-1">
-                                Request Demo
+                            <button
+                                onClick={() => window.open('https://pf.kakao.com/_wxexmxgn/chat', '_blank')}
+                                className="w-full sm:w-auto bg-white border border-slate-200 text-slate-700 px-7 py-4 rounded-2xl font-bold text-base hover:bg-slate-50 transition"
+                            >
+                                카카오톡 문의
                             </button>
                         </div>
-                        <div className="flex gap-8 pt-4">
+                        <div className="flex flex-wrap gap-6 pt-2">
                             <div>
                                 <div className="text-2xl font-black text-slate-900">500+</div>
-                                <div className="text-xs text-slate-400 font-bold uppercase tracking-widest">Global Events</div>
+                                <div className="text-xs text-slate-400 font-bold uppercase tracking-widest">Annual Events</div>
                             </div>
-                            <div className="border-l border-slate-200 h-10 my-auto"></div>
                             <div>
                                 <div className="text-2xl font-black text-slate-900">100k+</div>
                                 <div className="text-xs text-slate-400 font-bold uppercase tracking-widest">Participants</div>
                             </div>
+                            <div>
+                                <div className="text-2xl font-black text-slate-900">99.9%</div>
+                                <div className="text-xs text-slate-400 font-bold uppercase tracking-widest">Service Uptime</div>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="relative animate-in zoom-in duration-1000">
-                        <div className="absolute -inset-4 bg-gradient-to-tr from-eregi-600 to-indigo-600 rounded-3xl opacity-10 blur-2xl"></div>
-                        <div className="relative bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-white/10 aspect-[4/3] flex items-center justify-center">
-                            {/* Mockup Overlay */}
-                            <div className="absolute inset-0 bg-gradient-to-br from-eregi-500/10 to-transparent"></div>
-                            <div className="p-8 w-full space-y-6">
-                                <div className="h-4 w-32 bg-slate-800 rounded-full"></div>
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div className="h-24 bg-slate-800 rounded-2xl animate-pulse"></div>
-                                    <div className="h-24 bg-eregi-600/20 rounded-2xl border border-eregi-500/30"></div>
-                                    <div className="h-24 bg-slate-800 rounded-2xl"></div>
+                    <div className="relative animate-in zoom-in duration-700">
+                        <div className="absolute -inset-2 bg-gradient-to-tr from-blue-600/20 to-cyan-500/20 rounded-3xl blur-2xl"></div>
+                        <div className="relative rounded-3xl border border-slate-200 bg-white p-6 sm:p-7 shadow-xl">
+                            <div className="flex items-center justify-between mb-5">
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Operational Snapshot</p>
+                                <span className="text-[10px] px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-bold">Live</span>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-semibold text-slate-700">실시간 등록</span>
+                                        <span className="text-xl font-black text-slate-900">1,284</span>
+                                    </div>
                                 </div>
-                                <div className="h-40 bg-slate-800 rounded-3xl opacity-50 relative overflow-hidden">
-                                    <div className="absolute bottom-0 left-0 right-0 h-2/3 bg-eregi-600/5 backdrop-blur-sm p-4">
-                                        <div className="h-2 w-1/2 bg-eregi-400/20 rounded mb-2"></div>
-                                        <div className="h-2 w-2/3 bg-eregi-400/10 rounded"></div>
+                                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-semibold text-slate-700">방명록 동의 기록</span>
+                                        <span className="text-xl font-black text-slate-900">742</span>
+                                    </div>
+                                </div>
+                                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-semibold text-slate-700">현장 체크인</span>
+                                        <span className="text-xl font-black text-slate-900">96%</span>
                                     </div>
                                 </div>
                             </div>
-                            <div className="absolute top-4 right-4 bg-eregi-600 text-[10px] font-black px-2 py-1 rounded-md text-white tracking-widest uppercase">Admin Console Live</div>
-                        </div>
-                        {/* Decorative Badge */}
-                        <div className="absolute -bottom-6 -left-6 bg-white p-6 rounded-2xl shadow-xl border border-slate-100 space-y-2 max-w-[180px]">
-                            <div className="flex gap-1">
-                                {[1, 2, 3, 4, 5].map(i => <div key={i} className="w-3 h-3 bg-yellow-400 rounded-full"></div>)}
-                            </div>
-                            <p className="text-[11px] font-bold text-slate-600">Rated #1 Academic Event Solution</p>
                         </div>
                     </div>
                 </div>
             </section>
 
             {/* 3. SOCIETIES GRID */}
-            <section className="py-20 bg-slate-50">
-                <div className="max-w-7xl mx-auto px-6">
+            <section className="py-16 bg-slate-50/80 border-y border-slate-100">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6">
                     <div className="text-center mb-12">
-                        <p className="text-eregi-600 font-black text-xs uppercase tracking-widest mb-2">Partner Organizations</p>
-                        <h2 className="text-3xl font-extrabold text-slate-900">Trusted by Premier Societies</h2>
+                        <p className="text-blue-700 font-black text-xs uppercase tracking-widest mb-2">Partner Organizations</p>
+                        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">협력 학회</h2>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-5">
                         {societies.map(soc => (
-                            <div key={soc.id} onClick={() => window.open(`https://${soc.id}.eregi.co.kr`, '_blank')} className="group flex flex-col items-center justify-center p-8 bg-white rounded-2xl border border-slate-100 hover:border-eregi-200 hover:shadow-xl hover:shadow-eregi-600/5 transition-all cursor-pointer">
-                                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 group-hover:bg-eregi-50 transition-colors">
-                                    <span className="text-xl font-black text-slate-300 group-hover:text-eregi-600">{soc.id.substring(0, 2).toUpperCase()}</span>
+                            <div
+                                key={soc.id}
+                                onClick={() => window.open(`https://${soc.id}.eregi.co.kr`, '_blank')}
+                                className="group flex flex-col items-center justify-center p-5 sm:p-6 bg-white rounded-2xl border border-slate-100 hover:border-blue-200 hover:shadow-md transition-all cursor-pointer"
+                            >
+                                <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center mb-3 group-hover:bg-blue-50 transition-colors">
+                                    <span className="text-lg font-black text-slate-400 group-hover:text-blue-700">{soc.id.substring(0, 2).toUpperCase()}</span>
                                 </div>
                                 <span className="text-xs font-bold text-slate-600 text-center line-clamp-1">{soc.name.ko}</span>
                             </div>
@@ -178,16 +225,19 @@ const LandingPage: React.FC = () => {
             </section>
 
             {/* 4. CONFERENCE FEED */}
-            <section className="py-24 px-6">
+            <section className="py-20 px-4 sm:px-6">
                 <div className="max-w-7xl mx-auto">
-                    <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-16">
+                    <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-10">
                         <div className="space-y-2">
-                            <span className="text-eregi-600 font-black text-xs uppercase tracking-widest">{UI_TEXT.upcomingEvents.subtitle.ko}</span>
-                            <h2 className="text-4xl font-extrabold text-slate-900 tracking-tight">{UI_TEXT.upcomingEvents.title.ko}</h2>
+                            <span className="text-blue-700 font-black text-xs uppercase tracking-widest">{UI_TEXT.upcomingEvents.subtitle.ko}</span>
+                            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">{UI_TEXT.upcomingEvents.title.ko}</h2>
                             <p className="text-slate-500 font-medium">{UI_TEXT.upcomingEvents.description.ko}</p>
                         </div>
-                        <button className="bg-slate-50 border border-slate-200 text-slate-600 px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-100 transition">
-                            View All Events <ChevronRight size={18} />
+                        <button
+                            onClick={() => navigate('/auth')}
+                            className="bg-white border border-slate-200 text-slate-700 px-5 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-50 transition"
+                        >
+                            전체 서비스 보기 <ChevronRight size={18} />
                         </button>
                     </div>
 
@@ -198,23 +248,23 @@ const LandingPage: React.FC = () => {
                             ))}
                         </div>
                     ) : (
-                        <div className="grid md:grid-cols-3 gap-8">
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
                             {conferences.length === 0 && <div className="col-span-full text-center py-20 text-slate-400 font-bold">진행 중인 행사가 없습니다.</div>}
                             {conferences.map(conf => (
-                                <div key={conf.id} className="group relative bg-white border border-slate-100 rounded-[2rem] p-8 shadow-sm hover:shadow-2xl hover:shadow-slate-200 transition-all cursor-pointer" onClick={() => window.open(`https://${conf.societyId}.eregi.co.kr`, '_blank')}>
-                                    <div className="flex justify-between items-start mb-6">
-                                        <div className="px-3 py-1 bg-eregi-50 text-eregi-600 rounded-lg text-[10px] font-black uppercase tracking-wider">{conf.societyName}</div>
+                                <div key={conf.id} className="group relative bg-white border border-slate-100 rounded-3xl p-6 shadow-sm hover:shadow-lg transition-all cursor-pointer" onClick={() => window.open(`https://${conf.societyId}.eregi.co.kr`, '_blank')}>
+                                    <div className="flex justify-between items-start mb-5">
+                                        <div className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-black uppercase tracking-wider">{conf.societyName}</div>
                                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">#{conf.societyId}</div>
                                     </div>
 
-                                    <h3 className="text-xl font-extrabold text-slate-900 mb-6 line-clamp-2 h-14 leading-tight group-hover:text-eregi-600 transition-colors">
+                                    <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 mb-5 line-clamp-2 min-h-[56px] leading-tight group-hover:text-blue-700 transition-colors">
                                         {formatTitle(conf.title)}
                                     </h3>
 
-                                    <div className="space-y-4 pt-6 border-t border-slate-50">
+                                    <div className="space-y-3 pt-5 border-t border-slate-100">
                                         <div className="flex items-center gap-3 text-slate-500">
                                             <Calendar size={18} className="text-slate-400" />
-                                            <span className="text-sm font-bold">{formatDate(conf.dates?.start)}</span>
+                                            <span className="text-sm font-bold">{formatDateRange(conf.dates)}</span>
                                         </div>
                                         <div className="flex items-center gap-3 text-slate-500">
                                             <MapPin size={18} className="text-slate-400" />
@@ -222,12 +272,11 @@ const LandingPage: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="mt-8 pt-2 flex items-center justify-between">
-                                        <span className="flex items-center gap-1.5 text-xs font-black text-green-600 bg-green-50 px-3 py-1.5 rounded-full">
-                                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                                            OPEN
+                                    <div className="mt-6 pt-1 flex items-center justify-between">
+                                        <span className={`inline-flex items-center gap-1.5 text-xs font-black px-3 py-1.5 rounded-full ${getStatusMeta(conf.status).className}`}>
+                                            {getStatusMeta(conf.status).label}
                                         </span>
-                                        <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white scale-0 group-hover:scale-100 transition-all shadow-lg shadow-black/20">
+                                        <div className="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center text-white scale-0 group-hover:scale-100 transition-all shadow-lg shadow-black/20">
                                             <ArrowRight size={20} />
                                         </div>
                                     </div>
@@ -239,24 +288,24 @@ const LandingPage: React.FC = () => {
             </section>
 
             {/* 5. CONTACT SECTION */}
-            <section className="py-20">
-                <div className="max-w-7xl mx-auto px-6">
-                    <div className="bg-slate-900 rounded-[3rem] p-12 lg:p-20 relative overflow-hidden text-center lg:text-left">
-                        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-eregi-600/20 to-transparent"></div>
+            <section className="py-16 sm:py-20">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                    <div className="bg-slate-900 rounded-[2rem] sm:rounded-[2.5rem] p-8 sm:p-12 lg:p-16 relative overflow-hidden text-center lg:text-left">
+                        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-blue-500/20 to-transparent"></div>
                         <div className="relative z-10 grid lg:grid-cols-2 gap-12 items-center">
                             <div>
-                                <h2 className="text-4xl lg:text-5xl font-black text-white mb-6 leading-tight">Ready to Modernize Your Conference?</h2>
-                                <p className="text-slate-400 text-lg font-medium max-w-lg mb-10 mx-auto lg:mx-0">
-                                    도입 비용, 기능 문의 등 궁금한 점이 있으신가요? <br />
-                                    카카오톡 실시간 상담을 통해 빠르게 답변해 드립니다.
+                                <h2 className="text-3xl lg:text-5xl font-black text-white mb-6 leading-tight">학술대회 운영, 지금 간단하게 시작하세요</h2>
+                                <p className="text-slate-300 text-base sm:text-lg font-medium max-w-lg mb-8 mx-auto lg:mx-0">
+                                    도입 상담, 기능 안내, 운영 절차까지
+                                    카카오톡으로 빠르게 안내해 드립니다.
                                 </p>
-                                <button onClick={() => window.open('https://pf.kakao.com/_wxexmxgn/chat', '_blank')} className="inline-flex items-center gap-3 bg-yellow-400 text-slate-900 px-10 py-5 rounded-2xl font-black text-xl hover:bg-yellow-300 shadow-2xl transition w-full sm:w-auto">
-                                    <MessageCircle size={28} /> KaKaoTalk Inquiry
+                                <button onClick={() => window.open('https://pf.kakao.com/_wxexmxgn/chat', '_blank')} className="inline-flex items-center justify-center gap-3 bg-yellow-400 text-slate-900 px-8 py-4 rounded-2xl font-black text-lg hover:bg-yellow-300 shadow-2xl transition w-full sm:w-auto">
+                                    <MessageCircle size={24} /> 카카오톡 상담
                                 </button>
                             </div>
                             <div className="grid grid-cols-2 gap-6">
                                 <div className="p-6 bg-white/5 rounded-3xl border border-white/10">
-                                    <BarChart3 className="text-eregi-500 mb-4" />
+                                    <BarChart3 className="text-blue-400 mb-4" />
                                     <div className="text-white font-bold mb-1">Real-time Analytics</div>
                                     <div className="text-slate-500 text-sm">Monitor registration stats live.</div>
                                 </div>

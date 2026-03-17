@@ -10,6 +10,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import { LayoutDashboard, Globe, FileText, Users, Settings, QrCode, Monitor, CreditCard, LogOut, ArrowLeft, Printer, BarChart, UserPlus, Building2, Bell, IdCard } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/ui/button';
+import { resolveSocietyByIdentifier } from '../utils/societyResolver';
 
 export default function ConfLayout() {
     const { cid } = useParams<{ cid: string }>();
@@ -91,12 +92,49 @@ export default function ConfLayout() {
                     }
                 }
 
+                // Fallback #2: cid가 composite(예: kaid_2026spring)인 경우 slug 파트로 조회
+                if (!found && cid && cid.includes('_')) {
+                    const slugPart = cid.split('_').slice(1).join('_');
+                    if (slugPart) {
+                        const q = query(collection(db, 'conferences'), where('slug', '==', slugPart), limit(1));
+                        const querySnapshot = await getDocs(q);
+                        if (!querySnapshot.empty) {
+                            const docData = querySnapshot.docs[0];
+                            confData = { id: docData.id, ...docData.data() } as Conference;
+                            found = true;
+                            console.log(`[ConfLayout] Found conference by slugPart query: ${slugPart}`);
+                        }
+                    }
+                }
+
                 if (found && confData) {
                     // Security Check: Society ID Mismatch
                     const confSocietyId = confData.societyId || confData.id.split('_')[0];
-                    
+
+                    let normalizedConfSociety = confSocietyId;
+                    let normalizedEffectiveSubdomain = effectiveSubdomain;
+
+                    try {
+                        const [resolvedConfSociety, resolvedEffectiveSubdomain] = await Promise.all([
+                            confSocietyId ? resolveSocietyByIdentifier(confSocietyId) : Promise.resolve(null),
+                            effectiveSubdomain ? resolveSocietyByIdentifier(effectiveSubdomain) : Promise.resolve(null)
+                        ]);
+
+                        normalizedConfSociety = (resolvedConfSociety?.data.domainCode as string | undefined)
+                            || resolvedConfSociety?.id
+                            || confSocietyId;
+                        normalizedEffectiveSubdomain = (resolvedEffectiveSubdomain?.data.domainCode as string | undefined)
+                            || resolvedEffectiveSubdomain?.id
+                            || effectiveSubdomain;
+                    } catch (e) {
+                        console.warn('[ConfLayout] Society normalize failed, fallback to raw compare', e);
+                    }
+
                     // Allow access if no effectiveSubdomain (e.g. dev environment or direct access)
-                    if (effectiveSubdomain && confSocietyId !== effectiveSubdomain) {
+                    if (
+                        effectiveSubdomain &&
+                        String(normalizedConfSociety).toLowerCase() !== String(normalizedEffectiveSubdomain).toLowerCase()
+                    ) {
                         console.error('Society Mismatch', { confSocietyId, effectiveSubdomain });
                         // Don't block access in dev mode if mismatch occurs
                         if (isDev) {
@@ -131,6 +169,9 @@ export default function ConfLayout() {
     const navItems = [
         { href: `/admin/conf/${cid}`, label: '대시보드', icon: LayoutDashboard },
         { href: `/admin/conf/${cid}/settings`, label: '행사 정보', icon: Globe },
+        ...(conference?.features?.stampTourEnabled
+            ? [{ href: `/admin/conf/${cid}/settings#stamp-tour`, label: '스탬프투어 설정', icon: Settings }]
+            : []),
         { href: `/admin/conf/${cid}/settings/registration`, label: '등록 설정', icon: CreditCard },
         { href: `/admin/conf/${cid}/sponsors`, label: '스폰서 관리', icon: Building2 },
         { href: `/admin/conf/${cid}/agenda`, label: '프로그램', icon: FileText },
@@ -148,7 +189,7 @@ export default function ConfLayout() {
     ];
 
     return (
-        <ConfProvider value={{ confId: cid!, conference, societyId: cid!.split('_')[0] }}>
+        <ConfProvider value={{ confId: cid!, conference, societyId: conference.societyId || cid!.split('_')[0] }}>
             <div className="flex h-screen bg-white">
                 {!isKioskMode && (
                     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
@@ -167,21 +208,38 @@ export default function ConfLayout() {
                         </div>
                         <nav className="flex-1 p-4 space-y-1">
                             {/* Force render for all admins: No permission filter applied */}
-                            {navItems.map(item => (
-                                <Link
-                                    key={item.href}
-                                    to={item.href}
-                                    className={cn(
-                                        "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
-                                        location.pathname === item.href
-                                            ? "bg-[#f0f5fa] text-[#003366] shadow-sm border border-[#e1ecf6] font-bold"
-                                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                                    )}
-                                >
-                                    <item.icon className={cn("w-4 h-4", location.pathname === item.href ? "text-[#24669e]" : "text-slate-400")} />
-                                    {item.label}
-                                </Link>
-                            ))}
+                            {navItems.map(item => {
+                                const isActive = location.pathname === item.href || `${location.pathname}${location.hash}` === item.href;
+                                const isStampTourLink = item.href.includes('#stamp-tour');
+                                return (
+                                    <Link
+                                        key={item.href}
+                                        to={item.href}
+                                        onClick={(e) => {
+                                            if (!isStampTourLink) return;
+                                            if (location.pathname === `/admin/conf/${cid}/settings`) {
+                                                e.preventDefault();
+                                                const section = document.getElementById('stamp-tour');
+                                                if (section) {
+                                                    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                }
+                                                if (window.location.hash !== '#stamp-tour') {
+                                                    window.history.replaceState(null, '', `/admin/conf/${cid}/settings#stamp-tour`);
+                                                }
+                                            }
+                                        }}
+                                        className={cn(
+                                            "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
+                                            isActive
+                                                ? "bg-[#f0f5fa] text-[#003366] shadow-sm border border-[#e1ecf6] font-bold"
+                                                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                                        )}
+                                    >
+                                        <item.icon className={cn("w-4 h-4", isActive ? "text-[#24669e]" : "text-slate-400")} />
+                                        {item.label}
+                                    </Link>
+                                );
+                            })}
                         </nav>
                         <div className="p-4 border-t border-gray-100">
                             <Button variant="ghost" className="w-full justify-start text-gray-400 hover:text-red-500" onClick={() => auth.signOut()}>

@@ -17,7 +17,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../componen
 import { safeFormatDate } from '../../utils/dateUtils';
 import PrintHandler from '../../components/print/PrintHandler';
 import BadgeTemplate from '../../components/print/BadgeTemplate';
-import { kadd_2026 } from '../../data/conferences/kadd_2026.backup';
 import { useRef } from 'react';
 import { handleDeleteRegistrationWithCleanup } from '../../utils/registrationDeleteHandler'; // Keep cascade delete handler
 import { Button } from '../../components/ui/button';
@@ -57,6 +56,17 @@ interface RootRegistration {
     options?: any[]; // Allow any to bypass TS error
     badgeQr?: string; // Added for QR printing
 }
+
+const DEFAULT_BADGE_CONFIG: BadgeConfig = {
+    dimensions: { width: '90mm', height: '120mm' },
+    backgroundUrl: '',
+    layout: {
+        name: { x: '50%', y: '38%', fontSize: '18px', align: 'center', fontWeight: '700' },
+        org: { x: '50%', y: '47%', fontSize: '12px', align: 'center' },
+        category: { x: '50%', y: '55%', fontSize: '11px', align: 'center' }
+    },
+    qr: { x: '50%', y: '70%', size: 120 }
+};
 
 const statusToKorean = (status: string) => {
     switch (status) {
@@ -124,7 +134,7 @@ const RegistrationListPage: React.FC = () => {
         if (info?.badgeLayout && info.badgeLayout.elements.length > 0) {
             return convertBadgeLayoutToConfig(info.badgeLayout);
         }
-        return kadd_2026.badge as BadgeConfig;
+        return DEFAULT_BADGE_CONFIG;
     }, [info]);
 
     // Use pagination hook (follows project convention: use hooks, not direct Firestore)

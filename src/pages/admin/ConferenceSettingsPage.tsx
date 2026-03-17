@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { doc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import { useLocation, useParams } from 'react-router-dom';
+import { collection, doc, getDoc, getDocs, onSnapshot, setDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../firebase';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Card, CardContent } from '../../components/ui/card';
+import { Switch } from '../../components/ui/switch';
 import BilingualInput from '../../components/ui/bilingual-input';
 import BilingualImageUpload from '../../components/ui/bilingual-image-upload';
 import RichTextEditor from '../../components/ui/RichTextEditor';
-import { Calendar, MapPin, Globe, FileText, ImageIcon, Save, Loader2, Info, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Calendar, MapPin, Globe, FileText, ImageIcon, Save, Loader2, Info, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Skeleton } from '../../components/ui/skeleton';
 
@@ -35,6 +36,61 @@ interface ConferenceData {
         submissionDeadline?: string;
         editDeadline?: string;
     };
+    features: {
+        guestbookEnabled: boolean;
+        stampTourEnabled: boolean;
+    };
+}
+
+interface SponsorSummary {
+    id: string;
+    name: string;
+    vendorId?: string;
+    order?: number;
+    isStampTourParticipant?: boolean;
+}
+
+type StampTourCompletionType = 'COUNT' | 'ALL';
+type StampTourBoothOrderMode = 'SPONSOR_ORDER' | 'CUSTOM';
+type StampTourRewardMode = 'RANDOM' | 'FIXED';
+
+interface StampTourRewardForm {
+    id: string;
+    name: string;
+    imageUrl?: string;
+    totalQty: number;
+    remainingQty: number;
+    weight?: number;
+    order?: number;
+    isFallback?: boolean;
+}
+
+interface StampTourConfigForm {
+    enabled: boolean;
+    endAt?: Timestamp;
+    completionRule: {
+        type: StampTourCompletionType;
+        requiredCount?: number;
+    };
+    boothOrderMode: StampTourBoothOrderMode;
+    customBoothOrder: string[];
+    rewardMode: StampTourRewardMode;
+    rewards: StampTourRewardForm[];
+    soldOutMessage: string;
+    completionMessage: string;
+}
+
+interface StampTourProgressRow {
+    id: string;
+    userId: string;
+    isCompleted?: boolean;
+    userName?: string;
+    userOrg?: string;
+    rewardName?: string;
+    rewardStatus: 'NONE' | 'REQUESTED' | 'REDEEMED';
+    completedAt?: Timestamp;
+    requestedAt?: Timestamp;
+    redeemedAt?: Timestamp;
 }
 
 const defaultData: ConferenceData = {
@@ -57,15 +113,61 @@ const defaultData: ConferenceData = {
     abstractDeadlines: {
         submissionDeadline: '',
         editDeadline: ''
+    },
+    features: {
+        guestbookEnabled: true,
+        stampTourEnabled: false
     }
+};
+
+const defaultStampTourConfig: StampTourConfigForm = {
+    enabled: false,
+    completionRule: {
+        type: 'COUNT',
+        requiredCount: 5
+    },
+    boothOrderMode: 'SPONSOR_ORDER',
+    customBoothOrder: [],
+    rewardMode: 'RANDOM',
+    rewards: [],
+    soldOutMessage: '선착순 경품이 모두 소진되었습니다.',
+    completionMessage: '스탬프 투어를 완료했습니다. 상품 수령 버튼을 눌러주세요.'
 };
 
 export default function ConferenceSettingsPage() {
     const { cid } = useParams<{ cid: string }>();
+    const location = useLocation();
     const [data, setData] = useState<ConferenceData>(defaultData);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
+    const [sponsors, setSponsors] = useState<SponsorSummary[]>([]);
+    const [stampTourConfig, setStampTourConfig] = useState<StampTourConfigForm>(defaultStampTourConfig);
+    const [stampTourProgress, setStampTourProgress] = useState<StampTourProgressRow[]>([]);
+
+    const getKstEndOfDayTimestamp = (dtStr: string): Timestamp | null => {
+        if (!dtStr) return null;
+        const [datePart] = dtStr.split('T');
+        if (!datePart) return null;
+        const [year, month, day] = datePart.split('-').map(Number);
+        if (!year || !month || !day) return null;
+        // 23:59 KST = 14:59 UTC
+        return Timestamp.fromDate(new Date(Date.UTC(year, month - 1, day, 14, 59, 0, 0)));
+    };
+
+    const formatKstTimestamp = (ts?: Timestamp): string => {
+        if (!ts) return '-';
+        const d = ts.toDate();
+        const kstOffset = 9 * 60;
+        const localMs = d.getTime() + kstOffset * 60 * 1000;
+        const kstDate = new Date(localMs);
+        const year = kstDate.getUTCFullYear();
+        const month = String(kstDate.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(kstDate.getUTCDate()).padStart(2, '0');
+        const hours = String(kstDate.getUTCHours()).padStart(2, '0');
+        const minutes = String(kstDate.getUTCMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day} ${hours}:${minutes} KST`;
+    };
 
     useEffect(() => {
         if (!cid) return;
@@ -78,10 +180,10 @@ export default function ConferenceSettingsPage() {
                 if (docSnap.exists()) {
                     const snapData = docSnap.data();
 
-                    const toDateTimeLocalStr = (ts: any): string => {
-                        if (ts && typeof ts === 'object' && ts.toDate) {
+                    const toDateTimeLocalStr = (ts: unknown): string => {
+                        if (ts && typeof ts === 'object' && 'toDate' in ts && typeof (ts as { toDate?: () => Date }).toDate === 'function') {
                             // Firestore Timestamp → KST 기준 datetime-local 문자열로 변환
-                            const d = ts.toDate();
+                            const d = (ts as { toDate: () => Date }).toDate();
                             // KST(Asia/Seoul, UTC+9) 기준으로 변환
                             const kstOffset = 9 * 60; // 분 단위
                             const localMs = d.getTime() + kstOffset * 60 * 1000;
@@ -100,13 +202,16 @@ export default function ConferenceSettingsPage() {
                         return '';
                     };
 
+                    const startStr = toDateTimeLocalStr(snapData.startDate || snapData.dates?.start);
+                    const endStr = toDateTimeLocalStr(snapData.endDate || snapData.dates?.end);
+
                     setData({
                         title: { ko: snapData.title?.ko || '', en: snapData.title?.en || '' },
                         subtitle: snapData.subtitle || '',
                         slug: snapData.slug || cid || '',
                         dates: {
-                            start: toDateTimeLocalStr(snapData.startDate || snapData.dates?.start),
-                            end: toDateTimeLocalStr(snapData.endDate || snapData.dates?.end)
+                            start: startStr,
+                            end: endStr
                         },
                         venue: {
                             name: {
@@ -138,8 +243,50 @@ export default function ConferenceSettingsPage() {
                             ko: snapData.welcomeMessage?.ko || snapData.welcomeMessage || '',
                             en: snapData.welcomeMessage?.en || ''
                         },
-                        welcomeMessageImages: snapData.welcomeMessageImages || []
+                        welcomeMessageImages: snapData.welcomeMessageImages || [],
+                        features: {
+                            guestbookEnabled: snapData.features?.guestbookEnabled ?? true,
+                            stampTourEnabled: snapData.features?.stampTourEnabled ?? false
+                        }
                     });
+
+                    const sponsorsSnap = await getDocs(collection(db, `conferences/${cid}/sponsors`));
+                    const sponsorList = sponsorsSnap.docs.map(d => {
+                        const s = d.data() as { name?: string; vendorId?: string; order?: number; isStampTourParticipant?: boolean };
+                        return {
+                            id: d.id,
+                            name: s.name || d.id,
+                            vendorId: s.vendorId,
+                            order: s.order,
+                            isStampTourParticipant: s.isStampTourParticipant === true
+                        } as SponsorSummary;
+                    });
+                    sponsorList.sort((a, b) => (a.order || 999) - (b.order || 999));
+                    setSponsors(sponsorList);
+
+                    const configRef = doc(db, `conferences/${cid}/settings`, 'stamp_tour');
+                    const configSnap = await getDoc(configRef);
+                    if (configSnap.exists()) {
+                        const cfg = configSnap.data() as Partial<StampTourConfigForm>;
+                        setStampTourConfig({
+                            ...defaultStampTourConfig,
+                            ...cfg,
+                            completionRule: {
+                                ...defaultStampTourConfig.completionRule,
+                                ...(cfg.completionRule || {})
+                            },
+                            rewards: Array.isArray(cfg.rewards) ? cfg.rewards : [],
+                            customBoothOrder: Array.isArray(cfg.customBoothOrder) ? cfg.customBoothOrder : [],
+                            enabled: snapData.features?.stampTourEnabled ?? cfg.enabled ?? false,
+                            endAt: cfg.endAt || getKstEndOfDayTimestamp(endStr) || undefined
+                        });
+                    } else {
+                        setStampTourConfig(prev => ({
+                            ...prev,
+                            enabled: snapData.features?.stampTourEnabled ?? false,
+                            endAt: getKstEndOfDayTimestamp(endStr) || undefined
+                        }));
+                    }
                 }
             } catch (error) {
                 console.error("Error fetching conference settings:", error);
@@ -150,6 +297,50 @@ export default function ConferenceSettingsPage() {
         };
 
         fetchData();
+    }, [cid]);
+
+    useEffect(() => {
+        if (location.hash !== '#stamp-tour') return;
+        const scrollToStampTour = () => {
+            const section = document.getElementById('stamp-tour');
+            if (!section) return false;
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return true;
+        };
+
+        if (scrollToStampTour()) return;
+        const timer = window.setTimeout(() => {
+            scrollToStampTour();
+        }, 250);
+        return () => window.clearTimeout(timer);
+    }, [location.hash, loading, data.features.stampTourEnabled]);
+
+    useEffect(() => {
+        if (!data.features.stampTourEnabled && !stampTourConfig.enabled) return;
+        const endAt = stampTourConfig.endAt || getKstEndOfDayTimestamp(data.dates.end) || undefined;
+        setStampTourConfig(prev => ({
+            ...prev,
+            enabled: data.features.stampTourEnabled,
+            endAt
+        }));
+    }, [data.features.stampTourEnabled, data.dates.end, stampTourConfig.endAt]);
+
+    useEffect(() => {
+        if (!cid) return;
+        const ref = collection(db, `conferences/${cid}/stamp_tour_progress`);
+        const unsub = onSnapshot(ref, (snap) => {
+            const list = snap.docs.map(d => {
+                const v = d.data() as StampTourProgressRow;
+                return { ...v, id: d.id };
+            });
+            list.sort((a, b) => {
+                const at = a.completedAt?.toMillis ? a.completedAt.toMillis() : 0;
+                const bt = b.completedAt?.toMillis ? b.completedAt.toMillis() : 0;
+                return bt - at;
+            });
+            setStampTourProgress(list);
+        });
+        return () => unsub();
     }, [cid]);
 
     const handleSave = async () => {
@@ -188,10 +379,23 @@ export default function ConferenceSettingsPage() {
                 welcomeMessageImages: data.welcomeMessageImages || [],
                 abstractSubmissionDeadline: data.abstractDeadlines.submissionDeadline ? Timestamp.fromDate(parseDatetimeLocal(data.abstractDeadlines.submissionDeadline)) : null,
                 abstractEditDeadline: data.abstractDeadlines.editDeadline ? Timestamp.fromDate(parseDatetimeLocal(data.abstractDeadlines.editDeadline)) : null,
+                features: {
+                    guestbookEnabled: data.features.guestbookEnabled,
+                    stampTourEnabled: data.features.stampTourEnabled
+                },
                 updatedAt: Timestamp.now()
             };
 
             await updateDoc(docRef, updateData);
+
+            const endAt = stampTourConfig.endAt || getKstEndOfDayTimestamp(data.dates.end) || undefined;
+            const stampConfigRef = doc(db, `conferences/${cid}/settings`, 'stamp_tour');
+            await setDoc(stampConfigRef, {
+                ...stampTourConfig,
+                enabled: data.features.stampTourEnabled,
+                endAt
+            }, { merge: true });
+
             toast.success("Conference settings saved successfully!");
         } catch (error) {
             console.error("Error saving conference settings:", error);
@@ -421,6 +625,449 @@ export default function ConferenceSettingsPage() {
                 </section>
 
                 <hr className="border-slate-100" />
+
+                {/* 2.7 Feature Toggles Section */}
+                <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+                    <div className="lg:col-span-4 space-y-3">
+                        <div className="flex items-center gap-2">
+                            <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600">
+                                <Info className="w-6 h-6" />
+                            </div>
+                            <h2 className="text-xl font-bold text-slate-800">부가 기능</h2>
+                        </div>
+                        <p className="text-slate-500 leading-relaxed text-sm">
+                            학술대회별로 방명록과 스탬프투어 사용 여부를 설정합니다.<br />
+                            방명록은 기본 설정이며, 스탬프투어는 별도 기획에 맞춰 필요 시 활성화합니다.
+                        </p>
+                    </div>
+
+                    <div className="lg:col-span-8">
+                        <Card className="border-0 shadow-sm ring-1 ring-slate-200 bg-white overflow-hidden rounded-2xl">
+                            <CardContent className="p-6 md:p-8 space-y-6">
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
+                                    <div className="space-y-0.5">
+                                        <Label className="text-sm font-bold text-slate-700">방명록 사용</Label>
+                                        <p className="text-xs text-slate-500">참가자 동의 기반으로 방명록을 수집합니다. 기본 설정은 ON입니다.</p>
+                                    </div>
+                                    <Switch
+                                        checked={data.features.guestbookEnabled}
+                                        onChange={(e) => setData(prev => ({
+                                            ...prev,
+                                            features: { ...prev.features, guestbookEnabled: e.target.checked }
+                                        }))}
+                                        className="data-[state=checked]:bg-emerald-600"
+                                    />
+                                </div>
+
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
+                                    <div className="space-y-0.5">
+                                        <Label className="text-sm font-bold text-slate-700">스탬프투어 사용</Label>
+                                        <p className="text-xs text-slate-500">별도 서비스 기획이 준비된 경우에만 활성화하세요.</p>
+                                    </div>
+                                    <Switch
+                                        checked={data.features.stampTourEnabled}
+                                        onChange={(e) => setData(prev => ({
+                                            ...prev,
+                                            features: { ...prev.features, stampTourEnabled: e.target.checked }
+                                        }))}
+                                        className="data-[state=checked]:bg-indigo-600"
+                                    />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </section>
+
+                <hr className="border-slate-100" />
+
+                {data.features.stampTourEnabled && (
+                    <>
+                        {/* 2.8 Stamp Tour Settings */}
+                        <section id="stamp-tour" className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+                            <div className="lg:col-span-4 space-y-3">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600">
+                                        <Info className="w-6 h-6" />
+                                    </div>
+                                    <h2 className="text-xl font-bold text-slate-800">스탬프투어 상세 설정</h2>
+                                </div>
+                                <p className="text-slate-500 leading-relaxed text-sm">
+                                    디지털 명찰에 표시되는 스탬프투어 규칙과 보상 정책을 설정합니다.<br />
+                                    완료 조건과 부스 순서, 상품 분배 규칙을 신중하게 확인하세요.
+                                </p>
+                                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                    <div className="text-xs font-semibold text-slate-500 mb-1">종료 시각 (KST)</div>
+                                    <div className="text-sm font-bold text-slate-800">{formatKstTimestamp(stampTourConfig.endAt)}</div>
+                                </div>
+                            </div>
+
+                            <div className="lg:col-span-8 space-y-6">
+                                <Card className="border-0 shadow-sm ring-1 ring-slate-200 bg-white overflow-hidden rounded-2xl">
+                                    <CardContent className="p-6 md:p-8 space-y-6">
+                                        {/* Completion Rule */}
+                                        <div className="space-y-2">
+                                            <Label className="text-base font-medium text-slate-700">완료 조건</Label>
+                                            <div className="flex items-center gap-4">
+                                                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                                                    <input
+                                                        type="radio"
+                                                        name="completionRule"
+                                                        checked={stampTourConfig.completionRule.type === 'COUNT'}
+                                                        onChange={() => setStampTourConfig(prev => ({
+                                                            ...prev,
+                                                            completionRule: { ...prev.completionRule, type: 'COUNT' }
+                                                        }))}
+                                                    />
+                                                    지정 개수 충족
+                                                </label>
+                                                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                                                    <input
+                                                        type="radio"
+                                                        name="completionRule"
+                                                        checked={stampTourConfig.completionRule.type === 'ALL'}
+                                                        onChange={() => setStampTourConfig(prev => ({
+                                                            ...prev,
+                                                            completionRule: { ...prev.completionRule, type: 'ALL' }
+                                                        }))}
+                                                    />
+                                                    전체 부스 완료
+                                                </label>
+                                            </div>
+                                            {stampTourConfig.completionRule.type === 'COUNT' && (
+                                                <div className="mt-2 max-w-xs">
+                                                    <Input
+                                                        type="number"
+                                                        min="1"
+                                                        value={stampTourConfig.completionRule.requiredCount || 1}
+                                                        onChange={(e) => setStampTourConfig(prev => ({
+                                                            ...prev,
+                                                            completionRule: {
+                                                                ...prev.completionRule,
+                                                                requiredCount: Math.max(1, Number(e.target.value || 1))
+                                                            }
+                                                        }))}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Booth Order */}
+                                        <div className="space-y-2">
+                                            <Label className="text-base font-medium text-slate-700">부스 노출 순서</Label>
+                                            <select
+                                                value={stampTourConfig.boothOrderMode}
+                                                onChange={(e) => setStampTourConfig(prev => ({
+                                                    ...prev,
+                                                    boothOrderMode: e.target.value as StampTourBoothOrderMode
+                                                }))}
+                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                            >
+                                                <option value="SPONSOR_ORDER">스폰서 순서 사용</option>
+                                                <option value="CUSTOM">직접 순서 지정</option>
+                                            </select>
+
+                                            {stampTourConfig.boothOrderMode === 'CUSTOM' && (
+                                                <div className="mt-3 space-y-2">
+                                                    {(() => {
+                                                        const boothCandidates = sponsors
+                                                            .filter(s => s.isStampTourParticipant)
+                                                            .map(s => ({ id: s.vendorId || s.id, name: s.name }));
+                                                        const ordered = stampTourConfig.customBoothOrder.length > 0
+                                                            ? stampTourConfig.customBoothOrder
+                                                                .map(id => boothCandidates.find(b => b.id === id))
+                                                                .filter(Boolean) as { id: string; name: string }[]
+                                                            : boothCandidates;
+
+                                                        return ordered.map((booth, index) => (
+                                                            <div key={booth.id} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                                                                <div className="text-sm font-medium text-slate-700">{booth.name}</div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            const list = [...ordered];
+                                                                            if (index === 0) return;
+                                                                            const tmp = list[index - 1];
+                                                                            list[index - 1] = list[index];
+                                                                            list[index] = tmp;
+                                                                            setStampTourConfig(prev => ({
+                                                                                ...prev,
+                                                                                customBoothOrder: list.map(i => i.id)
+                                                                            }));
+                                                                        }}
+                                                                    >
+                                                                        <ArrowUp className="w-4 h-4" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            const list = [...ordered];
+                                                                            if (index === list.length - 1) return;
+                                                                            const tmp = list[index + 1];
+                                                                            list[index + 1] = list[index];
+                                                                            list[index] = tmp;
+                                                                            setStampTourConfig(prev => ({
+                                                                                ...prev,
+                                                                                customBoothOrder: list.map(i => i.id)
+                                                                            }));
+                                                                        }}
+                                                                    >
+                                                                        <ArrowDown className="w-4 h-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        ));
+                                                    })()}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Reward Mode */}
+                                        <div className="space-y-2">
+                                            <Label className="text-base font-medium text-slate-700">상품 분배 방식</Label>
+                                            <select
+                                                value={stampTourConfig.rewardMode}
+                                                onChange={(e) => setStampTourConfig(prev => ({
+                                                    ...prev,
+                                                    rewardMode: e.target.value as StampTourRewardMode
+                                                }))}
+                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                            >
+                                                <option value="RANDOM">랜덤 지급</option>
+                                                <option value="FIXED">지정 순서 지급</option>
+                                            </select>
+                                        </div>
+
+                                        {/* Rewards */}
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <Label className="text-base font-medium text-slate-700">상품 목록</Label>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        const newReward: StampTourRewardForm = {
+                                                            id: `reward_${Date.now()}`,
+                                                            name: '',
+                                                            totalQty: 0,
+                                                            remainingQty: 0,
+                                                            weight: stampTourConfig.rewardMode === 'RANDOM' ? 1 : undefined,
+                                                            order: stampTourConfig.rewardMode === 'FIXED' ? (stampTourConfig.rewards.length + 1) : undefined
+                                                        };
+                                                        setStampTourConfig(prev => ({
+                                                            ...prev,
+                                                            rewards: [...prev.rewards, newReward]
+                                                        }));
+                                                    }}
+                                                >
+                                                    상품 추가
+                                                </Button>
+                                            </div>
+
+                                            {stampTourConfig.rewards.length === 0 ? (
+                                                <div className="text-sm text-slate-400">등록된 상품이 없습니다.</div>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    {stampTourConfig.rewards.map((reward, idx) => (
+                                                        <div key={reward.id} className="border border-slate-200 rounded-xl p-4 space-y-3">
+                                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                                <Input
+                                                                    value={reward.name}
+                                                                    onChange={(e) => {
+                                                                        const value = e.target.value;
+                                                                        setStampTourConfig(prev => ({
+                                                                            ...prev,
+                                                                            rewards: prev.rewards.map((r, i) => i === idx ? { ...r, name: value } : r)
+                                                                        }));
+                                                                    }}
+                                                                    placeholder="상품명"
+                                                                />
+                                                                <Input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    value={reward.totalQty}
+                                                                    onChange={(e) => {
+                                                                        const value = Number(e.target.value || 0);
+                                                                        setStampTourConfig(prev => ({
+                                                                            ...prev,
+                                                                            rewards: prev.rewards.map((r, i) => i === idx ? {
+                                                                                ...r,
+                                                                                totalQty: value,
+                                                                                remainingQty: r.remainingQty > 0 ? r.remainingQty : value
+                                                                            } : r)
+                                                                        }));
+                                                                    }}
+                                                                    placeholder="수량"
+                                                                />
+                                                                <Input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    value={reward.remainingQty}
+                                                                    onChange={(e) => {
+                                                                        const value = Number(e.target.value || 0);
+                                                                        setStampTourConfig(prev => ({
+                                                                            ...prev,
+                                                                            rewards: prev.rewards.map((r, i) => i === idx ? { ...r, remainingQty: value } : r)
+                                                                        }));
+                                                                    }}
+                                                                    placeholder="잔여 수량"
+                                                                />
+                                                            </div>
+
+                                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                                <Input
+                                                                    value={reward.imageUrl || ''}
+                                                                    onChange={(e) => {
+                                                                        const value = e.target.value;
+                                                                        setStampTourConfig(prev => ({
+                                                                            ...prev,
+                                                                            rewards: prev.rewards.map((r, i) => i === idx ? { ...r, imageUrl: value } : r)
+                                                                        }));
+                                                                    }}
+                                                                    placeholder="이미지 URL (선택)"
+                                                                />
+                                                                {stampTourConfig.rewardMode === 'RANDOM' ? (
+                                                                    <Input
+                                                                        type="number"
+                                                                        min="1"
+                                                                        value={reward.weight || 1}
+                                                                        onChange={(e) => {
+                                                                            const value = Number(e.target.value || 1);
+                                                                            setStampTourConfig(prev => ({
+                                                                                ...prev,
+                                                                                rewards: prev.rewards.map((r, i) => i === idx ? { ...r, weight: value } : r)
+                                                                            }));
+                                                                        }}
+                                                                        placeholder="가중치"
+                                                                    />
+                                                                ) : (
+                                                                    <Input
+                                                                        type="number"
+                                                                        min="1"
+                                                                        value={reward.order || idx + 1}
+                                                                        onChange={(e) => {
+                                                                            const value = Number(e.target.value || 1);
+                                                                            setStampTourConfig(prev => ({
+                                                                                ...prev,
+                                                                                rewards: prev.rewards.map((r, i) => i === idx ? { ...r, order: value } : r)
+                                                                            }));
+                                                                        }}
+                                                                        placeholder="지급 순서"
+                                                                    />
+                                                                )}
+                                                                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={reward.isFallback || false}
+                                                                        onChange={(e) => {
+                                                                            const value = e.target.checked;
+                                                                            setStampTourConfig(prev => ({
+                                                                                ...prev,
+                                                                                rewards: prev.rewards.map((r, i) => i === idx ? { ...r, isFallback: value } : r)
+                                                                            }));
+                                                                        }}
+                                                                    />
+                                                                    소진 대체용
+                                                                </label>
+                                                            </div>
+
+                                                            <div className="flex justify-end">
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => {
+                                                                        setStampTourConfig(prev => ({
+                                                                            ...prev,
+                                                                            rewards: prev.rewards.filter((_, i) => i !== idx)
+                                                                        }));
+                                                                    }}
+                                                                >
+                                                                    삭제
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Messages */}
+                                        <div className="space-y-3">
+                                            <Label className="text-base font-medium text-slate-700">완료 메시지</Label>
+                                            <Input
+                                                value={stampTourConfig.completionMessage}
+                                                onChange={(e) => setStampTourConfig(prev => ({ ...prev, completionMessage: e.target.value }))}
+                                                placeholder="완료 시 노출 메시지"
+                                            />
+                                            <Label className="text-base font-medium text-slate-700">소진 메시지</Label>
+                                            <Input
+                                                value={stampTourConfig.soldOutMessage}
+                                                onChange={(e) => setStampTourConfig(prev => ({ ...prev, soldOutMessage: e.target.value }))}
+                                                placeholder="소진 시 노출 메시지"
+                                            />
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Live Status */}
+                                <Card className="border-0 shadow-sm ring-1 ring-slate-200 bg-white overflow-hidden rounded-2xl">
+                                    <CardContent className="p-6 md:p-8 space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="text-lg font-bold text-slate-800">실시간 진행 현황</h3>
+                                            <div className="text-xs text-slate-500 font-semibold">
+                                                완료 {stampTourProgress.filter(p => p.isCompleted).length}건
+                                            </div>
+                                        </div>
+
+                                        {stampTourProgress.length === 0 ? (
+                                            <div className="text-sm text-slate-400">진행 데이터가 없습니다.</div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {stampTourProgress.map((row) => (
+                                                    <div key={row.id} className="flex items-center justify-between border border-slate-200 rounded-lg px-3 py-2">
+                                                        <div className="text-sm">
+                                                            <div className="font-semibold text-slate-700">{row.userName || row.userId}</div>
+                                                            <div className="text-xs text-slate-500">{row.userOrg || '-'}</div>
+                                                            <div className="text-xs text-slate-500">{row.rewardName || '상품 미정'}</div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${row.rewardStatus === 'REDEEMED' ? 'bg-emerald-100 text-emerald-700' : row.rewardStatus === 'REQUESTED' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                                {row.rewardStatus}
+                                                            </span>
+                                                            {row.rewardStatus === 'REQUESTED' && (
+                                                                <Button
+                                                                    type="button"
+                                                                    size="sm"
+                                                                    onClick={async () => {
+                                                                        if (!cid) return;
+                                                                        await updateDoc(doc(db, `conferences/${cid}/stamp_tour_progress/${row.id}`), {
+                                                                            rewardStatus: 'REDEEMED',
+                                                                            redeemedAt: Timestamp.now()
+                                                                        });
+                                                                    }}
+                                                                >
+                                                                    수령 완료
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </section>
+
+                        <hr className="border-slate-100" />
+                    </>
+                )}
 
                 {/* 2. Venue Info Section */}
                 <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">

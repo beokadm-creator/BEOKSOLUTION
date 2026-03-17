@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { useVendor } from '../../hooks/useVendor';
 import * as XLSX from 'xlsx';
 import { Button } from '../../components/ui/button';
@@ -8,14 +8,17 @@ import { BarChart3, Users, Clock, Download, QrCode, Search, Building2, Phone, Ma
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 export default function VendorDashboardPage() {
-    const { vendorId } = useParams<{ vendorId: string }>();
+    const { vendorId: paramVendorId } = useParams<{ vendorId: string }>();
+    const { activeVendorId } = useOutletContext<{ activeVendorId?: string | null }>();
     const navigate = useNavigate();
 
-    const vendorLogic = useVendor(vendorId);
-    const { vendor, loading, error, conferences, visits } = vendorLogic;
+    const resolvedVendorId = activeVendorId || paramVendorId;
+    const vendorLogic = useVendor(resolvedVendorId);
+    const { vendor, loading, error, conferences, visits, guestbookEntries, logVendorAudit, availableConferences, vendorRequests, requestSponsorship } = vendorLogic;
 
     const [selectedConfId, setSelectedConfId] = useState<string>('all');
     const [searchTerm, setSearchTerm] = useState('');
+    const [guestbookFilterConfId, setGuestbookFilterConfId] = useState<string>('all');
 
     const confMap = useMemo(() => {
         const m = new Map<string, string>();
@@ -40,6 +43,11 @@ export default function VendorDashboardPage() {
         return res;
     }, [visits, selectedConfId, searchTerm]);
 
+    const filteredGuestbooks = useMemo(() => {
+        if (guestbookFilterConfId === 'all') return guestbookEntries;
+        return guestbookEntries.filter(g => g.conferenceId === guestbookFilterConfId);
+    }, [guestbookEntries, guestbookFilterConfId]);
+
     const handleExport = () => {
         if (!filteredLeads.length) return;
 
@@ -56,6 +64,28 @@ export default function VendorDashboardPage() {
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Leads');
         XLSX.writeFile(workbook, `Vendor_Leads_${vendor?.name || 'CRM_Data'}.xlsx`);
+        logVendorAudit({
+            action: 'LEAD_EXPORTED',
+            entityType: 'LEAD',
+            entityId: 'EXPORT',
+            details: { count: filteredLeads.length }
+        });
+    };
+
+    const handleGuestbookExport = () => {
+        if (!guestbookEntries.length) return;
+
+        const worksheet = XLSX.utils.json_to_sheet(filteredGuestbooks.map((g: any) => ({
+            'Name': g.userName || 'Unknown',
+            'Affiliation': g.userOrg || '',
+            'Conference': g.conferenceId || '',
+            'Consent': 'Agreed',
+            'Created At': g.timestamp?.toLocaleString ? g.timestamp.toLocaleString() : new Date(g.timestamp || Date.now()).toLocaleString()
+        })));
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Guestbook');
+        XLSX.writeFile(workbook, `Guestbook_${vendor?.name || 'Vendor'}.xlsx`);
     };
 
     if (loading) return <div className="p-8 flex justify-center text-gray-500"><LoadingSpinner /></div>;
@@ -113,6 +143,77 @@ export default function VendorDashboardPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Integration Status */}
+            <Card className="border border-gray-200 shadow-sm">
+                <CardHeader>
+                    <CardTitle className="text-lg">Integration Status</CardTitle>
+                    <CardDescription>스탬프투어/방명록 연결 상태를 확인합니다.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    {conferences.length === 0 ? (
+                        <div className="text-sm text-gray-500 bg-gray-50 border border-gray-100 rounded-lg p-4">
+                            연결된 학술대회가 없습니다. 스폰서 매니저에서 파트너 연결을 먼저 설정해주세요.
+                        </div>
+                    ) : (
+                        conferences.map(conf => (
+                            <div key={conf.id} className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 border rounded-lg p-4 bg-white">
+                                <div className="font-semibold text-gray-800">{conf.name}</div>
+                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                    <span className={`px-2.5 py-1 rounded-full font-semibold ${conf.isStampTourParticipant ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                                        스탬프투어: {conf.isStampTourParticipant ? '연결됨' : '미연결'}
+                                    </span>
+                                    <span className="px-2.5 py-1 rounded-full font-semibold bg-amber-50 text-amber-700">
+                                        방명록: 준비중
+                                    </span>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                    <div className="text-xs text-gray-500">
+                        개인정보는 참가자 동의가 있는 경우에만 저장됩니다. 미동의 스캔은 익명으로 기록됩니다.
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Available Conferences (No Permission Yet) */}
+            <Card className="border border-gray-200 shadow-sm">
+                <CardHeader>
+                    <CardTitle className="text-lg">참여 가능한 학술대회</CardTitle>
+                    <CardDescription>스폰서로 연결되지 않은 학술대회도 목록에서 확인할 수 있습니다.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    {availableConferences.length === 0 ? (
+                        <div className="text-sm text-gray-500 bg-gray-50 border border-gray-100 rounded-lg p-4">
+                            현재 공개된 학술대회가 없습니다.
+                        </div>
+                    ) : (
+                        availableConferences.map(conf => {
+                            const isLinked = conferences.some(c => c.id === conf.id);
+                            const request = vendorRequests[conf.id];
+                            return (
+                                <div key={conf.id} className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border rounded-lg p-4 bg-white">
+                                    <div>
+                                        <div className="font-semibold text-gray-800">{conf.title || conf.id}</div>
+                                        <div className="text-xs text-gray-500">상태: {conf.status || 'UNKNOWN'}</div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {isLinked ? (
+                                            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">연결됨</span>
+                                        ) : request?.status ? (
+                                            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">요청됨 ({request.status})</span>
+                                        ) : (
+                                            <Button size="sm" variant="outline" onClick={() => requestSponsorship(conf.id)}>
+                                                스폰서 참여 요청
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+                </CardContent>
+            </Card>
 
             {/* Campaign Selection Grid */}
             <div className="space-y-3 pt-2">
@@ -253,6 +354,71 @@ export default function VendorDashboardPage() {
                                             </td>
                                             <td className="px-6 py-4 text-xs text-gray-500 font-mono tracking-tight">
                                                 {v.timestamp?.toDate ? v.timestamp.toDate().toLocaleString() : new Date(v.scannedAt || v.timestamp).toLocaleString()}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Guestbook Entries */}
+            <Card className="shadow-md border border-gray-200">
+                <CardHeader className="bg-gray-50/80 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 py-5 px-6">
+                    <div>
+                        <CardTitle className="text-lg flex items-center gap-2">Guestbook Entries <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full font-semibold">{filteredGuestbooks.length}건</span></CardTitle>
+                        <CardDescription className="mt-1">동의 기반 정보 제공(리드 저장) 로그를 확인합니다.</CardDescription>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <select
+                            value={guestbookFilterConfId}
+                            onChange={(e) => setGuestbookFilterConfId(e.target.value)}
+                            className="bg-white border border-gray-300 rounded-md text-sm py-2 px-3"
+                        >
+                            <option value="all">전체 학술대회</option>
+                            {Array.from(new Set(guestbookEntries.map(g => g.conferenceId))).map(id => (
+                                <option key={id} value={id}>{id}</option>
+                            ))}
+                        </select>
+                        <Button variant="outline" size="sm" onClick={handleGuestbookExport} disabled={guestbookEntries.length === 0} className="whitespace-nowrap bg-white border-gray-300 shadow-sm h-10 px-4">
+                            <Download className="w-4 h-4 mr-2" /> ?묒? ?ㅼ슫濡쒕뱶
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    {filteredGuestbooks.length === 0 ? (
+                        <div className="py-16 text-center text-gray-500 flex flex-col items-center bg-gray-50/30">
+                            <Clock className="w-12 h-12 mb-3 opacity-20" />
+                            <p className="font-medium">방명록 기록이 없습니다.</p>
+                            <p className="text-sm mt-1 text-gray-400">동의 후 메시지를 남기면 여기에 표시됩니다.</p>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto max-h-[600px]">
+                            <table className="w-full text-sm text-left whitespace-nowrap">
+                                <thead className="sticky top-0 text-xs text-slate-500 uppercase bg-slate-100 shadow-[0_1px_0_0_#e2e8f0] z-10">
+                                    <tr>
+                                        <th className="px-6 py-4 font-bold tracking-wider">참가자</th>
+                                        <th className="px-6 py-4 font-bold tracking-wider">소속</th>
+                                        <th className="px-6 py-4 font-bold tracking-wider">학술대회</th>
+                                        <th className="px-6 py-4 font-bold tracking-wider">동의 상태</th>
+                                        <th className="px-6 py-4 font-bold tracking-wider">작성 시간</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 bg-white">
+                                    {filteredGuestbooks.map((g: any, i) => (
+                                        <tr key={g.id || i} className="hover:bg-emerald-50/50 transition-colors">
+                                            <td className="px-6 py-4 font-bold text-gray-900">{g.userName || 'Unknown'}</td>
+                                            <td className="px-6 py-4 text-gray-700">{g.userOrg || '-'}</td>
+                                            <td className="px-6 py-4">
+                                                <div className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium border border-slate-200 truncate max-w-[200px]" title={g.conferenceId}>
+                                                    {g.conferenceId}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-emerald-700 font-semibold">동의 완료</td>
+                                            <td className="px-6 py-4 text-xs text-gray-500 font-mono tracking-tight">
+                                                {g.timestamp?.toLocaleString ? g.timestamp.toLocaleString() : new Date(g.timestamp || Date.now()).toLocaleString()}
                                             </td>
                                         </tr>
                                     ))}

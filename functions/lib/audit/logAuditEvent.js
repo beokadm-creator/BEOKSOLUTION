@@ -37,7 +37,6 @@ exports.logAuditEvent = void 0;
 exports.createAuditLogEntry = createAuditLogEntry;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
-const db = admin.firestore();
 /**
  * Cloud Function: logAuditEvent
  *
@@ -67,6 +66,7 @@ exports.logAuditEvent = functions.https.onCall(async (data, context) => {
     }
     try {
         const timestamp = admin.firestore.Timestamp.now();
+        const db = admin.firestore();
         // Determine actor type
         let actorType = 'PARTICIPANT';
         const actorEmail = (_a = context.auth.token) === null || _a === void 0 ? void 0 : _a.email;
@@ -170,6 +170,7 @@ function maskPII(details) {
 async function createAuditLogEntry(params) {
     const { action, entityType, entityId, vendorId, conferenceId, details, result, errorMessage, actorId = 'system', actorEmail, actorType = 'SYSTEM', } = params;
     const timestamp = admin.firestore.Timestamp.now();
+    const db = admin.firestore();
     const logEntry = {
         actorId,
         actorEmail,

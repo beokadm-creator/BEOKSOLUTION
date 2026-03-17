@@ -2,8 +2,6 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { createAuditLogEntry } from '../audit/logAuditEvent';
 
-const db = admin.firestore();
-
 /**
  * Cloud Function: scheduledDataCleanup
  *
@@ -20,6 +18,7 @@ export const scheduledDataCleanup = functions.pubsub
     .timeZone('Asia/Seoul')
     .onRun(async (context) => {
         const now = admin.firestore.Timestamp.now();
+        const db = admin.firestore();
         const threeYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 1095 * 24 * 60 * 60 * 1000));
         const twoYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 730 * 24 * 60 * 60 * 1000));
         const fiveYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 1825 * 24 * 60 * 60 * 1000));
@@ -144,13 +143,14 @@ export const manualDataCleanup = functions.https.onCall(async (data, context) =>
         throw new functions.https.HttpsError('permission-denied', 'Only super admin can trigger manual cleanup');
     }
 
-    try {
-        const { dryRun = false } = data as { dryRun?: boolean };
+        try {
+            const { dryRun = false } = data as { dryRun?: boolean };
 
-        const now = admin.firestore.Timestamp.now();
-        const threeYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 1095 * 24 * 60 * 60 * 1000));
-        const twoYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 730 * 24 * 60 * 60 * 1000));
-        const fiveYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 1825 * 24 * 60 * 60 * 1000));
+            const now = admin.firestore.Timestamp.now();
+            const db = admin.firestore();
+            const threeYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 1095 * 24 * 60 * 60 * 1000));
+            const twoYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 730 * 24 * 60 * 60 * 1000));
+            const fiveYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 1825 * 24 * 60 * 60 * 1000));
 
         const counts = {
             leadsPII: 0,

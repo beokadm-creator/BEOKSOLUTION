@@ -5,6 +5,7 @@ import { useAdminStore } from '../../store/adminStore';
 import { Button } from '../ui/button';
 import { Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { resolveSocietyByIdentifier } from '../../utils/societyResolver';
 
 const ConferenceSelector: React.FC = () => {
     const [loading, setLoading] = useState(true);
@@ -31,9 +32,16 @@ const ConferenceSelector: React.FC = () => {
                     return;
                 }
 
+                const resolved = await resolveSocietyByIdentifier(societyId);
+                const docId = resolved?.id || societyId;
+                const domainCode = String((resolved?.data.domainCode as string | undefined) || docId).toLowerCase();
+                const societyKeys = Array.from(new Set([domainCode, docId, societyId].filter(Boolean)));
+
                 // Query all conferences for this society
                 const conferencesRef = collection(db, 'conferences');
-                const q = query(conferencesRef, where('societyId', '==', societyId));
+                const q = societyKeys.length === 1
+                    ? query(conferencesRef, where('societyId', '==', societyKeys[0]))
+                    : query(conferencesRef, where('societyId', 'in', societyKeys.slice(0, 10)));
                 const querySnapshot = await getDocs(q);
                 
                 const conferences = querySnapshot.docs.map(doc => ({

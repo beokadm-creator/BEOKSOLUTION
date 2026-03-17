@@ -37,7 +37,6 @@ exports.withdrawConsentHttp = exports.withdrawConsent = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const logAuditEvent_1 = require("../audit/logAuditEvent");
-const db = admin.firestore();
 /**
  * Cloud Function: withdrawConsent
  *
@@ -70,6 +69,7 @@ exports.withdrawConsent = functions.https.onCall(async (data, context) => {
     }
     try {
         const timestamp = admin.firestore.Timestamp.now();
+        const db = admin.firestore();
         let withdrawnCount = 0;
         const maxBatchSize = 500;
         // Query all leads for this visitor
