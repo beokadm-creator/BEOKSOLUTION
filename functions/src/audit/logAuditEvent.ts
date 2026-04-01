@@ -38,8 +38,6 @@ export interface AuditLog {
   userAgent?: string;
 }
 
-const db = admin.firestore();
-
 /**
  * Cloud Function: logAuditEvent
  *
@@ -57,6 +55,7 @@ const db = admin.firestore();
  * - errorMessage?: string - Error message if failed
  */
 export const logAuditEvent = functions.https.onCall(async (data, context) => {
+    const db = admin.firestore();
     // Authentication check
     if (!context.auth) {
         throw new functions.https.HttpsError(
@@ -223,6 +222,7 @@ export async function createAuditLogEntry(params: {
     actorEmail?: string;
     actorType?: AuditActorType;
 }): Promise<void> {
+    const db = admin.firestore();
     const {
         action,
         entityType,

@@ -37,7 +37,6 @@ exports.logAuditEvent = void 0;
 exports.createAuditLogEntry = createAuditLogEntry;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
-const db = admin.firestore();
 /**
  * Cloud Function: logAuditEvent
  *
@@ -56,6 +55,7 @@ const db = admin.firestore();
  */
 exports.logAuditEvent = functions.https.onCall(async (data, context) => {
     var _a, _b, _c;
+    const db = admin.firestore();
     // Authentication check
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated to log audit events');
@@ -168,6 +168,7 @@ function maskPII(details) {
  * (for internal use without HTTPS call)
  */
 async function createAuditLogEntry(params) {
+    const db = admin.firestore();
     const { action, entityType, entityId, vendorId, conferenceId, details, result, errorMessage, actorId = 'system', actorEmail, actorType = 'SYSTEM', } = params;
     const timestamp = admin.firestore.Timestamp.now();
     const logEntry = {
