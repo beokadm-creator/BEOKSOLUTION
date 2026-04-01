@@ -10,6 +10,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import { LayoutDashboard, Globe, FileText, Users, Settings, QrCode, Monitor, CreditCard, LogOut, ArrowLeft, Printer, BarChart, UserPlus, Building2, Bell, IdCard } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/ui/button';
+import { resolveSocietyByIdentifier } from '../utils/societyResolver';
 
 export default function ConfLayout() {
     const { cid } = useParams<{ cid: string }>();
@@ -17,6 +18,7 @@ export default function ConfLayout() {
 
     // DEV 환경에서 ?society 파라미터도 society ID로 인식
     const societyFromParam = new URLSearchParams(window.location.search).get('society');
+    const sessionSocietyId = sessionStorage.getItem('societyId');
     
     // [Fix] In Dev/Hosting environment without subdomain, try to infer societyId from cid (slug)
     // cid format: societyId_conferenceId (e.g., kadd_2026spring)
@@ -25,7 +27,7 @@ export default function ConfLayout() {
         inferredSocietyId = cid.split('_')[0];
     }
 
-    const effectiveSubdomain = subdomain || societyFromParam || inferredSocietyId;
+    const effectiveSubdomain = societyFromParam || sessionSocietyId || subdomain || inferredSocietyId;
 
     const [conference, setConference] = useState<Conference | null>(null);
     const [loading, setLoading] = useState(true);
@@ -95,10 +97,51 @@ export default function ConfLayout() {
                     // Security Check: Society ID Mismatch
                     const confSocietyId = confData.societyId || confData.id.split('_')[0];
                     
-                    // Allow access if no effectiveSubdomain (e.g. dev environment or direct access)
-                    if (effectiveSubdomain && confSocietyId !== effectiveSubdomain) {
-                        console.error('Society Mismatch', { confSocietyId, effectiveSubdomain });
-                        // Don't block access in dev mode if mismatch occurs
+                    const lower = (value?: string | null) => String(value || '').trim().toLowerCase();
+                    const conferenceCandidates = new Set<string>([lower(confSocietyId)]);
+                    const requestCandidates = new Set<string>(
+                        [effectiveSubdomain, sessionSocietyId, subdomain, inferredSocietyId]
+                            .map((value) => lower(value))
+                            .filter(Boolean)
+                    );
+
+                    try {
+                        const [resolvedConferenceSociety, resolvedRequestedSociety] = await Promise.all([
+                            confSocietyId ? resolveSocietyByIdentifier(confSocietyId) : Promise.resolve(null),
+                            effectiveSubdomain ? resolveSocietyByIdentifier(effectiveSubdomain) : Promise.resolve(null)
+                        ]);
+
+                        [
+                            resolvedConferenceSociety?.id,
+                            resolvedConferenceSociety?.data.domainCode as string | undefined,
+                            resolvedConferenceSociety?.data.slug as string | undefined,
+                            ...(Array.isArray(resolvedConferenceSociety?.data.aliases) ? resolvedConferenceSociety.data.aliases : [])
+                        ].map((value) => lower(value)).filter(Boolean).forEach((value) => conferenceCandidates.add(value));
+
+                        [
+                            resolvedRequestedSociety?.id,
+                            resolvedRequestedSociety?.data.domainCode as string | undefined,
+                            resolvedRequestedSociety?.data.slug as string | undefined,
+                            ...(Array.isArray(resolvedRequestedSociety?.data.aliases) ? resolvedRequestedSociety.data.aliases : [])
+                        ].map((value) => lower(value)).filter(Boolean).forEach((value) => requestCandidates.add(value));
+                    } catch (error) {
+                        console.warn('[ConfLayout] Society resolution failed, falling back to raw identifiers', error);
+                    }
+
+                    const hasSocietyMatch =
+                        requestCandidates.size === 0
+                        || Array.from(requestCandidates).some((candidate) => conferenceCandidates.has(candidate));
+
+                    if (!hasSocietyMatch) {
+                        console.error('Society Mismatch', {
+                            confSocietyId,
+                            effectiveSubdomain,
+                            sessionSocietyId,
+                            subdomain,
+                            inferredSocietyId,
+                            conferenceCandidates: Array.from(conferenceCandidates),
+                            requestCandidates: Array.from(requestCandidates)
+                        });
                         if (isDev) {
                             console.warn('Allowing access despite mismatch in DEV mode');
                             setConference(confData);
@@ -123,7 +166,7 @@ export default function ConfLayout() {
         return () => {
             isMounted = false;
         };
-    }, [cid, effectiveSubdomain, isDev]);
+    }, [cid, effectiveSubdomain, inferredSocietyId, isDev, sessionSocietyId, subdomain]);
 
     if (loading) return <LoadingSpinner />;
     if (!conference) return <div>Conference Not Found</div>;
