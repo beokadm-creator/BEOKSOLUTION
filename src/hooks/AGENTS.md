@@ -1,3 +1,22 @@
+---
+precedence: 91
+required-for:
+  - path-specific-code-changes
+optional-for:
+  - repo-orientation
+memory-type: policy
+token-estimate: 780
+@include:
+  - ../../docs/shared/AI_DOC_SHARED_RULES.md
+  - ../../docs/shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Aligned path-specific agent instructions to the shared markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # Custom Hooks - Domain Logic Layer
 
 **Purpose**: 20+ custom hooks encapsulating all conference registration domain logic - NO generic React patterns here.
@@ -60,3 +79,11 @@ export const useConference = (targetId?: string) => {
 - **NEVER** skip loading states - always handle `{ loading }` before render
 - **NEVER** duplicate business logic - extract to hook if used >1 component
 - **NEVER** mix UI logic in hooks - pure domain logic only
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

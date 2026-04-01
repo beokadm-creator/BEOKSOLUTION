@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 428
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 배지 토큰 마이그레이션 및 알림톡 발송 구현 현황 및 계획
 
 ## ✅ 완료된 작업
@@ -35,3 +53,11 @@
 ## 🛑 주의사항
 - **Functions 배포 필수:** 수정된 백엔드 로직(`functions`)을 반드시 배포해야 합니다. (`firebase deploy --only functions`)
 - **알림톡 템플릿:** 관리자 페이지에서 `CONFERENCE_REGISTER` 타입의 템플릿이 활성화되어 있어야 발송됩니다.
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

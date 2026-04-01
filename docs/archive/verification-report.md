@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 1145
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 🧪 KADD 2026 Spring 출결 데이터 무결성 패치 검증 리포트
 
 ## 📋 검증 개요
@@ -206,3 +224,11 @@ const [isCleaning, setIsCleaning] = useState(false);
 3. **장기**: Cloud Functions 트리거 기반 자동 정리
 
 **최종 평가**: **⚠️ 조건부 통과** - 클린업 도구 UI 구현 후 완전 통과 예상
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

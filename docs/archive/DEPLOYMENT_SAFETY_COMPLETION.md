@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 1409
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 배포 안전성 개선 작업 완료 보고서
 
 ## 📋 작업 개요
@@ -293,3 +311,11 @@ curl https://us-central1-{PROJECT_ID}.cloudfunctions.net/healthCheck
 6. ✅ **상세한 문서화** - 실행 가이드 및 롤백 절차
 
 **이제 NHN 알림톡 전환을 안전하게 진행할 수 있습니다!** 🚀
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

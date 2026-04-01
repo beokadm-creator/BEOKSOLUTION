@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 819
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 바우처 URL 재발송 기능 추가 방법
 
 ## 1. Import 추가
@@ -104,3 +122,11 @@ firebase deploy --only functions
 2. "송신" 아이콘 버튼 클릭
 3. 새로운 바우처 URL이 클립보드에 복사되었는지 확인
 4. URL 접속 시 새 토큰이 생성되었는지 확인
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

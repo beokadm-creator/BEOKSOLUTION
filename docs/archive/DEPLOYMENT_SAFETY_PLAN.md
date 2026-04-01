@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 1273
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 배포 안전성 확보 계획
 
 ## 🚨 문제 상황
@@ -231,3 +249,11 @@ firebase hosting:clone SOURCE_SITE_ID:SOURCE_CHANNEL_ID TARGET_SITE_ID:live
 - [Firebase Hosting Preview Channels](https://firebase.google.com/docs/hosting/test-preview-deploy)
 - [Feature Flags Best Practices](https://martinfowler.com/articles/feature-toggles.html)
 - [Blue-Green Deployment](https://martinfowler.com/bliki/BlueGreenDeployment.html)
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

@@ -1,111 +1,69 @@
-# ⚠️ VERSION CONTROL PROTECTION ACTIVE ⚠️
-
-**This repository has rollback prevention enabled.**
-
-## Current Production Version
-- **v1.0.0** (see `.DEPLOYED_VERSION` file)
-- **Baseline Tag**: `v1.0.0` (commit `35aaeed`)
-- **Release Notes**: [`RELEASE_NOTES_v1.0.0.md`](./RELEASE_NOTES_v1.0.0.md)
-
-## Critical Rules (ENFORCED)
-
-### ✅ Required for ALL Changes
-- Create feature branch: `git checkout -b feature/description`
-- Run tests: `npm test` (167 tests must pass)
-- Fix linting: `npm run lint` (0 errors, 0 warnings)
-- Create Pull Request on GitHub
-- Wait for CI/CD to pass (ESLint + TypeScript + Tests + Build)
-- Get review approval
-
-### ❌ PROHIBITED
-- Direct commits to `main` branch (GitHub will block)
-- Skipping tests (pre-commit hooks will block)
-- Rolling back to previous versions (tag protection)
-- Force pushing to `main` (branch protection)
-
-## Mandatory Reading
-**Before making ANY changes**, read:
-1. [`MANDATORY_WORKFLOW.md`](./MANDATORY_WORKFLOW.md) - Step-by-step workflow
-2. [`VERSION_CONTROL_POLICY.md`](./VERSION_CONTROL_POLICY.md) - Version control rules
-3. [`BRANCH_PROTECTION_SETUP.md`](./BRANCH_PROTECTION_SETUP.md) - GitHub setup guide
-
-## Multi-Layer Protection
-1. **Pre-commit hooks** (local): ESLint + Tests
-2. **GitHub Branch Protection** (server): PR required, CI/CD validation
-3. **Git Tag v1.0.0** (anchor): Immutable production baseline
-
+---
+precedence: 80
+required-for:
+  - repo-orientation
+  - initial-doc-triage
+optional-for:
+  - feature-implementation
+  - deployment-review
+memory-type: overview
+token-estimate: 414
+@include:
+  - docs/shared/AI_DOC_SHARED_RULES.md
+  - docs/shared/ESSENTIAL_POST_COMPACT.md
+  - docs/shared/VERSION_CONTROL_SHARED.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Replaced template content with canonical repo overview and shared-rule references.
 ---
 
-# React + TypeScript + Vite
+# eRegi
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+<!-- STATIC:BEGIN -->
 
-Currently, two official plugins are available:
+eRegi is a multi-tenant registration and conference operations platform for societies, conference admins, vendors, and attendees. The codebase combines a React 19 frontend, Firebase backend services, and role-specific admin flows.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Canonical Reading Order
 
-## React Compiler
+1. `AGENTS.md`
+2. `MANDATORY_WORKFLOW.md`
+3. `docs/system_architecture.md`
+4. `docs/MULTI_TENANT_GUIDE.md`
+5. `docs/development_guide.md`
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## What This Repository Covers
 
-## Expanding the ESLint configuration
+- Society and conference registration flows
+- Admin dashboards for society, conference, and vendor operations
+- Payment integrations through cloud functions
+- Badge and print workflows
+- Multi-tenant domain routing and role-aware access control
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Canonical Documentation Map
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- Workflow and guardrails: `MANDATORY_WORKFLOW.md`
+- AI markdown system: `docs/shared/AI_DOC_SHARED_RULES.md`
+- Essential compact rules: `docs/shared/ESSENTIAL_POST_COMPACT.md`
+- Shared version-control rules: `docs/shared/VERSION_CONTROL_SHARED.md`
+- Development setup: `docs/development_guide.md`
+- Git workflow: `docs/git_workflow.md`
+- Deployment reference: `docs/deployment_guide_merged.md`
+- Architecture: `docs/system_architecture.md`
+- Multi-tenant model: `docs/MULTI_TENANT_GUIDE.md`
+- Historical records: `docs/archive/`
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Essential (Post-Compact)
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- Never work directly on `main`.
+- Prefer the active docs above over `docs/archive/`.
+- When documents conflict, use the higher `precedence` value first.
+- Archive docs are historical evidence, not current policy.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+<!-- STATIC:END -->
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+<!-- DYNAMIC:BEGIN -->
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Current release tag referenced by the repository guardrails: `v1.0.1`.
+
+<!-- DYNAMIC:END -->

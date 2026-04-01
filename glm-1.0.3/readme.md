@@ -1,3 +1,21 @@
+---
+precedence: 45
+required-for: []
+optional-for:
+  - vendor-reference
+memory-type: reference
+token-estimate: 12618
+@include:
+  - ../docs/shared/AI_DOC_SHARED_RULES.md
+  - ../docs/shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Normalized under the repository markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 ![glm](/doc/manual/logo-mini.png)
 
 [OpenGL Mathematics](http://glm.g-truc.net/) (*GLM*) is a header only C++ mathematics library for graphics software based on the [OpenGL Shading Language (GLSL) specifications](https://www.opengl.org/registry/doc/GLSLangSpec.4.50.diff.pdf).
@@ -1331,3 +1349,10 @@ generation distribution
 - Add mat2, mat3, mat4 GLSL types
 - Add almost all functions
 
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

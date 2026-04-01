@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 1093
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # ✅ [SOLO Coder] RegistrationListPage 코드 복구 완료 리포트
 
 ## 📋 작업 완료 개요
@@ -202,3 +220,11 @@ await handleDeleteRegistrationWithCleanup(reg, conferenceId, setRegistrations);
 ---
 
 *코드 복구 완료 후, 회원 삭제 기능이 정상적으로 동작하는지 테스트를 권장합니다.*
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

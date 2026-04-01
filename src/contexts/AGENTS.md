@@ -1,3 +1,22 @@
+---
+precedence: 91
+required-for:
+  - path-specific-code-changes
+optional-for:
+  - repo-orientation
+memory-type: policy
+token-estimate: 1279
+@include:
+  - ../../docs/shared/AI_DOC_SHARED_RULES.md
+  - ../../docs/shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Aligned path-specific agent instructions to the shared markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # React Context Providers - State Management Layer
 
 **Purpose**: 4 React Context providers that enable domain-based data sharing and role-based access control across the eRegi platform.
@@ -127,3 +146,11 @@ const canAccessSociety = (societyId: string) => {
 ### Testing
 - Mock contexts in tests using `createContext` + custom mock provider
 - Test loading/error states for context-dependent components
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

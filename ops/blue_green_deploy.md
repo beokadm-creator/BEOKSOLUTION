@@ -1,3 +1,22 @@
+---
+precedence: 68
+required-for:
+  - operations-work
+optional-for:
+  - deployment-review
+memory-type: runbook
+token-estimate: 594
+@include:
+  - ../docs/shared/AI_DOC_SHARED_RULES.md
+  - ../docs/shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Normalized under the repository markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 Atomic Blue/Green Deployment Plan
 
 Goal
@@ -42,3 +61,11 @@ Rollback Strategy
 
 Notes
 - This is a blueprint. Adapt to your cloud provider, cluster, and CI/CD tooling.
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

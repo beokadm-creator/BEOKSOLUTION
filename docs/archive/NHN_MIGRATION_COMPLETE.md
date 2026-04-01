@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 1167
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # ✅ NHN Cloud 알림톡 마이그레이션 완료
 
 ## 📋 완료된 작업 목록
@@ -220,3 +238,11 @@ https://us-central1-eregi-8fc1e.cloudfunctions.net/checkAlimTalkConfigHttp?socie
 **마이그레이션 완료! 🎉**
 
 이제 Functions를 빌드하고 배포할 준비가 되었습니다.
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

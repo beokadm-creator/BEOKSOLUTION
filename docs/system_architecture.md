@@ -1,3 +1,22 @@
+---
+precedence: 82
+required-for:
+  - architecture-review
+optional-for:
+  - repo-orientation
+memory-type: architecture
+token-estimate: 1208
+@include:
+  - shared/AI_DOC_SHARED_RULES.md
+  - shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Normalized under the repository markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # eRegi System Architecture & Composition Research
 
 ## 1. System Overview
@@ -60,3 +79,11 @@ The React Router is configured with explicit Route Guards (`AdminGuard`) and Lay
 
 ---
 *Generated via automated research script for codebase documentation maintainability.*
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

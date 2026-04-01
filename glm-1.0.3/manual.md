@@ -1,3 +1,21 @@
+---
+precedence: 45
+required-for: []
+optional-for:
+  - vendor-reference
+memory-type: reference
+token-estimate: 24658
+@include:
+  - ../docs/shared/AI_DOC_SHARED_RULES.md
+  - ../docs/shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Normalized under the repository markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 ![Alt](./doc/manual/logo-mini.png "GLM Logo")
 
 # GLM 1.0.0 Manual
@@ -2448,3 +2466,11 @@ Special thanks to:
 * [*Grant James*](http://www.zeuscmd.com/) for the implementation of all combination of none-squared matrix products.
 * Jesse Talavera-Greenberg for his work on the manual amount other things.
 * All the GLM users that have report bugs and hence help GLM to become a great library!
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

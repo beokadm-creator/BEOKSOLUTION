@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 1823
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # ✅ 회원 인증 금액 적용 문제 - 정정 패치 적용 완료
 
 **작성일**: 2026-01-22 | **상태**: ✅ 정정 완료
@@ -282,3 +300,10 @@ firebase deploy --only functions
 - 등록 페이지에서 `priceKey` 우선 사용
 - 데이터 정합성 완벽히 보장
 
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

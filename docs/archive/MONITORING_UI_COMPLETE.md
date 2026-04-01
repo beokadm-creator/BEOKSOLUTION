@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 1382
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 🎉 헬스체크 및 알림톡 설정 확인 UI 추가 완료
 
 ## 📋 작업 완료 요약
@@ -237,3 +255,11 @@ git push origin v3.5.8-stable
 **모든 작업이 성공적으로 완료되었습니다!** 🎉
 
 이제 슈퍼어드민 페이지의 모니터링 탭에서 헬스체크와 알림톡 설정을 쉽게 확인할 수 있습니다.
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

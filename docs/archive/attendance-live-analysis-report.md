@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 1454
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # KADD 2026 Spring 실시간 출결 현황 기능 로직 검증 리포트
 
 ## 📋 개요
@@ -279,3 +297,11 @@ interface UnifiedAccessLog {
 ---
 
 *본 리포트는 현재 코드 기반으로 분석된 결과이며, 실제 운영 환경에서 추가적인 검증이 필요합니다.*
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

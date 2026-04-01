@@ -1,3 +1,21 @@
+---
+precedence: 25
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: report
+token-estimate: 479
+@include:
+  - ../../docs/shared/AI_DOC_SHARED_RULES.md
+  - ../../docs/shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as a generated report under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 I have completed the requested changes to fix the data mapping and display issues.
 
 **Summary of Changes:**
@@ -23,3 +41,11 @@ I have completed the requested changes to fix the data mapping and display issue
     *   Verified `<WideHero />` and `<WideProgram />` props are correctly passed.
 
 These changes align with the "SOLO Coder" instructions to fix the address mismatches and ensure all data (About, Pricing, Hero Subtitle, Program, Footer) is correctly rendered.
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

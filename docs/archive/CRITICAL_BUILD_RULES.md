@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 593
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # CRITICAL BUILD & DEPLOYMENT RULES
 
 ## 🚨 URGENT: DO NOT MODIFY VITE CONFIGURATION 🚨
@@ -45,3 +63,11 @@ Before any deployment to production (`firebase deploy`):
 
 **Reason for this rule**:
 An incident on 2026-02-09 caused a production outage because the `rolldown-vite` override was removed to fix a minor build error. This resulted in a broken build being deployed. Always prioritize runtime stability over fixing minor build warnings by changing core infrastructure.
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

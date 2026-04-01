@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 760
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # Firebase 와일드카드 서브도메인 설정 가이드
 
 ## 목표
@@ -189,3 +207,11 @@ Dev:  admin.eregi-dev.web.app (WildCard Subdomain)
 Firebase Console에서 설정 완료 후 알려주세요! 🚀
 
 설정이 완료되면 모든 서브도메인이 자동으로 작동합니다.
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

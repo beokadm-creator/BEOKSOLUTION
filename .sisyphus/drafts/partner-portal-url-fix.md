@@ -1,3 +1,21 @@
+---
+precedence: 30
+required-for: []
+optional-for:
+  - work-in-progress-context
+memory-type: draft
+token-estimate: 3186
+@include:
+  - ../../docs/shared/AI_DOC_SHARED_RULES.md
+  - ../../docs/shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as a draft under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # Draft: Partner Portal URL 구조 개선
 
 ## 문제 요약
@@ -454,3 +472,11 @@ ConferenceBadgePage에서 isStampTourParticipant == true 필터링
 | **Stamps 저장** | ⚠️ **실패 (Rules 문제)** | Rules 수정 필요 |
 | **스탬프 투어 체크** | ⚠️ **누락 (무조건 저장)** | 로직 수정 필요 |
 | **사용자 스탬프 UI** | 준비됨 (데이터 없음) | 수정 후 정상 작동 |
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

@@ -1,3 +1,22 @@
+---
+precedence: 70
+required-for:
+  - marketing-content-work
+optional-for:
+  - content-review
+memory-type: reference
+token-estimate: 5065
+@include:
+  - docs/shared/AI_DOC_SHARED_RULES.md
+  - docs/shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Normalized under the repository markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # e-Regi 웹사이트 콘텐츠 가이드
 
 ## 🎯 웹사이트 구조 제안
@@ -868,3 +887,11 @@ const observer = new IntersectionObserver((entries) => {
 ---
 
 이 문서를 바탕으로 웹사이트를 제작하시거나, 각 섹션을 필요에 맞게 커스터마이징하여 사용하실 수 있습니다. 디자인 시스템과 코드 예시가 포함되어 있어 개발팀이 바로 작업을 시작할 수 있습니다!
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

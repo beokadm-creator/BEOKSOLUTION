@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 734
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # Git Commit & Firebase 배포 가이드
 
 ## Git 상태 확인
@@ -133,3 +151,11 @@ firebase deploy --only hosting:kadd,hosting:kap
 - [ ] 배포 URL 접근 가능 확인
 - [ ] 시나리오 테스트 가이드에 따라 모든 시나리오 테스트 완료
 - [ ] 모든 시나리오 테스트 통과 확인
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

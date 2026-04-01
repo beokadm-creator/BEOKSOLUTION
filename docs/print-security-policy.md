@@ -1,3 +1,21 @@
+---
+precedence: 72
+required-for: []
+optional-for:
+  - repo-orientation
+memory-type: reference
+token-estimate: 4221
+@include:
+  - shared/AI_DOC_SHARED_RULES.md
+  - shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Normalized under the repository markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # Security & Validation Policies for eRegi Print System
 ## Document Protection and Access Control
 
@@ -637,3 +655,11 @@ const detectDDoSPatterns = (ipAddress: string): boolean => {
 ---
 
 이 보안 정책은 eRegi 인쇄 시스템의 모든 문서를 보호하고, 무단 접근을 방지하며, 개인정보보호 규정을 준수하는 것을 목표로 합니다.
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 701
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 라이브/개발 환경 분리 완료 최종 보고
 
 ## 완료 날짜
@@ -184,3 +202,11 @@ npm run deploy:prod
 **상태:** 라이브/개발 환경 분리 완료, 안정성 확보 완료 ✅
 
 **이제 개발과 운영이 완전히 분리되어 안전하게 개발할 수 있습니다!** 🚀
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

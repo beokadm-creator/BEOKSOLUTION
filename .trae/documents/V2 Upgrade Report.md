@@ -1,3 +1,21 @@
+---
+precedence: 25
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: report
+token-estimate: 303
+@include:
+  - ../../docs/shared/AI_DOC_SHARED_RULES.md
+  - ../../docs/shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as a generated report under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # eRegi V2 고도화 및 V1 제거 완료 보고
 
 ## 1. [Destruction] V1 레거시 완전 제거
@@ -20,3 +38,11 @@
 - **오류 처리**: 하드웨어 미연동 시 개발 모드(Mock)로 자동 폴백되도록 예외 처리 추가.
 
 모든 과제가 완료되었으며, 시스템은 V2 아키텍처로 안전하게 구동됩니다.
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

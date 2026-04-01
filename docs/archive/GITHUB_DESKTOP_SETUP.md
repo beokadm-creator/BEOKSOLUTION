@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 786
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # GitHub Desktop으로 BEOKSOLUTION 저장소 연결
 
 ## 방법 1: GitHub Desktop GUI 사용 (추천)
@@ -120,3 +138,11 @@ https://cloud.google.com/sdk/docs/install#windows
 1. **방법 1 (GUI)**: 가장 쉬움 - GitHub Desktop의 그래픽 인터페이스 사용
 2. **방법 3 (터미널)**: GitHub Desktop 내 터미널 사용
 3. **방법 2 (직접 경로)**: Git 전체 경로를 사용하여 명령어 실행
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->
