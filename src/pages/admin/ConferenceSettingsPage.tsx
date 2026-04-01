@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { collection, doc, getDoc, getDocs, onSnapshot, setDoc, Timestamp, updateDoc } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../../firebase';
+import { db, functions, storage } from '../../firebase';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -14,6 +15,7 @@ import RichTextEditor from '../../components/ui/RichTextEditor';
 import { ArrowDown, ArrowUp, Calendar, MapPin, Globe, FileText, ImageIcon, Save, Loader2, Info, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Skeleton } from '../../components/ui/skeleton';
+import { getStampMissionTargetCount, hasValidStampTourRewards, normalizeStampTourRewards } from '../../utils/stampTour';
 
 interface ConferenceData {
     title: { ko: string; en: string };
@@ -53,6 +55,8 @@ interface SponsorSummary {
 type StampTourCompletionType = 'COUNT' | 'ALL';
 type StampTourBoothOrderMode = 'SPONSOR_ORDER' | 'CUSTOM';
 type StampTourRewardMode = 'RANDOM' | 'FIXED';
+type StampTourDrawMode = 'PARTICIPANT' | 'ADMIN' | 'BOTH';
+type StampTourRewardFulfillmentMode = 'INSTANT' | 'LOTTERY';
 
 interface StampTourRewardForm {
     id: string;
@@ -75,6 +79,9 @@ interface StampTourConfigForm {
     boothOrderMode: StampTourBoothOrderMode;
     customBoothOrder: string[];
     rewardMode: StampTourRewardMode;
+    drawMode: StampTourDrawMode;
+    rewardFulfillmentMode: StampTourRewardFulfillmentMode;
+    lotteryScheduledAt?: Timestamp;
     rewards: StampTourRewardForm[];
     soldOutMessage: string;
     completionMessage: string;
@@ -88,9 +95,11 @@ interface StampTourProgressRow {
     userOrg?: string;
     rewardName?: string;
     rewardStatus: 'NONE' | 'REQUESTED' | 'REDEEMED';
+    lotteryStatus?: 'PENDING' | 'SELECTED' | 'NOT_SELECTED';
     completedAt?: Timestamp;
     requestedAt?: Timestamp;
     redeemedAt?: Timestamp;
+    requestedBy?: string;
 }
 
 const defaultData: ConferenceData = {
@@ -129,6 +138,8 @@ const defaultStampTourConfig: StampTourConfigForm = {
     boothOrderMode: 'SPONSOR_ORDER',
     customBoothOrder: [],
     rewardMode: 'RANDOM',
+    drawMode: 'PARTICIPANT',
+    rewardFulfillmentMode: 'INSTANT',
     rewards: [],
     soldOutMessage: '선착순 경품이 모두 소진되었습니다.',
     completionMessage: '스탬프 투어를 완료했습니다. 상품 수령 버튼을 눌러주세요.'
@@ -144,6 +155,7 @@ export default function ConferenceSettingsPage() {
     const [sponsors, setSponsors] = useState<SponsorSummary[]>([]);
     const [stampTourConfig, setStampTourConfig] = useState<StampTourConfigForm>(defaultStampTourConfig);
     const [stampTourProgress, setStampTourProgress] = useState<StampTourProgressRow[]>([]);
+    const [drawingUserId, setDrawingUserId] = useState<string | null>(null);
 
     const getKstEndOfDayTimestamp = (dtStr: string): Timestamp | null => {
         if (!dtStr) return null;
@@ -277,6 +289,9 @@ export default function ConferenceSettingsPage() {
                             },
                             rewards: Array.isArray(cfg.rewards) ? cfg.rewards : [],
                             customBoothOrder: Array.isArray(cfg.customBoothOrder) ? cfg.customBoothOrder : [],
+                            drawMode: cfg.drawMode || defaultStampTourConfig.drawMode,
+                            rewardFulfillmentMode: cfg.rewardFulfillmentMode || defaultStampTourConfig.rewardFulfillmentMode,
+                            lotteryScheduledAt: cfg.lotteryScheduledAt,
                             enabled: snapData.features?.stampTourEnabled ?? cfg.enabled ?? false,
                             endAt: cfg.endAt || getKstEndOfDayTimestamp(endStr) || undefined
                         });
@@ -323,7 +338,7 @@ export default function ConferenceSettingsPage() {
             enabled: data.features.stampTourEnabled,
             endAt
         }));
-    }, [data.features.stampTourEnabled, data.dates.end, stampTourConfig.endAt]);
+    }, [data.features.stampTourEnabled, data.dates.end, stampTourConfig.enabled, stampTourConfig.endAt]);
 
     useEffect(() => {
         if (!cid) return;
@@ -343,10 +358,42 @@ export default function ConferenceSettingsPage() {
         return () => unsub();
     }, [cid]);
 
+    const stampTourParticipantCount = sponsors.filter((sponsor) => sponsor.isStampTourParticipant).length;
+    const normalizedRequiredStampCount = getStampMissionTargetCount(
+        stampTourConfig.completionRule,
+        stampTourParticipantCount
+    );
+
     const handleSave = async () => {
         if (!cid) return;
         setSaving(true);
         try {
+            if (data.features.stampTourEnabled && stampTourParticipantCount === 0) {
+                toast.error('스탬프 투어 참여 부스를 먼저 1개 이상 연결해 주세요.');
+                return;
+            }
+
+            const sanitizedRewards = normalizeStampTourRewards(
+                stampTourConfig.rewards,
+                stampTourConfig.rewardMode
+            );
+            if (
+                data.features.stampTourEnabled &&
+                !hasValidStampTourRewards(sanitizedRewards, stampTourConfig.rewardMode)
+            ) {
+                toast.error('보상 이름, 수량, 랜덤 가중치 또는 고정 순서를 확인해 주세요.');
+                return;
+            }
+
+            if (
+                data.features.stampTourEnabled &&
+                stampTourConfig.rewardFulfillmentMode === 'LOTTERY' &&
+                !stampTourConfig.lotteryScheduledAt
+            ) {
+                toast.error('예약 추첨형은 추첨 예정 시각을 반드시 지정해야 합니다.');
+                return;
+            }
+
             const docRef = doc(db, 'conferences', cid);
 
             // datetime-local 값(예: "2026-05-10T09:00")을 KST 기준 UTC Timestamp로 변환
@@ -392,9 +439,24 @@ export default function ConferenceSettingsPage() {
             const stampConfigRef = doc(db, `conferences/${cid}/settings`, 'stamp_tour');
             await setDoc(stampConfigRef, {
                 ...stampTourConfig,
+                completionRule: {
+                    ...stampTourConfig.completionRule,
+                    requiredCount: stampTourConfig.completionRule.type === 'COUNT'
+                        ? normalizedRequiredStampCount
+                        : undefined
+                },
                 enabled: data.features.stampTourEnabled,
-                endAt
+                endAt,
+                rewards: sanitizedRewards
             }, { merge: true });
+
+            if (
+                data.features.stampTourEnabled &&
+                stampTourConfig.completionRule.type === 'COUNT' &&
+                normalizedRequiredStampCount !== (stampTourConfig.completionRule.requiredCount || 0)
+            ) {
+                toast.success(`완료 기준을 참여 부스 수에 맞춰 ${normalizedRequiredStampCount}개로 보정했습니다.`);
+            }
 
             toast.success("Conference settings saved successfully!");
         } catch (error) {
@@ -419,6 +481,52 @@ export default function ConferenceSettingsPage() {
             throw error;
         } finally {
             setUploadingImage(false);
+        }
+    };
+
+    const handleAdminRewardDraw = async (row: StampTourProgressRow) => {
+        if (!cid) return;
+
+        setDrawingUserId(row.id);
+        try {
+            const adminDrawReward = httpsCallable(functions, 'adminDrawStampReward');
+            const response = await adminDrawReward({
+                confId: cid,
+                userId: row.id,
+                userName: row.userName,
+                userOrg: row.userOrg
+            });
+
+            const payload = response.data as { rewardName?: string };
+            toast.success(
+                payload.rewardName
+                    ? `${row.userName || row.id} 추첨 완료: ${payload.rewardName}`
+                    : `${row.userName || row.id} 추첨이 완료되었습니다.`
+            );
+        } catch (error) {
+            console.error('Admin reward draw failed:', error);
+            toast.error(error instanceof Error ? error.message : '관리자 추첨 처리에 실패했습니다.');
+        } finally {
+            setDrawingUserId(null);
+        }
+    };
+
+    const handleRunLottery = async () => {
+        if (!cid) return;
+
+        setDrawingUserId('LOTTERY_BATCH');
+        try {
+            const runLottery = httpsCallable(functions, 'runStampRewardLottery');
+            const response = await runLottery({ confId: cid });
+            const payload = response.data as { totalEligible?: number; totalSelected?: number; totalNotSelected?: number };
+            toast.success(
+                `추첨 완료: 대상 ${payload.totalEligible || 0}명, 당첨 ${payload.totalSelected || 0}명, 미당첨 ${payload.totalNotSelected || 0}명`
+            );
+        } catch (error) {
+            console.error('Run lottery failed:', error);
+            toast.error(error instanceof Error ? error.message : '예약 추첨 실행에 실패했습니다.');
+        } finally {
+            setDrawingUserId(null);
         }
     };
 
@@ -747,6 +855,9 @@ export default function ConferenceSettingsPage() {
                                                             }
                                                         }))}
                                                     />
+                                                    <p className="mt-2 text-xs text-slate-500">
+                                                        참여 부스 {stampTourParticipantCount}개 기준으로 저장 시 최대 {Math.max(stampTourParticipantCount, 1)}개까지 맞춰집니다.
+                                                    </p>
                                                 </div>
                                             )}
                                         </div>
@@ -840,7 +951,83 @@ export default function ConferenceSettingsPage() {
                                                 <option value="RANDOM">랜덤 지급</option>
                                                 <option value="FIXED">지정 순서 지급</option>
                                             </select>
+                                            <p className="text-xs text-slate-500">
+                                                랜덤은 남은 재고만 대상으로 가중치 추첨하며, 일반 상품 소진 시 대체용 상품만 남아 있으면 그 목록에서 이어서 지급됩니다.
+                                            </p>
                                         </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-base font-medium text-slate-700">추첨 진행 주체</Label>
+                                            <select
+                                                value={stampTourConfig.drawMode}
+                                                onChange={(e) => setStampTourConfig(prev => ({
+                                                    ...prev,
+                                                    drawMode: e.target.value as StampTourDrawMode
+                                                }))}
+                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                            >
+                                                <option value="PARTICIPANT">참가자 디지털명찰에서 추첨</option>
+                                                <option value="ADMIN">관리자 화면에서만 추첨</option>
+                                                <option value="BOTH">참가자/관리자 모두 가능</option>
+                                            </select>
+                                            <p className="text-xs text-slate-500">
+                                                전광판이나 운영 화면에서 관리자가 직접 당첨을 확정하려면 관리자 또는 모두 가능으로 설정하세요.
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-base font-medium text-slate-700">보상 처리 기준</Label>
+                                            <select
+                                                value={stampTourConfig.rewardFulfillmentMode}
+                                                onChange={(e) => setStampTourConfig(prev => ({
+                                                    ...prev,
+                                                    rewardFulfillmentMode: e.target.value as StampTourRewardFulfillmentMode
+                                                }))}
+                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                            >
+                                                <option value="INSTANT">미션 완료 즉시 수령 가능</option>
+                                                <option value="LOTTERY">관리자 지정 시각 일괄 추첨</option>
+                                            </select>
+                                            <p className="text-xs text-slate-500">
+                                                즉시 수령형은 완료 즉시 보상 요청이 가능하고, 예약 추첨형은 마감 후 완료자 전체를 대상으로 한 번에 추첨합니다.
+                                            </p>
+                                        </div>
+
+                                        {stampTourConfig.rewardFulfillmentMode === 'LOTTERY' && (
+                                            <div className="space-y-2">
+                                                <Label className="text-base font-medium text-slate-700">예약 추첨 시각</Label>
+                                                <Input
+                                                    type="datetime-local"
+                                                    value={stampTourConfig.lotteryScheduledAt ? (() => {
+                                                        const d = stampTourConfig.lotteryScheduledAt.toDate();
+                                                        const kstOffset = 9 * 60;
+                                                        const localMs = d.getTime() + kstOffset * 60 * 1000;
+                                                        const kstDate = new Date(localMs);
+                                                        const year = kstDate.getUTCFullYear();
+                                                        const month = String(kstDate.getUTCMonth() + 1).padStart(2, '0');
+                                                        const day = String(kstDate.getUTCDate()).padStart(2, '0');
+                                                        const hours = String(kstDate.getUTCHours()).padStart(2, '0');
+                                                        const minutes = String(kstDate.getUTCMinutes()).padStart(2, '0');
+                                                        return `${year}-${month}-${day}T${hours}:${minutes}`;
+                                                    })() : ''}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        if (!value) {
+                                                            setStampTourConfig(prev => ({ ...prev, lotteryScheduledAt: undefined }));
+                                                            return;
+                                                        }
+                                                        const [datePart, timePart] = value.split('T');
+                                                        const [year, month, day] = datePart.split('-').map(Number);
+                                                        const [hour, minute] = (timePart || '00:00').split(':').map(Number);
+                                                        const scheduled = new Date(Date.UTC(year, month - 1, day, hour - 9, minute, 0, 0));
+                                                        setStampTourConfig(prev => ({ ...prev, lotteryScheduledAt: Timestamp.fromDate(scheduled) }));
+                                                    }}
+                                                />
+                                                <p className="text-xs text-slate-500">
+                                                    이 시각 전에는 누구도 추첨할 수 없고, 시각이 지나면 관리자만 전체 완료자를 대상으로 일괄 추첨할 수 있습니다.
+                                                </p>
+                                            </div>
+                                        )}
 
                                         {/* Rewards */}
                                         <div className="space-y-3">
@@ -1025,6 +1212,19 @@ export default function ConferenceSettingsPage() {
                                             </div>
                                         </div>
 
+                                        {stampTourConfig.rewardFulfillmentMode === 'LOTTERY' && (
+                                            <div className="flex justify-end">
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    onClick={() => void handleRunLottery()}
+                                                    disabled={drawingUserId === 'LOTTERY_BATCH'}
+                                                >
+                                                    {drawingUserId === 'LOTTERY_BATCH' ? '추첨 중...' : '예약 추첨 실행'}
+                                                </Button>
+                                            </div>
+                                        )}
+
                                         {stampTourProgress.length === 0 ? (
                                             <div className="text-sm text-slate-400">진행 데이터가 없습니다.</div>
                                         ) : (
@@ -1037,10 +1237,20 @@ export default function ConferenceSettingsPage() {
                                                             <div className="text-xs text-slate-500">{row.rewardName || '상품 미정'}</div>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${row.rewardStatus === 'REDEEMED' ? 'bg-emerald-100 text-emerald-700' : row.rewardStatus === 'REQUESTED' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
-                                                                {row.rewardStatus}
+                                                            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${(row.rewardStatus || 'NONE') === 'REDEEMED' ? 'bg-emerald-100 text-emerald-700' : (row.rewardStatus || 'NONE') === 'REQUESTED' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                                {row.rewardStatus || 'NONE'}
                                                             </span>
-                                                            {row.rewardStatus === 'REQUESTED' && (
+                                                            {stampTourConfig.rewardFulfillmentMode === 'INSTANT' && (!row.rewardStatus || row.rewardStatus === 'NONE') && row.isCompleted && (stampTourConfig.drawMode === 'ADMIN' || stampTourConfig.drawMode === 'BOTH') && (
+                                                                <Button
+                                                                    type="button"
+                                                                    size="sm"
+                                                                    onClick={() => void handleAdminRewardDraw(row)}
+                                                                    disabled={drawingUserId === row.id}
+                                                                >
+                                                                    {drawingUserId === row.id ? '추첨 중...' : '관리자 추첨'}
+                                                                </Button>
+                                                            )}
+                                                            {(row.rewardStatus || 'NONE') === 'REQUESTED' && (
                                                                 <Button
                                                                     type="button"
                                                                     size="sm"

@@ -38,6 +38,7 @@ const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const logAuditEvent_1 = require("../audit/logAuditEvent");
 const shared_1 = require("./shared");
+const shared_2 = require("../stampTour/shared");
 exports.processVendorVisit = functions.https.onCall(async (data, context) => {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r;
     if (!context.auth) {
@@ -155,6 +156,41 @@ exports.processVendorVisit = functions.https.onCall(async (data, context) => {
         });
     }
     if (transactionResult.stampGranted) {
+        try {
+            const progressRef = db.doc(`conferences/${confId}/stamp_tour_progress/${visitorId}`);
+            const [configSnap, sponsorsSnap, visitorStampsSnap, progressSnap] = await Promise.all([
+                db.doc(`conferences/${confId}/settings/stamp_tour`).get(),
+                db.collection(`conferences/${confId}/sponsors`).where("isStampTourParticipant", "==", true).get(),
+                db.collection(`conferences/${confId}/stamps`).where("userId", "==", visitorId).get(),
+                progressRef.get()
+            ]);
+            if (configSnap.exists) {
+                const config = configSnap.data();
+                const requiredCount = (0, shared_2.getRequiredCount)(config.completionRule, sponsorsSnap.size);
+                const uniqueVendorIds = new Set(visitorStampsSnap.docs
+                    .map((docSnap) => docSnap.data().vendorId)
+                    .filter(Boolean));
+                if (requiredCount > 0 && uniqueVendorIds.size >= requiredCount) {
+                    const existingProgress = progressSnap.exists
+                        ? progressSnap.data()
+                        : {};
+                    await progressRef.set({
+                        userId: visitorId,
+                        conferenceId: confId,
+                        userName: visitorName,
+                        userOrg: visitorOrg || null,
+                        isCompleted: true,
+                        completedAt: existingProgress.completedAt || now,
+                        rewardStatus: existingProgress.rewardStatus || "NONE",
+                        lotteryStatus: existingProgress.lotteryStatus
+                            || (config.rewardFulfillmentMode === "LOTTERY" ? "PENDING" : admin.firestore.FieldValue.delete())
+                    }, { merge: true });
+                }
+            }
+        }
+        catch (error) {
+            console.error("[processVendorVisit] Failed to update stamp progress", error);
+        }
         await (0, logAuditEvent_1.createAuditLogEntry)({
             action: "STAMP_CREATED",
             entityType: "STAMP",

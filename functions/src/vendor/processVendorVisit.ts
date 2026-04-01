@@ -2,6 +2,7 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { createAuditLogEntry } from "../audit/logAuditEvent";
 import { assertVendorActor, getAffiliationName, resolveRegistrationByScan } from "./shared";
+import { getRequiredCount, StampTourConfig } from "../stampTour/shared";
 
 export const processVendorVisit = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
@@ -53,7 +54,13 @@ export const processVendorVisit = functions.https.onCall(async (data, context) =
         const stampSnap = await tx.get(stampRef);
         const guestbookSnap = await tx.get(guestbookRef);
 
-        const existingLead = leadSnap.exists ? (leadSnap.data() as Record<string, any>) : null;
+        const existingLead = leadSnap.exists ? (leadSnap.data() as {
+            isConsentAgreed?: boolean;
+            visitorOrg?: string;
+            visitorPhone?: string;
+            visitorEmail?: string;
+            firstVisitedAt?: admin.firestore.Timestamp;
+        }) : null;
         const hasPreviousConsent = existingLead?.isConsentAgreed === true;
 
         tx.set(leadRef, {
@@ -146,6 +153,50 @@ export const processVendorVisit = functions.https.onCall(async (data, context) =
     }
 
     if (transactionResult.stampGranted) {
+        try {
+            const progressRef = db.doc(`conferences/${confId}/stamp_tour_progress/${visitorId}`);
+            const [configSnap, sponsorsSnap, visitorStampsSnap, progressSnap] = await Promise.all([
+                db.doc(`conferences/${confId}/settings/stamp_tour`).get(),
+                db.collection(`conferences/${confId}/sponsors`).where("isStampTourParticipant", "==", true).get(),
+                db.collection(`conferences/${confId}/stamps`).where("userId", "==", visitorId).get(),
+                progressRef.get()
+            ]);
+
+            if (configSnap.exists) {
+                const config = configSnap.data() as StampTourConfig;
+                const requiredCount = getRequiredCount(config.completionRule, sponsorsSnap.size);
+                const uniqueVendorIds = new Set(
+                    visitorStampsSnap.docs
+                        .map((docSnap) => (docSnap.data() as { vendorId?: string }).vendorId)
+                        .filter(Boolean) as string[]
+                );
+
+                if (requiredCount > 0 && uniqueVendorIds.size >= requiredCount) {
+                    const existingProgress = progressSnap.exists
+                        ? (progressSnap.data() as {
+                            completedAt?: admin.firestore.Timestamp;
+                            rewardStatus?: "NONE" | "REQUESTED" | "REDEEMED";
+                            lotteryStatus?: "PENDING" | "SELECTED" | "NOT_SELECTED";
+                        })
+                        : {};
+
+                    await progressRef.set({
+                        userId: visitorId,
+                        conferenceId: confId,
+                        userName: visitorName,
+                        userOrg: visitorOrg || null,
+                        isCompleted: true,
+                        completedAt: existingProgress.completedAt || now,
+                        rewardStatus: existingProgress.rewardStatus || "NONE",
+                        lotteryStatus: existingProgress.lotteryStatus
+                            || (config.rewardFulfillmentMode === "LOTTERY" ? "PENDING" : admin.firestore.FieldValue.delete())
+                    }, { merge: true });
+                }
+            }
+        } catch (error) {
+            console.error("[processVendorVisit] Failed to update stamp progress", error);
+        }
+
         await createAuditLogEntry({
             action: "STAMP_CREATED",
             entityType: "STAMP",

@@ -1050,7 +1050,10 @@ export interface StampRecord {
 export type StampTourCompletionType = 'COUNT' | 'ALL';
 export type StampTourBoothOrderMode = 'SPONSOR_ORDER' | 'CUSTOM';
 export type StampTourRewardMode = 'RANDOM' | 'FIXED';
+export type StampTourDrawMode = 'PARTICIPANT' | 'ADMIN' | 'BOTH';
+export type StampTourRewardFulfillmentMode = 'INSTANT' | 'LOTTERY';
 export type StampTourRewardStatus = 'NONE' | 'REQUESTED' | 'REDEEMED';
+export type StampTourLotteryStatus = 'PENDING' | 'SELECTED' | 'NOT_SELECTED';
 
 export interface StampTourReward {
   id: string;
@@ -1073,6 +1076,10 @@ export interface StampTourConfig {
   boothOrderMode: StampTourBoothOrderMode;
   customBoothOrder?: string[]; // vendorId list
   rewardMode: StampTourRewardMode;
+  drawMode?: StampTourDrawMode;
+  rewardFulfillmentMode?: StampTourRewardFulfillmentMode;
+  lotteryScheduledAt?: Timestamp;
+  lotteryExecutedAt?: Timestamp;
   rewards: StampTourReward[];
   soldOutMessage?: string;
   completionMessage?: string;
@@ -1089,9 +1096,13 @@ export interface StampTourProgress {
   rewardId?: string;
   rewardName?: string;
   rewardStatus: StampTourRewardStatus;
+  drawModeUsed?: StampTourDrawMode;
+  lotteryStatus?: StampTourLotteryStatus;
   requestedAt?: Timestamp;
   redeemedAt?: Timestamp;
   redeemedBy?: string;
+  requestedBy?: string;
+  lotteryExecutedAt?: Timestamp;
 }
 
 /**

@@ -21,6 +21,8 @@ import { logAuditEvent } from './audit/logAuditEvent';
 import { withdrawConsent } from './vendor/withdrawConsent';
 import { scheduledDataCleanup, manualDataCleanup } from './scheduled/dataCleanup';
 import { requestStampReward } from './stampTour/requestStampReward';
+import { adminDrawStampReward } from './stampTour/adminDrawStampReward';
+import { runStampRewardLottery } from './stampTour/runStampRewardLottery';
 
 export const corsHandler = cors({ origin: true });
 
@@ -52,6 +54,8 @@ export {
     scheduledDataCleanup,
     manualDataCleanup,
     requestStampReward,
+    adminDrawStampReward,
+    runStampRewardLottery,
     // healthCheck,
     // scheduledHealthCheck,
     // checkAlimTalkConfig,

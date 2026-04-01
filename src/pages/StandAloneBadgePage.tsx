@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { getAuth, onAuthStateChanged } from 'firebase/auth'; // RAW SDK
 import { getFirestore, collection, query, where, onSnapshot, orderBy, type Query, getDocs, doc, getDoc } from 'firebase/firestore'; // RAW SDK
@@ -10,6 +10,54 @@ import { RefreshCw, CheckCircle, Loader2, Clock, FileText, Calendar, Languages, 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { DOMAIN_CONFIG, extractSocietyFromHost } from '../utils/domainHelper';
 import { functions } from '../firebase';
+import { getStampMissionTargetCount } from '../utils/stampTour';
+
+type TimestampLike = {
+    toDate: () => Date;
+};
+
+type ZoneBreak = {
+    start: string;
+    end: string;
+};
+
+type AttendanceZone = {
+    id: string;
+    start?: string;
+    end?: string;
+    breaks?: ZoneBreak[];
+    ruleDate?: string;
+};
+
+type AttendanceRule = {
+    zones?: Array<Omit<AttendanceZone, 'ruleDate'>>;
+};
+
+type AttendanceSettings = {
+    rules?: Record<string, AttendanceRule>;
+};
+
+type BadgeConfig = {
+    materialsUrls?: Array<{ name: string; url: string }>;
+    translationUrl?: string;
+};
+
+type BadgeUiState = {
+    name: string;
+    aff: string;
+    id: string;
+    userId: string;
+    issued: boolean;
+    zone: string;
+    time: string;
+    license: string;
+    status: string;
+    badgeQr: string | null;
+    receiptNumber?: string;
+    isCompleted?: boolean;
+    lastCheckIn?: TimestampLike;
+    baseMinutes?: number;
+};
 
 type StampTourConfig = {
     enabled: boolean;
@@ -17,6 +65,9 @@ type StampTourConfig = {
     boothOrderMode: 'SPONSOR_ORDER' | 'CUSTOM';
     customBoothOrder?: string[];
     rewardMode: 'RANDOM' | 'FIXED';
+    drawMode?: 'PARTICIPANT' | 'ADMIN' | 'BOTH';
+    rewardFulfillmentMode?: 'INSTANT' | 'LOTTERY';
+    lotteryScheduledAt?: TimestampLike;
     rewards: Array<{
         id: string;
         name: string;
@@ -32,8 +83,10 @@ type StampTourConfig = {
 
 type StampProgress = {
     rewardStatus?: 'NONE' | 'REQUESTED' | 'REDEEMED';
+    lotteryStatus?: 'PENDING' | 'SELECTED' | 'NOT_SELECTED';
     rewardName?: string;
     isCompleted?: boolean;
+    completedAt?: TimestampLike;
 };
 const StandAloneBadgePage: React.FC = () => {
     // BUGFIX-20250124: Fixed React error #130 by moving unsubscribeDB to outer scope
@@ -41,10 +94,10 @@ const StandAloneBadgePage: React.FC = () => {
     const navigate = useNavigate();
     const db = getFirestore();
     const [status, setStatus] = useState("INIT"); // INIT, LOADING, READY, NO_AUTH, NO_DATA, REDIRECTING
-    const [ui, setUi] = useState<{ name: string, aff: string, id: string, userId: string, issued: boolean, zone: string, time: string, license: string, status: string, badgeQr: string | null, receiptNumber?: string, isCompleted?: boolean, lastCheckIn?: any, baseMinutes?: number } | null>(null);
-    const [zones, setZones] = useState<any[]>([]);
+    const [ui, setUi] = useState<BadgeUiState | null>(null);
+    const [zones, setZones] = useState<AttendanceZone[]>([]);
     const [liveMinutes, setLiveMinutes] = useState<number>(0);
-    const [badgeConfig, setBadgeConfig] = useState<any>(null);
+    const [badgeConfig, setBadgeConfig] = useState<BadgeConfig | null>(null);
     const [stampConfig, setStampConfig] = useState<StampTourConfig | null>(null);
     const [stampBoothCandidates, setStampBoothCandidates] = useState<Array<{ id: string; name: string }>>([]);
     const [myStamps, setMyStamps] = useState<string[]>([]);
@@ -53,13 +106,13 @@ const StandAloneBadgePage: React.FC = () => {
     const [rewardRequesting, setRewardRequesting] = useState(false);
     const [rewardMessage, setRewardMessage] = useState('');
     const [rewardAnimationOpen, setRewardAnimationOpen] = useState(false);
-    const [msg, setMsg] = useState("珥덇린??以?..");
+    const [msg, setMsg] = useState("초기화 중...");
     const [refreshing, setRefreshing] = useState(false);
     const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const lastQueryRef = useRef<Query | null>(null);
 
     // Helper to determine correct confId
-    const getConfIdToUse = (slugVal: string | undefined): string => {
+    const getConfIdToUse = useCallback((slugVal: string | undefined): string => {
         if (!slugVal) {
             return '';
         }
@@ -68,11 +121,11 @@ const StandAloneBadgePage: React.FC = () => {
             return slugVal;
         } else {
             const hostname = window.location.hostname;
-            let societyIdToUse = extractSocietyFromHost(hostname) || DOMAIN_CONFIG.DEFAULT_SOCIETY;
+            const societyIdToUse = extractSocietyFromHost(hostname) || DOMAIN_CONFIG.DEFAULT_SOCIETY;
 
             return `${societyIdToUse}_${slugVal}`;
         }
-    };
+    }, []);
 
     useEffect(() => {
         const auth = getAuth();
@@ -91,7 +144,7 @@ const StandAloneBadgePage: React.FC = () => {
             if (user) {
                 // Firebase user authenticated - proceed to show badge
                 setStatus("LOADING");
-                setMsg("?곗씠??濡쒕뱶 以?..");
+                setMsg("데이터를 불러오는 중입니다...");
 
                 const confIdToUse = getConfIdToUse(slug);
 
@@ -125,11 +178,12 @@ const StandAloneBadgePage: React.FC = () => {
                         ]);
 
                         if (rulesSnap.exists()) {
-                            const allRules = rulesSnap.data().rules || {};
-                            let allZones: any[] = [];
-                            Object.entries(allRules).forEach(([dateStr, rule]: [string, any]) => {
+                            const attendanceSettings = rulesSnap.data() as AttendanceSettings;
+                            const allRules = attendanceSettings.rules || {};
+                            const allZones: AttendanceZone[] = [];
+                            Object.entries(allRules).forEach(([dateStr, rule]) => {
                                 if (rule && rule.zones) {
-                                    rule.zones.forEach((z: any) => {
+                                    rule.zones.forEach((z) => {
                                         allZones.push({ ...z, ruleDate: dateStr });
                                     });
                                 }
@@ -151,7 +205,7 @@ const StandAloneBadgePage: React.FC = () => {
                         // This should only happen if the document was deleted after we found it
                         console.log(`[StandAloneBadgePage] ${source} registration disappeared`);
                         setStatus("NO_DATA");
-                        setMsg("?깅줉 ?뺣낫媛 ?놁뒿?덈떎.");
+                        setMsg("등록 정보가 없습니다.");
                         return;
                     }
 
@@ -224,13 +278,13 @@ const StandAloneBadgePage: React.FC = () => {
                             // No data in either
                             console.log('[StandAloneBadgePage] No PAID registration found in either collection');
                             setStatus("NO_DATA");
-                            setMsg("?깅줉 ?뺣낫媛 ?놁뒿?덈떎.");
+                            setMsg("등록 정보가 없습니다.");
                         }
                     }
                 } catch (err) {
                     console.error('[StandAloneBadgePage] Error fetching badge data:', err);
                     setStatus("NO_DATA");
-                    setMsg("?곗씠??濡쒕뱶 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.");
+                    setMsg("데이터를 불러오는 중 오류가 발생했습니다.");
                 }
 
             } else {
@@ -262,7 +316,7 @@ const StandAloneBadgePage: React.FC = () => {
                     }
                 } else {
                     setStatus("NO_AUTH");
-                    setMsg("濡쒓렇?몄씠 ?꾩슂?⑸땲??");
+                    setMsg("로그인이 필요합니다.");
                 }
             }
         });
@@ -271,7 +325,7 @@ const StandAloneBadgePage: React.FC = () => {
             if (unsubscribeDB) unsubscribeDB(); // Clean up DB subscription first
             if (unsubscribeAuth) unsubscribeAuth(); // Then clean up auth subscription
         };
-    }, [slug, navigate]);
+    }, [getConfIdToUse, navigate, slug]);
 
     // Auto-refresh when badge is NOT issued (voucher state)
     useEffect(() => {
@@ -365,7 +419,7 @@ const StandAloneBadgePage: React.FC = () => {
                 durationMinutes = Math.floor((boundedEnd.getTime() - boundedStart.getTime()) / 60000);
 
                 if (zoneRule && zoneRule.breaks && Array.isArray(zoneRule.breaks)) {
-                    zoneRule.breaks.forEach((brk: any) => {
+                    zoneRule.breaks.forEach((brk) => {
                         const localDateStr = zoneRule.ruleDate || start.getFullYear() + "-" + String(start.getMonth() + 1).padStart(2, '0') + "-" + String(start.getDate()).padStart(2, '0');
                         const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
                         const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
@@ -420,6 +474,9 @@ const StandAloneBadgePage: React.FC = () => {
                         boothOrderMode: configData.boothOrderMode || 'SPONSOR_ORDER',
                         customBoothOrder: configData.customBoothOrder || [],
                         rewardMode: configData.rewardMode || 'RANDOM',
+                        drawMode: configData.drawMode || 'PARTICIPANT',
+                        rewardFulfillmentMode: configData.rewardFulfillmentMode || 'INSTANT',
+                        lotteryScheduledAt: configData.lotteryScheduledAt,
                         rewards: Array.isArray(configData.rewards) ? configData.rewards : [],
                         soldOutMessage: configData.soldOutMessage,
                         completionMessage: configData.completionMessage
@@ -479,7 +536,7 @@ const StandAloneBadgePage: React.FC = () => {
             unsubscribeStamps?.();
             unsubscribeProgress?.();
         };
-    }, [slug, ui?.userId, ui?.issued]);
+    }, [db, getConfIdToUse, slug, ui?.issued, ui?.userId]);
 
     const orderedStampBooths = useMemo(() => {
         if (!stampConfig?.enabled) return [];
@@ -497,15 +554,28 @@ const StandAloneBadgePage: React.FC = () => {
 
     const requiredStampCount = useMemo(() => {
         if (!stampConfig?.enabled) return 0;
-        if (stampConfig.completionRule.type === 'ALL') {
-            return orderedStampBooths.length;
-        }
-        return Math.max(1, stampConfig.completionRule.requiredCount || orderedStampBooths.length);
+        return getStampMissionTargetCount(stampConfig.completionRule, orderedStampBooths.length);
     }, [orderedStampBooths.length, stampConfig]);
 
     const isStampMissionComplete = stampConfig?.enabled
         ? requiredStampCount > 0 && myStamps.length >= requiredStampCount
         : false;
+    const completedAtMs = stampProgress.completedAt?.toDate().getTime();
+    const lotteryScheduledAtMs = stampConfig?.lotteryScheduledAt?.toDate().getTime();
+    const completedBeforeLotteryCutoff = lotteryScheduledAtMs == null || completedAtMs == null || completedAtMs <= lotteryScheduledAtMs;
+    const lotteryStatus = stampProgress.lotteryStatus || (
+        stampConfig?.rewardFulfillmentMode === 'LOTTERY'
+        && isStampMissionComplete
+        && completedBeforeLotteryCutoff
+            ? 'PENDING'
+            : undefined
+    );
+    const isInstantReward = stampConfig?.rewardFulfillmentMode !== 'LOTTERY';
+    const canParticipantDraw = isInstantReward && stampConfig?.drawMode !== 'ADMIN';
+    const currentRewardStatus = stampProgress.rewardStatus || 'NONE';
+    const missedLotteryCutoff = !isInstantReward
+        && currentRewardStatus === 'NONE'
+        && !completedBeforeLotteryCutoff;
 
     const stampBooths = useMemo(() => {
         const stampedSet = new Set(myStamps);
@@ -556,8 +626,6 @@ const StandAloneBadgePage: React.FC = () => {
     const showBadgeQr = ui.issued; // Always show if issued
     // Fallback to generated ID if badgeQr is missing in DB but issued flag is true
     const qrValue = showBadgeQr ? (ui.badgeQr || `BADGE-${ui.id}`) : ui.id;
-    const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-
     console.log('[StandAloneBadgePage] QR Display Debug:', {
         issued: ui.issued,
         badgeQr: ui.badgeQr,
@@ -818,7 +886,7 @@ const StandAloneBadgePage: React.FC = () => {
                             {/* Materials Tab */}
                             <TabsContent value="materials" className="mt-2 p-1 space-y-2">
                                 {badgeConfig?.materialsUrls && badgeConfig.materialsUrls.length > 0 ? (
-                                    badgeConfig.materialsUrls.map((mat: any, idx: number) => (
+                                    badgeConfig.materialsUrls.map((mat, idx: number) => (
                                         <a
                                             key={idx}
                                             href={mat.url}
@@ -838,7 +906,7 @@ const StandAloneBadgePage: React.FC = () => {
                                 ) : (
                                     <>
                                         <a
-                                            href={`https://${hostname}/${slug}/materials`}
+                                            href={`/${slug}/materials`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="flex items-center p-4 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-xl transition-all group"
@@ -852,7 +920,7 @@ const StandAloneBadgePage: React.FC = () => {
                                             </div>
                                         </a>
                                         <a
-                                            href={`https://${hostname}/${slug}/abstracts`}
+                                            href={`/${slug}/abstracts`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="flex items-center p-4 bg-white hover:bg-purple-50 border border-gray-200 hover:border-purple-200 rounded-xl transition-all group"
@@ -872,7 +940,7 @@ const StandAloneBadgePage: React.FC = () => {
                             {/* Program Tab */}
                             <TabsContent value="program" className="mt-2 p-1">
                                 <a
-                                    href={`https://${hostname}/${slug}/program`}
+                                    href={`/${slug}/program`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="flex flex-col items-center justify-center p-8 bg-white border border-gray-200 rounded-2xl hover:border-amber-300 hover:bg-amber-50 transition-all text-center gap-3"
@@ -942,19 +1010,19 @@ const StandAloneBadgePage: React.FC = () => {
                                                         ? (stampConfig.completionMessage || '?몃???꽕?뺣맂 誘몄뀡???꾨즺?덉뒿?덈떎.')
                                                         : `吏湲덇퉴吏 ${myStamps.length}媛쒖쓽 遺ㅼ뒪 ?ㅽ꺃??紐⑥븯?듬땲??`}
                                                 </p>
-                                                {stampProgress.rewardStatus === 'REQUESTED' && (
+                                                {currentRewardStatus === 'REQUESTED' && (
                                                     <div className="rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-700">
                                                         {stampProgress.rewardName
                                                             ? `${stampProgress.rewardName} ?섎졊 ?붿껌??醫묒닔?섏뿀?듬땲??`
                                                             : '?곹뭹 ?섎졊 ?붿껌??醫묒닔?섏뿀?듬땲??'}
                                                     </div>
                                                 )}
-                                                {stampProgress.rewardStatus === 'REDEEMED' && (
+                                                {currentRewardStatus === 'REDEEMED' && (
                                                     <div className="rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-700">
                                                         ?곹뭹 ?섎졊??留덈즺?섏뿀?듬땲??
                                                     </div>
                                                 )}
-                                                {isStampMissionComplete && !stampProgress.rewardStatus && (
+                                                {isStampMissionComplete && currentRewardStatus === 'NONE' && canParticipantDraw && (
                                                     <button
                                                         type="button"
                                                         onClick={handleRewardRequest}
@@ -963,6 +1031,31 @@ const StandAloneBadgePage: React.FC = () => {
                                                     >
                                                         {rewardRequesting ? '?붿쿇 以?..' : '?곹뭹 異붿쿇 ?쒖옉'}
                                                     </button>
+                                                )}
+                                                {isStampMissionComplete && currentRewardStatus === 'NONE' && !canParticipantDraw && isInstantReward && (
+                                                    <div className="rounded-xl bg-sky-100 px-3 py-2 text-xs font-bold text-sky-700">
+                                                        관리자 추첨 대기 중입니다. 운영 화면에서 당첨을 확정합니다.
+                                                    </div>
+                                                )}
+                                                {isStampMissionComplete && !isInstantReward && lotteryStatus === 'PENDING' && (
+                                                    <div className="rounded-xl bg-sky-100 px-3 py-2 text-xs font-bold text-sky-700">
+                                                        예약 추첨 대기 중입니다. 지정된 시각 이후 운영 화면에서 전체 완료자를 기준으로 일괄 추첨합니다.
+                                                    </div>
+                                                )}
+                                                {isStampMissionComplete && !isInstantReward && lotteryStatus === 'PENDING' && stampConfig.lotteryScheduledAt && (
+                                                    <div className="rounded-xl bg-white/80 px-3 py-2 text-xs text-amber-900">
+                                                        추첨 예정 시각: {stampConfig.lotteryScheduledAt.toDate().toLocaleString('ko-KR')}
+                                                    </div>
+                                                )}
+                                                {missedLotteryCutoff && (
+                                                    <div className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">
+                                                        예약 추첨 마감 이후에 미션을 완료해 이번 회차 추첨 대상에서는 제외되었습니다.
+                                                    </div>
+                                                )}
+                                                {!isInstantReward && lotteryStatus === 'NOT_SELECTED' && (
+                                                    <div className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">
+                                                        이번 예약 추첨에서는 미당첨입니다.
+                                                    </div>
                                                 )}
                                                 {rewardMessage && (
                                                     <div className="rounded-xl bg-white/80 px-3 py-2 text-xs text-amber-900">
@@ -1039,7 +1132,7 @@ const StandAloneBadgePage: React.FC = () => {
                                 {stampProgress.rewardName || '異붿쿇 ?꾨즺'}
                             </h3>
                             <p className="mt-3 text-sm leading-6 text-gray-600">
-                                {rewardMessage || '?곹뭹 ?붿껌??醫묒닔?섏뿀?듬땲?? ?몃뜑?곗뒪?ш린 ?꾩뿉???뺤씤?댁＜?몄슂.'}
+                                {rewardMessage || '상품 요청이 접수되었습니다. 인포데스크에서 확인해 주세요.'}
                             </p>
                             <div className="mt-6 flex justify-center gap-2">
                                 <span className="h-2 w-2 animate-bounce rounded-full bg-amber-400" />
