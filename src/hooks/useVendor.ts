@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { doc, getDoc, setDoc, collection, addDoc, query, where, getDocs, Timestamp, orderBy, limit, collectionGroup, type DocumentSnapshot, type QueryDocumentSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, addDoc, query, where, getDocs, Timestamp, orderBy, limit, collectionGroup } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import toast from 'react-hot-toast';
 import { db, auth, functions } from '../firebase';
@@ -73,6 +73,13 @@ type RegistrationSnapshot = Registration & {
     organization?: string;
     type?: string;
     category?: string;
+    id?: string;
+    collectionName?: string;
+};
+
+type VendorScanResponse = {
+    user: ConferenceUserSnapshot;
+    reg: RegistrationSnapshot;
 };
 
 const getAffiliationName = (user: ConferenceUserSnapshot, reg: RegistrationSnapshot): string => {
@@ -368,143 +375,56 @@ export const useVendor = (vid: string | undefined) => {
             setError('참여 중인 학회가 선택되지 않았습니다.');
             return;
         }
+        if (!vendor?.id) {
+            setError('Vendor context is not ready.');
+            return;
+        }
 
         setLoading(true);
         setError(null);
         setScanResult(null);
 
         try {
-            // First check badgeQr
-            const regQ = query(collection(db, `conferences/${conferenceId}/registrations`), where('badgeQr', '==', qrData), limit(1));
-            const regSnap = await getDocs(regQ);
-            let regDoc: QueryDocumentSnapshot | DocumentSnapshot | null = regSnap.docs[0] ?? null;
-
-            // Fallback for DEV, just match ID directly if QR is simple 
-            if (!regDoc) {
-                const directRef = doc(db, `conferences/${conferenceId}/registrations`, qrData);
-                const singleDoc = await getDoc(directRef);
-                regDoc = singleDoc.exists() ? singleDoc : null;
-            }
-
-            if (!regDoc) {
-                throw new Error('유효하지 않은 QR 코드이거나 해당 학회에 등록되지 않은 참석자입니다.');
-            }
-
-            const reg = regDoc.data() as RegistrationSnapshot;
-            const regId = regDoc.id;
-            reg.id = regId;
-
-            // Try fetching from users collection or fallback to registration data
-            const userRef = doc(db, `conferences/${conferenceId}/users/${reg.userId || regId}`);
-            const userSnap = await getDoc(userRef);
-
-            const userData: ConferenceUserSnapshot = userSnap.exists() ? (userSnap.data() as ConferenceUser) : {
-                id: reg.userId || regId,
-                name: reg.userName || reg.name || '알 수 없음',
-                email: reg.email,
-                phone: reg.phone,
-                affiliation: reg.affiliation || reg.organization,
-                organization: reg.organization
-            };
-
-            setScanResult({
-                user: userData,
-                reg
+            const resolveVendorBadgeScan = httpsCallable(functions, 'resolveVendorBadgeScan');
+            const result = await resolveVendorBadgeScan({
+                vendorId: vendor.id,
+                confId: conferenceId,
+                qrData
             });
 
+            const payload = result.data as VendorScanResponse;
+            setScanResult({
+                user: payload.user,
+                reg: payload.reg
+            });
         } catch (e) {
             console.error(e);
             setError(e instanceof Error ? e.message : 'Unknown error');
         } finally {
             setLoading(false);
         }
-    }, [conferenceId]);
+    }, [conferenceId, vendor?.id]);
 
     // 4. Process Visit (Consent Gate)
-    const processVisit = useCallback(async (agreed: boolean) => {
+    const processVisit = useCallback(async (agreed: boolean, guestbookMessage?: string) => {
         if (!vendor || !conferenceId || !scanResult) return;
         if (!auth.currentUser) return;
 
         setLoading(true);
         try {
-            const visitorName = agreed ? (scanResult.user.name || 'Unknown User') : 'Anonymous (별칭)';
-
-            // L3 VENDOR DB: Write to /vendors/{vendorId}/leads
-            const leadData: Record<string, unknown> = {
-                conferenceId,
-                visitorId: scanResult.user.id,
-                visitorName,
-                timestamp: Timestamp.now(),
-                isConsentAgreed: agreed,
-                consentStatus: agreed ? 'ACTIVE' : 'ACTIVE', // Start as ACTIVE, can be withdrawn later
-                retentionPeriodDays: agreed ? 1095 : 1825, // 3 years for PII, 5 years for anonymous
-            };
-
-            if (agreed) {
-                leadData.visitorOrg = getAffiliationName(scanResult.user, scanResult.reg);
-                leadData.visitorPhone = scanResult.user.phone || scanResult.reg.phone || '';
-                leadData.visitorEmail = scanResult.user.email || scanResult.reg.email || '';
-            }
-
-            const leadRef = await addDoc(collection(db, `vendors/${vendor.id}/leads`), leadData);
-            await logVendorAudit({
-                action: 'LEAD_CREATED',
-                entityType: 'LEAD',
-                entityId: leadRef.id,
-                details: { isConsentAgreed: agreed, conferenceId }
+            const visitorOrg = getAffiliationName(scanResult.user, scanResult.reg);
+            const visitorPhone = scanResult.user.phone || scanResult.reg.phone || '';
+            const processVendorVisitFn = httpsCallable(functions, 'processVendorVisit');
+            await processVendorVisitFn({
+                vendorId: vendor.id,
+                confId: conferenceId,
+                qrData: scanResult.reg.id || scanResult.user.id,
+                agreed,
+                guestbookMessage: guestbookMessage || ''
             });
 
-            if (agreed) {
-                await logVendorAudit({
-                    action: 'CONSENT_GIVEN',
-                    entityType: 'CONSENT',
-                    entityId: scanResult.user.id,
-                    details: { conferenceId, vendorId: vendor.id }
-                });
-            }
-
-            // STAMP TOUR: 스탬프 투어 참가 업체만 stamps 저장
-            // conferences/{confId}/sponsors/{vendorId}에서 isStampTourParticipant 확인
-            const sponsorSnap = await getDoc(doc(db, `conferences/${conferenceId}/sponsors/${vendor.id}`));
-            const sponsorData = sponsorSnap.exists() ? sponsorSnap.data() : null;
-
-            if (conferenceFeatures.stampTourEnabled && sponsorData?.isStampTourParticipant === true) {
-                const stampRef = await addDoc(collection(db, `conferences/${conferenceId}/stamps`), {
-                    userId: scanResult.user.id,
-                    vendorId: vendor.id,
-                    vendorName: vendor.name,
-                    timestamp: Timestamp.now()
-                });
-                await logVendorAudit({
-                    action: 'STAMP_CREATED',
-                    entityType: 'STAMP',
-                    entityId: stampRef.id,
-                    details: { conferenceId, vendorId: vendor.id }
-                });
-            }
-
-            if (agreed && conferenceFeatures.guestbookEnabled) {
-                const guestbookRef = await addDoc(collection(db, `conferences/${conferenceId}/guestbook_entries`), {
-                    userId: scanResult.user.id,
-                    userName: scanResult.user.name || 'Unknown',
-                    userOrg: leadData.visitorOrg || '',
-                    vendorId: vendor.id,
-                    vendorName: vendor.name,
-                    conferenceId,
-                    leadId: leadRef.id,
-                    timestamp: Timestamp.now(),
-                    isConsentAgreed: true
-                });
-                await logVendorAudit({
-                    action: 'GUESTBOOK_SIGN',
-                    entityType: 'GUESTBOOK',
-                    entityId: guestbookRef.id,
-                    details: { conferenceId, vendorId: vendor.id }
-                });
-            }
-
             // Send AlimTalk if consent was given
-            if (agreed && leadData.visitorPhone) {
+            if (agreed && visitorPhone) {
                 try {
                     // Fetch vendor's notification settings
                     const infraSnap = await getDoc(doc(db, `vendors/${vendor.id}/settings/infrastructure`));
@@ -527,12 +447,11 @@ export const useVendor = (vid: string | undefined) => {
 
                             if (templateCode) {
                                 // Prepare template variables
-                                const visitorOrg = leadData.visitorOrg as string || '';
                                 const variables = {
                                     visitorName: scanResult.user.name || 'Unknown',
-                                    visitorOrg: visitorOrg,
+                                    visitorOrg,
                                     partnerName: vendor.name || 'Partner',
-                                    eventName: conferenceId, // You might want to fetch actual conference name
+                                    eventName: conferenceId,
                                     visitTime: new Date().toLocaleString('ko-KR', {
                                         year: 'numeric',
                                         month: '2-digit',
@@ -546,7 +465,7 @@ export const useVendor = (vid: string | undefined) => {
                                 const sendAlimTalkFn = httpsCallable(functions, 'sendVendorAlimTalk');
                                 await sendAlimTalkFn({
                                     vendorId: vendor.id,
-                                    phone: leadData.visitorPhone as string,
+                                    phone: visitorPhone,
                                     templateCode: templateCode,
                                     variables: variables
                                 });
@@ -557,8 +476,7 @@ export const useVendor = (vid: string | undefined) => {
                     }
                 } catch (alimError) {
                     console.error('Failed to send AlimTalk:', alimError);
-                    // Don't fail the entire process if AlimTalk fails
-                    toast.error('알림톡 발송에 실패했습니다. (방문 기록은 저장됨)');
+                    toast.error('알림톡 발송에 실패했습니다. 방문 기록은 정상 저장되었습니다.');
                 }
             }
 
@@ -572,7 +490,7 @@ export const useVendor = (vid: string | undefined) => {
         } finally {
             setLoading(false);
         }
-    }, [vendor, conferenceId, scanResult, conferenceFeatures, logVendorAudit]);
+    }, [vendor, conferenceId, scanResult]);
 
     const resetScan = () => {
         setScanResult(null);
@@ -595,11 +513,11 @@ export const useVendor = (vid: string | undefined) => {
                 await setDoc(confVRef, { name: updates.name, logoUrl: updates.logoUrl }, { merge: true });
             }
 
-            toast.success('프로필이 업데이트 되었습니다!');
+            toast.success('프로필이 업데이트되었습니다.');
         } catch (error) {
             console.error('Vendor profile update failed:', error);
-            toast.error('프로필 업데이트 실패');
-            setError('프로필 업데이트 실패');
+            toast.error('프로필 업데이트에 실패했습니다.');
+            setError('프로필 업데이트에 실패했습니다.');
         } finally {
             setLoading(false);
         }
@@ -633,3 +551,5 @@ export const useVendor = (vid: string | undefined) => {
         }
     };
 };
+
+

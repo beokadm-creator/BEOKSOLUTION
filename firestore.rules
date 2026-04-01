@@ -141,7 +141,7 @@ service cloud.firestore {
       // Stamps: Stamp Tour
       match /stamps/{stampId} {
         allow read: if isSuperAdmin() || isOwner(resource.data.userId);
-        allow create: if isAuthenticated();
+        allow create: if isSuperAdmin();
         allow update, delete: if isSuperAdmin();
       }
 
@@ -154,15 +154,14 @@ service cloud.firestore {
       // Stamp Tour Progress
       match /stamp_tour_progress/{userId} {
         allow read: if isSuperAdmin() || isOwner(userId);
-        allow create, update: if isSuperAdmin() || isOwner(userId);
+        allow create, update: if isSuperAdmin();
         allow delete: if isSuperAdmin();
       }
 
       // Guestbook entries: Require vendor consent flow
       match /guestbook_entries/{entryId} {
         allow read: if isSuperAdmin() || isVendorMember(resource.data.vendorId) || isOwner(resource.data.userId);
-        allow create: if isSuperAdmin() || isVendorMember(request.resource.data.vendorId);
-        allow update, delete: if isSuperAdmin();
+        allow create, update, delete: if isSuperAdmin();
       }
 
       // Submissions: owner can read own abstracts in MyPage
@@ -229,7 +228,8 @@ service cloud.firestore {
 
       // Leads contain PII - strict access control
       match /leads/{leadId} {
-        allow read, create, update, delete: if isSuperAdmin() || isVendorMember(vendorId);
+        allow read: if isSuperAdmin() || isVendorMember(vendorId);
+        allow create, update, delete: if isSuperAdmin();
       }
 
       // Audit logs for vendor operations

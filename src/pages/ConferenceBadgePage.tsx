@@ -1,8 +1,8 @@
-﻿import React, { useLayoutEffect, useState } from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { db, functions } from '../firebase';
-import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, setDoc, Timestamp, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, Timestamp, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import QRCode from 'react-qr-code';
 
@@ -607,6 +607,7 @@ const ConferenceBadgePage: React.FC = () => {
 };
 
 export default ConferenceBadgePage;
+
 
 
 

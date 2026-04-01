@@ -10,13 +10,15 @@ export type AuditAction =
   | 'STAMP_CREATED'
   | 'ALIMTALK_SENT'
   | 'ALIMTALK_FAILED'
+  | 'CONSENT_GIVEN'
   | 'CONSENT_WITHDRAWN'
+  | 'GUESTBOOK_SIGN'
   | 'VENDOR_LOGIN'
   | 'VENDOR_SETTINGS_CHANGED';
 
 export type AuditActorType = 'VENDOR_ADMIN' | 'SYSTEM' | 'PARTICIPANT' | 'SUPER_ADMIN';
 
-export type AuditEntityType = 'LEAD' | 'STAMP' | 'ALIMTALK' | 'CONSENT' | 'VENDOR';
+export type AuditEntityType = 'LEAD' | 'STAMP' | 'ALIMTALK' | 'CONSENT' | 'VENDOR' | 'GUESTBOOK';
 
 export interface AuditLog {
   id: string;

@@ -22,6 +22,7 @@ export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external
         scanBadge,
         scanResult,
         processVisit,
+        conferenceFeatures,
         loading,
         error,
     } = vendorLogic;
@@ -100,12 +101,16 @@ export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external
     };
 
     const handleAgree = () => {
+        if (conferenceFeatures.guestbookEnabled) {
+            setShowGuestbookPopup(true);
+            return;
+        }
         processVisit(true);
     };
 
     const submitGuestbook = async (message: string) => {
-        await processVisit(true);
-        setGuestbookMessage(message);
+        await processVisit(true, message);
+        setGuestbookMessage('');
         setShowGuestbookPopup(false);
     };
 

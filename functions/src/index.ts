@@ -15,6 +15,8 @@ import { resolveDataIntegrityAlert } from './monitoring/resolveAlert';
 // import { checkAlimTalkConfig, checkAlimTalkConfigHttp } from './alimtalk/checkConfig';
 import { scheduledAutoCheckout, manualAutoCheckout } from './attendance/autoCheckout';
 import { sendVendorAlimTalk } from './vendor/sendAlimTalk';
+import { resolveVendorBadgeScan } from './vendor/resolveBadgeScan';
+import { processVendorVisit } from './vendor/processVendorVisit';
 import { logAuditEvent } from './audit/logAuditEvent';
 import { withdrawConsent } from './vendor/withdrawConsent';
 import { scheduledDataCleanup, manualDataCleanup } from './scheduled/dataCleanup';
@@ -43,6 +45,8 @@ export {
     scheduledAutoCheckout,
     manualAutoCheckout,
     sendVendorAlimTalk,
+    resolveVendorBadgeScan,
+    processVendorVisit,
     logAuditEvent,
     withdrawConsent,
     scheduledDataCleanup,

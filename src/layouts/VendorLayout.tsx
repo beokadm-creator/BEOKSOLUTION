@@ -167,6 +167,11 @@ export default function VendorLayout() {
   // Handle Consent
   const handleConsent = async (agreed: boolean) => {
       if (agreed) {
+          if (conferenceFeatures.guestbookEnabled) {
+              setShowConsentPopup(false);
+              setShowGuestbookPopup(true);
+              return;
+          }
           await processVisit(true);
           setShowConsentPopup(false);
           return;
@@ -176,11 +181,8 @@ export default function VendorLayout() {
   };
 
   const submitGuestbook = async (message: string) => {
-      await processVisit(true);
+      await processVisit(true, message);
       setGuestbookMessage('');
-      if (message) {
-          console.debug('Guestbook message input is deprecated:', message);
-      }
       setShowGuestbookPopup(false);
   };
 
