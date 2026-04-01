@@ -37,7 +37,6 @@ exports.withdrawConsentHttp = exports.withdrawConsent = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const logAuditEvent_1 = require("../audit/logAuditEvent");
-const db = admin.firestore();
 /**
  * Cloud Function: withdrawConsent
  *
@@ -55,6 +54,7 @@ const db = admin.firestore();
  */
 exports.withdrawConsent = functions.https.onCall(async (data, context) => {
     var _a, _b;
+    const db = admin.firestore();
     // Authentication check
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated to withdraw consent');

@@ -37,7 +37,6 @@ exports.manualDataCleanup = exports.scheduledDataCleanup = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const logAuditEvent_1 = require("../audit/logAuditEvent");
-const db = admin.firestore();
 /**
  * Cloud Function: scheduledDataCleanup
  *
@@ -53,6 +52,7 @@ exports.scheduledDataCleanup = functions.pubsub
     .schedule('0 3 * * *')
     .timeZone('Asia/Seoul')
     .onRun(async (context) => {
+    const db = admin.firestore();
     const now = admin.firestore.Timestamp.now();
     const threeYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 1095 * 24 * 60 * 60 * 1000));
     const twoYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 730 * 24 * 60 * 60 * 1000));
@@ -154,6 +154,7 @@ exports.scheduledDataCleanup = functions.pubsub
  */
 exports.manualDataCleanup = functions.https.onCall(async (data, context) => {
     var _a, _b;
+    const db = admin.firestore();
     // Only super admin can trigger manual cleanup
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');

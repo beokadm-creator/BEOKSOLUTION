@@ -2,8 +2,6 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { createAuditLogEntry } from '../audit/logAuditEvent';
 
-const db = admin.firestore();
-
 /**
  * Cloud Function: withdrawConsent
  *
@@ -20,6 +18,7 @@ const db = admin.firestore();
  * - error?: string
  */
 export const withdrawConsent = functions.https.onCall(async (data, context) => {
+    const db = admin.firestore();
     // Authentication check
     if (!context.auth) {
         throw new functions.https.HttpsError(
