@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 770
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # Authentication Header Fix - Society Landing Page
 
 ## Issue
@@ -66,3 +84,11 @@ After deploying this fix:
 
 ## Date
 2026-01-21 18:48 KST
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

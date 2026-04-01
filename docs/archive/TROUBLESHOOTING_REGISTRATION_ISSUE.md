@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 1225
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 등록 데이터 불일치 문제 해결 가이드
 
 ## 문제 현상
@@ -198,3 +216,11 @@ await diagnoseRegistration({
   - `confirmNicePayment` (Line 70-127)
   - `confirmTossPayment` (Line 129-214)
 - 진단 함수: `functions/src/diagnose-registration.ts`
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

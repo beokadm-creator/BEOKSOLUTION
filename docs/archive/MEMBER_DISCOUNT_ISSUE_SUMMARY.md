@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 1319
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 회원 인증 금액 적용 문제 - 빠른 요약
 
 **문제**: KADD 학회 등록 페이지에서 마이페이지의 회원 인증 정보가 로드되지 않아 비회원 가격이 표시됨
@@ -188,3 +206,10 @@ useEffect(() => {
 - [src/hooks/useAuth.ts](src/hooks/useAuth.ts)
 - [functions/src/index.ts#L450](functions/src/index.ts#L450)
 
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

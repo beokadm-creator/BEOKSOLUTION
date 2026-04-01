@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 1506
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # P1 개선사항 완료 보고서
 
 **작성일:** 2026-02-04 11:47  
@@ -310,3 +328,11 @@ const userWithId: ConferenceUser = {
 **작성자:** Antigravity AI  
 **검토 필요:** 개발팀  
 **다음 리뷰:** Phase 2 완료 후
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

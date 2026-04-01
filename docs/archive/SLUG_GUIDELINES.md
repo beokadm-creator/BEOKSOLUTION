@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 1697
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # eRegi Slug 및 Conference ID 표준 규칙
 
 > 이 문서는 eRegi 시스템에서 학술대회를 생성할 때 반드시 준수해야 하는 Slug와 Document ID 규칙을 정의합니다.
@@ -326,3 +344,11 @@ const agendas = await getDocs(collection(db, 'conferences', confId, 'agendas'));
 ---
 
 > **중요:** 이 규칙은 eRegi 시스템의 안정성과 유지보수성을 위해 반드시 준수해야 합니다.
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

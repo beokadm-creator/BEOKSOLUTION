@@ -1,3 +1,22 @@
+---
+precedence: 91
+required-for:
+  - path-specific-code-changes
+optional-for:
+  - repo-orientation
+memory-type: policy
+token-estimate: 790
+@include:
+  - ../../docs/shared/AI_DOC_SHARED_RULES.md
+  - ../../docs/shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Aligned path-specific agent instructions to the shared markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # Business Logic Utilities
 
 **Purpose**: 19 pure functions implementing conference registration business logic - NO UI, NO state.
@@ -65,3 +84,11 @@
 - **NEVER** mix UI logic in utils - no JSX, no styles
 - **NEVER** skip input validation in security utils
 - **NEVER** use `Date` - always use `Timestamp` from firebase/firestore
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

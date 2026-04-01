@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 1247
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # User Data Loading - Debugging (2026-01-21)
 
 ## User Information
@@ -115,3 +133,11 @@ Merge data from both sources with proper field name mapping
 - All info indexed by these three IDs
 - Expected to have multiple participations across different societies/conferences
 - Non-members may have participations but no main `users/{uid}` document (this is normal and intended)
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

@@ -1,3 +1,22 @@
+---
+precedence: 76
+required-for:
+  - product-overview
+optional-for:
+  - repo-orientation
+memory-type: overview
+token-estimate: 2764
+@include:
+  - docs/shared/AI_DOC_SHARED_RULES.md
+  - docs/shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Normalized under the repository markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # e-Regi 시스템 소개서
 
 ## 시스템 개요
@@ -499,3 +518,11 @@ societies (학술 단체)
 *문서 버전: 1.0*
 *최종 업데이트: 2026년 3월*
 *시스템 버전: v3.5.8*
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

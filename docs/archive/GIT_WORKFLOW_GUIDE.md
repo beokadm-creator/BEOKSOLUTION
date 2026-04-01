@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 900
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # Git 작업 가이드 (GitHub 연동 문제 해결)
 
 ## 현재 상황
@@ -185,3 +203,11 @@ Modified files:
 - [Git 기본 사용법](https://git-scm.com/docs/gittutorial)
 - [GitHub SSH 키 설정](https://docs.github.com/en/authentication/connecting-to-github-with-ssh)
 - [Firebase 배포 가이드](https://firebase.google.com/docs/hosting/deploy-cli)
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

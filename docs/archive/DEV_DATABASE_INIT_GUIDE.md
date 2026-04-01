@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 564
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # Dev 환경 데이터베이스 초기화 가이드
 
 ## 문제 상황
@@ -131,3 +149,11 @@ https://eregi-dev.web.app?society=kap
 1. **간단하게**: 제가 해드링으로 방법 2 안내
 2. **정확하게**: 방법 1 (Export/Import) 안내
 3. **자동화**: 스크립트 작성 (시간 소요)
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

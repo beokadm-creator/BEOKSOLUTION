@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 2054
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 알림톡 설정 확인 및 React 버전 고정 완료 보고서
 
 ## 📋 작업 개요
@@ -429,3 +447,11 @@ curl "https://us-central1-{PROJECT_ID}.cloudfunctions.net/checkAlimTalkConfigHtt
    - 빠른 문제 감지
 
 **이제 알림톡 설정을 안전하게 관리하고, React 버전 변경으로 인한 문제를 방지할 수 있습니다!** 🚀
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

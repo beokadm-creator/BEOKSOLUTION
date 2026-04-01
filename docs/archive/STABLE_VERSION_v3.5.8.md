@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 542
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 안정화 버전 태그 생성 완료
 
 ## 📌 버전 정보
@@ -113,3 +131,11 @@ git reset --hard v3.5.8-stable
 **v3.5.8-stable은 프로덕션 사용 가능한 안정화 버전입니다.**
 
 모든 핵심 기능이 작동하며, 배포 안전성 시스템이 구축되어 있습니다. 문제 발생 시 이 버전으로 롤백할 수 있습니다.
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

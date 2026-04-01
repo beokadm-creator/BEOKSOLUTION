@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 503
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # Firebase 와일드카드 서브도메인 설정 상세 가이드
 
 ## 🔍 문제 상황
@@ -136,3 +154,11 @@ firebase hosting:flexible:channels:create
 프롬프트에 `*.eregi-dev.web.app` 입력하면 됩니다!
 
 설정 완료 후 알려주세요. 자동으로 모든 서브도메인이 생성됩니다. 🚀
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

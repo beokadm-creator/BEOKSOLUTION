@@ -1,3 +1,22 @@
+---
+precedence: 83
+required-for:
+  - multi-tenant-routing
+optional-for:
+  - repo-orientation
+memory-type: architecture
+token-estimate: 803
+@include:
+  - shared/AI_DOC_SHARED_RULES.md
+  - shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Normalized under the repository markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # eRegi 멀티 테넌트 아키텍처 (Multi-Tenant Architecture) 가이드
 
 eRegi는 단일 코드베이스로 다수 학회의 시스템을 동시 운영할 수 있도록 설계된 **멀티 테넌트(Multi-Tenant) SaaS 플랫폼**입니다.
@@ -72,3 +91,11 @@ export const DOMAIN_CONFIG = {
 
 1. **로컬 URL Param 지원:** `?society=kadd` 형태의 Query String을 파싱해 내부적으로 `kadd` 도메인에 있는 것과 같은 효과를 제공합니다 (`App.tsx` 최상위 처리 참조).
 2. **hosts 파일 조작 (Optional):** OS의 `hosts` 파일을 수정해 `127.0.0.1 kadd.eregi.local` 과 같은 형태로 편의에 맞게 테스트 로컬 도메인을 잡아 개발할 수 있습니다 (이 경우 `BASE_DOMAIN`을 `eregi.local` 로 설정).
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

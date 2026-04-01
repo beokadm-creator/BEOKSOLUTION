@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 1125
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # React 버전 고정 및 의존성 관리 정책
 
 ## 🚨 문제 상황
@@ -232,3 +250,11 @@ git commit -m "chore: lock React version to prevent unintended upgrades"
 - [npm semver 문서](https://docs.npmjs.com/cli/v6/using-npm/semver)
 - [npm ci 문서](https://docs.npmjs.com/cli/v8/commands/npm-ci)
 - [package-lock.json 가이드](https://docs.npmjs.com/cli/v8/configuring-npm/package-lock-json)
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

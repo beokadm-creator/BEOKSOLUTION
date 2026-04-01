@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 5353
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 디자인 변경 지시서
 ## 회원 인증 관련 페이지 디자인 개편
 
@@ -959,3 +977,11 @@ import { ShieldCheck, CheckCircle, AlertCircle, UserPlus, Mail, Calendar } from 
 ---
 
 **이 지시서에 따라 디자인만 변경하고, 기능은 절대 변경하지 마세요.**
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

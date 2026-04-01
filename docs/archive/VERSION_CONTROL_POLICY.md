@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 615
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 🛡️ MANDATORY WORKFLOW - Version Control
 
 **목적**: 이전 버전으로의 롤백 방지, 안전한 배포 관리
@@ -131,3 +149,11 @@ firebase deploy  # 구 버전 배포
 ---
 
 **핵심**: 항상 앞으로 전진하세요. 롤백은 금지입니다.
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

@@ -1,3 +1,22 @@
+---
+precedence: 91
+required-for:
+  - path-specific-code-changes
+optional-for:
+  - repo-orientation
+memory-type: policy
+token-estimate: 2394
+@include:
+  - ../../docs/shared/AI_DOC_SHARED_RULES.md
+  - ../../docs/shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Aligned path-specific agent instructions to the shared markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # Frontend Pages - Route Handlers
 
 **Purpose**: 54 pages organized by domain - user registration, conference info, admin dashboards, and public content.
@@ -202,3 +221,11 @@ Two different conference landing pages:
 - Playwright E2E tests for critical flows (registration, payment)
 - See `registration-guest.spec.ts` for test patterns
 - Tests use environment variables (`BASE_URL`, `TEST_SLUG`) for flexibility
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

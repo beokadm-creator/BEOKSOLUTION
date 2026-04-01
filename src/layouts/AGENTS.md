@@ -1,3 +1,22 @@
+---
+precedence: 91
+required-for:
+  - path-specific-code-changes
+optional-for:
+  - repo-orientation
+memory-type: policy
+token-estimate: 1675
+@include:
+  - ../../docs/shared/AI_DOC_SHARED_RULES.md
+  - ../../docs/shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Aligned path-specific agent instructions to the shared markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # Layout Components - Route-Level Wrappers
 
 **Purpose**: 5 layout components that wrap route segments to provide domain-specific context providers, navigation, and authentication guards.
@@ -154,3 +173,11 @@ const canAccessSociety = (societyId: string) => {
 - `src/pages/admin/AGENTS.md` - Admin pages that use these layouts
 - `src/hooks/AGENTS.md` - Custom hooks for accessing context data
 - Root `AGENTS.md` - Architecture patterns and routing overview
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

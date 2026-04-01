@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 1116
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # GitHub + Firebase Deployment Setup
 
 이 가이드는 GitHub Actions를 사용하여 Firebase에 자동 배포하는 방법을 설명합니다.
@@ -175,3 +193,11 @@ Error: Error reading indexes from firestore.indexes.json
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
 - [Firebase Deployment Documentation](https://firebase.google.com/docs/hosting/github-integration)
 - [Firebase CI/CD Guide](https://firebase.google.com/docs/functions/organize-functions)
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

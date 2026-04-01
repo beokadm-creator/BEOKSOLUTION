@@ -1,3 +1,21 @@
+---
+precedence: 35
+required-for: []
+optional-for:
+  - implementation-planning
+memory-type: workflow
+token-estimate: 1133
+@include:
+  - ../../docs/shared/AI_DOC_SHARED_RULES.md
+  - ../../docs/shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as a planning document under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # Partner Portal Fix - Work Plan
 
 ## 목표
@@ -171,3 +189,11 @@ if (sponsorData?.isStampTourParticipant === true) {
 | Firestore Rules 배포 후 기존 기능 영향 | 규칙 변경 최소화, stamps만 예외 처리 |
 | URL 변경 후 기존 북마크 404 | /partner 접속 시 첫 번째 벤더로 리다이렉트 |
 | sponsor 문서 없는 경우 | isStampTourParticipant 기본값 false 처리 |
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

@@ -1,3 +1,21 @@
+---
+precedence: 72
+required-for: []
+optional-for:
+  - repo-orientation
+memory-type: reference
+token-estimate: 1054
+@include:
+  - shared/AI_DOC_SHARED_RULES.md
+  - shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Normalized under the repository markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 2027년 시나리오 검토: 순수 슬러그 URL 아키텍처
 
 ## 현재 구조 (방안 1 적용 후)
@@ -173,3 +191,11 @@ Firestore 문서 ID: kadd_2027spring
 - ✅ 호환성 보장
 
 장기적으로는 방안 3(아키텍처 재설계)을 고려할 수 있으나, 현재 구조로도 충분히 확장 가능합니다.
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

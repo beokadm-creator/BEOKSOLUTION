@@ -1,3 +1,21 @@
+---
+precedence: 72
+required-for: []
+optional-for:
+  - repo-orientation
+memory-type: reference
+token-estimate: 3150
+@include:
+  - shared/AI_DOC_SHARED_RULES.md
+  - shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Normalized under the repository markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # UX Flow Specifications for eRegi Print System
 ## Admin Desk & User MyPage Workflows
 
@@ -423,3 +441,11 @@ interface I18nPrint {
 ---
 
 이 UX 명세는 eRegi 인쇄 시스템의 사용자 경험을 최적화하고, 직관적인 관리자 데스크와 사용자 MyPage를 구현하는 것을 목표로 합니다.
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

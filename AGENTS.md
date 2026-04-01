@@ -1,3 +1,23 @@
+---
+precedence: 99
+required-for:
+  - all-code-changes
+optional-for:
+  - repo-orientation
+memory-type: policy
+token-estimate: 1972
+@include:
+  - docs/shared/AI_DOC_SHARED_RULES.md
+  - docs/shared/ESSENTIAL_POST_COMPACT.md
+  - docs/shared/VERSION_CONTROL_SHARED.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Aligned root agent instructions to the shared markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 🚨 CRITICAL: VERSION CONTROL PROTECTION 🚨
 
 **ALL AGENTS MUST READ THIS BEFORE STARTING ANY WORK**
@@ -21,7 +41,7 @@ Before starting ANY work, agents MUST:
 2. **Check** current version: `git describe --tags --abbrev=0`
 3. **Create** feature branch: `git checkout -b feature/description`
 4. **NEVER** work directly on `main` branch
-5. **Verify** Node version: `node --version` (CI/CD requires 20.x, package.json allows 18+)
+5. **Verify** Node version: `node --version` (standard runtime is 22.x)
 
 ---
 
@@ -41,7 +61,7 @@ npx jest --testPathPattern=MyComponent.test.ts  # Single file
 npx jest --testNamePattern="should render"     # Single test
 npx jest --listTests    # List all test files
 
-# Firebase Functions (functions/src/ - Node 20 runtime)
+# Firebase Functions (functions/src/ - Node 22 runtime)
 cd functions && npm run build                      # Compile to lib/
 firebase emulators:start --only functions          # Local emulator
 firebase deploy --only functions                   # Deploy functions
@@ -170,12 +190,12 @@ src/
 ## Key Dependencies & Build
 
 - **React 19 + React Router 7**: Uses `useParams` (v7 API, not v6)
-- **Firebase**: Auth (session persistence), Firestore, Storage, Functions (Node 20 runtime)
+- **Firebase**: Auth (session persistence), Firestore, Storage, Functions (Node 22 runtime)
 - **Radix UI + Tailwind**: Accessible primitives + CSS-in-JS
 - **Payment**: Toss (domestic), Nice (backup)
 - **Notifications**: react-hot-toast, **Charts**: recharts
 - **Build Strategy**: Rolldown-Vite (faster than standard Vite), manual chunks - react-vendor, firebase-vendor, print-vendor, vendor
-- **Node Version**: package.json allows 18+, but CI/CD and Functions runtime require **20.x**
+- **Node Version**: use **22.x** for local development and Firebase Functions runtime
 
 ---
 
@@ -190,3 +210,11 @@ src/
 7. **Payment Functions**: Use `confirmNicePayment` or `confirmTossPayment` CloudFunctions only
 8. **Type Safety**: Never use `any` for Firestore models - import from schema.ts
 9. **Optional Queries During Index Build**: Some queries require indexes that take 5-15 minutes to build. For optional features, consider disabling the query temporarily rather than blocking the page
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 306
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 헬스체크 및 알림톡 설정 안내
 
 ## 🚀 헬스체크 기능 업데이트 완료
@@ -46,3 +64,11 @@ https://us-central1-eregi-8fc1e.cloudfunctions.net/checkAlimTalkConfigHttp?socie
   - 배포 안전성 강화
 
 이제 안심하고 서비스를 운영하실 수 있습니다! 🚀
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

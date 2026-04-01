@@ -1,3 +1,21 @@
+---
+precedence: 25
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: report
+token-estimate: 244
+@include:
+  - ../../docs/shared/AI_DOC_SHARED_RULES.md
+  - ../../docs/shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as a generated report under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 배포 무결성 및 로그 완전 소거 (Emergency Fix) 완료
 
 ## 1. 로그 소거 및 버전 동기화
@@ -17,3 +35,11 @@
 - **운영자**: Firebase Hosting 배포(`firebase deploy`)를 수행하여 변경된 빌드 아티팩트가 실제 서버에 반영되도록 하십시오.
 
 모든 긴급 조치가 완료되었습니다.
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

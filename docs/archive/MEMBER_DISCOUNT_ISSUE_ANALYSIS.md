@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 3612
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 🔍 회원 인증 금액 적용 문제 분석 리포트
 **작성일**: 2026-01-22 | **문제**: KADD 학회 등록 페이지에서 회원 할인 금액 미적용
 
@@ -490,3 +508,10 @@ const tierPrice = findMatchingPrice(memberVerificationData, activePeriod?.prices
 4. **배포**
    - 패치 적용 후 prod 환경에 배포
 
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

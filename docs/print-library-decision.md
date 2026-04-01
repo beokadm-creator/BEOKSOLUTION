@@ -1,3 +1,21 @@
+---
+precedence: 72
+required-for: []
+optional-for:
+  - repo-orientation
+memory-type: reference
+token-estimate: 1664
+@include:
+  - shared/AI_DOC_SHARED_RULES.md
+  - shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Normalized under the repository markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # Library Decision Report for eRegi Print System
 ## Technical Stack Analysis & Selection
 
@@ -265,3 +283,11 @@ class PrintService {
 ---
 
 **Final Recommendation:** Proceed with qrcode.react + react-to-print + html2canvas/jsPDF stack for optimal balance of features, compatibility, and performance.
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

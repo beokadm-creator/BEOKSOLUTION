@@ -1,3 +1,22 @@
+---
+precedence: 91
+required-for:
+  - path-specific-code-changes
+optional-for:
+  - repo-orientation
+memory-type: policy
+token-estimate: 933
+@include:
+  - ../../../docs/shared/AI_DOC_SHARED_RULES.md
+  - ../../../docs/shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Aligned path-specific agent instructions to the shared markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # Admin Pages - Conference Management UI
 
 **Purpose**: 28 pages for super admin, society admin, and conference admin operations.
@@ -81,3 +100,11 @@ pages/admin/
 - **NEVER** hardcode conference IDs - use adminStore or context
 - **NEVER** ignore permission checks - always verify role
 - **NEVER** render admin UI without loading states
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

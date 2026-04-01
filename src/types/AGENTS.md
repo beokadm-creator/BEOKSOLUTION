@@ -1,3 +1,22 @@
+---
+precedence: 91
+required-for:
+  - path-specific-code-changes
+optional-for:
+  - repo-orientation
+memory-type: policy
+token-estimate: 1499
+@include:
+  - ../../docs/shared/AI_DOC_SHARED_RULES.md
+  - ../../docs/shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Aligned path-specific agent instructions to the shared markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # TypeScript Schema Definitions - Firestore Models
 
 **Purpose**: 4 files defining all Firestore document interfaces and shared TypeScript types for the eRegi platform.
@@ -157,3 +176,11 @@ if (!docSnap.exists()) {
 
 const conference = docSnap.data() as Conference;  // Type assertion
 ```
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

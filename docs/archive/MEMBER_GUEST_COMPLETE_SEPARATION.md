@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 1303
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 회원/비회원 완전 분리 - 수정 사항 검증
 
 ## 1. ConferenceDetailHome.tsx 수정
@@ -162,3 +180,11 @@ const isGuestMode = mode === 'guest';
 - [x] ConferenceDetailHome mount 시 비회원 세션 정리
 - [x] 비회원이 페이지를 나갔다가 재접근 시 "등록하기" 버튼 표시
 - [x] 회원/비회원 완전 분리 (서로 간섭 없음)
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

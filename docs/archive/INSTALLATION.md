@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 744
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # Git 설치 및 설정 가이드 (Windows)
 
 ## Git 설치
@@ -137,3 +155,11 @@ Google Cloud Console에서 Developer Connect 권한 확인:
 
 - Git 설치 경로 (기본값): `C:\Program Files\Git`
 - gcloud 설치 경로 (기본값): `C:\Users\YOUR_USERNAME\AppData\Local\Google\Cloud SDK`
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

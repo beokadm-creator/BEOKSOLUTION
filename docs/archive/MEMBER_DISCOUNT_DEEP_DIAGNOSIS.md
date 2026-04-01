@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 2579
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # 🔴 회원 인증 금액 적용 문제 - 심층 진단 리포트
 
 **작성일**: 2026-01-22 | **상태**: 추가 데이터 수집 필요
@@ -375,3 +393,10 @@ console.log('Match:', normalized === priceKey);  // true?
 2. useMemberVerification에서 affiliations에 **priceKey 저장**
 3. 등록 페이지에서 **priceKey를 우선 사용**
 
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->

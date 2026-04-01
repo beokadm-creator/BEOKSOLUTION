@@ -1,3 +1,21 @@
+---
+precedence: 15
+required-for: []
+optional-for:
+  - historical-reference
+memory-type: archive
+token-estimate: 944
+@include:
+  - ../shared/AI_DOC_SHARED_RULES.md
+  - ../shared/ESSENTIAL_POST_COMPACT.md
+changelog:
+  - version: 1.0.0
+    date: 2026-04-02
+    summary: Classified as historical archive under the markdown governance schema.
+---
+
+<!-- STATIC:BEGIN -->
+
 # BEOKSOLUTION 저장소 연결 가이드
 
 이 가이드는 eRegi 프로젝트를 BEOKSOLUTION 저장소에 연결하는 방법을 설명합니다.
@@ -166,3 +184,11 @@ git config --global credential.helper manager-core
 - [Google Cloud Developer Connect](https://cloud.google.com/source-repositories/docs/connecting-repositories)
 - [Cloud Build 트리거 설정](https://cloud.google.com/build/docs/automating-builds/create-manage-build-triggers)
 - [Firebase 배포 문서](https://firebase.google.com/docs/hosting/github-integration)
+
+<!-- STATIC:END -->
+
+<!-- DYNAMIC:BEGIN -->
+
+Update this section only for volatile facts such as current status, versions, owners, or execution notes.
+
+<!-- DYNAMIC:END -->
