@@ -15,9 +15,14 @@ import { resolveDataIntegrityAlert } from './monitoring/resolveAlert';
 // import { checkAlimTalkConfig, checkAlimTalkConfigHttp } from './alimtalk/checkConfig';
 import { scheduledAutoCheckout, manualAutoCheckout } from './attendance/autoCheckout';
 import { sendVendorAlimTalk } from './vendor/sendAlimTalk';
+import { resolveVendorBadgeScan } from './vendor/resolveBadgeScan';
+import { processVendorVisit } from './vendor/processVendorVisit';
 import { logAuditEvent } from './audit/logAuditEvent';
 import { withdrawConsent } from './vendor/withdrawConsent';
 import { scheduledDataCleanup, manualDataCleanup } from './scheduled/dataCleanup';
+import { requestStampReward } from './stampTour/requestStampReward';
+import { adminDrawStampReward } from './stampTour/adminDrawStampReward';
+import { runStampRewardLottery } from './stampTour/runStampRewardLottery';
 
 export const corsHandler = cors({ origin: true });
 
@@ -42,10 +47,15 @@ export {
     scheduledAutoCheckout,
     manualAutoCheckout,
     sendVendorAlimTalk,
+    resolveVendorBadgeScan,
+    processVendorVisit,
     logAuditEvent,
     withdrawConsent,
     scheduledDataCleanup,
     manualDataCleanup,
+    requestStampReward,
+    adminDrawStampReward,
+    runStampRewardLottery,
     // healthCheck,
     // scheduledHealthCheck,
     // checkAlimTalkConfig,
@@ -1089,7 +1099,7 @@ export const sendAuthCode = functions
             throw new functions.https.HttpsError('invalid-argument', 'Missing phone number or code');
         }
 
-        // In a real implementation, this would call an SMS/AlimTalk provider API (e.g., Aligo, Twilio, Solapi)
+        // In a real implementation, this would call an SMS/AlimTalk provider API (e.g., Twilio, Solapi)
         // For now, we just log it as requested.
         functions.logger.info(`[SMS MOCK] Sending AlimTalk to ${phone}: [e-Regi] 가입인증번호 입니다. #${code}`);
 

@@ -1,45 +1,131 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { getAuth, onAuthStateChanged } from 'firebase/auth'; // RAW SDK
-import { getFirestore, collection, query, where, onSnapshot, orderBy, type Query, getDocs } from 'firebase/firestore'; // RAW SDK
+import { getFirestore, collection, query, where, onSnapshot, orderBy, type Query, getDocs, doc, getDoc } from 'firebase/firestore'; // RAW SDK
+import { httpsCallable } from 'firebase/functions';
 import { QRCodeSVG } from 'qrcode.react';
 import { useNavigate } from 'react-router-dom';
 import { SESSION_KEYS } from '../utils/cookie';
-import { RefreshCw, CheckCircle, Loader2, Clock, FileText, Calendar, Languages, Download, User, MapPin, TrendingUp } from 'lucide-react';
+import { RefreshCw, CheckCircle, Loader2, Clock, FileText, Calendar, Languages, Download, User, MapPin, TrendingUp, Sparkles, Gift } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { DOMAIN_CONFIG, extractSocietyFromHost } from '../utils/domainHelper';
+import { functions } from '../firebase';
+import { getStampMissionTargetCount } from '../utils/stampTour';
 
+type TimestampLike = {
+    toDate: () => Date;
+};
+
+type ZoneBreak = {
+    start: string;
+    end: string;
+};
+
+type AttendanceZone = {
+    id: string;
+    start?: string;
+    end?: string;
+    breaks?: ZoneBreak[];
+    ruleDate?: string;
+};
+
+type AttendanceRule = {
+    zones?: Array<Omit<AttendanceZone, 'ruleDate'>>;
+};
+
+type AttendanceSettings = {
+    rules?: Record<string, AttendanceRule>;
+};
+
+type BadgeConfig = {
+    materialsUrls?: Array<{ name: string; url: string }>;
+    translationUrl?: string;
+};
+
+type BadgeUiState = {
+    name: string;
+    aff: string;
+    id: string;
+    userId: string;
+    issued: boolean;
+    zone: string;
+    time: string;
+    license: string;
+    status: string;
+    badgeQr: string | null;
+    receiptNumber?: string;
+    isCompleted?: boolean;
+    lastCheckIn?: TimestampLike;
+    baseMinutes?: number;
+};
+
+type StampTourConfig = {
+    enabled: boolean;
+    completionRule: { type: 'COUNT' | 'ALL'; requiredCount?: number };
+    boothOrderMode: 'SPONSOR_ORDER' | 'CUSTOM';
+    customBoothOrder?: string[];
+    rewardMode: 'RANDOM' | 'FIXED';
+    drawMode?: 'PARTICIPANT' | 'ADMIN' | 'BOTH';
+    rewardFulfillmentMode?: 'INSTANT' | 'LOTTERY';
+    lotteryScheduledAt?: TimestampLike;
+    rewards: Array<{
+        id: string;
+        name: string;
+        imageUrl?: string;
+        remainingQty?: number;
+        totalQty?: number;
+        weight?: number;
+        order?: number;
+    }>;
+    soldOutMessage?: string;
+    completionMessage?: string;
+};
+
+type StampProgress = {
+    rewardStatus?: 'NONE' | 'REQUESTED' | 'REDEEMED';
+    lotteryStatus?: 'PENDING' | 'SELECTED' | 'NOT_SELECTED';
+    rewardName?: string;
+    isCompleted?: boolean;
+    completedAt?: TimestampLike;
+};
 const StandAloneBadgePage: React.FC = () => {
     // BUGFIX-20250124: Fixed React error #130 by moving unsubscribeDB to outer scope
     const { slug } = useParams();
     const navigate = useNavigate();
+    const db = getFirestore();
     const [status, setStatus] = useState("INIT"); // INIT, LOADING, READY, NO_AUTH, NO_DATA, REDIRECTING
-    const [ui, setUi] = useState<{ name: string, aff: string, id: string, issued: boolean, zone: string, time: string, license: string, status: string, badgeQr: string | null, receiptNumber?: string, isCompleted?: boolean, lastCheckIn?: any, baseMinutes?: number } | null>(null);
-    const [zones, setZones] = useState<any[]>([]);
+    const [ui, setUi] = useState<BadgeUiState | null>(null);
+    const [zones, setZones] = useState<AttendanceZone[]>([]);
     const [liveMinutes, setLiveMinutes] = useState<number>(0);
-    const [badgeConfig, setBadgeConfig] = useState<any>(null);
+    const [badgeConfig, setBadgeConfig] = useState<BadgeConfig | null>(null);
+    const [stampConfig, setStampConfig] = useState<StampTourConfig | null>(null);
+    const [stampBoothCandidates, setStampBoothCandidates] = useState<Array<{ id: string; name: string }>>([]);
+    const [myStamps, setMyStamps] = useState<string[]>([]);
+    const [stampProgress, setStampProgress] = useState<StampProgress>({});
+    const [guestbookEntries, setGuestbookEntries] = useState<Array<{ vendorName: string; message?: string }>>([]);
+    const [rewardRequesting, setRewardRequesting] = useState(false);
+    const [rewardMessage, setRewardMessage] = useState('');
+    const [rewardAnimationOpen, setRewardAnimationOpen] = useState(false);
     const [msg, setMsg] = useState("초기화 중...");
     const [refreshing, setRefreshing] = useState(false);
     const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const lastQueryRef = useRef<Query | null>(null);
 
     // Helper to determine correct confId
-    const getConfIdToUse = (slugVal: string | undefined): string => {
+    const getConfIdToUse = useCallback((slugVal: string | undefined): string => {
         if (!slugVal) {
-            const hostname = window.location.hostname;
-            const societyId = extractSocietyFromHost(hostname) || DOMAIN_CONFIG.DEFAULT_SOCIETY;
-            return `${societyId}_2026spring`;
+            return '';
         }
 
         if (slugVal.includes('_')) {
             return slugVal;
         } else {
             const hostname = window.location.hostname;
-            let societyIdToUse = extractSocietyFromHost(hostname) || DOMAIN_CONFIG.DEFAULT_SOCIETY;
+            const societyIdToUse = extractSocietyFromHost(hostname) || DOMAIN_CONFIG.DEFAULT_SOCIETY;
 
             return `${societyIdToUse}_${slugVal}`;
         }
-    };
+    }, []);
 
     useEffect(() => {
         const auth = getAuth();
@@ -58,7 +144,7 @@ const StandAloneBadgePage: React.FC = () => {
             if (user) {
                 // Firebase user authenticated - proceed to show badge
                 setStatus("LOADING");
-                setMsg("데이터 로드 중...");
+                setMsg("데이터를 불러오는 중입니다...");
 
                 const confIdToUse = getConfIdToUse(slug);
 
@@ -92,11 +178,12 @@ const StandAloneBadgePage: React.FC = () => {
                         ]);
 
                         if (rulesSnap.exists()) {
-                            const allRules = rulesSnap.data().rules || {};
-                            let allZones: any[] = [];
-                            Object.entries(allRules).forEach(([dateStr, rule]: [string, any]) => {
+                            const attendanceSettings = rulesSnap.data() as AttendanceSettings;
+                            const allRules = attendanceSettings.rules || {};
+                            const allZones: AttendanceZone[] = [];
+                            Object.entries(allRules).forEach(([dateStr, rule]) => {
                                 if (rule && rule.zones) {
-                                    rule.zones.forEach((z: any) => {
+                                    rule.zones.forEach((z) => {
                                         allZones.push({ ...z, ruleDate: dateStr });
                                     });
                                 }
@@ -155,6 +242,7 @@ const StandAloneBadgePage: React.FC = () => {
                         name: uiName,
                         aff: uiAff,
                         id: uiId,
+                        userId: String(d.userId || uiId),
                         issued: uiIssued,
                         zone: uiZone,
                         time: uiTime,
@@ -196,7 +284,7 @@ const StandAloneBadgePage: React.FC = () => {
                 } catch (err) {
                     console.error('[StandAloneBadgePage] Error fetching badge data:', err);
                     setStatus("NO_DATA");
-                    setMsg("데이터 로드 중 오류가 발생했습니다.");
+                    setMsg("데이터를 불러오는 중 오류가 발생했습니다.");
                 }
 
             } else {
@@ -237,7 +325,7 @@ const StandAloneBadgePage: React.FC = () => {
             if (unsubscribeDB) unsubscribeDB(); // Clean up DB subscription first
             if (unsubscribeAuth) unsubscribeAuth(); // Then clean up auth subscription
         };
-    }, [slug, navigate]);
+    }, [getConfIdToUse, navigate, slug]);
 
     // Auto-refresh when badge is NOT issued (voucher state)
     useEffect(() => {
@@ -331,7 +419,7 @@ const StandAloneBadgePage: React.FC = () => {
                 durationMinutes = Math.floor((boundedEnd.getTime() - boundedStart.getTime()) / 60000);
 
                 if (zoneRule && zoneRule.breaks && Array.isArray(zoneRule.breaks)) {
-                    zoneRule.breaks.forEach((brk: any) => {
+                    zoneRule.breaks.forEach((brk) => {
                         const localDateStr = zoneRule.ruleDate || start.getFullYear() + "-" + String(start.getMonth() + 1).padStart(2, '0') + "-" + String(start.getDate()).padStart(2, '0');
                         const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
                         const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
@@ -357,6 +445,173 @@ const StandAloneBadgePage: React.FC = () => {
         return () => clearInterval(timer);
     }, [ui, status, zones]);
 
+    useEffect(() => {
+        const confIdToUse = getConfIdToUse(slug);
+        if (!confIdToUse || !ui?.userId || !ui.issued) {
+            setStampConfig(null);
+            setStampBoothCandidates([]);
+            setMyStamps([]);
+            setStampProgress({});
+            setGuestbookEntries([]);
+            return;
+        }
+
+        let unsubscribeStamps: (() => void) | null = null;
+        let unsubscribeProgress: (() => void) | null = null;
+
+        const loadStampTour = async () => {
+            try {
+                const [configSnap, sponsorsSnap] = await Promise.all([
+                    getDoc(doc(db, `conferences/${confIdToUse}/settings/stamp_tour`)),
+                    getDocs(query(collection(db, `conferences/${confIdToUse}/sponsors`), where('isStampTourParticipant', '==', true)))
+                ]);
+
+                if (configSnap.exists()) {
+                    const configData = configSnap.data() as Partial<StampTourConfig>;
+                    setStampConfig({
+                        enabled: configData.enabled === true,
+                        completionRule: configData.completionRule || { type: 'COUNT', requiredCount: 5 },
+                        boothOrderMode: configData.boothOrderMode || 'SPONSOR_ORDER',
+                        customBoothOrder: configData.customBoothOrder || [],
+                        rewardMode: configData.rewardMode || 'RANDOM',
+                        drawMode: configData.drawMode || 'PARTICIPANT',
+                        rewardFulfillmentMode: configData.rewardFulfillmentMode || 'INSTANT',
+                        lotteryScheduledAt: configData.lotteryScheduledAt,
+                        rewards: Array.isArray(configData.rewards) ? configData.rewards : [],
+                        soldOutMessage: configData.soldOutMessage,
+                        completionMessage: configData.completionMessage
+                    });
+                } else {
+                    setStampConfig(null);
+                }
+
+                const booths = sponsorsSnap.docs.map((snapshot) => {
+                    const sponsor = snapshot.data() as { vendorId?: string; name?: string };
+                    return {
+                        id: sponsor.vendorId || snapshot.id,
+                        name: sponsor.name || snapshot.id
+                    };
+                });
+                setStampBoothCandidates(booths);
+
+                unsubscribeStamps = onSnapshot(
+                    query(collection(db, `conferences/${confIdToUse}/stamps`), where('userId', '==', ui.userId)),
+                    (snapshot) => {
+                        const uniqueVendorIds = Array.from(new Set(
+                            snapshot.docs
+                                .map((stampDoc) => (stampDoc.data() as { vendorId?: string }).vendorId)
+                                .filter(Boolean)
+                        )) as string[];
+                        setMyStamps(uniqueVendorIds);
+                    }
+                );
+
+                unsubscribeProgress = onSnapshot(
+                    doc(db, `conferences/${confIdToUse}/stamp_tour_progress/${ui.userId}`),
+                    (snapshot) => {
+                        setStampProgress(snapshot.exists() ? snapshot.data() as StampProgress : {});
+                    }
+                );
+
+                const guestbookSnap = await getDocs(
+                    query(collection(db, `conferences/${confIdToUse}/guestbook_entries`), where('userId', '==', ui.userId))
+                );
+                setGuestbookEntries(
+                    guestbookSnap.docs.map((entryDoc) => {
+                        const entry = entryDoc.data() as { vendorName?: string; message?: string };
+                        return {
+                            vendorName: entry.vendorName || 'Partner Booth',
+                            message: entry.message
+                        };
+                    })
+                );
+            } catch (error) {
+                console.error('[StandAloneBadgePage] Failed to load stamp tour data', error);
+            }
+        };
+
+        loadStampTour();
+
+        return () => {
+            unsubscribeStamps?.();
+            unsubscribeProgress?.();
+        };
+    }, [db, getConfIdToUse, slug, ui?.issued, ui?.userId]);
+
+    const orderedStampBooths = useMemo(() => {
+        if (!stampConfig?.enabled) return [];
+        if (stampConfig.boothOrderMode === 'CUSTOM' && stampConfig.customBoothOrder?.length) {
+            const priorityBooths = stampConfig.customBoothOrder
+                .map((boothId) => stampBoothCandidates.find((candidate) => candidate.id === boothId))
+                .filter(Boolean) as Array<{ id: string; name: string }>;
+            const remainingBooths = stampBoothCandidates.filter(
+                (candidate) => !stampConfig.customBoothOrder?.includes(candidate.id)
+            );
+            return [...priorityBooths, ...remainingBooths];
+        }
+        return stampBoothCandidates;
+    }, [stampBoothCandidates, stampConfig]);
+
+    const requiredStampCount = useMemo(() => {
+        if (!stampConfig?.enabled) return 0;
+        return getStampMissionTargetCount(stampConfig.completionRule, orderedStampBooths.length);
+    }, [orderedStampBooths.length, stampConfig]);
+
+    const isStampMissionComplete = stampConfig?.enabled
+        ? requiredStampCount > 0 && myStamps.length >= requiredStampCount
+        : false;
+    const completedAtMs = stampProgress.completedAt?.toDate().getTime();
+    const lotteryScheduledAtMs = stampConfig?.lotteryScheduledAt?.toDate().getTime();
+    const completedBeforeLotteryCutoff = lotteryScheduledAtMs == null || completedAtMs == null || completedAtMs <= lotteryScheduledAtMs;
+    const lotteryStatus = stampProgress.lotteryStatus || (
+        stampConfig?.rewardFulfillmentMode === 'LOTTERY'
+        && isStampMissionComplete
+        && completedBeforeLotteryCutoff
+            ? 'PENDING'
+            : undefined
+    );
+    const isInstantReward = stampConfig?.rewardFulfillmentMode !== 'LOTTERY';
+    const canParticipantDraw = isInstantReward && stampConfig?.drawMode !== 'ADMIN';
+    const currentRewardStatus = stampProgress.rewardStatus || 'NONE';
+    const missedLotteryCutoff = !isInstantReward
+        && currentRewardStatus === 'NONE'
+        && !completedBeforeLotteryCutoff;
+
+    const stampBooths = useMemo(() => {
+        const stampedSet = new Set(myStamps);
+        return orderedStampBooths.map((booth) => ({
+            ...booth,
+            isStamped: stampedSet.has(booth.id)
+        }));
+    }, [myStamps, orderedStampBooths]);
+
+    const handleRewardRequest = async () => {
+        const confIdToUse = getConfIdToUse(slug);
+        if (!confIdToUse || !ui || !stampConfig?.enabled || !isStampMissionComplete) return;
+
+        setRewardRequesting(true);
+        setRewardMessage('');
+        try {
+            const requestReward = httpsCallable(functions, 'requestStampReward');
+            const response = await requestReward({
+                confId: confIdToUse,
+                userName: ui.name,
+                userOrg: ui.aff
+            });
+            const payload = response.data as { rewardName?: string };
+            setRewardMessage(payload.rewardName
+                ? `${payload.rewardName} 추첨이 완료되었습니다. 인포데스크에서 확인해 주세요.`
+                : '상품 추첨이 완료되었습니다. 인포데스크에서 확인해 주세요.'
+            );
+            setRewardAnimationOpen(true);
+        } catch (error) {
+            console.error('[StandAloneBadgePage] Reward request failed', error);
+            setRewardMessage(error instanceof Error ? error.message : '상품 추첨 요청에 실패했습니다.');
+        } finally {
+            setRewardRequesting(false);
+        }
+    };
+
     if (msg && status !== "READY") return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center font-sans">
             <div className="text-center">
@@ -365,14 +620,12 @@ const StandAloneBadgePage: React.FC = () => {
             </div>
         </div>
     );
-    if (!ui) return <div className="p-10 text-center flex items-center justify-center min-h-screen">데이터 로드 실패</div>;
+    if (!ui) return <div className="p-10 text-center flex items-center justify-center min-h-screen">?곗씠??濡쒕뱶 ?ㅽ뙣</div>;
 
     // Determine which QR to show
     const showBadgeQr = ui.issued; // Always show if issued
     // Fallback to generated ID if badgeQr is missing in DB but issued flag is true
     const qrValue = showBadgeQr ? (ui.badgeQr || `BADGE-${ui.id}`) : ui.id;
-    const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-
     console.log('[StandAloneBadgePage] QR Display Debug:', {
         issued: ui.issued,
         badgeQr: ui.badgeQr,
@@ -415,7 +668,7 @@ const StandAloneBadgePage: React.FC = () => {
                                     <FileText className="w-8 h-8 text-amber-600" />
                                 </div>
                                 <h1 className="text-xl font-black mb-1 tracking-wide text-amber-700">
-                                    등록 확인 바우처
+                                    ?깅줉 ?뺤씤 諛붿슦泥?
                                 </h1>
                                 <p className="text-xs font-medium text-amber-600 uppercase tracking-wider">Registration Voucher</p>
                             </div>
@@ -423,7 +676,7 @@ const StandAloneBadgePage: React.FC = () => {
                             {/* Warning Notice */}
                             <div className="bg-amber-50 border-2 border-amber-200 rounded-xl py-2 px-3 mb-4">
                                 <p className="text-xs font-bold text-amber-800">
-                                    ⚠️ 현장 인포데스크에서 QR을 스캔하여<br />디지털 명찰을 발급받아야 합니다
+                                    ?좑툘 ?꾩옣 ?명룷?곗뒪?ъ뿉??QR???ㅼ틪?섏뿬<br />?붿???紐낆같??諛쒓툒諛쏆븘???⑸땲??
                                 </p>
                             </div>
 
@@ -444,14 +697,14 @@ const StandAloneBadgePage: React.FC = () => {
                             {/* License Number */}
                             {ui.license && ui.license !== '-' && (
                                 <div className="bg-gray-50 rounded-lg py-2 px-3 mb-4">
-                                    <p className="text-xs font-semibold text-gray-600">면허번호</p>
+                                    <p className="text-xs font-semibold text-gray-600">硫댄뿀踰덊샇</p>
                                     <p className="text-sm font-bold text-gray-800">{ui.license}</p>
                                 </div>
                             )}
 
                             {/* QR Code - The Main Element */}
                             <div className="bg-white p-3 inline-block rounded-2xl shadow-lg border-2 border-amber-200 mb-4">
-                                <div className="text-xs font-semibold text-gray-500 mb-2">인포데스크 제시용 QR</div>
+                                <div className="text-xs font-semibold text-gray-500 mb-2">?명룷?곗뒪???쒖떆??QR</div>
                                 <QRCodeSVG
                                     key={qrValue}
                                     value={qrValue}
@@ -465,9 +718,9 @@ const StandAloneBadgePage: React.FC = () => {
                             <div className="bg-amber-100 border border-amber-300 rounded-xl py-3 px-4">
                                 <p className="text-sm font-bold text-amber-900 flex items-center justify-center gap-2">
                                     <User className="w-4 h-4" />
-                                    현장 인포데스크에 QR 제시
+                                    ?꾩옣 ?명룷?곗뒪?ъ뿉 QR ?쒖떆
                                 </p>
-                                <p className="text-xs text-amber-700 mt-1">디지털 명찰을 발급받으세요</p>
+                                <p className="text-xs text-amber-700 mt-1">?붿???紐낆같??諛쒓툒諛쏆쑝?몄슂</p>
                             </div>
                         </div>
                     </div>
@@ -476,7 +729,7 @@ const StandAloneBadgePage: React.FC = () => {
                     {refreshing && (
                         <div className="mt-4 text-center text-sm text-amber-700 font-medium flex items-center justify-center gap-2 bg-white/80 rounded-lg py-2 px-4">
                             <RefreshCw className="w-4 h-4 animate-spin" />
-                            명찰 발급 상태 확인 중...
+                            紐낆같 諛쒓툒 ?곹깭 ?뺤씤 以?..
                         </div>
                     )}
 
@@ -485,7 +738,7 @@ const StandAloneBadgePage: React.FC = () => {
                         onClick={() => navigate(`/${slug && slug.includes('_') ? slug.split('_')[1] : slug || ''}`)}
                         className="block w-full mt-4 py-3 px-6 bg-white text-amber-700 font-bold rounded-xl hover:bg-amber-50 transition-colors text-center border-2 border-amber-200 shadow-md"
                     >
-                        학술대회 홈페이지
+                        ?숈닠????덊럹?댁?
                     </button>
                 </div>
             </div>
@@ -518,7 +771,7 @@ const StandAloneBadgePage: React.FC = () => {
                         {/* License Number Chip */}
                         {ui.license && ui.license !== '-' && (
                             <div className="bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full py-1.5 px-4 mb-6 inline-flex items-center shadow-sm">
-                                <span className="text-xs font-bold tracking-wide">면허번호 : {ui.license}</span>
+                                <span className="text-xs font-bold tracking-wide">硫댄뿀踰덊샇 : {ui.license}</span>
                             </div>
                         )}
 
@@ -538,33 +791,37 @@ const StandAloneBadgePage: React.FC = () => {
                             <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Access Code</p>
                         </div>
                         <p className="text-xs font-medium text-emerald-600 animate-pulse">
-                            입장/퇴장 시 위 QR코드를 스캔하세요
+                            ?낆옣/?댁옣 ????QR肄붾뱶瑜??ㅼ틪?섏꽭??
                         </p>
                     </div>
 
                     {/* Tabbed Interface - Compact & Clean */}
                     <div className="bg-gray-50/80 border-t border-gray-100 p-2">
                         <Tabs defaultValue="status" className="w-full">
-                            <TabsList className="grid grid-cols-5 w-full h-auto p-1 bg-white border border-gray-200 shadow-sm rounded-xl">
+                            <TabsList className="grid grid-cols-6 w-full h-auto p-1 bg-white border border-gray-200 shadow-sm rounded-xl">
                                 <TabsTrigger value="status" className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 rounded-lg transition-all">
                                     <User className="w-4 h-4" />
-                                    <span className="text-[10px] font-bold">상태</span>
+                                    <span className="text-[10px] font-bold">?곹깭</span>
                                 </TabsTrigger>
                                 <TabsTrigger value="sessions" className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 rounded-lg transition-all">
                                     <TrendingUp className="w-4 h-4" />
-                                    <span className="text-[10px] font-bold">수강</span>
+                                    <span className="text-[10px] font-bold">?섍컯</span>
                                 </TabsTrigger>
                                 <TabsTrigger value="materials" className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 rounded-lg transition-all">
                                     <FileText className="w-4 h-4" />
-                                    <span className="text-[10px] font-bold">자료</span>
+                                    <span className="text-[10px] font-bold">?먮즺</span>
                                 </TabsTrigger>
                                 <TabsTrigger value="program" className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 rounded-lg transition-all">
                                     <Calendar className="w-4 h-4" />
-                                    <span className="text-[10px] font-bold">일정</span>
+                                    <span className="text-[10px] font-bold">?쇱젙</span>
                                 </TabsTrigger>
                                 <TabsTrigger value="translation" className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 rounded-lg transition-all">
                                     <Languages className="w-4 h-4" />
-                                    <span className="text-[10px] font-bold">번역</span>
+                                    <span className="text-[10px] font-bold">踰덉뿭</span>
+                                </TabsTrigger>
+                                <TabsTrigger value="stamp-tour" className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 rounded-lg transition-all">
+                                    <Gift className="w-4 h-4" />
+                                    <span className="text-[10px] font-bold">?ㅽ꺃</span>
                                 </TabsTrigger>
                             </TabsList>
 
@@ -576,15 +833,15 @@ const StandAloneBadgePage: React.FC = () => {
                                     }`}>
                                     <div className="flex items-center justify-center gap-2">
                                         {ui.status === 'INSIDE'
-                                            ? <><span className="w-3 h-3 bg-green-500 rounded-full animate-ping" /><span>입장 완료 (INSIDE)</span></>
-                                            : <><span className="w-3 h-3 bg-gray-300 rounded-full" /><span>퇴장 상태 (OUTSIDE)</span></>
+                                            ? <><span className="w-3 h-3 bg-green-500 rounded-full animate-ping" /><span>?낆옣 ?꾨즺 (INSIDE)</span></>
+                                            : <><span className="w-3 h-3 bg-gray-300 rounded-full" /><span>?댁옣 ?곹깭 (OUTSIDE)</span></>
                                         }
                                     </div>
                                 </div>
 
                                 {ui.zone && ui.zone !== 'OUTSIDE' && (
                                     <div className="bg-blue-50/50 border border-blue-100 rounded-xl py-3 px-4 flex justify-between items-center">
-                                        <p className="text-xs text-blue-600 font-bold">현재 위치</p>
+                                        <p className="text-xs text-blue-600 font-bold">?꾩옱 ?꾩튂</p>
                                         <p className="text-sm font-black text-blue-800 flex items-center gap-1">
                                             <MapPin className="w-3 h-3 text-blue-500" />
                                             {ui.zone}
@@ -595,12 +852,12 @@ const StandAloneBadgePage: React.FC = () => {
                                 {liveMinutes > 0 && (
                                     <div className="bg-purple-50/50 border border-purple-100 rounded-xl py-3 px-4 flex justify-between items-center">
                                         <div className="flex flex-col">
-                                            <p className="text-xs text-purple-600 font-bold">인정 수강 시간 (실시간)</p>
-                                            {ui.status === 'INSIDE' && <p className="text-[10px] text-purple-400">현재 수강 시간 포함</p>}
+                                            <p className="text-xs text-purple-600 font-bold">?몄젙 ?섍컯 ?쒓컙 (?ㅼ떆媛?</p>
+                                            {ui.status === 'INSIDE' && <p className="text-[10px] text-purple-400">?꾩옱 ?섍컯 ?쒓컙 ?ы븿</p>}
                                         </div>
                                         <p className="text-sm font-black text-purple-800 flex items-center gap-1">
                                             <Clock className="w-3 h-3 text-purple-500" />
-                                            {Math.floor(liveMinutes / 60)}시간 {liveMinutes % 60}분
+                                            {Math.floor(liveMinutes / 60)}?쒓컙 {liveMinutes % 60}遺?
                                         </p>
                                     </div>
                                 )}
@@ -613,7 +870,7 @@ const StandAloneBadgePage: React.FC = () => {
                                         {ui.isCompleted ? <CheckCircle className="w-6 h-6 text-emerald-600" /> : <TrendingUp className="w-6 h-6 text-gray-400" />}
                                     </div>
                                     <p className="text-xs text-gray-500 font-bold mb-1 uppercase tracking-wider">Session Progress</p>
-                                    <p className="text-sm text-gray-500 font-medium mb-4">평점(출결) 이수 현황</p>
+                                    <p className="text-sm text-gray-500 font-medium mb-4">?됱젏(異쒓껐) ?댁닔 ?꾪솴</p>
 
                                     <div className="flex flex-col items-center gap-1 mb-4">
                                         <span className={`text-3xl font-black tracking-tight ${ui.isCompleted ? 'text-emerald-600' : 'text-gray-900'}`}>
@@ -629,7 +886,7 @@ const StandAloneBadgePage: React.FC = () => {
                             {/* Materials Tab */}
                             <TabsContent value="materials" className="mt-2 p-1 space-y-2">
                                 {badgeConfig?.materialsUrls && badgeConfig.materialsUrls.length > 0 ? (
-                                    badgeConfig.materialsUrls.map((mat: any, idx: number) => (
+                                    badgeConfig.materialsUrls.map((mat, idx: number) => (
                                         <a
                                             key={idx}
                                             href={mat.url}
@@ -642,14 +899,14 @@ const StandAloneBadgePage: React.FC = () => {
                                             </div>
                                             <div className="text-left">
                                                 <p className="text-sm font-bold text-gray-900">{mat.name}</p>
-                                                <p className="text-xs text-gray-500">자료실 이동</p>
+                                                <p className="text-xs text-gray-500">?먮즺???대룞</p>
                                             </div>
                                         </a>
                                     ))
                                 ) : (
                                     <>
                                         <a
-                                            href={`https://${hostname}/${slug}/materials`}
+                                            href={`/${slug}/materials`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="flex items-center p-4 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-xl transition-all group"
@@ -658,12 +915,12 @@ const StandAloneBadgePage: React.FC = () => {
                                                 <Download className="w-5 h-5 text-blue-600" />
                                             </div>
                                             <div className="text-left">
-                                                <p className="text-sm font-bold text-gray-900">강의 자료실</p>
-                                                <p className="text-xs text-gray-500">발표자료 다운로드</p>
+                                                <p className="text-sm font-bold text-gray-900">강의 자료집</p>
+                                                <p className="text-xs text-gray-500">諛쒗몴?먮즺 ?ㅼ슫濡쒕뱶</p>
                                             </div>
                                         </a>
                                         <a
-                                            href={`https://${hostname}/${slug}/abstracts`}
+                                            href={`/${slug}/abstracts`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="flex items-center p-4 bg-white hover:bg-purple-50 border border-gray-200 hover:border-purple-200 rounded-xl transition-all group"
@@ -672,8 +929,8 @@ const StandAloneBadgePage: React.FC = () => {
                                                 <FileText className="w-5 h-5 text-purple-600" />
                                             </div>
                                             <div className="text-left">
-                                                <p className="text-sm font-bold text-gray-900">초록집 (Abstract)</p>
-                                                <p className="text-xs text-gray-500">학술대회 초록 모음</p>
+                                                <p className="text-sm font-bold text-gray-900">珥덈줉吏?(Abstract)</p>
+                                                <p className="text-xs text-gray-500">?숈닠???珥덈줉 紐⑥쓬</p>
                                             </div>
                                         </a>
                                     </>
@@ -683,7 +940,7 @@ const StandAloneBadgePage: React.FC = () => {
                             {/* Program Tab */}
                             <TabsContent value="program" className="mt-2 p-1">
                                 <a
-                                    href={`https://${hostname}/${slug}/program`}
+                                    href={`/${slug}/program`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="flex flex-col items-center justify-center p-8 bg-white border border-gray-200 rounded-2xl hover:border-amber-300 hover:bg-amber-50 transition-all text-center gap-3"
@@ -692,7 +949,7 @@ const StandAloneBadgePage: React.FC = () => {
                                         <Calendar className="w-8 h-8 text-amber-600" />
                                     </div>
                                     <div>
-                                        <p className="text-lg font-bold text-gray-900">전체 프로그램 보기</p>
+                                        <p className="text-lg font-bold text-gray-900">?꾩껜 ?꾨줈洹몃옩 蹂닿린</p>
                                         <p className="text-sm text-gray-500">Google Calendar / App</p>
                                     </div>
                                 </a>
@@ -707,16 +964,137 @@ const StandAloneBadgePage: React.FC = () => {
                                                 <Languages className="w-8 h-8 relative z-10" />
                                                 <span className="absolute inset-0 bg-blue-400 opacity-20 animate-ping rounded-full" />
                                             </div>
-                                            <p className="text-sm text-blue-900 font-bold mb-1">실시간 번역 서비스 연결</p>
-                                            <p className="text-xs text-blue-600">클릭하면 번역 서비스로 이동합니다</p>
+                                            <p className="text-sm text-blue-900 font-bold mb-1">?ㅼ떆媛?踰덉뿭 ?쒕퉬???곌껐</p>
+                                            <p className="text-xs text-blue-600">클릭하면 통역 서비스로 이동합니다.</p>
                                         </div>
                                     </a>
                                 ) : (
                                     <div className="bg-gray-50 rounded-2xl py-12 px-4 border border-dashed border-gray-300 text-center">
                                         <Languages className="w-10 h-10 text-gray-300 mx-auto mb-4" />
-                                        <p className="text-sm text-gray-900 font-bold mb-1">실시간 번역 서비스</p>
-                                        <p className="text-xs text-gray-500">현재 준비 중입니다</p>
+                                        <p className="text-sm text-gray-900 font-bold mb-1">실시간 통역 서비스</p>
+                                        <p className="text-xs text-gray-500">?꾩옱 以鍮?以묒엯?덈떎</p>
                                     </div>
+                                )}
+                            </TabsContent>
+
+                            <TabsContent value="stamp-tour" className="mt-2 p-1 space-y-3">
+                                {!stampConfig?.enabled ? (
+                                    <div className="bg-white rounded-2xl border border-dashed border-gray-300 py-10 px-4 text-center">
+                                        <Gift className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                                        <p className="text-sm font-bold text-gray-800 mb-1">스탬프 투어 미운영</p>
+                                        <p className="text-xs text-gray-500">?대깽?몄쓣 ?숈빐 ?뺤씤?댁＜?몄슂.</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-200 p-4 shadow-sm">
+                                            <div className="flex items-center justify-between gap-3 mb-3">
+                                                <div>
+                                                    <p className="text-sm font-black text-amber-900">遺??ㅽ꺃 ?꾪닾</p>
+                                                    <p className="text-xs text-amber-700">遺ㅼ뒪 ?⑸Ц 諛??숈쓽 ?꾨즺 ???ㅽ꺃??李⑥쑝濡?遺숈뒿?덈떎.</p>
+                                                </div>
+                                                <div className="rounded-full bg-white px-3 py-1 text-sm font-black text-amber-700 shadow-sm">
+                                                    {myStamps.length} / {requiredStampCount || stampBoothCandidates.length}
+                                                </div>
+                                            </div>
+
+                                            <div className="h-3 overflow-hidden rounded-full bg-amber-200">
+                                                <div
+                                                    className="h-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-700"
+                                                    style={{ width: `${Math.min(100, requiredStampCount > 0 ? (myStamps.length / requiredStampCount) * 100 : 0)}%` }}
+                                                />
+                                            </div>
+
+                                            <div className="mt-4 space-y-2">
+                                                <p className="text-xs font-semibold text-amber-900">
+                                                    {isStampMissionComplete
+                                                        ? (stampConfig.completionMessage || '?몃???꽕?뺣맂 誘몄뀡???꾨즺?덉뒿?덈떎.')
+                                                        : `吏湲덇퉴吏 ${myStamps.length}媛쒖쓽 遺ㅼ뒪 ?ㅽ꺃??紐⑥븯?듬땲??`}
+                                                </p>
+                                                {currentRewardStatus === 'REQUESTED' && (
+                                                    <div className="rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-700">
+                                                        {stampProgress.rewardName
+                                                            ? `${stampProgress.rewardName} ?섎졊 ?붿껌??醫묒닔?섏뿀?듬땲??`
+                                                            : '?곹뭹 ?섎졊 ?붿껌??醫묒닔?섏뿀?듬땲??'}
+                                                    </div>
+                                                )}
+                                                {currentRewardStatus === 'REDEEMED' && (
+                                                    <div className="rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-700">
+                                                        ?곹뭹 ?섎졊??留덈즺?섏뿀?듬땲??
+                                                    </div>
+                                                )}
+                                                {isStampMissionComplete && currentRewardStatus === 'NONE' && canParticipantDraw && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleRewardRequest}
+                                                        disabled={rewardRequesting}
+                                                        className="w-full rounded-2xl bg-gray-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    >
+                                                        {rewardRequesting ? '?붿쿇 以?..' : '?곹뭹 異붿쿇 ?쒖옉'}
+                                                    </button>
+                                                )}
+                                                {isStampMissionComplete && currentRewardStatus === 'NONE' && !canParticipantDraw && isInstantReward && (
+                                                    <div className="rounded-xl bg-sky-100 px-3 py-2 text-xs font-bold text-sky-700">
+                                                        관리자 추첨 대기 중입니다. 운영 화면에서 당첨을 확정합니다.
+                                                    </div>
+                                                )}
+                                                {isStampMissionComplete && !isInstantReward && lotteryStatus === 'PENDING' && (
+                                                    <div className="rounded-xl bg-sky-100 px-3 py-2 text-xs font-bold text-sky-700">
+                                                        예약 추첨 대기 중입니다. 지정된 시각 이후 운영 화면에서 전체 완료자를 기준으로 일괄 추첨합니다.
+                                                    </div>
+                                                )}
+                                                {isStampMissionComplete && !isInstantReward && lotteryStatus === 'PENDING' && stampConfig.lotteryScheduledAt && (
+                                                    <div className="rounded-xl bg-white/80 px-3 py-2 text-xs text-amber-900">
+                                                        추첨 예정 시각: {stampConfig.lotteryScheduledAt.toDate().toLocaleString('ko-KR')}
+                                                    </div>
+                                                )}
+                                                {missedLotteryCutoff && (
+                                                    <div className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">
+                                                        예약 추첨 마감 이후에 미션을 완료해 이번 회차 추첨 대상에서는 제외되었습니다.
+                                                    </div>
+                                                )}
+                                                {!isInstantReward && lotteryStatus === 'NOT_SELECTED' && (
+                                                    <div className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">
+                                                        이번 예약 추첨에서는 미당첨입니다.
+                                                    </div>
+                                                )}
+                                                {rewardMessage && (
+                                                    <div className="rounded-xl bg-white/80 px-3 py-2 text-xs text-amber-900">
+                                                        {rewardMessage}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+                                            <p className="mb-3 text-sm font-black text-gray-900">李몄뿬 遺ㅼ뒪 ?꾪솴</p>
+                                            <div className="space-y-2">
+                                                {stampBooths.length === 0 ? (
+                                                    <p className="text-xs text-gray-400">?ㅽ꺃 ?꾪닾 李몄뿬 遺ㅼ뒪媛 ?놁뒿?덈떎.</p>
+                                                ) : stampBooths.map((booth) => (
+                                                    <div key={booth.id} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2 text-sm">
+                                                        <span className="font-semibold text-gray-800">{booth.name}</span>
+                                                        <span className={`rounded-full px-2 py-1 text-xs font-bold ${booth.isStamped ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-500'}`}>
+                                                            {booth.isStamped ? '?ㅽ꺃 ?꾨즺' : '誘몄쇅'}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+                                            <p className="mb-3 text-sm font-black text-gray-900">諛⑸챸濡?李몄뿬 ?낅젰</p>
+                                            <div className="space-y-2">
+                                                {guestbookEntries.length === 0 ? (
+                                                    <p className="text-xs text-gray-400">?꾩쭅 諛⑸챸濡앹씠 ?놁뒿?덈떎.</p>
+                                                ) : guestbookEntries.map((entry, index) => (
+                                                    <div key={`${entry.vendorName}-${index}`} className="rounded-xl bg-gray-50 px-3 py-2">
+                                                        <p className="text-sm font-semibold text-gray-800">{entry.vendorName}</p>
+                                                        {entry.message && <p className="mt-1 text-xs text-gray-500">{entry.message}</p>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </>
                                 )}
                             </TabsContent>
                         </Tabs>
@@ -729,12 +1107,48 @@ const StandAloneBadgePage: React.FC = () => {
                         onClick={() => navigate(`/${slug && slug.includes('_') ? slug.split('_')[1] : slug || ''}`)}
                         className="inline-flex items-center justify-center py-3 px-8 bg-white/80 backdrop-blur-sm text-emerald-800 font-bold rounded-full hover:bg-white transition-colors border border-emerald-100 shadow-sm text-sm"
                     >
-                        학술대회 홈페이지로 이동
+                        ?숈닠????덊럹?댁?濡??대룞
                     </button>
                 </div>
             </div>
+
+            {rewardAnimationOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/70 px-6">
+                    <div className="relative w-full max-w-sm overflow-hidden rounded-[2rem] bg-white p-8 text-center shadow-2xl">
+                        <button
+                            type="button"
+                            onClick={() => setRewardAnimationOpen(false)}
+                            className="absolute right-4 top-4 rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-600"
+                        >
+                            ?リ린
+                        </button>
+                        <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-amber-200 via-orange-100 to-transparent" />
+                        <div className="relative">
+                            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg">
+                                <Sparkles className="h-10 w-10 animate-pulse" />
+                            </div>
+                            <p className="text-xs font-bold uppercase tracking-[0.3em] text-amber-600">Reward Reveal</p>
+                            <h3 className="mt-2 text-2xl font-black text-gray-900">
+                                {stampProgress.rewardName || '異붿쿇 ?꾨즺'}
+                            </h3>
+                            <p className="mt-3 text-sm leading-6 text-gray-600">
+                                {rewardMessage || '상품 요청이 접수되었습니다. 인포데스크에서 확인해 주세요.'}
+                            </p>
+                            <div className="mt-6 flex justify-center gap-2">
+                                <span className="h-2 w-2 animate-bounce rounded-full bg-amber-400" />
+                                <span className="h-2 w-2 animate-bounce rounded-full bg-orange-400 [animation-delay:120ms]" />
+                                <span className="h-2 w-2 animate-bounce rounded-full bg-yellow-400 [animation-delay:240ms]" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
 export default StandAloneBadgePage;
+
+
+
+

@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.healthCheck = exports.onTossWebhook = exports.logPerformance = exports.logError = exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.confirmTossPaymentHttp = exports.confirmTossPayment = exports.confirmNicePayment = exports.prepareNicePayment = exports.manualDataCleanup = exports.scheduledDataCleanup = exports.withdrawConsent = exports.logAuditEvent = exports.sendVendorAlimTalk = exports.manualAutoCheckout = exports.scheduledAutoCheckout = exports.resolveDataIntegrityAlert = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.bulkSendNotifications = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.corsHandler = void 0;
+exports.healthCheck = exports.onTossWebhook = exports.logPerformance = exports.logError = exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.confirmTossPaymentHttp = exports.confirmTossPayment = exports.confirmNicePayment = exports.prepareNicePayment = exports.runStampRewardLottery = exports.adminDrawStampReward = exports.requestStampReward = exports.manualDataCleanup = exports.scheduledDataCleanup = exports.withdrawConsent = exports.logAuditEvent = exports.processVendorVisit = exports.resolveVendorBadgeScan = exports.sendVendorAlimTalk = exports.manualAutoCheckout = exports.scheduledAutoCheckout = exports.resolveDataIntegrityAlert = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.bulkSendNotifications = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.corsHandler = void 0;
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -69,6 +69,10 @@ Object.defineProperty(exports, "scheduledAutoCheckout", { enumerable: true, get:
 Object.defineProperty(exports, "manualAutoCheckout", { enumerable: true, get: function () { return autoCheckout_1.manualAutoCheckout; } });
 const sendAlimTalk_1 = require("./vendor/sendAlimTalk");
 Object.defineProperty(exports, "sendVendorAlimTalk", { enumerable: true, get: function () { return sendAlimTalk_1.sendVendorAlimTalk; } });
+const resolveBadgeScan_1 = require("./vendor/resolveBadgeScan");
+Object.defineProperty(exports, "resolveVendorBadgeScan", { enumerable: true, get: function () { return resolveBadgeScan_1.resolveVendorBadgeScan; } });
+const processVendorVisit_1 = require("./vendor/processVendorVisit");
+Object.defineProperty(exports, "processVendorVisit", { enumerable: true, get: function () { return processVendorVisit_1.processVendorVisit; } });
 const logAuditEvent_1 = require("./audit/logAuditEvent");
 Object.defineProperty(exports, "logAuditEvent", { enumerable: true, get: function () { return logAuditEvent_1.logAuditEvent; } });
 const withdrawConsent_1 = require("./vendor/withdrawConsent");
@@ -76,6 +80,12 @@ Object.defineProperty(exports, "withdrawConsent", { enumerable: true, get: funct
 const dataCleanup_1 = require("./scheduled/dataCleanup");
 Object.defineProperty(exports, "scheduledDataCleanup", { enumerable: true, get: function () { return dataCleanup_1.scheduledDataCleanup; } });
 Object.defineProperty(exports, "manualDataCleanup", { enumerable: true, get: function () { return dataCleanup_1.manualDataCleanup; } });
+const requestStampReward_1 = require("./stampTour/requestStampReward");
+Object.defineProperty(exports, "requestStampReward", { enumerable: true, get: function () { return requestStampReward_1.requestStampReward; } });
+const adminDrawStampReward_1 = require("./stampTour/adminDrawStampReward");
+Object.defineProperty(exports, "adminDrawStampReward", { enumerable: true, get: function () { return adminDrawStampReward_1.adminDrawStampReward; } });
+const runStampRewardLottery_1 = require("./stampTour/runStampRewardLottery");
+Object.defineProperty(exports, "runStampRewardLottery", { enumerable: true, get: function () { return runStampRewardLottery_1.runStampRewardLottery; } });
 exports.corsHandler = (0, cors_1.default)({ origin: true });
 admin.initializeApp();
 // import { sendAlimTalkTest } from './alimtalk/sendTest';
@@ -1010,7 +1020,7 @@ exports.sendAuthCode = functions
     if (!phone || !code) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing phone number or code');
     }
-    // In a real implementation, this would call an SMS/AlimTalk provider API (e.g., Aligo, Twilio, Solapi)
+    // In a real implementation, this would call an SMS/AlimTalk provider API (e.g., Twilio, Solapi)
     // For now, we just log it as requested.
     functions.logger.info(`[SMS MOCK] Sending AlimTalk to ${phone}: [e-Regi] 가입인증번호 입니다. #${code}`);
     return { success: true, message: "Code sent successfully (MOCK)" };

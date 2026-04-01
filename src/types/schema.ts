@@ -118,6 +118,10 @@ export interface Conference {
     start: Timestamp;
     end: Timestamp;
   };
+  features?: {
+    guestbookEnabled?: boolean;
+    stampTourEnabled?: boolean;
+  };
   location: string;
   venue?: {
     name: LocalizedText;
@@ -137,6 +141,10 @@ export interface ConferenceInfo {
   dates: {
     start: Timestamp;
     end: Timestamp;
+  };
+  features?: {
+    guestbookEnabled?: boolean;
+    stampTourEnabled?: boolean;
   };
   venue?: {
     name: LocalizedText;
@@ -981,24 +989,42 @@ export interface RegistrationOption {
 // ==========================================
 
 /**
+ * Collection: `vendors/{vendorId}`
+ * Partner/Vendor profile information
+ */
+export interface VendorProfile {
+  id: string;
+  name: string;
+  slug?: string;
+  description?: string;
+  logoUrl?: string;
+  homeUrl?: string;
+  productUrl?: string;
+  ownerUid?: string;
+  adminEmail?: string;
+  staffEmails?: string[];
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+/**
  * Collection: `vendors/{vendorId}/leads/{leadId}`
- * Partner booth visitor leads with consent management
  */
 export interface VendorLead {
   id: string;
   conferenceId: string;
-  visitorId: string;           // User ID or registration ID
-  visitorName: string;          // "Anonymous (별칭)" if consent denied
-  visitorOrg?: string;          // Only if consent agreed
-  visitorPhone?: string;        // Only if consent agreed (PII)
+  visitorId?: string;
+  visitorName: string;
+  visitorOrg?: string;
+  visitorPhone?: string;
   visitorEmail?: string;        // Only if consent agreed (PII)
   timestamp: Timestamp;
   isConsentAgreed: boolean;
-  
+
   // Consent withdrawal support
   consentStatus: 'ACTIVE' | 'WITHDRAWN';
   consentWithdrawnAt?: Timestamp;
-  
+
   // Data retention policy
   retentionPeriodDays?: number; // Default: 1095 (3 years for PII)
   scheduledDeletionAt?: Timestamp;
@@ -1021,6 +1047,97 @@ export interface StampRecord {
   scheduledDeletionAt?: Timestamp;
 }
 
+export type StampTourCompletionType = 'COUNT' | 'ALL';
+export type StampTourBoothOrderMode = 'SPONSOR_ORDER' | 'CUSTOM';
+export type StampTourRewardMode = 'RANDOM' | 'FIXED';
+export type StampTourDrawMode = 'PARTICIPANT' | 'ADMIN' | 'BOTH';
+export type StampTourRewardFulfillmentMode = 'INSTANT' | 'LOTTERY';
+export type StampTourRewardStatus = 'NONE' | 'REQUESTED' | 'REDEEMED';
+export type StampTourLotteryStatus = 'PENDING' | 'SELECTED' | 'NOT_SELECTED';
+
+export interface StampTourReward {
+  id: string;
+  name: string;
+  imageUrl?: string;
+  totalQty: number;
+  remainingQty: number;
+  weight?: number; // RANDOM mode
+  order?: number; // FIXED mode
+  isFallback?: boolean;
+}
+
+export interface StampTourConfig {
+  enabled: boolean;
+  endAt: Timestamp;
+  completionRule: {
+    type: StampTourCompletionType;
+    requiredCount?: number;
+  };
+  boothOrderMode: StampTourBoothOrderMode;
+  customBoothOrder?: string[]; // vendorId list
+  rewardMode: StampTourRewardMode;
+  drawMode?: StampTourDrawMode;
+  rewardFulfillmentMode?: StampTourRewardFulfillmentMode;
+  lotteryScheduledAt?: Timestamp;
+  lotteryExecutedAt?: Timestamp;
+  rewards: StampTourReward[];
+  soldOutMessage?: string;
+  completionMessage?: string;
+}
+
+export interface StampTourProgress {
+  id: string;
+  userId: string;
+  conferenceId: string;
+  userName?: string;
+  userOrg?: string;
+  isCompleted: boolean;
+  completedAt?: Timestamp;
+  rewardId?: string;
+  rewardName?: string;
+  rewardStatus: StampTourRewardStatus;
+  drawModeUsed?: StampTourDrawMode;
+  lotteryStatus?: StampTourLotteryStatus;
+  requestedAt?: Timestamp;
+  redeemedAt?: Timestamp;
+  redeemedBy?: string;
+  requestedBy?: string;
+  lotteryExecutedAt?: Timestamp;
+}
+
+/**
+ * Collection: `conferences/{confId}/guestbook_entries/{entryId}`
+ * Guestbook records for vendors with explicit consent
+ */
+export interface GuestbookEntry {
+  id: string;
+  userId: string;
+  userName: string;
+  userOrg?: string;
+  vendorId: string;
+  vendorName: string;
+  conferenceId: string;
+  message?: string;
+  leadId?: string;
+  timestamp: Timestamp;
+  isConsentAgreed: boolean;
+}
+
+/**
+ * Collection: `conferences/{confId}/vendor_requests/{vendorId}`
+ */
+export interface VendorSponsorshipRequest {
+  id: string;
+  vendorId: string;
+  vendorName: string;
+  conferenceId: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  requesterEmail?: string;
+  requestedAt: Timestamp;
+  reviewedAt?: Timestamp;
+  reviewedBy?: string;
+}
+
 // ==========================================
 // 9. Audit Logging (NEW)
 // ==========================================
@@ -1036,7 +1153,9 @@ export type AuditAction =
   | 'STAMP_CREATED'
   | 'ALIMTALK_SENT'
   | 'ALIMTALK_FAILED'
+  | 'CONSENT_GIVEN'
   | 'CONSENT_WITHDRAWN'
+  | 'GUESTBOOK_SIGN'
   | 'VENDOR_LOGIN'
   | 'VENDOR_SETTINGS_CHANGED';
 
@@ -1048,7 +1167,7 @@ export type AuditActorType = 'VENDOR_ADMIN' | 'SYSTEM' | 'PARTICIPANT' | 'SUPER_
 /**
  * Entity types for audit logging
  */
-export type AuditEntityType = 'LEAD' | 'STAMP' | 'ALIMTALK' | 'CONSENT' | 'VENDOR';
+export type AuditEntityType = 'LEAD' | 'STAMP' | 'ALIMTALK' | 'CONSENT' | 'VENDOR' | 'GUESTBOOK';
 
 /**
  * Collection: `audit_logs/{logId}` (Global - Super Admin only)
@@ -1087,4 +1206,3 @@ export interface AuditLog {
   ipAddress?: string;
   userAgent?: string;
 }
-
