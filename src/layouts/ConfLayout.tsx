@@ -7,7 +7,7 @@ import { doc, getDoc, collection, getDocs, query, where, limit } from 'firebase/
 import { db, auth } from '../firebase';
 import { Conference } from '../types/schema';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { LayoutDashboard, Globe, FileText, Users, Settings, QrCode, Monitor, CreditCard, LogOut, ArrowLeft, Printer, BarChart, UserPlus, Building2, Bell, IdCard } from 'lucide-react';
+import { LayoutDashboard, Globe, FileText, Users, Settings, QrCode, Monitor, CreditCard, LogOut, ArrowLeft, Printer, BarChart, UserPlus, Building2, Bell, IdCard, Trophy } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/ui/button';
 import { resolveSocietyByIdentifier } from '../utils/societyResolver';
@@ -189,6 +189,14 @@ export default function ConfLayout() {
         { href: `/admin/conf/${cid}/attendance-live`, label: '실시간 출결', icon: Monitor },
         { href: `/admin/conf/${cid}/statistics`, label: '수강 현황', icon: BarChart },
     ];
+
+    if (conference?.features?.stampTourEnabled) {
+        navItems.splice(3, 0, {
+            href: `/admin/conf/${cid}/stamp-tour-draw`,
+            label: '스탬프투어 추첨',
+            icon: Trophy
+        });
+    }
 
     return (
         <ConfProvider value={{ confId: cid!, conference, societyId: cid!.split('_')[0] }}>

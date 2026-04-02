@@ -39,6 +39,7 @@ import StatisticsPage from './pages/admin/StatisticsPage';
 import AttendanceLivePage from './pages/admin/AttendanceLivePage';
 import InfodeskPage from './pages/admin/conf/InfodeskPage';
 import GatePage from './pages/admin/conf/GatePage';
+import StampTourDrawPage from './pages/admin/conf/StampTourDrawPage';
 import AgendaManager from './pages/admin/AgendaManager';
 import SponsorManager from './pages/admin/SponsorManager';
 import RegistrationListPage from './pages/admin/RegistrationListPage';
@@ -198,6 +199,7 @@ const App: React.FC = () => {
                     <Route path="gate" element={<GatePage />} />
                     <Route path="gate/zone/:zoneId" element={<GatePage />} />
                     <Route path="infodesk" element={<InfodeskPage />} />
+                    <Route path="stamp-tour-draw" element={<StampTourDrawPage />} />
                   </Route>
                   <Route path="*" element={<Navigate to={activeSocietyId ? `/admin/society` : "/super"} />} />
                 </Route>
@@ -290,6 +292,7 @@ const App: React.FC = () => {
                     <Route path="gate" element={<GatePage />} />
                     <Route path="gate/zone/:zoneId" element={<GatePage />} />
                     <Route path="infodesk" element={<InfodeskPage />} />
+                    <Route path="stamp-tour-draw" element={<StampTourDrawPage />} />
                   </Route>
 
                   {/* L3: Vendor Layout */}
