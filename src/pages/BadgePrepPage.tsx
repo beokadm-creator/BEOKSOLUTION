@@ -3,10 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { httpsCallable } from 'firebase/functions';
 import { getFunctions } from 'firebase/functions';
-import { getFirestore, doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, onSnapshot, type DocumentData, type DocumentSnapshot } from 'firebase/firestore';
 import { RefreshCw, AlertCircle, CheckCircle, Loader2, Clock, FileText, Calendar, Languages, Download, User, MapPin, TrendingUp } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { DOMAIN_CONFIG, extractSocietyFromHost } from '../utils/domainHelper';
+import {
+  resolveConferenceIdFromRoute,
+  resolvePublicSlugFromConferenceId
+} from '../utils/conferenceRoute';
 
 interface TokenValidationResult {
   valid: boolean;
@@ -29,7 +32,7 @@ interface TokenValidationResult {
     totalMinutes: number;
     receiptNumber: string;
     amount?: number;
-    lastCheckIn?: any;
+    lastCheckIn?: { toDate?: () => Date } | null;
     isCompleted?: boolean;
     // Additional fields for enhanced badge
     sessionsCompleted?: number;
@@ -42,6 +45,36 @@ interface TokenValidationResult {
   };
 }
 
+type TimestampLike = {
+  toDate?: () => Date;
+};
+
+type ZoneBreak = {
+  start: string;
+  end: string;
+};
+
+type AttendanceZone = {
+  id: string;
+  start?: string;
+  end?: string;
+  breaks?: ZoneBreak[];
+  ruleDate?: string;
+};
+
+type AttendanceRule = {
+  zones?: Array<Omit<AttendanceZone, 'ruleDate'>>;
+};
+
+type AttendanceSettings = {
+  rules?: Record<string, AttendanceRule>;
+};
+
+type BadgeConfig = {
+  materialsUrls?: Array<{ name: string; url: string }>;
+  translationUrl?: string;
+};
+
 const BadgePrepPage: React.FC = () => {
   const { slug, token } = useParams<{ slug: string; token: string }>();
   const navigate = useNavigate();
@@ -51,11 +84,11 @@ const BadgePrepPage: React.FC = () => {
   const [result, setResult] = useState<TokenValidationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [badgeConfig, setBadgeConfig] = useState<any>(null);
-  const [zones, setZones] = useState<any[]>([]);
+  const [badgeConfig, setBadgeConfig] = useState<BadgeConfig | null>(null);
+  const [zones, setZones] = useState<AttendanceZone[]>([]);
   const [liveMinutes, setLiveMinutes] = useState<number>(0);
-  const [lastCheckIn, setLastCheckIn] = useState<any>(null);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
+  const publicSlug = resolvePublicSlugFromConferenceId(slug);
 
   const voucherQrValue = useMemo(() => {
     if (!result?.registration) return '';
@@ -70,22 +103,9 @@ const BadgePrepPage: React.FC = () => {
   }, [result?.registration]);
 
   // Helper to determine correct confId
-  const getConfIdToUse = useCallback((slugVal: string | undefined): string => {
-    if (!slugVal) {
-      const hostname = window.location.hostname;
-      const societyId = extractSocietyFromHost(hostname) || DOMAIN_CONFIG.DEFAULT_SOCIETY;
-      return `${societyId}_2026spring`;
-    }
-
-    if (slugVal.includes('_')) {
-      return slugVal;
-    } else {
-      const hostname = window.location.hostname;
-      let societyIdToUse = extractSocietyFromHost(hostname) || DOMAIN_CONFIG.DEFAULT_SOCIETY;
-
-      return `${societyIdToUse}_${slugVal}`;
-    }
-  }, []);
+  const getConfIdToUse = useCallback((slugVal: string | undefined): string => (
+    resolveConferenceIdFromRoute(slugVal)
+  ), []);
 
   // Validate token
   const validateToken = useCallback(async () => {
@@ -146,11 +166,11 @@ const BadgePrepPage: React.FC = () => {
     const attendanceRef = doc(db, `conferences/${confId}/settings/attendance`);
     getDoc(attendanceRef).then(snap => {
       if (snap.exists()) {
-        const rules = snap.data().rules || {};
-        let allZones: any[] = [];
-        Object.entries(rules).forEach(([dateStr, rule]: [string, any]) => {
+        const rules = (snap.data() as AttendanceSettings).rules || {};
+        const allZones: AttendanceZone[] = [];
+        Object.entries(rules).forEach(([dateStr, rule]) => {
           if (rule && rule.zones) {
-            rule.zones.forEach((z: any) => {
+            rule.zones.forEach((z) => {
               allZones.push({ ...z, ruleDate: dateStr });
             });
           }
@@ -163,7 +183,7 @@ const BadgePrepPage: React.FC = () => {
   const [liveAttendance, setLiveAttendance] = useState<{
     status: 'INSIDE' | 'OUTSIDE';
     totalMinutes: number;
-    lastCheckIn: any;
+    lastCheckIn: TimestampLike | null;
     currentZone: string | null;
   } | null>(null);
 
@@ -177,8 +197,10 @@ const BadgePrepPage: React.FC = () => {
     const regRef = doc(db, `conferences/${confId}/registrations`, regId);
     const extRef = doc(db, `conferences/${confId}/external_attendees`, regId);
 
-    let unsubscribeExt: (() => void) | null = null;
-    const processSnap = (snap: any) => {
+    let regularSnap: DocumentSnapshot<DocumentData> | null = null;
+    let externalSnap: DocumentSnapshot<DocumentData> | null = null;
+
+    const processSnap = (snap: DocumentSnapshot<DocumentData>) => {
       if (snap.exists()) {
         const d = snap.data();
         setLiveAttendance({
@@ -188,24 +210,44 @@ const BadgePrepPage: React.FC = () => {
           currentZone: d.currentZone || null
         });
         setIsCompleted(!!d.isCompleted);
+      } else {
+        setLiveAttendance(null);
+        setIsCompleted(false);
       }
     };
 
-    const unsubscribeReg = onSnapshot(regRef, (snap) => {
-      if (snap.exists()) {
-        processSnap(snap);
-      } else if (!unsubscribeExt) {
-        unsubscribeExt = onSnapshot(extRef, (extSnap) => {
-          processSnap(extSnap);
-        });
+    const syncPreferredSnapshot = () => {
+      if (regularSnap?.exists()) {
+        processSnap(regularSnap);
+        return;
       }
+
+      if (externalSnap?.exists()) {
+        processSnap(externalSnap);
+        return;
+      }
+
+      setLiveAttendance(null);
+      setIsCompleted(false);
+    };
+
+    const unsubscribeReg = onSnapshot(regRef, (snap) => {
+      regularSnap = snap;
+      syncPreferredSnapshot();
     }, (err) => {
       console.warn('[BadgePrepPage] Registration doc sync restricted:', err);
     });
 
+    const unsubscribeExt = onSnapshot(extRef, (snap) => {
+      externalSnap = snap;
+      syncPreferredSnapshot();
+    }, (err) => {
+      console.warn('[BadgePrepPage] External attendee doc sync restricted:', err);
+    });
+
     return () => {
       unsubscribeReg();
-      if (unsubscribeExt) unsubscribeExt();
+      unsubscribeExt();
     };
   }, [result?.registration?.id, slug, getConfIdToUse]);
 
@@ -232,7 +274,7 @@ const BadgePrepPage: React.FC = () => {
       const now = new Date();
       const start = currentCheckIn.toDate ? currentCheckIn.toDate() : new Date();
       let sessionDuration = 0;
-      const zoneRule = zones.find(z => z.id === currentZoneId);
+      const zoneRule = zones.find((z) => z.id === currentZoneId);
       let deduction = 0;
 
       let boundedStart = start;
@@ -252,7 +294,7 @@ const BadgePrepPage: React.FC = () => {
         sessionDuration = Math.floor((boundedEnd.getTime() - boundedStart.getTime()) / 60000);
 
         if (zoneRule && zoneRule.breaks && Array.isArray(zoneRule.breaks)) {
-          zoneRule.breaks.forEach((brk: any) => {
+          zoneRule.breaks.forEach((brk) => {
             const localDateStr = zoneRule.ruleDate || start.getFullYear() + "-" + String(start.getMonth() + 1).padStart(2, '0') + "-" + String(start.getDate()).padStart(2, '0');
             // Force breaks to KST
             const breakStart = new Date(`${localDateStr}T${brk.start}:00+09:00`);
@@ -325,7 +367,7 @@ const BadgePrepPage: React.FC = () => {
             {error || '이 링크는 만료되었거나 유효하지 않습니다.'}
           </p>
           <button
-            onClick={() => navigate(`/${slug && slug.includes('_') ? slug.split('_')[1] : slug || ''}`)}
+            onClick={() => navigate(`/${publicSlug}`)}
             className="inline-block w-full py-3 px-6 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors text-center"
           >
             학술대회 홈페이지로 이동
@@ -437,7 +479,7 @@ const BadgePrepPage: React.FC = () => {
 
           {/* Home Button */}
           <button
-            onClick={() => navigate(`/${slug && slug.includes('_') ? slug.split('_')[1] : slug || ''}`)}
+            onClick={() => navigate(`/${publicSlug}`)}
             className="block w-full mt-4 py-3 px-6 bg-white text-amber-700 font-bold rounded-xl hover:bg-amber-50 transition-colors text-center border-2 border-amber-200 shadow-md"
           >
             학술대회 홈페이지
@@ -586,7 +628,7 @@ const BadgePrepPage: React.FC = () => {
                 {/* Materials Tab */}
                 <TabsContent value="materials" className="mt-2 p-1 space-y-2">
                   {badgeConfig?.materialsUrls && badgeConfig.materialsUrls.length > 0 ? (
-                    badgeConfig.materialsUrls.map((mat: any, idx: number) => (
+                    badgeConfig.materialsUrls.map((mat, idx: number) => (
                       <a
                         key={idx}
                         href={mat.url}
@@ -683,7 +725,7 @@ const BadgePrepPage: React.FC = () => {
           {/* Home Button - Floating Bottom aesthetics */}
           <div className="mt-6 text-center">
             <button
-              onClick={() => navigate(`/${slug && slug.includes('_') ? slug.split('_')[1] : slug || ''}`)}
+            onClick={() => navigate(`/${publicSlug}`)}
               className="inline-flex items-center justify-center py-3 px-8 bg-white/80 backdrop-blur-sm text-emerald-800 font-bold rounded-full hover:bg-white transition-colors border border-emerald-100 shadow-sm text-sm"
             >
               학술대회 홈페이지로 이동

@@ -6,6 +6,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { useUserStore } from '../store/userStore';
 import { useConference } from '../hooks/useConference';
 
+type RegistrationSuccessData = {
+    name?: string;
+    userName?: string;
+    userInfo?: {
+        name?: string;
+    };
+    status?: string;
+    paymentStatus?: string;
+    virtualAccount?: {
+        bank?: string;
+        accountNumber?: string;
+        customerName?: string;
+        dueDate?: string;
+    };
+};
+
 const RegistrationSuccessPage: React.FC = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -13,7 +29,7 @@ const RegistrationSuccessPage: React.FC = () => {
     const conference = useConference();
 
     // State for registration data
-    const [regData, setRegData] = React.useState<unknown>(null);
+    const [regData, setRegData] = React.useState<RegistrationSuccessData | null>(null);
     const setLoading = React.useState(true)[1];
 
     // Determine targetSlug
@@ -42,14 +58,21 @@ const RegistrationSuccessPage: React.FC = () => {
                 const { collection, query, where, getDocs } = await import('firebase/firestore');
                 const { db } = await import('../firebase');
 
-                const q = query(
-                    collection(db, `conferences/${conference.id}/registrations`),
-                    where('orderId', '==', orderId)
-                );
+                const [registrationSnapshot, externalSnapshot] = await Promise.all([
+                    getDocs(query(
+                        collection(db, `conferences/${conference.id}/registrations`),
+                        where('orderId', '==', orderId)
+                    )),
+                    getDocs(query(
+                        collection(db, `conferences/${conference.id}/external_attendees`),
+                        where('orderId', '==', orderId)
+                    ))
+                ]);
 
-                const querySnapshot = await getDocs(q);
-                if (!querySnapshot.empty) {
-                    setRegData(querySnapshot.docs[0].data());
+                if (!registrationSnapshot.empty) {
+                    setRegData(registrationSnapshot.docs[0].data() as RegistrationSuccessData);
+                } else if (!externalSnapshot.empty) {
+                    setRegData(externalSnapshot.docs[0].data() as RegistrationSuccessData);
                 }
             } catch (error) {
                 console.error("Failed to fetch registration:", error);

@@ -7,6 +7,13 @@ import QRCode from "react-qr-code";
 import { useAuth } from "../hooks/useAuth";
 import { db, functions } from "../firebase";
 import { getStampMissionTargetCount } from "../utils/stampTour";
+import {
+    getBadgeDisplayAffiliation,
+    getBadgeDisplayName,
+    isBadgeIssued,
+    type BadgeRecordSource
+} from "../utils/badgeRecord";
+import { resolveConferenceIdFromRoute } from "../utils/conferenceRoute";
 
 type TimestampLike = {
     toDate: () => Date;
@@ -96,6 +103,7 @@ const parseConferenceEndAt = (raw: unknown): Date | null => {
 const ConferenceBadgePage: React.FC = () => {
     const { slug } = useParams();
     const { auth } = useAuth();
+    const confId = resolveConferenceIdFromRoute(slug);
 
     const [uiData, setUiData] = useState<BadgeUiData | null>(null);
     const [zones, setZones] = useState<AttendanceZone[]>([]);
@@ -124,7 +132,7 @@ const ConferenceBadgePage: React.FC = () => {
     );
 
     useLayoutEffect(() => {
-        if (!slug) {
+        if (!confId) {
             setConferenceEnded(false);
             setConferenceChecked(true);
             return;
@@ -133,7 +141,7 @@ const ConferenceBadgePage: React.FC = () => {
         let cancelled = false;
         (async () => {
             try {
-                const confSnap = await getDoc(doc(db, "conferences", slug));
+                const confSnap = await getDoc(doc(db, "conferences", confId));
                 if (!confSnap.exists()) {
                     if (!cancelled) {
                         setConferenceEnded(false);
@@ -160,10 +168,10 @@ const ConferenceBadgePage: React.FC = () => {
         return () => {
             cancelled = true;
         };
-    }, [slug]);
+    }, [confId]);
 
     useLayoutEffect(() => {
-        if (!slug) {
+        if (!confId) {
             setMsg("?좏슚?섏? ?딆? ?숉쉶 寃쎈줈?낅땲??");
             return;
         }
@@ -183,15 +191,20 @@ const ConferenceBadgePage: React.FC = () => {
         setMsg("紐낆같 ?뺣낫瑜?遺덈윭?ㅻ뒗 以묒엯?덈떎...");
         const userId = auth.user.id;
         const registrationQuery = query(
-            collection(db, `conferences/${slug}/registrations`),
+            collection(db, `conferences/${confId}/registrations`),
             where("userId", "==", userId),
             where("paymentStatus", "==", "PAID"),
             orderBy("createdAt", "desc")
         );
+        const externalAttendeeQuery = query(
+            collection(db, `conferences/${confId}/external_attendees`),
+            where("userId", "==", userId),
+            where("paymentStatus", "==", "PAID")
+        );
 
         import("firebase/firestore").then(async ({ doc, getDoc }) => {
             try {
-                const rulesSnap = await getDoc(doc(db, `conferences/${slug}/settings/attendance`));
+                const rulesSnap = await getDoc(doc(db, `conferences/${confId}/settings/attendance`));
                 if (!rulesSnap.exists()) return;
 
                 const attendanceSettings = rulesSnap.data() as AttendanceSettings;
@@ -208,7 +221,10 @@ const ConferenceBadgePage: React.FC = () => {
             }
         });
 
-        const unsubscribe = onSnapshot(registrationQuery, (snapshot) => {
+        const processSnapshot = (
+            snapshot: Awaited<ReturnType<typeof getDocs>>,
+            source: BadgeRecordSource
+        ) => {
             if (snapshot.empty) {
                 setUiData(null);
                 setMsg("?깅줉 ?뺣낫瑜?李얠쓣 ???놁뒿?덈떎.");
@@ -224,19 +240,20 @@ const ConferenceBadgePage: React.FC = () => {
             }
 
             const regId = snapshot.docs[0].id;
+            const issued = isBadgeIssued(registration, source);
             const voucherQr = String(registration.confirmationQr || regId);
             const badgeQr = String(registration.badgeQr || `BADGE-${regId}`);
-            const qrValue = registration.badgeIssued ? badgeQr : voucherQr;
+            const qrValue = issued ? badgeQr : voucherQr;
             const baseMinutes = Number(registration.totalMinutes || 0);
 
             setUiData({
                 status: String(registration.attendanceStatus || "OUTSIDE"),
                 zone: String(registration.attendanceStatus === "INSIDE" ? (registration.currentZone || "Inside") : "OUTSIDE"),
-                name: String(registration.userName || registration.name || "?대쫫 ?놁쓬"),
-                aff: String(registration.affiliation || registration.organization || registration.userAffiliation || registration.userInfo?.affiliation || "?뚯냽 ?놁쓬"),
+                name: getBadgeDisplayName(registration),
+                aff: getBadgeDisplayAffiliation(registration),
                 id: String(regId),
                 userId: String(registration.userId || regId),
-                issued: !!registration.badgeIssued,
+                issued,
                 qrValue,
                 receiptNumber: String(registration.receiptNumber || registration.orderId || "-"),
                 lastCheckIn: registration.lastCheckIn,
@@ -244,10 +261,47 @@ const ConferenceBadgePage: React.FC = () => {
             });
             setLiveMinutes(baseMinutes);
             setMsg("");
-        });
+        };
 
-        return () => unsubscribe();
-    }, [slug, auth.user, conferenceChecked, conferenceEnded]);
+        let unsubscribe = () => { };
+        let cancelled = false;
+
+        (async () => {
+            try {
+                const registrationSnapshot = await getDocs(registrationQuery);
+                if (cancelled) return;
+
+                if (!registrationSnapshot.empty) {
+                    processSnapshot(registrationSnapshot, "REGULAR");
+                    unsubscribe = onSnapshot(registrationQuery, (snapshot) => processSnapshot(snapshot, "REGULAR"));
+                    return;
+                }
+
+                const externalAttendeeSnapshot = await getDocs(externalAttendeeQuery);
+                if (cancelled) return;
+
+                if (!externalAttendeeSnapshot.empty) {
+                    processSnapshot(externalAttendeeSnapshot, "EXTERNAL");
+                    unsubscribe = onSnapshot(externalAttendeeQuery, (snapshot) => processSnapshot(snapshot, "EXTERNAL"));
+                    return;
+                }
+
+                setUiData(null);
+                setMsg("?깅줉 ?뺣낫瑜?李얠쓣 ???놁뒿?덈떎.");
+            } catch (error) {
+                console.error("[ConferenceBadgePage] Failed to load badge data", error);
+                if (!cancelled) {
+                    setUiData(null);
+                    setMsg("?곗씠?곕? 遺덈윭?ㅻ뒗 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.");
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+            unsubscribe();
+        };
+    }, [confId, auth.user, conferenceChecked, conferenceEnded]);
 
     useLayoutEffect(() => {
         if (!uiData) return;
@@ -298,14 +352,14 @@ const ConferenceBadgePage: React.FC = () => {
     }, [uiData, zones]);
 
     useLayoutEffect(() => {
-        if (!slug || !uiData?.userId) return;
+        if (!confId || !uiData?.userId) return;
 
         let unsubscribeStamps = () => { };
         let unsubscribeProgress = () => { };
 
         const fetchStampTour = async () => {
             try {
-                const configSnap = await getDoc(doc(db, `conferences/${slug}/settings`, "stamp_tour"));
+                const configSnap = await getDoc(doc(db, `conferences/${confId}/settings`, "stamp_tour"));
                 if (configSnap.exists()) {
                     const cfg = configSnap.data() as Partial<StampTourConfig>;
                     setStampConfig({
@@ -327,7 +381,7 @@ const ConferenceBadgePage: React.FC = () => {
                 }
 
                 const sponsorsSnap = await getDocs(
-                    query(collection(db, `conferences/${slug}/sponsors`), where("isStampTourParticipant", "==", true))
+                    query(collection(db, `conferences/${confId}/sponsors`), where("isStampTourParticipant", "==", true))
                 );
                 const boothCandidates = sponsorsSnap.docs.map((snapshot) => {
                     const sponsor = snapshot.data() as { vendorId?: string; name?: string };
@@ -340,7 +394,7 @@ const ConferenceBadgePage: React.FC = () => {
                 setTotalVendors(boothCandidates.length);
 
                 unsubscribeStamps = onSnapshot(
-                    query(collection(db, `conferences/${slug}/stamps`), where("userId", "==", uiData.userId)),
+                    query(collection(db, `conferences/${confId}/stamps`), where("userId", "==", uiData.userId)),
                     (snapshot) => {
                         const uniqueVendors = Array.from(new Set(
                             snapshot.docs
@@ -352,14 +406,14 @@ const ConferenceBadgePage: React.FC = () => {
                 );
 
                 unsubscribeProgress = onSnapshot(
-                    doc(db, `conferences/${slug}/stamp_tour_progress/${uiData.userId}`),
+                    doc(db, `conferences/${confId}/stamp_tour_progress/${uiData.userId}`),
                     (snapshot) => {
                         setStampProgress(snapshot.exists() ? snapshot.data() as StampProgress : {});
                     }
                 );
 
                 const guestbookSnap = await getDocs(
-                    query(collection(db, `conferences/${slug}/guestbook_entries`), where("userId", "==", uiData.userId))
+                    query(collection(db, `conferences/${confId}/guestbook_entries`), where("userId", "==", uiData.userId))
                 );
                 setGuestbookEntries(
                     guestbookSnap.docs.map((guestbookDoc) => {
@@ -382,7 +436,7 @@ const ConferenceBadgePage: React.FC = () => {
             unsubscribeStamps();
             unsubscribeProgress();
         };
-    }, [slug, uiData?.userId]);
+    }, [confId, uiData?.userId]);
 
     const orderedBooths = useMemo(() => {
         if (!stampConfig?.enabled) return [];
@@ -423,14 +477,14 @@ const ConferenceBadgePage: React.FC = () => {
         && !completedBeforeLotteryCutoff;
 
     const handleRewardRequest = async () => {
-        if (!slug || !uiData?.userId || !stampConfig?.enabled) return;
+        if (!confId || !uiData?.userId || !stampConfig?.enabled) return;
 
         setRewardRequesting(true);
         setRewardMessage("");
         try {
             const requestReward = httpsCallable(functions, "requestStampReward");
             const response = await requestReward({
-                confId: slug,
+                confId,
                 userName: uiData.name,
                 userOrg: uiData.aff
             });

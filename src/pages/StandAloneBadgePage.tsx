@@ -8,9 +8,18 @@ import { useNavigate } from 'react-router-dom';
 import { SESSION_KEYS } from '../utils/cookie';
 import { RefreshCw, CheckCircle, Loader2, Clock, FileText, Calendar, Languages, Download, User, MapPin, TrendingUp, Sparkles, Gift } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { DOMAIN_CONFIG, extractSocietyFromHost } from '../utils/domainHelper';
 import { functions } from '../firebase';
 import { getStampMissionTargetCount } from '../utils/stampTour';
+import {
+    getBadgeDisplayAffiliation,
+    getBadgeDisplayName,
+    isBadgeIssued,
+    type BadgeRecordSource
+} from '../utils/badgeRecord';
+import {
+    resolveConferenceIdFromRoute,
+    resolvePublicSlugFromConferenceId
+} from '../utils/conferenceRoute';
 
 type TimestampLike = {
     toDate: () => Date;
@@ -110,6 +119,7 @@ const StandAloneBadgePage: React.FC = () => {
     const [refreshing, setRefreshing] = useState(false);
     const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const lastQueryRef = useRef<Query | null>(null);
+    const lastSourceRef = useRef<BadgeRecordSource | null>(null);
     const [badgeLang, setBadgeLang] = useState<'ko' | 'en'>('ko');
 
     const t = useCallback((ko: string, en: string) => (
@@ -123,20 +133,10 @@ const StandAloneBadgePage: React.FC = () => {
     ), [badgeLang]);
 
     // Helper to determine correct confId
-    const getConfIdToUse = useCallback((slugVal: string | undefined): string => {
-        if (!slugVal) {
-            return '';
-        }
-
-        if (slugVal.includes('_')) {
-            return slugVal;
-        } else {
-            const hostname = window.location.hostname;
-            const societyIdToUse = extractSocietyFromHost(hostname) || DOMAIN_CONFIG.DEFAULT_SOCIETY;
-
-            return `${societyIdToUse}_${slugVal}`;
-        }
-    }, []);
+    const getConfIdToUse = useCallback((slugVal: string | undefined): string => (
+        resolveConferenceIdFromRoute(slugVal)
+    ), []);
+    const publicSlug = resolvePublicSlugFromConferenceId(slug);
 
     useEffect(() => {
         const auth = getAuth();
@@ -211,7 +211,7 @@ const StandAloneBadgePage: React.FC = () => {
                 });
 
                 // 2. Helper to process snapshot data
-                const processSnapshot = (snap: import('firebase/firestore').QuerySnapshot, source: 'REGULAR' | 'EXTERNAL') => {
+                const processSnapshot = (snap: import('firebase/firestore').QuerySnapshot, source: BadgeRecordSource) => {
                     if (snap.empty) {
                         // This should only happen if the document was deleted after we found it
                         console.log(`[StandAloneBadgePage] ${source} registration disappeared`);
@@ -224,19 +224,10 @@ const StandAloneBadgePage: React.FC = () => {
                     console.log(`[StandAloneBadgePage] ${source} Registration found:`, d);
 
                     // Common Field Mapping
-                    const uiName = String(d.userName || d.userInfo?.name || d.name || 'No Name'); // d.name for External
-                    const uiAff = String(d.affiliation || d.userAffiliation || d.userInfo?.affiliation || d.organization || '-'); // d.organization for External
+                    const uiName = getBadgeDisplayName(d);
+                    const uiAff = getBadgeDisplayAffiliation(d);
                     const uiId = String(snap.docs[0].id);
-                    // CRITICAL LOGIC CHANGE: 
-                    // For EXTERNAL attendees, badgeQr is pre-generated, so we MUST check badgeIssued flag.
-                    // For REGULAR attendees, we maintain legacy check (badgeQr existence) but prioritize badgeIssued if available.
-                    let uiIssued = false;
-                    if (source === 'EXTERNAL') {
-                        uiIssued = !!d.badgeIssued;
-                    } else {
-                        // Legacy support for regular registrations
-                        uiIssued = !!d.badgeIssued || !!d.badgeQr;
-                    }
+                    const uiIssued = isBadgeIssued(d, source);
 
                     // External might not have attendanceStatus, default to OUTSIDE
                     const uiZone = String(d.attendanceStatus === 'INSIDE' ? (d.currentZone || 'Inside') : 'OUTSIDE');
@@ -277,6 +268,7 @@ const StandAloneBadgePage: React.FC = () => {
                     if (!snapReg.empty) {
                         console.log('[StandAloneBadgePage] Found in REGISTRATIONS');
                         if (lastQueryRef) lastQueryRef.current = qReg;
+                        lastSourceRef.current = 'REGULAR';
                         unsubscribeDB = onSnapshot(qReg, (snap) => processSnapshot(snap, 'REGULAR'));
                     } else {
                         // Check External
@@ -284,6 +276,7 @@ const StandAloneBadgePage: React.FC = () => {
                         if (!snapExt.empty) {
                             console.log('[StandAloneBadgePage] Found in EXTERNAL_ATTENDEES');
                             if (lastQueryRef) lastQueryRef.current = qExt;
+                            lastSourceRef.current = 'EXTERNAL';
                             unsubscribeDB = onSnapshot(qExt, (snap) => processSnapshot(snap, 'EXTERNAL'));
                         } else {
                             // No data in either
@@ -314,13 +307,13 @@ const StandAloneBadgePage: React.FC = () => {
                         // Check if session is for different conference
                         if (currentConfId !== confIdToUse) {
                             console.log('[StandAloneBadgePage] Session for different conference, redirecting to check-status');
-                            navigate(`/${slug}/check-status?lang=ko`, { replace: true });
+                            navigate(`/${publicSlug}/check-status?lang=ko`, { replace: true });
                             return;
                         }
 
                         // For non-members, redirect to NonMemberHubPage which has QR code
                         console.log('[StandAloneBadgePage] Non-member detected, redirecting to hub', { registrationId: session.registrationId });
-                        navigate(`/${slug}/non-member/hub`, { replace: true });
+                        navigate(`/${publicSlug}/non-member/hub`, { replace: true });
                         return;
                     } catch (err) {
                         console.error('[StandAloneBadgePage] Failed to parse non-member session:', err);
@@ -336,7 +329,7 @@ const StandAloneBadgePage: React.FC = () => {
             if (unsubscribeDB) unsubscribeDB(); // Clean up DB subscription first
             if (unsubscribeAuth) unsubscribeAuth(); // Then clean up auth subscription
         };
-    }, [getConfIdToUse, navigate, slug]);
+    }, [getConfIdToUse, navigate, publicSlug, slug]);
 
     // Auto-refresh when badge is NOT issued (voucher state)
     useEffect(() => {
@@ -345,40 +338,26 @@ const StandAloneBadgePage: React.FC = () => {
             // Faster polling for immediate switch after InfoDesk scan
             refreshIntervalRef.current = setInterval(() => {
                 setRefreshing(true);
-                // Re-query to get latest data
-                onSnapshot(lastQueryRef.current!, (snap) => {
-                    if (!snap.empty) {
+                getDocs(lastQueryRef.current!)
+                    .then((snap) => {
+                        if (snap.empty || !lastSourceRef.current) return;
+
                         const d = snap.docs[0].data();
+                        const uiIssued = isBadgeIssued(d, lastSourceRef.current);
+                        if (!uiIssued) return;
 
-                        // Apply same logic for refresh
-                        let uiIssued = false;
-                        // We need to know if it's EXTERNAL or REGULAR here too.
-                        // However, we don't have 'source' variable in this effect.
-                        // But we can infer it from the collection path in lastQueryRef, or check data structure.
-                        // External attendees usually have 'organization' field, Regular have 'affiliation'.
-                        // Or better, check if 'badgeIssued' is explicitly false but 'badgeQr' exists.
-
-                        if (d.registrationType?.startsWith('MANUAL') || d.organization) {
-                            uiIssued = !!d.badgeIssued;
-                        } else {
-                            uiIssued = !!d.badgeIssued || !!d.badgeQr;
-                        }
-
-                        if (uiIssued) {
-                            // Badge has been issued - update UI
-                            setUi((prev) => ({
-                                ...prev!,
-                                issued: true,
-                                badgeQr: d.badgeQr || null,
-                                status: String(d.attendanceStatus || 'OUTSIDE'),
-                                zone: String(d.attendanceStatus === 'INSIDE' ? (d.currentZone || 'Inside') : 'OUTSIDE'),
-                                time: String(d.totalMinutes || '0')
-                            }));
-                            setRefreshing(false);
-                        }
-                    }
-                    setRefreshing(false);
-                });
+                        setUi((prev) => ({
+                            ...prev!,
+                            issued: true,
+                            badgeQr: d.badgeQr || null,
+                            status: String(d.attendanceStatus || 'OUTSIDE'),
+                            zone: String(d.attendanceStatus === 'INSIDE' ? (d.currentZone || 'Inside') : 'OUTSIDE'),
+                            time: String(d.totalMinutes || '0')
+                        }));
+                    })
+                    .finally(() => {
+                        setRefreshing(false);
+                    });
             }, 2000);
 
             return () => {
@@ -769,7 +748,7 @@ const StandAloneBadgePage: React.FC = () => {
 
                     {/* Home Button */}
                     <button
-                        onClick={() => navigate(`/${slug && slug.includes('_') ? slug.split('_')[1] : slug || ''}`)}
+                        onClick={() => navigate(`/${publicSlug}`)}
                         className="block w-full mt-4 py-3 px-6 bg-white text-amber-700 font-bold rounded-xl hover:bg-amber-50 transition-colors text-center border-2 border-amber-200 shadow-md"
                     >
                         {t('행사 홈으로', 'Back to event home')}
@@ -1154,7 +1133,7 @@ const StandAloneBadgePage: React.FC = () => {
                 {/* Home Button - Floating Bottom aesthetics */}
                 <div className="mt-6 text-center">
                     <button
-                        onClick={() => navigate(`/${slug && slug.includes('_') ? slug.split('_')[1] : slug || ''}`)}
+                        onClick={() => navigate(`/${publicSlug}`)}
                         className="inline-flex items-center justify-center py-3 px-8 bg-white/80 backdrop-blur-sm text-emerald-800 font-bold rounded-full hover:bg-white transition-colors border border-emerald-100 shadow-sm text-sm"
                     >
                         {t('행사 홈으로', 'Back to event home')}
