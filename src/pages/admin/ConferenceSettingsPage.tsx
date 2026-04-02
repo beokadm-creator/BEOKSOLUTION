@@ -513,21 +513,7 @@ export default function ConferenceSettingsPage() {
 
     const handleRunLottery = async () => {
         if (!cid) return;
-
-        setDrawingUserId('LOTTERY_BATCH');
-        try {
-            const runLottery = httpsCallable(functions, 'runStampRewardLottery');
-            const response = await runLottery({ confId: cid });
-            const payload = response.data as { totalEligible?: number; totalSelected?: number; totalNotSelected?: number };
-            toast.success(
-                `추첨 완료: 대상 ${payload.totalEligible || 0}명, 당첨 ${payload.totalSelected || 0}명, 미당첨 ${payload.totalNotSelected || 0}명`
-            );
-        } catch (error) {
-            console.error('Run lottery failed:', error);
-            toast.error(error instanceof Error ? error.message : '예약 추첨 실행에 실패했습니다.');
-        } finally {
-            setDrawingUserId(null);
-        }
+        window.location.href = `/admin/conf/${cid}/stamp-tour-draw`;
     };
 
     const handleAddImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1218,9 +1204,8 @@ export default function ConferenceSettingsPage() {
                                                     type="button"
                                                     size="sm"
                                                     onClick={() => void handleRunLottery()}
-                                                    disabled={drawingUserId === 'LOTTERY_BATCH'}
                                                 >
-                                                    {drawingUserId === 'LOTTERY_BATCH' ? '추첨 중...' : '예약 추첨 실행'}
+                                                    추첨 전용 화면 열기
                                                 </Button>
                                             </div>
                                         )}

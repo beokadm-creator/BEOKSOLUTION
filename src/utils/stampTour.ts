@@ -85,3 +85,17 @@ export const hasValidStampTourRewards = (
     return Number(reward.order ?? 1) > 0;
   });
 };
+
+export const maskStampTourParticipantName = (name: string | null | undefined) => {
+  const trimmed = (name || "").trim();
+  if (!trimmed) return "이름 비공개";
+
+  const chars = Array.from(trimmed);
+  if (chars.length === 1) return `${chars[0]}*`;
+  if (chars.length === 2) return `${chars[0]}*`;
+
+  return chars.map((char, index) => {
+    if (index === 0 || index === chars.length - 1) return char;
+    return "*";
+  }).join("");
+};
