@@ -980,7 +980,7 @@ export default function ConferenceSettingsPage() {
                                         </div>
 
                                         {stampTourConfig.rewardFulfillmentMode === 'LOTTERY' && (
-                                            <div className="space-y-2">
+                                            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                                                 <Label className="text-base font-medium text-slate-700">예약 추첨 시각</Label>
                                                 <Input
                                                     type="datetime-local"
@@ -1012,6 +1012,19 @@ export default function ConferenceSettingsPage() {
                                                 <p className="text-xs text-slate-500">
                                                     이 시각 전에는 누구도 추첨할 수 없고, 시각이 지나면 관리자만 전체 완료자를 대상으로 일괄 추첨할 수 있습니다.
                                                 </p>
+                                                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white px-3 py-3 ring-1 ring-slate-200">
+                                                    <div className="text-sm text-slate-600">
+                                                        관리자 추첨 전용 화면에서 단수 추첨, 복수 추첨, 전체 추첨, 데모 리허설을 실행할 수 있습니다.
+                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => void handleRunLottery()}
+                                                    >
+                                                        관리자 추첨 화면 바로가기
+                                                    </Button>
+                                                </div>
                                             </div>
                                         )}
 
@@ -1048,6 +1061,11 @@ export default function ConferenceSettingsPage() {
                                                 <div className="space-y-3">
                                                     {stampTourConfig.rewards.map((reward, idx) => (
                                                         <div key={reward.id} className="border border-slate-200 rounded-xl p-4 space-y-3">
+                                                            <div className="grid grid-cols-1 gap-3 text-xs font-semibold text-slate-500 md:grid-cols-3">
+                                                                <div>상품명</div>
+                                                                <div>총 수량: 처음 준비한 전체 개수</div>
+                                                                <div>현재 남은 수량: 지금 추첨 가능한 개수</div>
+                                                            </div>
                                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                                                 <Input
                                                                     value={reward.name}
@@ -1091,6 +1109,11 @@ export default function ConferenceSettingsPage() {
                                                                     placeholder="잔여 수량"
                                                                 />
                                                             </div>
+
+                                                            <p className="text-xs text-slate-500">
+                                                                왼쪽 숫자는 총 수량, 오른쪽 숫자는 현재 남은 수량입니다.
+                                                                이미 일부를 지급했다면 오른쪽 현재 남은 수량만 실제 재고에 맞게 조정해 주세요.
+                                                            </p>
 
                                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                                                 <Input
