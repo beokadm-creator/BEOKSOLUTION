@@ -1058,12 +1058,14 @@ export type StampTourLotteryStatus = 'PENDING' | 'SELECTED' | 'NOT_SELECTED';
 export interface StampTourReward {
   id: string;
   name: string;
+  label?: string;
   imageUrl?: string;
   totalQty: number;
   remainingQty: number;
   weight?: number; // RANDOM mode
   order?: number; // FIXED mode
   isFallback?: boolean;
+  drawCompletedAt?: Timestamp;
 }
 
 export interface StampTourConfig {
@@ -1095,6 +1097,7 @@ export interface StampTourProgress {
   completedAt?: Timestamp;
   rewardId?: string;
   rewardName?: string;
+  rewardLabel?: string;
   rewardStatus: StampTourRewardStatus;
   drawModeUsed?: StampTourDrawMode;
   lotteryStatus?: StampTourLotteryStatus;

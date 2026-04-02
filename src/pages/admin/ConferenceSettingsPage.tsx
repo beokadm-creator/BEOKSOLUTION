@@ -15,7 +15,14 @@ import RichTextEditor from '../../components/ui/RichTextEditor';
 import { ArrowDown, ArrowUp, Calendar, MapPin, Globe, FileText, ImageIcon, Save, Loader2, Info, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Skeleton } from '../../components/ui/skeleton';
-import { getStampMissionTargetCount, hasValidStampTourRewards, normalizeStampTourRewards } from '../../utils/stampTour';
+import {
+    getSelectableStampTourRewards,
+    getStampMissionTargetCount,
+    getStampTourRewardTitle,
+    hasValidStampTourRewards,
+    isStampTourRewardDrawCompleted,
+    normalizeStampTourRewards
+} from '../../utils/stampTour';
 
 interface ConferenceData {
     title: { ko: string; en: string };
@@ -61,12 +68,14 @@ type StampTourRewardFulfillmentMode = 'INSTANT' | 'LOTTERY';
 interface StampTourRewardForm {
     id: string;
     name: string;
+    label?: string;
     imageUrl?: string;
     totalQty: number;
     remainingQty: number;
     weight?: number;
     order?: number;
     isFallback?: boolean;
+    drawCompletedAt?: Timestamp;
 }
 
 interface StampTourConfigForm {
@@ -94,6 +103,7 @@ interface StampTourProgressRow {
     userName?: string;
     userOrg?: string;
     rewardName?: string;
+    rewardLabel?: string;
     rewardStatus: 'NONE' | 'REQUESTED' | 'REDEEMED';
     lotteryStatus?: 'PENDING' | 'SELECTED' | 'NOT_SELECTED';
     completedAt?: Timestamp;
@@ -141,8 +151,8 @@ const defaultStampTourConfig: StampTourConfigForm = {
     drawMode: 'PARTICIPANT',
     rewardFulfillmentMode: 'INSTANT',
     rewards: [],
-    soldOutMessage: '선착순 경품이 모두 소진되었습니다.',
-    completionMessage: '스탬프 투어를 완료했습니다. 상품 수령 버튼을 눌러주세요.'
+    soldOutMessage: '???????癒꺜?꿔꺂??씙??????黎앸럽??筌???????遺얘턁?????????遺얜??????????????????',
+    completionMessage: '??????熬곻퐢夷????????????됬뙴???용봾留???????꾩룆梨띰쭕??????????????怨몄）. ??????怨쀫뮝嶺? ???????????????????黎앸럽?녷④낮釉???????'
 };
 
 export default function ConferenceSettingsPage() {
@@ -194,10 +204,10 @@ export default function ConferenceSettingsPage() {
 
                     const toDateTimeLocalStr = (ts: unknown): string => {
                         if (ts && typeof ts === 'object' && 'toDate' in ts && typeof (ts as { toDate?: () => Date }).toDate === 'function') {
-                            // Firestore Timestamp → KST 기준 datetime-local 문자열로 변환
+                            // Firestore Timestamp ??KST ??????? datetime-local ?????????????????怨뺤른????
                             const d = (ts as { toDate: () => Date }).toDate();
-                            // KST(Asia/Seoul, UTC+9) 기준으로 변환
-                            const kstOffset = 9 * 60; // 분 단위
+                            // KST(Asia/Seoul, UTC+9) ????????????????????怨뺤른????
+                            const kstOffset = 9 * 60; // ?????????怨뺤꽑?
                             const localMs = d.getTime() + kstOffset * 60 * 1000;
                             const kstDate = new Date(localMs);
                             const year = kstDate.getUTCFullYear();
@@ -208,7 +218,7 @@ export default function ConferenceSettingsPage() {
                             return `${year}-${month}-${day}T${hours}:${minutes}`;
                         }
                         if (typeof ts === 'string' && ts.length >= 10) {
-                            // 날짜만 있는 문자열('YYYY-MM-DD')은 00:00으로 표기
+                            // ???????癒꺜??????????????????????'YYYY-MM-DD')?? 00:00??????????????쇰뮛?????
                             return ts.includes('T') ? ts.substring(0, 16) : `${ts}T00:00`;
                         }
                         return '';
@@ -363,13 +373,17 @@ export default function ConferenceSettingsPage() {
         stampTourConfig.completionRule,
         stampTourParticipantCount
     );
+    const selectableLotteryRewards = getSelectableStampTourRewards(
+        stampTourConfig.rewards,
+        { excludeCompletedDraws: true }
+    );
 
     const handleSave = async () => {
         if (!cid) return;
         setSaving(true);
         try {
             if (data.features.stampTourEnabled && stampTourParticipantCount === 0) {
-                toast.error('스탬프 투어 참여 부스를 먼저 1개 이상 연결해 주세요.');
+                toast.error('??????熬곻퐢夷??????????遺얘턁???????????????됱삩????? ?????븍툖???紐꽺?? 1????????????????ㅻ깹??????????諛몄カ?????????');
                 return;
             }
 
@@ -381,7 +395,7 @@ export default function ConferenceSettingsPage() {
                 data.features.stampTourEnabled &&
                 !hasValidStampTourRewards(sanitizedRewards, stampTourConfig.rewardMode)
             ) {
-                toast.error('보상 이름, 수량, 랜덤 가중치 또는 고정 순서를 확인해 주세요.');
+                toast.error('?????怨뺤른????녾낮?녔틦??????? ?????? ???饔낅떽????鶯ㅺ동???볥궚????????ル뭽???????熬곣벀嫄?????꾤뙴?????????????????????????耀붾굝?????????????????諛몄カ?????????');
                 return;
             }
 
@@ -390,22 +404,22 @@ export default function ConferenceSettingsPage() {
                 stampTourConfig.rewardFulfillmentMode === 'LOTTERY' &&
                 !stampTourConfig.lotteryScheduledAt
             ) {
-                toast.error('예약 추첨형은 추첨 예정 시각을 반드시 지정해야 합니다.');
+                toast.error('???????숈?????????袁④뎬????? ??????袁④뎬???????關?쒎첎?嫄???????????????諛몃마嶺뚮?????????????遺얘턁???????耀붾굝???????????????饔낅떽???????');
                 return;
             }
 
             const docRef = doc(db, 'conferences', cid);
 
-            // datetime-local 값(예: "2026-05-10T09:00")을 KST 기준 UTC Timestamp로 변환
-            // new Date("2026-05-10T09:00")는 로컬 타임존(KST) 기준으로 파싱됨
-            // 단, 브라우저가 다른 타임존에 있을 경우를 대비해 명시적으로 KST 오프셋 적용
+            // datetime-local ???? "2026-05-10T09:00")??KST ??????? UTC Timestamp???????怨뺤른????
+            // new Date("2026-05-10T09:00")?????????????????????繹먮냱???KST) ?????????????????????
+            // ?? ????????????????????ル뭽?? ????????뉖??????????繹먮냱????????關?쒎첎?嫄?????黎앸럽??筌????????????????????遺얘턁?????꿔꺂?????諛ㅻ?????????대첐?饔낅떽???嶺뚮슢??쾮??KST ?????????????????대첐??
             const parseDatetimeLocal = (dtStr: string): Date => {
-                // datetime-local 값은 타임존 정보 없음 → KST(UTC+9)로 명시 처리
-                // "2026-05-10T09:00" → UTC 2026-05-10T00:00:00Z 로 변환
+                // datetime-local ??????ル뭽??? ????????繹먮냱?????耀붾굝?????????????????살몖????KST(UTC+9)????遺얘턁?????꿔꺂?????諛ㅻ????遺얘턁????傭?끆???嶺뚮?猷볠꽴??
+                // "2026-05-10T09:00" ??UTC 2026-05-10T00:00:00Z ???????怨뺤른????
                 const [datePart, timePart] = dtStr.split('T');
                 const [year, month, day] = datePart.split('-').map(Number);
                 const [hour, minute] = (timePart || '00:00').split(':').map(Number);
-                // KST = UTC+9, 즉 UTC로 변환할 때 9시간 빼기
+                // KST = UTC+9, ??UTC???????怨뺤른????????????9??????????????깅즽??
                 return new Date(Date.UTC(year, month - 1, day, hour - 9, minute, 0, 0));
             };
 
@@ -455,7 +469,7 @@ export default function ConferenceSettingsPage() {
                 stampTourConfig.completionRule.type === 'COUNT' &&
                 normalizedRequiredStampCount !== (stampTourConfig.completionRule.requiredCount || 0)
             ) {
-                toast.success(`완료 기준을 참여 부스 수에 맞춰 ${normalizedRequiredStampCount}개로 보정했습니다.`);
+                toast.success(`??????꾩룆梨띰쭕?????????????遺얘턁???????????????됱삩???????饔낅떽??????雅???遺얘턁???????${normalizedRequiredStampCount}??????ル뭽??雅?퍔瑗?땟戮щ쐩??潁???????怨뺤른????????????????怨몄）.`);
             }
 
             toast.success("Conference settings saved successfully!");
@@ -477,7 +491,7 @@ export default function ConferenceSettingsPage() {
             return downloadURL;
         } catch (error) {
             console.error('Image upload error:', error);
-            toast.error('이미지 업로드 실패 / Image upload failed');
+            toast.error('??????遺얘턁????? ???????????????쇰뮝??/ Image upload failed');
             throw error;
         } finally {
             setUploadingImage(false);
@@ -500,12 +514,12 @@ export default function ConferenceSettingsPage() {
             const payload = response.data as { rewardName?: string };
             toast.success(
                 payload.rewardName
-                    ? `${row.userName || row.id} 추첨 완료: ${payload.rewardName}`
-                    : `${row.userName || row.id} 추첨이 완료되었습니다.`
+                    ? `${row.userName || row.id} ??????袁④뎬?????????꾩룆梨띰쭕?? ${payload.rewardName}`
+                    : `${row.userName || row.id} ??????袁④뎬??????????꾩룆梨띰쭕???????????`
             );
         } catch (error) {
             console.error('Admin reward draw failed:', error);
-            toast.error(error instanceof Error ? error.message : '관리자 추첨 처리에 실패했습니다.');
+            toast.error(error instanceof Error ? error.message : '??????⑤㈇????????좊틣??????????袁④뎬?????遺얘턁????傭?끆???嶺뚮?猷볠꽴???????????쇰뮝??????????????怨몄）.');
         } finally {
             setDrawingUserId(null);
         }
@@ -526,7 +540,7 @@ export default function ConferenceSettingsPage() {
                 ...prev,
                 welcomeMessageImages: [...(prev.welcomeMessageImages || []), url]
             }));
-            toast.success('이미지가 추가되었습니다 / Image added');
+            toast.success('??????遺얘턁???????????ル뭽?? ??????袁④뎬????????????/ Image added');
         } catch {
             // Error already handled in handleImageUpload
         }
@@ -544,7 +558,7 @@ export default function ConferenceSettingsPage() {
             <div className="flex h-[50vh] items-center justify-center">
                 <div className="text-center space-y-3">
                     <Info className="w-10 h-10 text-slate-300 mx-auto" />
-                    <p className="text-slate-500 font-medium">관리할 행사를 먼저 선택해주세요.</p>
+                    <p className="text-slate-500 font-medium">??????⑤㈇????????좊틣???欲꼲???듯렡???????롮쾸???????????븍툖???紐꽺?? ????鶯ㅺ동??????????轝꿸섣?????耀붾굝???????</p>
                 </div>
             </div>
         );
@@ -568,8 +582,8 @@ export default function ConferenceSettingsPage() {
             <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-slate-200 shadow-sm transition-all">
                 <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">행사 설정</h1>
-                        <p className="text-sm text-slate-500 font-medium mt-0.5">기본 정보 및 시각 자료 관리</p>
+                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Conference settings</h1>
+                        <p className="text-sm text-slate-500 font-medium mt-0.5">Basic conference information and visual settings</p>
                     </div>
                     <Button
                         onClick={handleSave}
@@ -580,12 +594,12 @@ export default function ConferenceSettingsPage() {
                         {saving ? (
                             <>
                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                저장 중...
+                                ??????..
                             </>
                         ) : (
                             <>
                                 <Save className="w-4 h-4 mr-2" />
-                                변경사항 저장
+                                ?????怨뺤른????黎앸럽??筌????????????
                             </>
                         )}
                     </Button>
@@ -601,11 +615,11 @@ export default function ConferenceSettingsPage() {
                             <div className="p-2.5 bg-blue-50 rounded-xl text-blue-600">
                                 <Calendar className="w-6 h-6" />
                             </div>
-                            <h2 className="text-xl font-bold text-slate-800">기본 정보</h2>
+                            <h2 className="text-xl font-bold text-slate-800">Basic info</h2>
                         </div>
                         <p className="text-slate-500 leading-relaxed text-sm">
-                            행사의 공식 명칭, 진행 기간, 그리고 슬로건을 설정합니다.<br />
-                            이 정보는 행사의 정체성을 나타내는 가장 중요한 데이터입니다.
+                            ??????롮쾸?????????????ㅿ폎?????遺얘턁?????꿔꺂?????諛ㅻ????筌뤾퍗猷? ??遺얘턁???????꿔꺂???????????????怨멸텛?? ??????ル뵁??????癲?????????袁ⓦ걤???꾩룆梨?????????살몖??????關?쒎첎?嫄?????饔낅떽???????<br />
+                            ????耀붾굝????????????????롮쾸????????耀붾굝????????????濡?씀?濾??μ떜媛??????????????????ル뭽?????????熬곣벀嫄?????꾤뙴??????????????????????????怨몄）.
                         </p>
                         <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 mt-4">
                             <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 mb-2">
@@ -622,29 +636,29 @@ export default function ConferenceSettingsPage() {
                         <Card className="border-0 shadow-sm ring-1 ring-slate-200 bg-white overflow-hidden rounded-2xl">
                             <CardContent className="p-6 md:p-8 space-y-8">
                                 <BilingualInput
-                                    label="컨퍼런스 제목 (Title)"
+                                    label="??????????????????饔낅떽??????猷고ｇ땟???(Title)"
                                     valueKO={data.title.ko}
                                     valueEN={data.title.en}
                                     onChangeKO={(value) => setData(prev => ({ ...prev, title: { ...prev.title, ko: value } }))}
                                     onChangeEN={(value) => setData(prev => ({ ...prev, title: { ...prev.title, en: value } }))}
-                                    placeholderKO="예: 제 35회 춘계학술대회"
+                                    placeholderKO="e.g. 2026 Spring Conference"
                                     placeholderEN="e.g. The 35th Spring Conference"
                                     required
                                 />
 
                                 <div className="space-y-3">
-                                    <Label className="text-base font-medium text-slate-700">부제 / 슬로건 (Subtitle)</Label>
+                                    <Label className="text-base font-medium text-slate-700">??????됱삩????/ ???????袁ⓦ걤???꾩룆梨???(Subtitle)</Label>
                                     <Input
                                         value={data.subtitle || ''}
                                         onChange={(e) => setData(prev => ({ ...prev, subtitle: e.target.value }))}
-                                        placeholder="예: Innovating the Future of Medicine"
+                                        placeholder="?? Innovating the Future of Medicine"
                                         className="h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-lg text-base"
                                     />
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-3">
-                                        <Label className="text-base font-medium text-slate-700">시작 일시 (Start Date & Time)</Label>
+                                        <Label className="text-base font-medium text-slate-700">???饔낅떽????鶯ㅺ동???嫄???????롮쾸?椰???⑤８理귡땡?(Start Date & Time)</Label>
                                         <Input
                                             type="datetime-local"
                                             value={data.dates.start}
@@ -653,7 +667,7 @@ export default function ConferenceSettingsPage() {
                                         />
                                     </div>
                                     <div className="space-y-3">
-                                        <Label className="text-base font-medium text-slate-700">종료 일시 (End Date & Time)</Label>
+                                        <Label className="text-base font-medium text-slate-700">????????깅뼂????????롮쾸?椰???⑤８理귡땡?(End Date & Time)</Label>
                                         <Input
                                             type="datetime-local"
                                             value={data.dates.end}
@@ -676,11 +690,11 @@ export default function ConferenceSettingsPage() {
                             <div className="p-2.5 bg-purple-50 rounded-xl text-purple-600">
                                 <FileText className="w-6 h-6" />
                             </div>
-                            <h2 className="text-xl font-bold text-slate-800">초록 접수 기간</h2>
+                            <h2 className="text-xl font-bold text-slate-800">Abstract deadlines</h2>
                         </div>
                         <p className="text-slate-500 leading-relaxed text-sm">
-                            초록 접수 및 수정 기간을 설정합니다.<br />
-                            기간이 지나면 사용자는 초록을 제출하거나 수정할 수 없습니다.
+                            ????????怨뚮뼺?怨뺥닠??????????????怨뚮뼺?됰뗀?????????????怨멸텛???????關?쒎첎?嫄?????饔낅떽???????<br />
+                            ??????????怨멸텛?????遺얘턁???????????????????????????怨뚮뼺?怨뺥닠?????饔낅떽???????????????????怨뚮뼺?됰뗀????????????繹먮굞??????????怨몄）.
                         </p>
                     </div>
 
@@ -689,7 +703,7 @@ export default function ConferenceSettingsPage() {
                             <CardContent className="p-6 md:p-8 space-y-8">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-3">
-                                        <Label className="text-base font-medium text-slate-700">신규 접수 마감 일시 (Submission Deadline)</Label>
+                                        <Label className="text-base font-medium text-slate-700">?????壤굿?????????????遺얘턁????????筌뤾퍓?????????롮쾸?椰???⑤８理귡땡?(Submission Deadline)</Label>
                                         <Input
                                             type="datetime-local"
                                             value={data.abstractDeadlines.submissionDeadline || ''}
@@ -697,11 +711,11 @@ export default function ConferenceSettingsPage() {
                                             className="h-11 border-slate-200 rounded-lg"
                                         />
                                         <p className="text-xs text-slate-400 mt-1">
-                                            이 시간까지 새로운 초록을 제출할 수 있습니다.
+                                            ???????????ㅿ폎???ш끽維뽳쭩??? ???????????????怨뚮뼺?怨뺥닠?????饔낅떽??????????????????????怨몄）.
                                         </p>
                                     </div>
                                     <div className="space-y-3">
-                                        <Label className="text-base font-medium text-slate-700">수정 마감 일시 (Edit Deadline)</Label>
+                                        <Label className="text-base font-medium text-slate-700">?????怨뚮뼺?됰뗀?????遺얘턁????????筌뤾퍓?????????롮쾸?椰???⑤８理귡땡?(Edit Deadline)</Label>
                                         <Input
                                             type="datetime-local"
                                             value={data.abstractDeadlines.editDeadline || ''}
@@ -709,7 +723,7 @@ export default function ConferenceSettingsPage() {
                                             className="h-11 border-slate-200 rounded-lg"
                                         />
                                         <p className="text-xs text-slate-400 mt-1">
-                                            이 시간까지 기존 초록을 수정할 수 있습니다.
+                                            ???????????ㅿ폎???ш끽維뽳쭩??? ????????????????怨뚮뼺?怨뺥닠???????怨뚮뼺?됰뗀???????????????????怨몄）.
                                         </p>
                                     </div>
                                 </div>
@@ -727,11 +741,11 @@ export default function ConferenceSettingsPage() {
                             <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600">
                                 <Info className="w-6 h-6" />
                             </div>
-                            <h2 className="text-xl font-bold text-slate-800">부가 기능</h2>
+                            <h2 className="text-xl font-bold text-slate-800">Feature toggles</h2>
                         </div>
                         <p className="text-slate-500 leading-relaxed text-sm">
-                            학술대회별로 방명록과 스탬프투어 사용 여부를 설정합니다.<br />
-                            방명록은 기본 설정이며, 스탬프투어는 별도 기획에 맞춰 필요 시 활성화합니다.
+                            ?????????놁졁???????????????諛몃마??潁뺛깺苡????꿔꺂????용끏???熬곣뫖利당춯???????猷멥럸?????????熬곻퐢夷???????????▲뀋????????????????關?쒎첎?嫄?????饔낅떽???????<br />
+                            ?????諛몃마??潁뺛깺苡????꿔꺂????용끏???熬곣뫖利당춯????? ????????????關?쒎첎?嫄??????? ??????熬곻퐢夷???????????▲뀋???????????怨뺤른????????????????遺얘턁?????????????꾩룆梨띰쭕?????????????????????????怨몄）.
                         </p>
                     </div>
 
@@ -740,8 +754,8 @@ export default function ConferenceSettingsPage() {
                             <CardContent className="p-6 md:p-8 space-y-6">
                                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
                                     <div className="space-y-0.5">
-                                        <Label className="text-sm font-bold text-slate-700">방명록 사용</Label>
-                                        <p className="text-xs text-slate-500">참가자 동의 기반으로 방명록을 수집합니다. 기본 설정은 ON입니다.</p>
+                                        <Label className="text-sm font-bold text-slate-700">Guestbook enabled</Label>
+                                        <p className="text-xs text-slate-500">??遺얘턁???????ㅼ뒧??????????????곕??? ??????????????????????????諛몃마??潁뺛깺苡????꿔꺂????용끏???熬곣뫖利당춯??????????????怨뚮뼺?됰뗀?????饔낅떽??????? ????????????關?쒎첎?嫄???? ON??????嶺?罹??</p>
                                     </div>
                                     <Switch
                                         checked={data.features.guestbookEnabled}
@@ -755,8 +769,8 @@ export default function ConferenceSettingsPage() {
 
                                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
                                     <div className="space-y-0.5">
-                                        <Label className="text-sm font-bold text-slate-700">스탬프투어 사용</Label>
-                                        <p className="text-xs text-slate-500">별도 서비스 기획이 준비된 경우에만 활성화하세요.</p>
+                                        <Label className="text-sm font-bold text-slate-700">Stamp tour enabled</Label>
+                                        <p className="text-xs text-slate-500">?????怨뺤른????????饔낅떽?????????筌????????????????熬곣벀嫄?癲ル슣?????????????????黎앸럽??筌?????????????????????耀붾굝???????</p>
                                     </div>
                                     <Switch
                                         checked={data.features.stampTourEnabled}
@@ -783,14 +797,14 @@ export default function ConferenceSettingsPage() {
                                     <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600">
                                         <Info className="w-6 h-6" />
                                     </div>
-                                    <h2 className="text-xl font-bold text-slate-800">스탬프투어 상세 설정</h2>
+                                    <h2 className="text-xl font-bold text-slate-800">Stamp tour settings</h2>
                                 </div>
                                 <p className="text-slate-500 leading-relaxed text-sm">
-                                    디지털 명찰에 표시되는 스탬프투어 규칙과 보상 정책을 설정합니다.<br />
-                                    완료 조건과 부스 순서, 상품 분배 규칙을 신중하게 확인하세요.
+                                    ???????遺얘턁?????꿔꺂?????諛ㅻ????紐꾨였????????????癲됱빖?????猷몃룯??????????熬곻퐢夷???????????▲뀋????????????猷고????????怨뺤른????녾낮?녔틦????耀붾굝?????????????關?쒎첎?嫄?????饔낅떽???????<br />
+                                    ??????꾩룆梨띰쭕???????Β??????????????????됱삩?????????? ??????怨쀫뮝嶺? ?????????щ쫫???????????????????癒꺜?????????곕춴????耀붾굝????????????饔낅떽???壤굿??곸읆???
                                 </p>
                                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                    <div className="text-xs font-semibold text-slate-500 mb-1">종료 시각 (KST)</div>
+                                    <div className="text-xs font-semibold text-slate-500 mb-1">????????깅뼂????????(KST)</div>
                                     <div className="text-sm font-bold text-slate-800">{formatKstTimestamp(stampTourConfig.endAt)}</div>
                                 </div>
                             </div>
@@ -800,7 +814,7 @@ export default function ConferenceSettingsPage() {
                                     <CardContent className="p-6 md:p-8 space-y-6">
                                         {/* Completion Rule */}
                                         <div className="space-y-2">
-                                            <Label className="text-base font-medium text-slate-700">완료 조건</Label>
+                                            <Label className="text-base font-medium text-slate-700">Completion rule</Label>
                                             <div className="flex items-center gap-4">
                                                 <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                                                     <input
@@ -812,7 +826,7 @@ export default function ConferenceSettingsPage() {
                                                             completionRule: { ...prev.completionRule, type: 'COUNT' }
                                                         }))}
                                                     />
-                                                    지정 개수 충족
+                                                    ??遺얘턁?????????????ル뭽???????棺堉?뤃??믡굦??????
                                                 </label>
                                                 <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                                                     <input
@@ -824,7 +838,7 @@ export default function ConferenceSettingsPage() {
                                                             completionRule: { ...prev.completionRule, type: 'ALL' }
                                                         }))}
                                                     />
-                                                    전체 부스 완료
+                                                    ??????꾩룆梨띰쭕????????됱삩??????????꾩룆梨띰쭕??
                                                 </label>
                                             </div>
                                             {stampTourConfig.completionRule.type === 'COUNT' && (
@@ -842,7 +856,7 @@ export default function ConferenceSettingsPage() {
                                                         }))}
                                                     />
                                                     <p className="mt-2 text-xs text-slate-500">
-                                                        참여 부스 {stampTourParticipantCount}개 기준으로 저장 시 최대 {Math.max(stampTourParticipantCount, 1)}개까지 맞춰집니다.
+                                                        ??遺얘턁???????????????됱삩????{stampTourParticipantCount}?????????????????????????遺얘턁??????傭? {Math.max(stampTourParticipantCount, 1)}??????ル뭽??????? ??遺얘턁???????????????????
                                                     </p>
                                                 </div>
                                             )}
@@ -850,7 +864,7 @@ export default function ConferenceSettingsPage() {
 
                                         {/* Booth Order */}
                                         <div className="space-y-2">
-                                            <Label className="text-base font-medium text-slate-700">부스 노출 순서</Label>
+                                            <Label className="text-base font-medium text-slate-700">Booth display order</Label>
                                             <select
                                                 value={stampTourConfig.boothOrderMode}
                                                 onChange={(e) => setStampTourConfig(prev => ({
@@ -859,8 +873,8 @@ export default function ConferenceSettingsPage() {
                                                 }))}
                                                 className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                                             >
-                                                <option value="SPONSOR_ORDER">스폰서 순서 사용</option>
-                                                <option value="CUSTOM">직접 순서 지정</option>
+                                                <option value="SPONSOR_ORDER">Use sponsor order</option>
+                                                <option value="CUSTOM">Use custom order</option>
                                             </select>
 
                                             {stampTourConfig.boothOrderMode === 'CUSTOM' && (
@@ -925,7 +939,7 @@ export default function ConferenceSettingsPage() {
 
                                         {/* Reward Mode */}
                                         <div className="space-y-2">
-                                            <Label className="text-base font-medium text-slate-700">상품 분배 방식</Label>
+                                            <Label className="text-base font-medium text-slate-700">Reward distribution mode</Label>
                                             <select
                                                 value={stampTourConfig.rewardMode}
                                                 onChange={(e) => setStampTourConfig(prev => ({
@@ -934,16 +948,16 @@ export default function ConferenceSettingsPage() {
                                                 }))}
                                                 className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                                             >
-                                                <option value="RANDOM">랜덤 지급</option>
-                                                <option value="FIXED">지정 순서 지급</option>
+                                                <option value="RANDOM">Random draw</option>
+                                                <option value="FIXED">Fixed order</option>
                                             </select>
                                             <p className="text-xs text-slate-500">
-                                                랜덤은 남은 재고만 대상으로 가중치 추첨하며, 일반 상품 소진 시 대체용 상품만 남아 있으면 그 목록에서 이어서 지급됩니다.
+                                                ???饔낅떽????鶯ㅺ동???볥궚??? ??? ????????????????대첐?饔낅떽???嶺뚮슢??쾮????????ル뭽???????熬곣벀嫄?????꾤뙴?????????袁④뎬?????? ????????????????怨쀫뮝嶺? ???????????遺얘턁?????????????怨쀫뮝嶺????????????關?쒎첎?嫄?濡ろ뜇?遺븍뙕???????遺얘턁?????????遺얜??熬곣뫖釉멧벧猿뗪섭鴉?????????????繹먮굞??????遺얘턁??????????援쏂굜???饔낅떽?????????誘⑦?????????怨몄）.
                                             </p>
                                         </div>
 
                                         <div className="space-y-2">
-                                            <Label className="text-base font-medium text-slate-700">추첨 진행 주체</Label>
+                                            <Label className="text-base font-medium text-slate-700">Who can run the draw</Label>
                                             <select
                                                 value={stampTourConfig.drawMode}
                                                 onChange={(e) => setStampTourConfig(prev => ({
@@ -952,17 +966,17 @@ export default function ConferenceSettingsPage() {
                                                 }))}
                                                 className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                                             >
-                                                <option value="PARTICIPANT">참가자 디지털명찰에서 추첨</option>
-                                                <option value="ADMIN">관리자 화면에서만 추첨</option>
-                                                <option value="BOTH">참가자/관리자 모두 가능</option>
+                                                <option value="PARTICIPANT">Participant device only</option>
+                                                <option value="ADMIN">Admin screen only</option>
+                                                <option value="BOTH">Participant and admin</option>
                                             </select>
                                             <p className="text-xs text-slate-500">
-                                                전광판이나 운영 화면에서 관리자가 직접 당첨을 확정하려면 관리자 또는 모두 가능으로 설정하세요.
+                                                ?????????????????????????筌뤾퍓愿????댁삩? ????濾?鶯????????????⑤㈇????????좊틣?????꿔꺂????븐슦????????쎛 ??遺얘턁????????????????耀붾굝??????????????곗뒭??????????⑤㈇????????좊틣???????????遺얘턁?????????遺얜??????????ル뭽?????????????關?쒎첎?嫄?????饔낅떽???壤굿??곸읆???
                                             </p>
                                         </div>
 
                                         <div className="space-y-2">
-                                            <Label className="text-base font-medium text-slate-700">보상 처리 기준</Label>
+                                            <Label className="text-base font-medium text-slate-700">?????怨뺤른????녾낮?녔틦????遺얘턁????傭?끆???嶺뚮?猷볠꽴?????????</Label>
                                             <select
                                                 value={stampTourConfig.rewardFulfillmentMode}
                                                 onChange={(e) => setStampTourConfig(prev => ({
@@ -971,17 +985,17 @@ export default function ConferenceSettingsPage() {
                                                 }))}
                                                 className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                                             >
-                                                <option value="INSTANT">미션 완료 즉시 수령 가능</option>
-                                                <option value="LOTTERY">관리자 지정 시각 일괄 추첨</option>
+                                                <option value="INSTANT">Instant reward</option>
+                                                <option value="LOTTERY">Scheduled lottery</option>
                                             </select>
                                             <p className="text-xs text-slate-500">
-                                                즉시 수령형은 완료 즉시 보상 요청이 가능하고, 예약 추첨형은 마감 후 완료자 전체를 대상으로 한 번에 추첨합니다.
+                                                ??遺얘턁???鶯ㅺ동???⑥ャ걖?꿔꺂????용끏??????????? ??????꾩룆梨띰쭕????遺얘턁???鶯ㅺ동???⑥ャ걖?꿔꺂????용끏????????怨뺤른????녾낮?녔틦??????濾??????????ル뭽????????γ볥걙????? ???????숈?????????袁④뎬????? ??遺얘턁????????筌뤾퍓???????????꾩룆梨띰쭕?????????꾩룆梨띰쭕?????????????대첐?饔낅떽???嶺뚮슢??쾮??????????????살퓢????????袁④뎬?????饔낅떽???????
                                             </p>
                                         </div>
 
                                         {stampTourConfig.rewardFulfillmentMode === 'LOTTERY' && (
                                             <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                                                <Label className="text-base font-medium text-slate-700">예약 추첨 시각</Label>
+                                                <Label className="text-base font-medium text-slate-700">Lottery schedule</Label>
                                                 <Input
                                                     type="datetime-local"
                                                     value={stampTourConfig.lotteryScheduledAt ? (() => {
@@ -1010,11 +1024,11 @@ export default function ConferenceSettingsPage() {
                                                     }}
                                                 />
                                                 <p className="text-xs text-slate-500">
-                                                    이 시각 전에는 누구도 추첨할 수 없고, 시각이 지나면 관리자만 전체 완료자를 대상으로 일괄 추첨할 수 있습니다.
+                                                    ??????????????꾩룆梨띰쭕??????????????????????袁④뎬????????????????? ?????????遺얘턁?????????????????⑤㈇????????좊틣???????????????꾩룆梨띰쭕????????꾩룆梨띰쭕???? ??????????대첐?饔낅떽???嶺뚮슢??쾮??????????????袁④뎬???????????????????怨몄）.
                                                 </p>
                                                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white px-3 py-3 ring-1 ring-slate-200">
                                                     <div className="text-sm text-slate-600">
-                                                        관리자 추첨 전용 화면에서 단수 추첨, 복수 추첨, 전체 추첨, 데모 리허설을 실행할 수 있습니다.
+                                                        ??????⑤㈇????????좊틣??????????袁④뎬?????????꾩룆梨띰쭕??????濾?鶯?????????????????袁④뎬??? ?????怨뺤른?癲ル슢???????????袁④뎬??? ??????꾩룆梨띰쭕????????袁④뎬??? ????????낆┨????????좊틣???????關?쒎첎?嫄????????????????????????????怨몄）.
                                                     </div>
                                                     <Button
                                                         type="button"
@@ -1022,8 +1036,7 @@ export default function ConferenceSettingsPage() {
                                                         size="sm"
                                                         onClick={() => void handleRunLottery()}
                                                     >
-                                                        관리자 추첨 화면 바로가기
-                                                    </Button>
+                                                        ??????⑤㈇????????좊틣??????????袁④뎬???????濾?鶯???????諛몃마嶺뚮??????????袁ⓦ걤???꾩룆梨?????                                                    </Button>
                                                 </div>
                                             </div>
                                         )}
@@ -1031,7 +1044,7 @@ export default function ConferenceSettingsPage() {
                                         {/* Rewards */}
                                         <div className="space-y-3">
                                             <div className="flex items-center justify-between">
-                                                <Label className="text-base font-medium text-slate-700">상품 목록</Label>
+                                                <Label className="text-base font-medium text-slate-700">Reward list</Label>
                                                 <Button
                                                     type="button"
                                                     variant="outline"
@@ -1040,6 +1053,7 @@ export default function ConferenceSettingsPage() {
                                                         const newReward: StampTourRewardForm = {
                                                             id: `reward_${Date.now()}`,
                                                             name: '',
+                                                            label: '',
                                                             totalQty: 0,
                                                             remainingQty: 0,
                                                             weight: stampTourConfig.rewardMode === 'RANDOM' ? 1 : undefined,
@@ -1051,22 +1065,51 @@ export default function ConferenceSettingsPage() {
                                                         }));
                                                     }}
                                                 >
-                                                    상품 추가
+                                                    ??????怨쀫뮝嶺? ??????袁④뎬??
                                                 </Button>
                                             </div>
 
                                             {stampTourConfig.rewards.length === 0 ? (
-                                                <div className="text-sm text-slate-400">등록된 상품이 없습니다.</div>
+                                                <div className="text-sm text-slate-400">?????濡?씀?濾????ㅼ굡??????????怨쀫뮝嶺?????????繹먮굞??????????怨몄）.</div>
                                             ) : (
                                                 <div className="space-y-3">
                                                     {stampTourConfig.rewards.map((reward, idx) => (
                                                         <div key={reward.id} className="border border-slate-200 rounded-xl p-4 space-y-3">
-                                                            <div className="grid grid-cols-1 gap-3 text-xs font-semibold text-slate-500 md:grid-cols-3">
-                                                                <div>상품명</div>
-                                                                <div>총 수량: 처음 준비한 전체 개수</div>
-                                                                <div>현재 남은 수량: 지금 추첨 가능한 개수</div>
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <div>
+                                                                    <div className="text-sm font-semibold text-slate-700">
+                                                                        {getStampTourRewardTitle(reward) || `Reward ${idx + 1}`}
+                                                                    </div>
+                                                                    {isStampTourRewardDrawCompleted(reward) && (
+                                                                        <div className="mt-1 text-xs font-semibold text-rose-500">
+                                                                            This reward is locked because its draw has already finished.
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className="text-xs font-semibold text-slate-500">
+                                                                    {selectableLotteryRewards.some((item) => item.id === reward.id)
+                                                                        ? 'Selectable'
+                                                                        : 'Locked'}
+                                                                </div>
                                                             </div>
-                                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                            <div className="grid grid-cols-1 gap-3 text-xs font-semibold text-slate-500 md:grid-cols-4">
+                                                                <div>Rank label</div>
+                                                                <div>Reward name</div>
+                                                                <div>Total quantity: initial stock prepared for this reward</div>
+                                                                <div>Remaining quantity: stock still available for drawing</div>
+                                                            </div>
+                                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                                                <Input
+                                                                    value={reward.label || ''}
+                                                                    onChange={(e) => {
+                                                                        const value = e.target.value;
+                                                                        setStampTourConfig(prev => ({
+                                                                            ...prev,
+                                                                            rewards: prev.rewards.map((r, i) => i === idx ? { ...r, label: value } : r)
+                                                                        }));
+                                                                    }}
+                                                                    placeholder="e.g. 1st prize"
+                                                                />
                                                                 <Input
                                                                     value={reward.name}
                                                                     onChange={(e) => {
@@ -1076,7 +1119,7 @@ export default function ConferenceSettingsPage() {
                                                                             rewards: prev.rewards.map((r, i) => i === idx ? { ...r, name: value } : r)
                                                                         }));
                                                                     }}
-                                                                    placeholder="상품명"
+                                                                    placeholder="Reward name"
                                                                 />
                                                                 <Input
                                                                     type="number"
@@ -1093,7 +1136,7 @@ export default function ConferenceSettingsPage() {
                                                                             } : r)
                                                                         }));
                                                                     }}
-                                                                    placeholder="수량"
+                                                                    placeholder="Image URL (optional)"
                                                                 />
                                                                 <Input
                                                                     type="number"
@@ -1106,13 +1149,13 @@ export default function ConferenceSettingsPage() {
                                                                             rewards: prev.rewards.map((r, i) => i === idx ? { ...r, remainingQty: value } : r)
                                                                         }));
                                                                     }}
-                                                                    placeholder="잔여 수량"
+                                                                        placeholder="Weight"
                                                                 />
                                                             </div>
 
                                                             <p className="text-xs text-slate-500">
-                                                                왼쪽 숫자는 총 수량, 오른쪽 숫자는 현재 남은 수량입니다.
-                                                                이미 일부를 지급했다면 오른쪽 현재 남은 수량만 실제 재고에 맞게 조정해 주세요.
+                                                                ??????????勇??????????????? ????????뉖????釉먮폁????????????????꾩룆梨띰쭕????? ???????????嶺?罹??
+                                                                ???? ???????遺얘턁??????????援쏂굜???饔낅떽????熬곣뫁커??熬곣벀?????????ル???????????뉖????釉먮폁??????????꾩룆梨띰쭕????? ??????꿔꺂???癰귨샨??????關?쒎첎?嫄?濚밸쮦??????????遺얘턁???????????????Β?????????????諛몄カ?????????
                                                             </p>
 
                                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -1125,7 +1168,7 @@ export default function ConferenceSettingsPage() {
                                                                             rewards: prev.rewards.map((r, i) => i === idx ? { ...r, imageUrl: value } : r)
                                                                         }));
                                                                     }}
-                                                                    placeholder="이미지 URL (선택)"
+                                                                    placeholder="??????遺얘턁????? URL (????鶯ㅺ동???????"
                                                                 />
                                                                 {stampTourConfig.rewardMode === 'RANDOM' ? (
                                                                     <Input
@@ -1139,7 +1182,7 @@ export default function ConferenceSettingsPage() {
                                                                                 rewards: prev.rewards.map((r, i) => i === idx ? { ...r, weight: value } : r)
                                                                             }));
                                                                         }}
-                                                                        placeholder="가중치"
+                                                                        placeholder="Display order"
                                                                     />
                                                                 ) : (
                                                                     <Input
@@ -1153,7 +1196,7 @@ export default function ConferenceSettingsPage() {
                                                                                 rewards: prev.rewards.map((r, i) => i === idx ? { ...r, order: value } : r)
                                                                             }));
                                                                         }}
-                                                                        placeholder="지급 순서"
+                                                                        placeholder="Sold out message"
                                                                     />
                                                                 )}
                                                                 <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
@@ -1168,7 +1211,7 @@ export default function ConferenceSettingsPage() {
                                                                             }));
                                                                         }}
                                                                     />
-                                                                    소진 대체용
+                                                                    ?????????遺얘턁???????
                                                                 </label>
                                                             </div>
 
@@ -1184,7 +1227,7 @@ export default function ConferenceSettingsPage() {
                                                                         }));
                                                                     }}
                                                                 >
-                                                                    삭제
+                                                                    ????
                                                                 </Button>
                                                             </div>
                                                         </div>
@@ -1195,17 +1238,17 @@ export default function ConferenceSettingsPage() {
 
                                         {/* Messages */}
                                         <div className="space-y-3">
-                                            <Label className="text-base font-medium text-slate-700">완료 메시지</Label>
+                                            <Label className="text-base font-medium text-slate-700">??????꾩룆梨띰쭕????遺얘턁??????????</Label>
                                             <Input
                                                 value={stampTourConfig.completionMessage}
                                                 onChange={(e) => setStampTourConfig(prev => ({ ...prev, completionMessage: e.target.value }))}
-                                                placeholder="완료 시 노출 메시지"
+                                                placeholder="??????꾩룆梨띰쭕??????耀붾굝?????????遺얘턁??????????"
                                             />
-                                            <Label className="text-base font-medium text-slate-700">소진 메시지</Label>
+                                            <Label className="text-base font-medium text-slate-700">???????遺얘턁??????????</Label>
                                             <Input
                                                 value={stampTourConfig.soldOutMessage}
                                                 onChange={(e) => setStampTourConfig(prev => ({ ...prev, soldOutMessage: e.target.value }))}
-                                                placeholder="소진 시 노출 메시지"
+                                                placeholder="?????????耀붾굝?????????遺얘턁??????????"
                                             />
                                         </div>
                                     </CardContent>
@@ -1215,9 +1258,9 @@ export default function ConferenceSettingsPage() {
                                 <Card className="border-0 shadow-sm ring-1 ring-slate-200 bg-white overflow-hidden rounded-2xl">
                                     <CardContent className="p-6 md:p-8 space-y-4">
                                         <div className="flex items-center justify-between">
-                                            <h3 className="text-lg font-bold text-slate-800">실시간 진행 현황</h3>
+                                            <h3 className="text-lg font-bold text-slate-800">Live status</h3>
                                             <div className="text-xs text-slate-500 font-semibold">
-                                                완료 {stampTourProgress.filter(p => p.isCompleted).length}건
+                                                ??????꾩룆梨띰쭕??{stampTourProgress.filter(p => p.isCompleted).length}??
                                             </div>
                                         </div>
 
@@ -1228,13 +1271,13 @@ export default function ConferenceSettingsPage() {
                                                     size="sm"
                                                     onClick={() => void handleRunLottery()}
                                                 >
-                                                    추첨 전용 화면 열기
+                                                    ??????袁④뎬?????????꾩룆梨띰쭕??????濾?鶯???????μ떜媛?걫??곸쁼??
                                                 </Button>
                                             </div>
                                         )}
 
                                         {stampTourProgress.length === 0 ? (
-                                            <div className="text-sm text-slate-400">진행 데이터가 없습니다.</div>
+                                            <div className="text-sm text-slate-400">??遺얘턁???????꿔꺂??????????????? ??????繹먮굞??????????怨몄）.</div>
                                         ) : (
                                             <div className="space-y-2">
                                                 {stampTourProgress.map((row) => (
@@ -1242,7 +1285,7 @@ export default function ConferenceSettingsPage() {
                                                         <div className="text-sm">
                                                             <div className="font-semibold text-slate-700">{row.userName || row.userId}</div>
                                                             <div className="text-xs text-slate-500">{row.userOrg || '-'}</div>
-                                                            <div className="text-xs text-slate-500">{row.rewardName || '상품 미정'}</div>
+                                                            <div className="text-xs text-slate-500">{row.rewardLabel ? `${row.rewardLabel}${row.rewardName ? ` - ${row.rewardName}` : ""}` : row.rewardName || "Reward pending"}</div>
                                                         </div>
                                                         <div className="flex items-center gap-2">
                                                             <span className={`text-xs px-2 py-1 rounded-full font-semibold ${(row.rewardStatus || 'NONE') === 'REDEEMED' ? 'bg-emerald-100 text-emerald-700' : (row.rewardStatus || 'NONE') === 'REQUESTED' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
@@ -1255,7 +1298,7 @@ export default function ConferenceSettingsPage() {
                                                                     onClick={() => void handleAdminRewardDraw(row)}
                                                                     disabled={drawingUserId === row.id}
                                                                 >
-                                                                    {drawingUserId === row.id ? '추첨 중...' : '관리자 추첨'}
+                                                                    {drawingUserId === row.id ? "Drawing..." : "Admin draw"}
                                                                 </Button>
                                                             )}
                                                             {(row.rewardStatus || 'NONE') === 'REQUESTED' && (
@@ -1270,7 +1313,7 @@ export default function ConferenceSettingsPage() {
                                                                         });
                                                                     }}
                                                                 >
-                                                                    수령 완료
+                                                                    ????????????꾩룆梨띰쭕??
                                                                 </Button>
                                                             )}
                                                         </div>
@@ -1294,11 +1337,11 @@ export default function ConferenceSettingsPage() {
                             <div className="p-2.5 bg-red-50 rounded-xl text-red-600">
                                 <MapPin className="w-6 h-6" />
                             </div>
-                            <h2 className="text-xl font-bold text-slate-800">장소 정보</h2>
+                            <h2 className="text-xl font-bold text-slate-800">Venue info</h2>
                         </div>
                         <p className="text-slate-500 leading-relaxed text-sm">
-                            오프라인 행사가 개최되는 장소 정보를 입력합니다. <br />
-                            지도 링크는 네이버 지도나 구글 맵의 공유 링크를 사용하는 것이 좋습니다.
+                            ?????????????롮쾸?椰?????????롮쾸??????????ル뭽?? ??????ル뭽???????癲됱빖?????猷몃룯??????????耀붾굝??????????????????⑤뜪輿???饔낅떽??????? <br />
+                            ??遺얘턁?????????遺얘턁????????沅걔?輿삳뿫遊????????關?쒎첎?嫄??怨몄겮嶺????遺얘턁?????????????곕섯????? ??遺얘턁???????????????ㅿ폎??? ??遺얘턁????????沅걔?輿삳뿫遊????筌뚯슜留???????????癲됱빖?????猷몃룯??????黎앸럽??筌????????????????????怨몄）.
                         </p>
                     </div>
 
@@ -1306,7 +1349,7 @@ export default function ConferenceSettingsPage() {
                         <Card className="border-0 shadow-sm ring-1 ring-slate-200 bg-white overflow-hidden rounded-2xl">
                             <CardContent className="p-6 md:p-8 space-y-8">
                                 <BilingualInput
-                                    label="장소명 (Venue Name)"
+                                    label="?????????(Venue Name)"
                                     valueKO={data.venue.name.ko}
                                     valueEN={data.venue.name.en}
                                     onChangeKO={(value) => setData(prev => ({
@@ -1317,13 +1360,13 @@ export default function ConferenceSettingsPage() {
                                         ...prev,
                                         venue: { ...prev.venue, name: { ...prev.venue.name, en: value } }
                                     }))}
-                                    placeholderKO="예: 코엑스 그랜드볼룸"
+                                    placeholderKO="e.g. COEX Grand Ballroom"
                                     placeholderEN="e.g. COEX Grand Ballroom"
                                     required
                                 />
 
                                 <BilingualInput
-                                    label="전체 주소 (Address)"
+                                    label="??????꾩룆梨띰쭕????????諛몄カ???(Address)"
                                     valueKO={data.venue.address.ko}
                                     valueEN={data.venue.address.en}
                                     onChangeKO={(value) => setData(prev => ({
@@ -1334,13 +1377,13 @@ export default function ConferenceSettingsPage() {
                                         ...prev,
                                         venue: { ...prev.venue, address: { ...prev.venue.address, en: value } }
                                     }))}
-                                    placeholderKO="예: 서울특별시 강남구 영동대로 513"
+                                    placeholderKO="?? ???饔낅떽???????????????밸븶筌믩끃??獄???????????ル뭽??癲??壤굿??⑸츅??????⑤슦留????????濚밸Ŧ援??????513"
                                     placeholderEN="Full Address"
                                     required
                                 />
 
                                 <div className="space-y-3">
-                                    <Label className="text-base font-medium text-slate-700">지도 링크 URL</Label>
+                                    <Label className="text-base font-medium text-slate-700">??遺얘턁?????????遺얘턁????????沅걔?輿삳뿫遊???URL</Label>
                                     <div className="relative">
                                         <Globe className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
                                         <Input
@@ -1351,12 +1394,12 @@ export default function ConferenceSettingsPage() {
                                         />
                                     </div>
                                     <p className="text-xs text-slate-500 ml-1">
-                                        * 참석자들이 쉽게 찾아올 수 있도록 정확한 지도 URL을 입력해주세요.
+                                        * ??遺얘턁????????????????????獄쏅챶留????????遺얘턁??????????????????????紐꾨첐????耀붾굝???????????곕츧?????遺얘턁???????URL??????????⑤뜪輿????轝꿸섣?????耀붾굝???????
                                     </p>
                                 </div>
 
                                 <div className="space-y-3">
-                                    <Label className="text-base font-medium text-slate-700">구글 지도 임베드 URL (Google Map Embed URL)</Label>
+                                    <Label className="text-base font-medium text-slate-700">??? ??遺얘턁?????????????꾩룆梨띰쭕???URL (Google Map Embed URL)</Label>
                                     <div className="relative">
                                         <Globe className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
                                         <Input
@@ -1367,7 +1410,7 @@ export default function ConferenceSettingsPage() {
                                         />
                                     </div>
                                     <p className="text-xs text-slate-500 ml-1">
-                                        * 지도 공유 -&gt; 지도 퍼가기에서 복사한 HTML의 src 속성값만 입력하세요. (선택사항)
+                                        * ??遺얘턁??????????????ㅿ폎??? -&gt; ??遺얘턁???????????????????????嶺?筌???????怨뺤른?癲ル슢????????HTML??src ???????紐껊뭸???????ル뭽????????????⑤뜪輿???饔낅떽???壤굿??곸읆??? (????鶯ㅺ동??????????
                                     </p>
                                 </div>
                             </CardContent>
@@ -1384,18 +1427,18 @@ export default function ConferenceSettingsPage() {
                             <div className="p-2.5 bg-purple-50 rounded-xl text-purple-600">
                                 <ImageIcon className="w-6 h-6" />
                             </div>
-                            <h2 className="text-xl font-bold text-slate-800">시각 자료</h2>
+                            <h2 className="text-xl font-bold text-slate-800">Visual assets</h2>
                         </div>
                         <p className="text-slate-500 leading-relaxed text-sm">
-                            행사를 대표하는 배너와 포스터 이미지를 업로드합니다.<br />
-                            국문과 영문 페이지에 각각 다른 이미지를 설정할 수 있습니다.
+                            ??????롮쾸??????????????????????諛몃마嶺뚮???????癲?? ???????????遺얘턁????????????????????????怨몄）.<br />
+                            ???????????リ옇??뙴??????怨뚮뼺?됰뗀???????????????????ル뭽??????怨멸텛??????????뉖????????遺얘턁???????????關?쒎첎?嫄???????????????????怨몄）.
                         </p>
                         <div className="mt-4 p-4 bg-purple-50/50 rounded-xl border border-purple-100">
-                            <h4 className="font-semibold text-purple-900 text-sm mb-2">💡 권장 사이즈</h4>
+                            <h4 className="font-semibold text-purple-900 text-sm mb-2">Recommended image size</h4>
                             <ul className="text-xs text-purple-800 space-y-1.5 list-disc list-inside">
-                                <li>메인 배너: 1920 x 600 px</li>
-                                <li>포스터: 세로형 또는 정사각형 (A4 비율 권장)</li>
-                                <li>파일 형식: JPG, PNG (최대 5MB)</li>
+                                <li>??遺얘턁????????????諛몃마嶺뚮???????癲? 1920 x 600 px</li>
+                                <li>????? ??耀붾굝????????곗뵰壤??????????耀붾굝????????????????덉떻???(A4 ???????????</li>
+                                <li>???????耀붾굝??????????⑤８?? JPG, PNG (??遺얘턁??????傭? 5MB)</li>
                             </ul>
                         </div>
                     </div>
@@ -1404,7 +1447,7 @@ export default function ConferenceSettingsPage() {
                         <Card className="border-0 shadow-sm ring-1 ring-slate-200 bg-white overflow-hidden rounded-2xl">
                             <CardContent className="p-6 md:p-8 space-y-10">
                                 <BilingualImageUpload
-                                    label="메인 배너 (Main Banner)"
+                                    label="??遺얘턁????????????諛몃마嶺뚮???????癲?(Main Banner)"
                                     valueKO={data.visualAssets.banner.ko}
                                     valueEN={data.visualAssets.banner.en}
                                     onChangeKO={(url) => setData(prev => ({
@@ -1417,15 +1460,15 @@ export default function ConferenceSettingsPage() {
                                     }))}
                                     pathBaseKO={`conferences/${cid}/banner_ko`}
                                     pathBaseEN={`conferences/${cid}/banner_en`}
-                                    recommendedSize="1920x600 px 권장"
-                                    labelKO="🇰🇷 국문 배너"
-                                    labelEN="🇺🇸 영문 배너"
+                                    recommendedSize="1920x600 px"
+                                    labelKO="Banner image (KO)"
+                                    labelEN="Banner image (EN)"
                                 />
 
                                 <div className="border-t border-slate-100" />
 
                                 <BilingualImageUpload
-                                    label="포스터 / 썸네일 (Poster)"
+                                    label="?????/ ??耀붾굝????????(Poster)"
                                     valueKO={data.visualAssets.poster.ko}
                                     valueEN={data.visualAssets.poster.en}
                                     onChangeKO={(url) => setData(prev => ({
@@ -1438,9 +1481,9 @@ export default function ConferenceSettingsPage() {
                                     }))}
                                     pathBaseKO={`conferences/${cid}/poster_ko`}
                                     pathBaseEN={`conferences/${cid}/poster_en`}
-                                    recommendedSize="세로형 이미지 권장 (A4)"
-                                    labelKO="🇰🇷 국문 포스터"
-                                    labelEN="🇺🇸 영문 포스터"
+                                    recommendedSize="Poster image for print or A4 ratio"
+                                    labelKO="Poster image (KO)"
+                                    labelEN="Poster image (EN)"
                                 />
                             </CardContent>
                         </Card>
@@ -1456,11 +1499,11 @@ export default function ConferenceSettingsPage() {
                             <div className="p-2.5 bg-green-50 rounded-xl text-green-600">
                                 <FileText className="w-6 h-6" />
                             </div>
-                            <h2 className="text-xl font-bold text-slate-800">환영 메시지</h2>
+                            <h2 className="text-xl font-bold text-slate-800">?????怨뚮뼺?됰뗀?????댁삩? ??遺얘턁??????????</h2>
                         </div>
                         <p className="text-slate-500 leading-relaxed text-sm">
-                            학술대회 조직위원장 또는 회장의 인사말을 입력합니다.<br />
-                            HTML 편집과 이미지 추가를 지원합니다.
+                            ?????????놁졁?????????Β???????????嶺뚮?猷???????꾩룆梨띰쭕????????????????耀붾굝???????꿔꺂?????몄몡????????????⑤뜪輿???饔낅떽???????<br />
+                            HTML ??耀붾굝???????袁⑸즴筌?????????遺얘턁????? ??????袁④뎬??????遺얘턁??????????遺븍き????????????怨몄）.
                         </p>
                     </div>
 
@@ -1470,7 +1513,7 @@ export default function ConferenceSettingsPage() {
                                 {/* Korean Editor */}
                                 <div>
                                     <Label className="text-base font-medium text-slate-700 mb-2 block">
-                                        🇰🇷 한국어 / Korean
+                                        ???????????쇰뮛?????ㅼ쭋???/ Korean
                                     </Label>
                                     <RichTextEditor
                                         value={data.welcomeMessage.ko}
@@ -1478,14 +1521,14 @@ export default function ConferenceSettingsPage() {
                                             ...prev,
                                             welcomeMessage: { ...prev.welcomeMessage, ko: value }
                                         }))}
-                                        placeholder="예: 존경하는 회원 여러분, 안녕하십니까..."
+                                        placeholder="?? ?????Β?????????癲됱빖?????猷몃룯??????????????? ??????沃섃뫂?????饔낅떽????????????..."
                                     />
                                 </div>
 
                                 {/* English Editor */}
                                 <div>
                                     <Label className="text-base font-medium text-slate-700 mb-2 block">
-                                        🇺🇸 English
+                                        ?????English
                                     </Label>
                                     <RichTextEditor
                                         value={data.welcomeMessage.en}
@@ -1501,13 +1544,13 @@ export default function ConferenceSettingsPage() {
                                 <div>
                                     <Label className="text-base font-medium text-slate-700 mb-2 flex items-center gap-2">
                                         <ImageIcon size={18} />
-                                        이미지 추가 / Add Images
+                                        ??????遺얘턁????? ??????袁④뎬?? / Add Images
                                     </Label>
                                     <div className="flex items-center gap-4">
                                         <label className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer transition">
                                             <ImageIcon size={18} />
                                             <span className="text-sm font-bold text-slate-700">
-                                                {uploadingImage ? '업로드 중 / Uploading...' : '이미지 선택 / Choose Image'}
+                                                {uploadingImage ? '?????????/ Uploading...' : '??????遺얘턁????? ????鶯ㅺ동???????/ Choose Image'}
                                             </span>
                                             <input
                                                 type="file"
@@ -1518,7 +1561,7 @@ export default function ConferenceSettingsPage() {
                                             />
                                         </label>
                                         <span className="text-xs text-slate-500">
-                                            JPG, PNG (최대 5MB)
+                                            JPG, PNG (??遺얘턁??????傭? 5MB)
                                         </span>
                                     </div>
 

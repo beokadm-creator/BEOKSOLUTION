@@ -1,6 +1,9 @@
 import {
+  getSelectableStampTourRewards,
   getStampMissionTargetCount,
+  getStampTourRewardTitle,
   hasValidStampTourRewards,
+  isStampTourRewardDrawCompleted,
   normalizeStampTourRewards,
 } from "./stampTour";
 
@@ -22,11 +25,12 @@ describe("stampTour utils", () => {
   describe("normalizeStampTourRewards", () => {
     it("sanitizes reward quantities and random weights", () => {
       const normalized = normalizeStampTourRewards([
-        { id: "a", name: "  Gift A  ", totalQty: 5, remainingQty: 9, weight: 0 },
+        { id: "a", name: "  Gift A  ", label: " 1st ", totalQty: 5, remainingQty: 9, weight: 0 },
       ], "RANDOM");
 
       expect(normalized[0]).toMatchObject({
         name: "Gift A",
+        label: "1st",
         totalQty: 5,
         remainingQty: 5,
         weight: 1,
@@ -55,8 +59,31 @@ describe("stampTour utils", () => {
 
     it("accepts valid random rewards", () => {
       expect(hasValidStampTourRewards([
-        { id: "a", name: "Gift A", totalQty: 3, remainingQty: 2, weight: 2 },
+        { id: "a", name: "Gift A", label: "1등", totalQty: 3, remainingQty: 2, weight: 2 },
       ], "RANDOM")).toBe(true);
+    });
+  });
+
+  describe("getSelectableStampTourRewards", () => {
+    it("filters out rewards that have already completed their lottery draw", () => {
+      const rewards = getSelectableStampTourRewards([
+        { id: "a", name: "Gift A", totalQty: 1, remainingQty: 1, drawCompletedAt: { seconds: 1 } },
+        { id: "b", name: "Gift B", totalQty: 1, remainingQty: 1 },
+      ], { excludeCompletedDraws: true });
+
+      expect(rewards).toHaveLength(1);
+      expect(rewards[0].id).toBe("b");
+    });
+  });
+
+  describe("reward helpers", () => {
+    it("builds a combined reward title from rank and product name", () => {
+      expect(getStampTourRewardTitle({ label: "1등", name: "아이패드" })).toBe("1등 - 아이패드");
+    });
+
+    it("detects completed draw rewards", () => {
+      expect(isStampTourRewardDrawCompleted({ drawCompletedAt: { seconds: 1 } })).toBe(true);
+      expect(isStampTourRewardDrawCompleted({})).toBe(false);
     });
   });
 });

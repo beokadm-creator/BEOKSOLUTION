@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.assertStampTourAdmin = exports.resolveSelectableRewards = exports.selectReward = exports.normalizeRewards = exports.getRequiredCount = void 0;
+exports.assertStampTourAdmin = exports.resolveSelectableRewards = exports.selectReward = exports.getRewardDisplayLabel = exports.isRewardDrawCompleted = exports.normalizeRewards = exports.getRequiredCount = void 0;
 const functions = __importStar(require("firebase-functions"));
 const getRequiredCount = (rule, boothCount) => {
     var _a;
@@ -57,6 +57,7 @@ const normalizeRewards = (rewards, mode) => rewards.map((reward, index) => {
     return {
         ...reward,
         name: (reward.name || "").trim(),
+        label: (reward.label || "").trim(),
         totalQty,
         remainingQty,
         weight: mode === "RANDOM" ? Math.max(1, Math.floor(Number((_d = reward.weight) !== null && _d !== void 0 ? _d : 1) || 1)) : undefined,
@@ -64,6 +65,16 @@ const normalizeRewards = (rewards, mode) => rewards.map((reward, index) => {
     };
 });
 exports.normalizeRewards = normalizeRewards;
+const isRewardDrawCompleted = (reward) => Boolean(reward.drawCompletedAt);
+exports.isRewardDrawCompleted = isRewardDrawCompleted;
+const getRewardDisplayLabel = (reward) => {
+    const label = (reward.label || "").trim();
+    const name = (reward.name || "").trim();
+    if (label && name)
+        return `${label} - ${name}`;
+    return label || name;
+};
+exports.getRewardDisplayLabel = getRewardDisplayLabel;
 const selectReward = (rewards, mode) => {
     if (mode === "RANDOM") {
         const totalWeight = rewards.reduce((sum, reward) => sum + Math.max(1, reward.weight || 1), 0);
@@ -79,11 +90,17 @@ const selectReward = (rewards, mode) => {
     return rewards.slice().sort((a, b) => (a.order || 0) - (b.order || 0))[0];
 };
 exports.selectReward = selectReward;
-const resolveSelectableRewards = (config) => {
+const resolveSelectableRewards = (config, options) => {
     const mode = config.rewardMode === "FIXED" ? "FIXED" : "RANDOM";
     const rewards = (0, exports.normalizeRewards)(Array.isArray(config.rewards) ? config.rewards : [], mode);
-    const primaryRewards = rewards.filter(reward => reward.remainingQty > 0 && reward.name.length > 0 && !reward.isFallback);
-    const fallbackRewards = rewards.filter(reward => reward.remainingQty > 0 && reward.name.length > 0 && reward.isFallback);
+    const primaryRewards = rewards.filter(reward => reward.remainingQty > 0
+        && (reward.name.length > 0 || (reward.label || "").length > 0)
+        && !reward.isFallback
+        && (!(options === null || options === void 0 ? void 0 : options.excludeCompletedDraws) || !(0, exports.isRewardDrawCompleted)(reward)));
+    const fallbackRewards = rewards.filter(reward => reward.remainingQty > 0
+        && (reward.name.length > 0 || (reward.label || "").length > 0)
+        && reward.isFallback
+        && (!(options === null || options === void 0 ? void 0 : options.excludeCompletedDraws) || !(0, exports.isRewardDrawCompleted)(reward)));
     return {
         mode,
         rewards,
