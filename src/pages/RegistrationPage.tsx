@@ -16,10 +16,7 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/card';
 import { CheckCircle2, Loader2, Save, CreditCard, ChevronLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
-import NicePaymentForm from '../components/payment/NicePaymentForm';
 import { AddonSelector } from '../components/eregi/AddonSelector';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../firebase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { WideFooterPreview } from '../components/conference/wide-preview/WideFooterPreview';
@@ -94,7 +91,7 @@ function AddonSelectorWrapper({
     // const addonsEnabled = isEnabled('optional_addons_enabled');
     const addonsEnabled = true;
 
-    // DEV 환경이거나 URL 파라미터로 강제 활성화된 경우 허용
+    // DEV ????????????????URL ?????????낟??????????類??癲???????ル뒌?????????????椰???믩꾨젩???汝뷴젆?琉????????μ떜媛?걫??곷묄??
     const isDev = window.location.hostname.includes('--dev-') ||
         window.location.hostname === 'localhost' ||
         new URLSearchParams(window.location.search).get('debug_addons') === 'true';
@@ -190,8 +187,6 @@ export default function RegistrationPage() {
 
     // Payment Config
     const [tossClientKey, setTossClientKey] = useState<string | null>(null);
-    const [paymentProvider, setPaymentProvider] = useState<string>('TOSS');
-    const [nicePaySecret, setNicePaySecret] = useState('');
     const [paymentWidget, setPaymentWidget] = useState<PaymentWidgetInstance | null>(null);
     const paymentMethodsWidgetRef = useRef<HTMLDivElement>(null);
     const paymentMethodsInstanceRef = useRef<unknown>(null);
@@ -208,7 +203,6 @@ export default function RegistrationPage() {
     });
 
     const [isInfoSaved, setIsInfoSaved] = useState(false);
-    const [currentRegId, setCurrentRegId] = useState<string | null>(null);
     const [finalCategory, setFinalCategory] = useState('');
 
     // Pricing hook for optional add-ons
@@ -224,9 +218,6 @@ export default function RegistrationPage() {
 
     // [Fix-Step 156] selectedTier state to ensure grade/tier is saved
     const [selectedTier, setSelectedTier] = useState<string>('');
-
-    // NicePay State
-    const [nicePayActive, setNicePayActive] = useState(false);
 
     // [Fix-Step 330] Ensure Language Consistency
     useEffect(() => {
@@ -307,17 +298,12 @@ export default function RegistrationPage() {
 
                     // Use DB key if configured, otherwise fallback to default test key
                     const apiKey = domesticPayment?.apiKey || defaultClientKey;
-                    const secretKey = domesticPayment?.secretKey || '';
-
                     setTossClientKey(apiKey);
-                    setNicePaySecret(secretKey);
-                    setPaymentProvider(domesticPayment?.provider || 'TOSS');
 
                     // Log current mode for debugging
                     console.log('[Payment] Provider:', domesticPayment?.provider, 'Test Mode:', domesticPayment?.isTestMode);
                 } else {
                     setTossClientKey(defaultClientKey);
-                    setPaymentProvider('TOSS');
                 }
 
                 // 2. Pre-fill User Data if logged in
@@ -327,14 +313,14 @@ export default function RegistrationPage() {
                         ...prev,
                         name: prev.name || uData.name || '',
                         email: uData.email || '',
-                        phone: uData.phone || '', // ✅ ConferenceUser has phone
-                        affiliation: uData.organization || '', // ✅ ConferenceUser.organization -> UI.affiliation
+                        phone: uData.phone || '', // ??ConferenceUser has phone
+                        affiliation: uData.organization || '', // ??ConferenceUser.organization -> UI.affiliation
                         licenseNumber: prev.licenseNumber || uData.licenseNumber || ''
                     }));
                 }
             } catch (error) {
                 console.error("Init failed:", error);
-                toast.error("초기화 실패");
+                toast.error("초기화에 실패했습니다.");
             } finally {
                 setIsInitializing(false);
             }
@@ -355,7 +341,7 @@ export default function RegistrationPage() {
             if (activePeriod) {
                 categoryPrefix = activePeriod.name.ko;
             } else {
-                categoryPrefix = language === 'ko' ? '학술대회 등록' : 'Conference Registration';
+                categoryPrefix = language === 'ko' ? '\uD559\uC220\uB300\uD68C \uB4F1\uB85D' : 'Conference Registration';
             }
 
             // Still need to determine the category name
@@ -468,8 +454,8 @@ export default function RegistrationPage() {
         if (!targetGradeId) {
             // Try finding "Non-member" in grades list first
             const nonMember = grades.find(g => {
-                const n = String(g.name || '').toLowerCase();  // ✅ Safe handling of undefined name
-                return n.includes('비회원') || n.includes('non-member');
+                const n = String(g.name || '').toLowerCase();  // ??Safe handling of undefined name
+                return n.includes('\uBE44\uD68C\uC6D0') || n.includes('non-member');
             });
             if (nonMember) {
                 targetGradeId = nonMember.code || nonMember.id;
@@ -523,7 +509,7 @@ export default function RegistrationPage() {
 
     // Payment Widget Init
     useEffect(() => {
-        if (isInfoSaved && tossClientKey && paymentProvider === 'TOSS') {
+        if (isInfoSaved && tossClientKey) {
             (async () => {
                 const customerKey = auth.user ? auth.user.id : uuidv4();
                 try {
@@ -534,7 +520,7 @@ export default function RegistrationPage() {
                 }
             })();
         }
-    }, [isInfoSaved, auth.user, tossClientKey, paymentProvider]);
+    }, [isInfoSaved, auth.user, tossClientKey]);
 
     useEffect(() => {
         if (paymentWidget && paymentMethodsWidgetRef.current && totalPrice >= 0) {
@@ -581,12 +567,12 @@ export default function RegistrationPage() {
         setIsProcessing(true);
         try {
             await signInWithEmailAndPassword(firebaseAuth, formData.email, formData.simplePassword);
-            toast.success(language === 'ko' ? "정보를 불러왔습니다." : "User info loaded.");
+            toast.success(language === 'ko' ? "기존 정보를 불러왔습니다." : "User info loaded.");
             // useEffect will handle form population
         } catch (error: unknown) {
             console.error("Login failed:", error);
             if (error && typeof error === 'object' && 'code' in error && (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password')) {
-                toast.error(language === 'ko' ? "등록된 정보가 없습니다. 새로 입력해주세요." : "No record found. Please fill in details.");
+                toast.error(language === 'ko' ? "일치하는 계정을 찾지 못했습니다. 아래 정보를 직접 입력해주세요." : "No record found. Please fill in details.");
             } else {
                 const message = error instanceof Error ? error.message : 'Unknown error';
                 toast.error("Login failed: " + message);
@@ -598,7 +584,7 @@ export default function RegistrationPage() {
 
     const handleSaveBasicInfo = async () => {
         if (!formData.name || !formData.email || !formData.phone || !formData.affiliation) {
-            toast.error(language === 'ko' ? "모든 필수 항목을 입력해주세요." : "Please fill in all required fields.");
+            toast.error(language === 'ko' ? "필수 항목을 모두 입력해주세요." : "Please fill in all required fields.");
             return;
         }
 
@@ -617,7 +603,7 @@ export default function RegistrationPage() {
                 try {
                     const userCredential = await createUserWithEmailAndPassword(firebaseAuth, formData.email, formData.simplePassword);
                     uid = userCredential.user.uid;
-                    toast.success(language === 'ko' ? "회원가입이 완료되었습니다." : "Account created successfully.");
+                    toast.success(language === 'ko' ? "계정이 생성되었습니다." : "Account created successfully.");
                 } catch (authError: unknown) {
                     const err = authError as { code?: string };
                     if (err.code === 'auth/email-already-in-use') {
@@ -648,7 +634,7 @@ export default function RegistrationPage() {
                     name: formData.name,
                     email: formData.email,
                     phone: formData.phone,
-                    organization: formData.affiliation, // UI는 affiliation, DB는 organization으로 저장
+                    organization: formData.affiliation, // UI??affiliation, DB??organization????????????
                     licenseNumber: formData.licenseNumber
                 });
 
@@ -670,7 +656,7 @@ export default function RegistrationPage() {
         } catch (e: unknown) {
             console.error("Save info failed:", e);
             const message = e instanceof Error ? e.message : 'Unknown error';
-            toast.error(language === 'ko' ? `저장 실패: ${message}` : `Save failed: ${message}`);
+            toast.error(language === 'ko' ? `저장에 실패했습니다: ${message}` : `Save failed: ${message}`);
         } finally {
             setIsProcessing(false);
         }
@@ -757,12 +743,9 @@ export default function RegistrationPage() {
             // [Modified] Do NOT save to Firestore yet (Prevent Garbage)
             // Save to sessionStorage to retrieve after success
             sessionStorage.setItem(`pending_reg_${orderId}`, JSON.stringify(regData));
-            setCurrentRegId(regRef.id);
 
             // 2. Process Payment
-            if (paymentProvider === 'NICE') {
-                setNicePayActive(true);
-            } else if (paymentProvider === 'TOSS' && paymentWidget) {
+            if (paymentWidget) {
                 const origin = window.location.origin;
                 const successUrl = `${origin}/payment/success?slug=${slug}&societyId=${info?.societyId}&confId=${confId}&regId=${regRef.id}`;
                 const failUrl = `${origin}/${slug}/register/fail?regId=${regRef.id}`;
@@ -776,7 +759,7 @@ export default function RegistrationPage() {
                     failUrl,
                 });
             } else {
-                toast.error("Payment provider error");
+                toast.error("Payment widget is not ready.");
                 setIsProcessing(false);
             }
 
@@ -785,51 +768,6 @@ export default function RegistrationPage() {
             toast.error("결제 시작 실패");
             setIsProcessing(false);
         }
-    };
-
-    const handleNiceSuccess = async (data: { TxTid: string }) => {
-        try {
-            const confirmFn = httpsCallable(functions, 'confirmNicePayment');
-            const result = await confirmFn({
-                tid: data.TxTid,
-                amt: totalPrice,
-                mid: tossClientKey,
-                key: nicePaySecret,
-                regId: currentRegId,
-                confId: confId,
-                // [Fix-Option] Include options for NicePay
-                baseAmount: basePrice,
-                optionsTotal: optionsTotal,
-                selectedOptions: selectedOptions.map(o => ({
-                    optionId: o.option.id,
-                    name: o.option.name,
-                    price: o.option.price,
-                    quantity: o.quantity,
-                    totalPrice: o.option.price * o.quantity
-                }))
-            });
-
-            const resData = result.data as { success: boolean; message?: string };
-            if (resData.success) {
-                navigate(`/${slug}/register/success?regId=${currentRegId}`);
-            } else {
-                toast.error("Payment Confirmation Failed: " + resData.message);
-                setIsProcessing(false);
-                setNicePayActive(false);
-            }
-        } catch (error: unknown) {
-            console.error("NicePay Confirm Error:", error);
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            toast.error("Payment Confirmation Error: " + message);
-            setIsProcessing(false);
-            setNicePayActive(false);
-        }
-    };
-
-    const handleNiceFail = (error: string) => {
-        toast.error("Payment Failed: " + error);
-        setIsProcessing(false);
-        setNicePayActive(false);
     };
 
     if (confLoading || isInitializing) {
@@ -863,10 +801,10 @@ export default function RegistrationPage() {
                     <div>
                         <Button variant="ghost" className="pl-0 mb-4" onClick={() => navigate(`/${slug}`)}>
                             <ChevronLeft className="w-5 h-5 mr-1" />
-                            {language === 'ko' ? '홈으로' : 'Home'}
+                            {language === 'ko' ? '\uD648\uC73C\uB85C' : 'Home'}
                         </Button>
                         <h1 className="text-3xl font-bold text-gray-900">
-                            {language === 'ko' ? `${societyName} 학술대회 등록페이지` : `${societyName} Conference Registration Page`}
+                            {language === 'ko' ? societyName + ' \uB4F1\uB85D \uD398\uC774\uC9C0' : societyName + ' Conference Registration Page'}
                         </h1>
                         <p className="mt-2 text-gray-600">
                             {info?.title ? (language === 'ko' ? info.title.ko : info.title.en) : 'Conference'}
@@ -880,10 +818,10 @@ export default function RegistrationPage() {
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isInfoSaved ? 'bg-green-100 text-green-600' : 'bg-blue-600 text-white'}`}>
                                     {isInfoSaved ? <CheckCircle2 className="w-5 h-5" /> : '1'}
                                 </div>
-                                {language === 'ko' ? '기본 정보 입력' : 'Basic Information'}
+                                {language === 'ko' ? '기본 정보' : 'Basic Information'}
                             </CardTitle>
                             <CardDescription>
-                                {language === 'ko' ? '학술대회 등록을 위한 기본 정보를 입력해주세요.' : 'Please enter your basic information for registration.'}
+                                {language === 'ko' ? '등록을 위해 기본 정보를 입력해주세요.' : 'Please enter your basic information for registration.'}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -924,10 +862,10 @@ export default function RegistrationPage() {
                                             onChange={e => setFormData({ ...formData, simplePassword: e.target.value })}
                                             readOnly={isInfoSaved}
                                             className="bg-white"
-                                            placeholder={language === 'ko' ? '비밀번호 입력' : 'Enter password'}
+                                            placeholder={language === 'ko' ? '비밀번호를 입력하세요' : 'Enter password'}
                                         />
                                         <p className="text-xs text-gray-500">
-                                            * {language === 'ko' ? '기존 회원은 정보가 자동 입력되며, 신규 회원은 이 정보로 계정이 생성됩니다.' : 'Existing users: info auto-loads. New users: account created.'}
+                                            * {language === 'ko' ? '기존 가입자는 정보를 불러오고, 처음 등록하는 경우에는 계정이 자동 생성됩니다.' : 'Existing users: info auto-loads. New users: account created.'}
                                         </p>
                                     </div>
                                 )}
@@ -942,7 +880,7 @@ export default function RegistrationPage() {
                                         onChange={e => setFormData({ ...formData, name: e.target.value })}
                                         readOnly={memberVerified || isInfoSaved}
                                         className={memberVerified || isInfoSaved ? 'bg-gray-100' : ''}
-                                        placeholder="홍길동"
+                                        placeholder="이름을 입력하세요"
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -952,7 +890,7 @@ export default function RegistrationPage() {
                                         onChange={e => setFormData({ ...formData, affiliation: e.target.value })}
                                         readOnly={isInfoSaved}
                                         className={isInfoSaved ? 'bg-gray-100' : ''}
-                                        placeholder="소속 (병원/학교)"
+                                        placeholder="소속을 입력하세요"
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -962,11 +900,11 @@ export default function RegistrationPage() {
                                         onChange={e => setFormData({ ...formData, licenseNumber: e.target.value })}
                                         readOnly={isInfoSaved || (memberVerified && !!paramMemberCode)}
                                         className={isInfoSaved || (memberVerified && !!paramMemberCode) ? 'bg-gray-100' : ''}
-                                        placeholder="면허번호 (없을 경우 생년월일)"
+                                        placeholder="면허번호를 입력하세요"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>{language === 'ko' ? '연락처' : 'Phone'} <span className="text-red-500">*</span></Label>
+                                    <Label>{language === 'ko' ? '휴대폰 번호' : 'Phone'} <span className="text-red-500">*</span></Label>
                                     <Input
                                         value={formData.phone}
                                         onChange={e => setFormData({ ...formData, phone: e.target.value })}
@@ -980,7 +918,7 @@ export default function RegistrationPage() {
                         <CardFooter className={`${isInfoSaved ? 'hidden' : 'block'}`}>
                             <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={handleSaveBasicInfo} disabled={isProcessing}>
                                 <Save className="w-4 h-4 mr-2" />
-                                {language === 'ko' ? '기본 정보 저장하기' : 'Save Basic Info'}
+                                {language === 'ko' ? '기본 정보 저장' : 'Save Basic Info'}
                             </Button>
                         </CardFooter>
                         {isInfoSaved && (
@@ -1013,7 +951,7 @@ export default function RegistrationPage() {
                                     {language === 'ko' ? '결제' : 'Payment'}
                                 </CardTitle>
                                 <CardDescription>
-                                    {language === 'ko' ? '등록비를 결제하고 등록을 완료하세요.' : 'Complete payment to finish registration.'}
+                                    {language === 'ko' ? '결제를 완료하면 등록이 마무리됩니다.' : 'Complete payment to finish registration.'}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-6">
@@ -1025,7 +963,7 @@ export default function RegistrationPage() {
                                         </div>
                                         <div className="text-right">
                                             <p className="text-sm text-gray-500">Base Fee</p>
-                                            <p className="text-lg font-semibold text-slate-700">₩{basePrice.toLocaleString()}</p>
+                                            <p className="text-lg font-semibold text-slate-700">{basePrice.toLocaleString()}원</p>
                                         </div>
                                     </div>
 
@@ -1042,11 +980,11 @@ export default function RegistrationPage() {
                                                             {item.option.name[language] || item.option.name.ko}
                                                         </span>
                                                         <span className="text-[11px] text-slate-500">
-                                                            ₩{item.option.price.toLocaleString()} × {item.quantity}
+                                                            {item.option.price.toLocaleString()}원 x {item.quantity}
                                                         </span>
                                                     </div>
                                                     <span className="font-semibold text-slate-800">
-                                                        ₩{(item.option.price * item.quantity).toLocaleString()}
+                                                        {(item.option.price * item.quantity).toLocaleString()}원
                                                     </span>
                                                 </div>
                                             ))}
@@ -1055,7 +993,7 @@ export default function RegistrationPage() {
                                                     {language === 'ko' ? '옵션 합계' : 'Options Subtotal'}
                                                 </span>
                                                 <span className="text-sm font-bold text-blue-600">
-                                                    + ₩{optionsTotal.toLocaleString()}
+                                                    + {optionsTotal.toLocaleString()}원
                                                 </span>
                                             </div>
                                         </div>
@@ -1067,41 +1005,20 @@ export default function RegistrationPage() {
                                             <p className="text-sm font-medium text-slate-700">{language === 'ko' ? '총 결제 금액' : 'Total Amount'}</p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-2xl font-bold text-blue-600">₩{totalPrice.toLocaleString()}</p>
+                                            <p className="text-2xl font-bold text-blue-600">{totalPrice.toLocaleString()}원</p>
                                         </div>
                                     </div>
                                 </div>
 
 
                                 {/* Payment Widget Area */}
-                                {paymentProvider === 'NICE' ? (
-                                    <div className="text-center p-8 bg-blue-50 rounded-xl border border-blue-100">
-                                        <p className="mb-4 font-medium text-blue-800">
-                                            {language === 'ko' ? '나이스페이 결제창이 열립니다.' : 'NicePay window will open.'}
-                                        </p>
-                                        {nicePayActive && (
-                                            <NicePaymentForm
-                                                amount={totalPrice}
-                                                buyerName={formData.name}
-                                                buyerEmail={formData.email}
-                                                buyerTel={formData.phone}
-                                                goodsName={finalCategory}
-                                                mid={tossClientKey || ''}
-                                                merchantKey={nicePaySecret}
-                                                onSuccess={handleNiceSuccess}
-                                                onFail={handleNiceFail}
-                                            />
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div id="payment-widget" ref={paymentMethodsWidgetRef} className="min-h-[300px]" />
-                                )}
+                                <div id="payment-widget" ref={paymentMethodsWidgetRef} className="min-h-[300px]" />
                             </CardContent>
                             <CardFooter>
                                 <Button
                                     className="w-full h-12 text-lg font-bold bg-blue-600 hover:bg-blue-700 shadow-md"
                                     onClick={handlePayment}
-                                    disabled={isProcessing || (!paymentWidget && paymentProvider !== 'NICE')}
+                                    disabled={isProcessing || !paymentWidget}
                                 >
                                     {isProcessing ? (
                                         <>
@@ -1124,7 +1041,7 @@ export default function RegistrationPage() {
             {/* FOOTER - WideFooterPreview */}
             <WideFooterPreview
                 society={footerInfo ? {
-                    name: societyName || info?.societyId,  // Firestore에서 가져온 학회명 사용
+                    name: societyName || info?.societyId,  // Firestore??????????ル뒌????饔낅떽?????嶺뚮ㅎ?닺짆?????μ떜媛?걫??곷퉮??????????
                     footerInfo
                 } : undefined}
                 language={language}
@@ -1136,18 +1053,18 @@ export default function RegistrationPage() {
                 onClick={() => setShowRefundModal(true)}
                 className="fixed bottom-4 right-4 z-40 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-bold transition-colors"
             >
-                {language === 'ko' ? '환불규정' : 'Refund Policy'}
+                {language === 'ko' ? '환불 규정' : 'Refund Policy'}
             </button>
 
             {/* Refund Policy Modal */}
             <Dialog open={showRefundModal} onOpenChange={setShowRefundModal}>
                 <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>{language === 'ko' ? '환불규정' : 'Refund Policy'}</DialogTitle>
+                        <DialogTitle>{language === 'ko' ? '환불 규정' : 'Refund Policy'}</DialogTitle>
                     </DialogHeader>
                     <div className="mt-4 whitespace-pre-wrap text-sm text-slate-600 leading-relaxed">
-                        {regSettings?.refundPolicy || (info as ConferenceInfo)?.refundPolicy ||
-                            "2026년 3월 5일 17시까지 전액 환불 이후 환불은 불가 합니다. 카드결제 : 승인취소 퀵계좌이체 등 : 시스템에서 계좌 환불 * 카드사 승인 사정에 따라 환불이 영업일 기준 5일 이상 발생할 수 있습니다. 자세한 사항은 사무국으로 문의주시기 바랍니다."}
+                        {regSettings?.refundPolicy || (info as ConferenceInfo)?.refundPolicy || "등록 이후 환불 규정은 학회 운영 방침을 따릅니다. 자세한 사항은 사무국으로 문의해주세요."}
+
                     </div>
                     <div className="mt-6 flex justify-end">
                         <Button onClick={() => setShowRefundModal(false)}>

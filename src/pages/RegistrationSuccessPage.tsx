@@ -43,12 +43,13 @@ const RegistrationSuccessPage: React.FC = () => {
     })();
 
     const orderId = searchParams.get('orderId');
+    const regId = searchParams.get('regId');
     // const userName = searchParams.get('name'); // Use fetched data if available
 
     // Fetch Registration Data
     React.useEffect(() => {
         const fetchRegistration = async () => {
-            if (!conference.id || !orderId) {
+            if (!conference.id || (!orderId && !regId)) {
                 setLoading(false);
                 return;
             }
@@ -58,10 +59,15 @@ const RegistrationSuccessPage: React.FC = () => {
                 const { collection, query, where, getDocs } = await import('firebase/firestore');
                 const { db } = await import('../firebase');
 
-                const registrationSnapshot = await getDocs(query(
-                    collection(db, `conferences/${conference.id}/registrations`),
-                    where('orderId', '==', orderId)
-                ));
+                const registrationSnapshot = orderId
+                    ? await getDocs(query(
+                        collection(db, `conferences/${conference.id}/registrations`),
+                        where('orderId', '==', orderId)
+                    ))
+                    : await getDocs(query(
+                        collection(db, `conferences/${conference.id}/registrations`),
+                        where('id', '==', regId)
+                    ));
 
                 if (!registrationSnapshot.empty) {
                     setRegData(registrationSnapshot.docs[0].data() as RegistrationSuccessData);
@@ -74,7 +80,7 @@ const RegistrationSuccessPage: React.FC = () => {
         };
 
         fetchRegistration();
-    }, [conference.id, orderId, setLoading]);
+    }, [conference.id, orderId, regId, setLoading]);
     const handlePrint = () => {
         window.print();
     };
@@ -122,7 +128,7 @@ const RegistrationSuccessPage: React.FC = () => {
                         <div className="flex flex-col space-y-4">
                             <div className="flex justify-between items-center border-b border-gray-200 pb-3">
                                 <span className="text-gray-500 font-medium text-sm md:text-base">Registration ID</span>
-                                <span className="font-mono font-bold text-gray-800 text-base md:text-lg">{orderId || 'Unknown'}</span>
+                                <span className="font-mono font-bold text-gray-800 text-base md:text-lg">{orderId || regId || 'Unknown'}</span>
                             </div>
                             <div className="flex justify-between items-center border-b border-gray-200 pb-3">
                                 <span className="text-gray-500 font-medium text-sm md:text-base">Name</span>

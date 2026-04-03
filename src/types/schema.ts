@@ -284,7 +284,7 @@ export interface MembershipPaymentHistory {
   userName: string; // 결제한 회원 이름
   feeTierId: string; // 선택한 등급 ID
   amount: number; // 결제 금액
-  paymentMethod: 'TOSS' | 'NICE'; // 결제 수단
+  paymentMethod: 'TOSS'; // 결제 수단
   paymentStatus: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
   orderId: string; // PG사 주문번호
   paymentDetails: {
