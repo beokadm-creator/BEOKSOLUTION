@@ -58,21 +58,13 @@ const RegistrationSuccessPage: React.FC = () => {
                 const { collection, query, where, getDocs } = await import('firebase/firestore');
                 const { db } = await import('../firebase');
 
-                const [registrationSnapshot, externalSnapshot] = await Promise.all([
-                    getDocs(query(
-                        collection(db, `conferences/${conference.id}/registrations`),
-                        where('orderId', '==', orderId)
-                    )),
-                    getDocs(query(
-                        collection(db, `conferences/${conference.id}/external_attendees`),
-                        where('orderId', '==', orderId)
-                    ))
-                ]);
+                const registrationSnapshot = await getDocs(query(
+                    collection(db, `conferences/${conference.id}/registrations`),
+                    where('orderId', '==', orderId)
+                ));
 
                 if (!registrationSnapshot.empty) {
                     setRegData(registrationSnapshot.docs[0].data() as RegistrationSuccessData);
-                } else if (!externalSnapshot.empty) {
-                    setRegData(externalSnapshot.docs[0].data() as RegistrationSuccessData);
                 }
             } catch (error) {
                 console.error("Failed to fetch registration:", error);
