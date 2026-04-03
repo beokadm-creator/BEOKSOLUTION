@@ -109,9 +109,7 @@ const SuperAdminPage: React.FC = () => {
     const resolveAlert = async (alertId: string, alertPath: string) => {
         setResolvingAlertId(alertId);
         try {
-            const { httpsCallable } = await import('firebase/functions');
-            const { functions: firebaseFunctions } = await import('../../firebase');
-            const resolveAlertFunction = httpsCallable(firebaseFunctions, 'resolveDataIntegrityAlert');
+            const resolveAlertFunction = httpsCallable(functions, 'resolveDataIntegrityAlert');
 
             await resolveAlertFunction({ alertPath });
             toast.success('알림이 해결되었습니다');

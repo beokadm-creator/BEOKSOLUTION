@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, updateDoc, collection, addDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { doc, getDoc, updateDoc, collection, addDoc, Timestamp, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { db, functions } from '../../firebase';
+import { httpsCallable } from 'firebase/functions';
 import { Button } from '../../components/ui/button';
 import { ArrowLeft, Printer, XCircle, CheckCircle, CreditCard, Edit, Save, X, Loader2, AlertCircle, CheckCircle2, Copy, ExternalLink, MessageCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -85,26 +86,24 @@ const VoucherLinkSection: React.FC<VoucherLinkSectionProps> = ({
 
         const fetchToken = async () => {
             try {
-                const { getDocs, collection: fsCol, query: fsQuery, where: fsWhere, orderBy: fsOrderBy, limit: fsLimit } = await import('firebase/firestore');
-                const { db: fsDb } = await import('../../firebase');
-                const q = fsQuery(
-                    fsCol(fsDb, "conferences/" + confId + "/badge_tokens"),
-                    fsWhere('registrationId', '==', registrationId),
-                    fsWhere('status', '==', 'ACTIVE'),
-                    fsOrderBy('createdAt', 'desc'),
-                    fsLimit(1)
+                const q = query(
+                    collection(db, "conferences/" + confId + "/badge_tokens"),
+                    where('registrationId', '==', registrationId),
+                    where('status', '==', 'ACTIVE'),
+                    orderBy('createdAt', 'desc'),
+                    limit(1)
                 );
                 const snapshot = await getDocs(q);
                 if (!snapshot.empty) {
                     setBadgeToken(snapshot.docs[0].data().token);
                     setTokenStatus('active');
                 } else {
-                    const qIssued = fsQuery(
-                        fsCol(fsDb, "conferences/" + confId + "/badge_tokens"),
-                        fsWhere('registrationId', '==', registrationId),
-                        fsWhere('status', '==', 'ISSUED'),
-                        fsOrderBy('createdAt', 'desc'),
-                        fsLimit(1)
+                    const qIssued = query(
+                        collection(db, "conferences/" + confId + "/badge_tokens"),
+                        where('registrationId', '==', registrationId),
+                        where('status', '==', 'ISSUED'),
+                        orderBy('createdAt', 'desc'),
+                        limit(1)
                     );
                     const issuedSnap = await getDocs(qIssued);
                     if (!issuedSnap.empty) {
@@ -333,9 +332,6 @@ const RegistrationDetailPage: React.FC = () => {
         setCanceling(true);
         try {
             // [Modified] Call Cloud Function to Cancel Payment via PG API
-            const { httpsCallable } = await import('firebase/functions');
-            const { functions } = await import('../../firebase'); // Dynamic import to ensure init
-
             const cancelFn = httpsCallable(functions, 'cancelTossPayment');
 
             await cancelFn({
@@ -405,8 +401,6 @@ const RegistrationDetailPage: React.FC = () => {
 
         setIsResending(true);
         try {
-            const { httpsCallable } = await import('firebase/functions');
-            const { functions } = await import('../../firebase');
             const resendNotificationFn = httpsCallable(functions, 'resendBadgePrepToken');
             const result = await resendNotificationFn({
                 confId: effectiveCid,

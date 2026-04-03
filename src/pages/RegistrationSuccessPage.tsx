@@ -5,6 +5,8 @@ import { CheckCircle2, Download, Home, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { useUserStore } from '../store/userStore';
 import { useConference } from '../hooks/useConference';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../firebase';
 
 type RegistrationSuccessData = {
     name?: string;
@@ -55,10 +57,6 @@ const RegistrationSuccessPage: React.FC = () => {
             }
 
             try {
-                // Import firestore dynamically or use from top-level if added
-                const { collection, query, where, getDocs } = await import('firebase/firestore');
-                const { db } = await import('../firebase');
-
                 const registrationSnapshot = orderId
                     ? await getDocs(query(
                         collection(db, `conferences/${conference.id}/registrations`),

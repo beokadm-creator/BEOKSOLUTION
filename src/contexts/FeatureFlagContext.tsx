@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { getRemoteConfig, getValue, fetchAndActivate, RemoteConfig } from 'firebase/remote-config';
 import { useAuth } from '../hooks/useAuth';
+import app from '../firebase';
 
 // Feature flag type definitions
 interface FeatureFlags {
@@ -58,10 +59,6 @@ export function FeatureFlagProvider({ children }: FeatureFlagProviderProps) {
 
     const initializeRemoteConfig = async () => {
       try {
-        // Initialize Remote Config
-        // Note: Firebase app is already initialized in src/firebase.ts
-        // We need to import it to get the app instance
-        const { default: app } = await import('../firebase');
         const rc = getRemoteConfig(app);
 
         // Settings for development

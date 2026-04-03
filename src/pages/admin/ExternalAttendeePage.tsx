@@ -2,7 +2,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useConference } from '../../hooks/useConference';
 import { useAuth } from '../../hooks/useAuth';
-import { collection, getDoc, getDocs, doc, updateDoc, Timestamp, addDoc, query, where, onSnapshot, runTransaction } from 'firebase/firestore';
+import { collection, getDoc, getDocs, doc, updateDoc, Timestamp, addDoc, query, where, onSnapshot, runTransaction, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { safeFormatDate } from '../../utils/dateUtils';
 import { httpsCallable, getFunctions } from 'firebase/functions';
@@ -44,9 +44,7 @@ const VoucherLinkSection: React.FC<VoucherLinkSectionProps> = ({
         const fetchToken = async () => {
             try {
                 if (attendee.badgePrepToken) {
-                    const { getDoc, doc: fsDoc } = await import('firebase/firestore');
-                    const { db: fsDb } = await import('../../firebase');
-                    const tokenSnap = await getDoc(fsDoc(fsDb, `conferences/${confId}/badge_tokens`, attendee.badgePrepToken));
+                    const tokenSnap = await getDoc(doc(db, `conferences/${confId}/badge_tokens`, attendee.badgePrepToken));
                     if (tokenSnap.exists()) {
                         const data = tokenSnap.data();
                         setTokenStatus(data.status === 'ACTIVE' ? 'active' : data.status === 'ISSUED' ? 'issued' : 'expired');
@@ -57,26 +55,24 @@ const VoucherLinkSection: React.FC<VoucherLinkSectionProps> = ({
                     return;
                 }
 
-                const { getDocs, collection: fsCol, query: fsQuery, where: fsWhere, orderBy: fsOrderBy, limit: fsLimit } = await import('firebase/firestore');
-                const { db: fsDb } = await import('../../firebase');
-                const q = fsQuery(
-                    fsCol(fsDb, `conferences/${confId}/badge_tokens`),
-                    fsWhere('registrationId', '==', attendee.id),
-                    fsWhere('status', '==', 'ACTIVE'),
-                    fsOrderBy('createdAt', 'desc'),
-                    fsLimit(1)
+                const q = query(
+                    collection(db, `conferences/${confId}/badge_tokens`),
+                    where('registrationId', '==', attendee.id),
+                    where('status', '==', 'ACTIVE'),
+                    orderBy('createdAt', 'desc'),
+                    limit(1)
                 );
                 const snapshot = await getDocs(q);
                 if (!snapshot.empty) {
                     setBadgeToken(snapshot.docs[0].data().token);
                     setTokenStatus('active');
                 } else {
-                    const qIssued = fsQuery(
-                        fsCol(fsDb, `conferences/${confId}/badge_tokens`),
-                        fsWhere('registrationId', '==', attendee.id),
-                        fsWhere('status', '==', 'ISSUED'),
-                        fsOrderBy('createdAt', 'desc'),
-                        fsLimit(1)
+                    const qIssued = query(
+                        collection(db, `conferences/${confId}/badge_tokens`),
+                        where('registrationId', '==', attendee.id),
+                        where('status', '==', 'ISSUED'),
+                        orderBy('createdAt', 'desc'),
+                        limit(1)
                     );
                     const issuedSnap = await getDocs(qIssued);
                     if (!issuedSnap.empty) {
@@ -462,7 +458,7 @@ const ExternalAttendeePage: React.FC = () => {
                     if (authResult.data.success) {
                         toast.success('회원 계정이 자동으로 생성되었습니다.');
                         // Update local state with new userId
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                         
                         (attendeeData as any).userId = authResult.data.uid;
                     }
                 } catch (authError) {
@@ -492,7 +488,7 @@ const ExternalAttendeePage: React.FC = () => {
             const rawData = await importFromExcel(file);
 
             // Map data supporting both English and Korean headers
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
             const mappedData = rawData.map((row: any) => {
                 const name = String(row.name || row['이름'] || row['성명'] || '').trim();
                 const phone = String(row.phone || row['전화번호'] || row['핸드폰'] || row['연락처'] || '').trim();
