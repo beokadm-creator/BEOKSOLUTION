@@ -5,6 +5,24 @@ import { CheckCircle2, Download, Home, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { useUserStore } from '../store/userStore';
 import { useConference } from '../hooks/useConference';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../firebase';
+
+type RegistrationSuccessData = {
+    name?: string;
+    userName?: string;
+    userInfo?: {
+        name?: string;
+    };
+    status?: string;
+    paymentStatus?: string;
+    virtualAccount?: {
+        bank?: string;
+        accountNumber?: string;
+        customerName?: string;
+        dueDate?: string;
+    };
+};
 
 const RegistrationSuccessPage: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -13,7 +31,7 @@ const RegistrationSuccessPage: React.FC = () => {
     const conference = useConference();
 
     // State for registration data
-    const [regData, setRegData] = React.useState<unknown>(null);
+    const [regData, setRegData] = React.useState<RegistrationSuccessData | null>(null);
     const setLoading = React.useState(true)[1];
 
     // Determine targetSlug
@@ -27,29 +45,30 @@ const RegistrationSuccessPage: React.FC = () => {
     })();
 
     const orderId = searchParams.get('orderId');
+    const regId = searchParams.get('regId');
     // const userName = searchParams.get('name'); // Use fetched data if available
 
     // Fetch Registration Data
     React.useEffect(() => {
         const fetchRegistration = async () => {
-            if (!conference.id || !orderId) {
+            if (!conference.id || (!orderId && !regId)) {
                 setLoading(false);
                 return;
             }
 
             try {
-                // Import firestore dynamically or use from top-level if added
-                const { collection, query, where, getDocs } = await import('firebase/firestore');
-                const { db } = await import('../firebase');
+                const registrationSnapshot = orderId
+                    ? await getDocs(query(
+                        collection(db, `conferences/${conference.id}/registrations`),
+                        where('orderId', '==', orderId)
+                    ))
+                    : await getDocs(query(
+                        collection(db, `conferences/${conference.id}/registrations`),
+                        where('id', '==', regId)
+                    ));
 
-                const q = query(
-                    collection(db, `conferences/${conference.id}/registrations`),
-                    where('orderId', '==', orderId)
-                );
-
-                const querySnapshot = await getDocs(q);
-                if (!querySnapshot.empty) {
-                    setRegData(querySnapshot.docs[0].data());
+                if (!registrationSnapshot.empty) {
+                    setRegData(registrationSnapshot.docs[0].data() as RegistrationSuccessData);
                 }
             } catch (error) {
                 console.error("Failed to fetch registration:", error);
@@ -59,7 +78,7 @@ const RegistrationSuccessPage: React.FC = () => {
         };
 
         fetchRegistration();
-    }, [conference.id, orderId, setLoading]);
+    }, [conference.id, orderId, regId, setLoading]);
     const handlePrint = () => {
         window.print();
     };
@@ -107,7 +126,7 @@ const RegistrationSuccessPage: React.FC = () => {
                         <div className="flex flex-col space-y-4">
                             <div className="flex justify-between items-center border-b border-gray-200 pb-3">
                                 <span className="text-gray-500 font-medium text-sm md:text-base">Registration ID</span>
-                                <span className="font-mono font-bold text-gray-800 text-base md:text-lg">{orderId || 'Unknown'}</span>
+                                <span className="font-mono font-bold text-gray-800 text-base md:text-lg">{orderId || regId || 'Unknown'}</span>
                             </div>
                             <div className="flex justify-between items-center border-b border-gray-200 pb-3">
                                 <span className="text-gray-500 font-medium text-sm md:text-base">Name</span>

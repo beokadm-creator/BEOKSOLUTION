@@ -1,24 +1,16 @@
 import { useBixolon } from '../../hooks/useBixolon';
 // import { BadgeElement } from '../../types/schema';
-import React, { useState, useEffect, useMemo } from 'react';
-import { BadgeConfig } from '../../types/print';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useExcel } from '../../hooks/useExcel';
 import { useRegistrationsPagination } from '../../hooks/useRegistrationsPagination';
-import { useConference } from '../../hooks/useConference';
-import { convertBadgeLayoutToConfig } from '../../utils/badgeConverter';
 import toast from 'react-hot-toast';
-import { query, collection, getDocs, getDoc, limit, doc, updateDoc, Timestamp, addDoc, where, orderBy as fbOrderBy } from 'firebase/firestore';
+import { query, collection, getDocs, getDoc, doc, Timestamp, orderBy as fbOrderBy } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../../firebase';
-import { Loader2, Printer, ChevronLeft, ChevronRight, MessageCircle, CheckSquare, Square, CheckCircle2, AlertTriangle, ShieldCheck, X } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, MessageCircle, CheckSquare, Square, CheckCircle2, AlertTriangle, ShieldCheck, X } from 'lucide-react';
 import { EregiButton } from '../../components/eregi/EregiForm';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { safeFormatDate } from '../../utils/dateUtils';
-import PrintHandler from '../../components/print/PrintHandler';
-import BadgeTemplate from '../../components/print/BadgeTemplate';
-import { kadd_2026 } from '../../data/conferences/kadd_2026.backup';
-import { useRef } from 'react';
 import { handleDeleteRegistrationWithCleanup } from '../../utils/registrationDeleteHandler'; // Keep cascade delete handler
 import { Button } from '../../components/ui/button';
 
@@ -54,8 +46,23 @@ interface RootRegistration {
         customerName?: string;
         dueDate?: string;
     };
-    options?: any[]; // Allow any to bypass TS error
+    options?: RegistrationOptionSummary[];
     badgeQr?: string; // Added for QR printing
+    baseAmount?: number;
+    optionsTotal?: number;
+}
+
+interface RegistrationOptionSummary {
+    name?: string | { ko?: string };
+    quantity?: number;
+}
+
+interface FallbackBadgeElement {
+    x: number;
+    y: number;
+    fontSize: number;
+    isVisible: boolean;
+    type: string;
 }
 
 const statusToKorean = (status: string) => {
@@ -77,9 +84,7 @@ const displayTier = (tier: string | undefined): string => {
 };
 
 const RegistrationListPage: React.FC = () => {
-    // [Fix-Step 150] BYPASS STRICT HOOK & MANUAL RESOLVE
-    // const { slug } = useConference(); // REMOVED
-    const { slug } = useParams<{ slug: string }>(); // Use Router Params directly
+    const { cid } = useParams<{ cid: string }>();
     const navigate = useNavigate();
 
     const { exportToExcel, processing: exporting } = useExcel();
@@ -89,11 +94,7 @@ const RegistrationListPage: React.FC = () => {
     const [filterStatus, setFilterStatus] = useState('SUCCESSFUL');
     const [searchName, setSearchName] = useState('');
 
-    // [Fix-Step 150] Smart Slug Auto-Resolution (Manual)
-    const [activeSlug, setActiveSlug] = useState<string | null>(slug || null);
-    const [conferenceId, setConferenceId] = useState<string | null>(null);
-    const { info } = useConference(conferenceId || slug);
-    const [status, setStatus] = useState<string>("Initializing...");
+    const conferenceId = cid || null;
 
     // Bixolon Hook
     const { printBadge, printing: bixolonPrinting, error: bixolonError } = useBixolon();
@@ -101,7 +102,6 @@ const RegistrationListPage: React.FC = () => {
     // Selection & Processing State
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [progress, setProgress] = useState(0);
 
     // ─── Bulk Send Modal State ───────────────────────────────────────────────
     const [bulkModal, setBulkModal] = useState<{
@@ -120,13 +120,6 @@ const RegistrationListPage: React.FC = () => {
         result: null
     });
 
-    const badgeConfig = useMemo(() => {
-        if (info?.badgeLayout && info.badgeLayout.elements.length > 0) {
-            return convertBadgeLayoutToConfig(info.badgeLayout);
-        }
-        return kadd_2026.badge as BadgeConfig;
-    }, [info]);
-
     // Use pagination hook (follows project convention: use hooks, not direct Firestore)
     const {
         registrations,
@@ -143,51 +136,6 @@ const RegistrationListPage: React.FC = () => {
         itemsPerPage: 50,
         searchQuery: searchName
     });
-
-    // Auto-Resolve Slug if missing
-    useEffect(() => {
-        if (slug) {
-            // If slug is provided, we still need conferenceId. 
-            // Query by slug to get ID.
-            const findId = async () => {
-                const q = query(collection(db, 'conferences'), where('slug', '==', slug));
-                const snap = await getDocs(q);
-                if (!snap.empty) {
-                    setConferenceId(snap.docs[0].id);
-                    setActiveSlug(slug);
-                    setStatus(`URL Slug Found: ${slug}`);
-                }
-            };
-            findId();
-            return;
-        }
-
-        const resolveSlug = async () => {
-            setStatus("HOOK BYPASSED. Searching for active conference...");
-            try {
-                // Try to find ANY conference for this society (or system-wide fallback)
-                // Assuming 'kap' is the default society for this admin view
-                const q = query(collection(db, 'conferences'), limit(1));
-                const snap = await getDocs(q);
-
-                if (!snap.empty) {
-                    const found = snap.docs[0].data().slug;
-                    const foundId = snap.docs[0].id;
-                    setActiveSlug(found);
-                    setConferenceId(foundId);
-                    setStatus(`Auto-Resolved: ${found}`);
-                } else {
-                    console.error("No active conferences found in system.");
-                    setStatus("Resolution Failed: No conferences found.");
-                }
-            } catch (e: unknown) {
-                console.error("Failed to auto-resolve conference:", e);
-                setStatus(`Resolution Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
-            }
-        };
-
-        resolveSlug();
-    }, [slug]);
 
     // Action: Issue Badge Manual
     const handleIssueBadge = async (e: React.MouseEvent, reg: RootRegistration) => {
@@ -247,9 +195,10 @@ const RegistrationListPage: React.FC = () => {
             } else {
                 throw new Error('Failed to send notification');
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Failed to send notification:', error);
-            toast.error(`Error: ${error.message || 'Unknown error'}`);
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            toast.error(`Error: ${message}`);
         } finally {
             setIsProcessing(false);
         }
@@ -368,7 +317,7 @@ const RegistrationListPage: React.FC = () => {
                 }
             }));
             setSelectedIds([]);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Bulk send failed:', error);
             toast.error(`발송 실패: ${error.message || '알 수 없는 오류'}`);
             setBulkModal(prev => ({ ...prev, step: 'confirm' }));
@@ -425,41 +374,15 @@ const RegistrationListPage: React.FC = () => {
                 }
             }
 
-            // Fallback to slug if conferenceId is missing
-            if (!badgeLayout && slug) {
-                console.log('[Bixolon] Fetching conference by slug...');
-                try {
-                    const q = query(collection(db, 'conferences'), where('slug', '==', slug));
-                    const snap = await getDocs(q);
-                    if (!snap.empty) {
-                        const cid = snap.docs[0].id;
-                        const cfgSnap = await getDoc(doc(db, `conferences/${cid}/settings/badge_config`));
-                        if (cfgSnap.exists()) {
-                            const data = cfgSnap.data();
-                            if (data.badgeLayoutEnabled && data.badgeLayout) {
-                                badgeLayout = {
-                                    width: data.badgeLayout.width || 800,
-                                    height: data.badgeLayout.height || 1200,
-                                    elements: data.badgeLayout.elements || [],
-                                    enableCutting: data.badgeLayout.enableCutting || false
-                                };
-                            }
-                        }
-                    }
-                } catch (fetchErr) {
-                    console.error('[Bixolon] slug-based badge_config fetch failed:', fetchErr);
-                }
-            }
-
             // Info Desk와 동일한 기본 레이아웃 폴백 (v356 로직 동기화)
             const activeLayout = badgeLayout || {
                 width: 800,
                 height: 1200,
                 elements: [
-                    { x: 400, y: 150, fontSize: 6, isVisible: true, type: 'QR' } as any,
-                    { x: 400, y: 450, fontSize: 4, isVisible: true, type: 'NAME' } as any,
-                    { x: 400, y: 600, fontSize: 2, isVisible: true, type: 'ORG' } as any
-                ]
+                    { x: 400, y: 150, fontSize: 6, isVisible: true, type: 'QR' },
+                    { x: 400, y: 450, fontSize: 4, isVisible: true, type: 'NAME' },
+                    { x: 400, y: 600, fontSize: 2, isVisible: true, type: 'ORG' }
+                ] as FallbackBadgeElement[]
             };
 
             let userName = reg.userName || '';
@@ -624,24 +547,30 @@ const RegistrationListPage: React.FC = () => {
                 '면허번호': r.licenseNumber || '-',
                 '등급': displayTier(r.tier),
                 '결제금액': r.amount,
-                '선택옵션': r.options ? r.options.map((o: any) => `${typeof o.name === 'string' ? o.name : o.name?.ko || ''}(${o.quantity})`).join(', ') : '-',
+                '선택옵션': r.options ? r.options.map((o) => `${typeof o.name === 'string' ? o.name : o.name?.ko || ''}(${o.quantity})`).join(', ') : '-',
                 '결제수단': r.paymentType || r.paymentMethod || r.method || '카드',
                 '상태': statusToKorean(r.status),
                 '등록일': safeFormatDate(r.createdAt),
             }));
-            exportToExcel(data, `Registrants_${activeSlug}_${new Date().toISOString().slice(0, 10)}`);
+            exportToExcel(data, `Registrants_${conferenceId || 'unknown'}_${new Date().toISOString().slice(0, 10)}`);
             toast.success(`총 ${data.length}명의 데이터를 다운로드했습니다.`);
-        } catch (err) {
+        } catch {
             toast.dismiss(toastId);
             toast.error('데이터를 불러오는데 실패했습니다.');
         }
     };
 
-    if (loading && !activeSlug) return (
+    if (!conferenceId) return (
+        <div className="p-8 text-red-600 font-bold border border-red-400 bg-red-50 m-4 rounded">
+            잘못된 학술대회 경로입니다.
+        </div>
+    );
+
+    if (loading) return (
         <div className="p-8 flex flex-col items-center">
             <Loader2 className="animate-spin w-8 h-8 text-blue-600 mb-4" />
             <div className="text-gray-500 text-sm font-mono mb-4">
-                Loading... {status}
+                Loading registrations...
             </div>
         </div>
     );
@@ -955,6 +884,7 @@ const RegistrationListPage: React.FC = () => {
 
                                     {/* Checklist */}
                                     <div className="space-y-2">
+                                        {/* eslint-disable-next-line no-irregular-whitespace */}
                                         <p className="text-sm font-semibold text-gray-700">다음 사항을 확인하세요 ⚠️</p>
                                         {[
                                             '앞에 표시된 등록자가 모두 전화번호를 보유한 실제 수령 대상임을 확인했습니다.',

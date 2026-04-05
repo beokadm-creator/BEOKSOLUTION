@@ -6,6 +6,21 @@ import { db } from '../firebase';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { LogOut, Building2, PanelLeftClose, PanelLeft, LayoutDashboard, QrCode, Settings, Users, Bell } from 'lucide-react';
 
+// URL에서 추출한 vendorId 또는 첫 번째 벤더 ID - utility functions
+const slugify = (value: string) => {
+    return value
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9가-힣]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+};
+
+const getVendorSlug = (v: { id: string; name?: string; slug?: string } | undefined | null) => {
+    if (!v) return null;
+    const fallback = v.name ? slugify(v.name) : '';
+    return (v.slug && v.slug.trim()) || fallback || v.id;
+};
+
 export default function VendorPortalLayout() {
     const [loading, setLoading] = useState(true);
     const [authorized, setAuthorized] = useState(false);
@@ -17,8 +32,16 @@ export default function VendorPortalLayout() {
 
     const isCameraMode = location.pathname.includes('/scanner/camera');
 
-    // URL에서 추출한 vendorId 또는 첫 번째 벤더 ID
-    const activeVendorId = urlVendorId || (vendors.length > 0 ? vendors[0].id : null);
+    const resolveVendorId = () => {
+        if (!urlVendorId) return null;
+        const direct = vendors.find(v => v.id === urlVendorId);
+        if (direct) return direct.id;
+        const bySlug = vendors.find(v => (v.slug && v.slug === urlVendorId) || (v.name && slugify(v.name) === urlVendorId));
+        return bySlug ? bySlug.id : null;
+    };
+
+    const resolvedVendorId = resolveVendorId();
+    const activeVendorId = resolvedVendorId || (vendors.length > 0 ? vendors[0].id : null);
 
     useEffect(() => {
         const auth = getAuth();
@@ -64,19 +87,21 @@ export default function VendorPortalLayout() {
     useEffect(() => {
         if (!loading && authorized && vendors.length > 0) {
             const validVendorIds = vendors.map(v => v.id);
+            const fallbackVendor = vendors[0];
+            const fallbackSlug = getVendorSlug(fallbackVendor);
             
             // URL이 /partner로 끝나면 첫 번째 벤더로 리다이렉트
             if (location.pathname === '/partner') {
-                navigate(`/partner/${vendors[0].id}`, { replace: true });
+                navigate(`/partner/${fallbackSlug}`, { replace: true });
                 return;
             }
             
             // URL에 vendorId가 있지만 권한이 없는 경우
-            if (urlVendorId && !validVendorIds.includes(urlVendorId)) {
-                navigate(`/partner/${vendors[0].id}`, { replace: true });
+            if (urlVendorId && !validVendorIds.includes(resolvedVendorId || '')) {
+                navigate(`/partner/${fallbackSlug}`, { replace: true });
             }
         }
-    }, [loading, authorized, vendors, urlVendorId, location.pathname, navigate]);
+    }, [loading, authorized, vendors, urlVendorId, location.pathname, navigate, resolvedVendorId]);
 
     const handleLogout = async () => {
         const auth = getAuth();
@@ -93,11 +118,12 @@ export default function VendorPortalLayout() {
     }
 
     const activeVendor = vendors.find(v => v.id === activeVendorId);
+    const activeVendorSlug = getVendorSlug(activeVendor);
 
     // NavLink 경로 생성 (vendorId 포함)
     const getNavPath = (path: string) => {
-        if (!activeVendorId) return '/partner';
-        return `/partner/${activeVendorId}${path ? `/${path}` : ''}`;
+        if (!activeVendorSlug) return '/partner';
+        return `/partner/${activeVendorSlug}${path ? `/${path}` : ''}`;
     };
 
     return (
@@ -119,7 +145,11 @@ export default function VendorPortalLayout() {
                                 <select
                                     id="vendor-select"
                                     value={activeVendorId || ''}
-                                    onChange={(e) => navigate(`/partner/${e.target.value}`)}
+                                    onChange={(e) => {
+                                        const selected = vendors.find(v => v.id === e.target.value);
+                                        const slug = getVendorSlug(selected);
+                                        navigate(`/partner/${slug}`);
+                                    }}
                                     className="w-full bg-indigo-800 border-none rounded text-sm py-2 px-3 text-white focus:ring-0"
                                 >
                                     {vendors.map(v => (
@@ -193,7 +223,7 @@ export default function VendorPortalLayout() {
                 )}
                 <div className={`flex-1 overflow-auto ${isCameraMode ? 'p-0 w-full h-full bg-black' : 'p-6'}`}>
                     {/* We pass activeVendorId to children via Outlet context so they know which vendor to load data for */}
-                    <Outlet context={{ activeVendorId }} />
+                    <Outlet context={{ activeVendorId, activeVendorSlug }} />
                 </div>
             </main>
         </div>

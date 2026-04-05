@@ -15,7 +15,7 @@ import { Badge } from '../../components/ui/badge';
 interface InfraSettings {
     payment: {
         domestic: {
-            provider: 'TOSS' | 'NICE' | 'KCP' | 'KICC' | '';
+            provider: 'TOSS' | 'KCP' | 'KICC' | '';
             merchantId: string;
             apiKey: string;
             secretKey: string;
@@ -223,7 +223,7 @@ export default function InfraPage() {
                                         ...prev,
                                         payment: {
                                             ...prev.payment,
-                                            domestic: { ...prev.payment.domestic, provider: val as 'TOSS' | 'NICE' | 'KCP' | 'KICC' }
+                                            domestic: { ...prev.payment.domestic, provider: val as 'TOSS' | 'KCP' | 'KICC' }
                                         }
                                     }))}
                                 >
@@ -232,7 +232,6 @@ export default function InfraPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="TOSS">Toss Payments (Recommended)</SelectItem>
-                                        <SelectItem value="NICE">NicePay</SelectItem>
                                         <SelectItem value="KCP">NHN KCP</SelectItem>
                                         <SelectItem value="KICC">EasyPay (KICC)</SelectItem>
                                     </SelectContent>

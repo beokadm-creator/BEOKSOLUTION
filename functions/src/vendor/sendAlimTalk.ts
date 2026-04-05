@@ -1,6 +1,8 @@
 import * as functions from 'firebase-functions';
+import * as admin from 'firebase-admin';
 import { NotificationService } from '../services/notificationService';
 import { createAuditLogEntry } from '../audit/logAuditEvent';
+import { assertVendorActor } from './shared';
 
 /**
  * Cloud Function: sendVendorAlimTalk
@@ -38,6 +40,9 @@ export const sendVendorAlimTalk = functions.https.onCall(async (data, context) =
     }
 
     try {
+        const db = admin.firestore();
+        await assertVendorActor(db, vendorId, context.auth);
+
         const notificationService = NotificationService.getInstance();
 
         const result = await notificationService.sendAlimTalk(

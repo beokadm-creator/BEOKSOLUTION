@@ -19,6 +19,18 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function vendorDoc(vendorId) {
+      return get(/databases/$(database)/documents/vendors/$(vendorId)).data;
+    }
+
+    function isVendorMember(vendorId) {
+      return isAuthenticated() && (
+        vendorDoc(vendorId).ownerUid == request.auth.uid ||
+        vendorDoc(vendorId).adminEmail == request.auth.token.email ||
+        (vendorDoc(vendorId).staffEmails != null && request.auth.token.email in vendorDoc(vendorId).staffEmails)
+      );
+    }
+
     // Global Admin Access
     match /{document=**} {
       allow read, write: if isSuperAdmin();
@@ -29,9 +41,43 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isSuperAdmin();
 
-      match /{allSubcollections=**} { 
-         allow read: if true; 
-         allow write: if isSuperAdmin(); 
+      // Public conference mapping under society namespace
+      match /conferences/{confDocId} {
+        allow read: if true;
+        allow write: if isSuperAdmin();
+      }
+
+      // Public settings required by landing/registration flows
+      match /settings/{settingId} {
+        allow read: if settingId in ['identity', 'terms', 'infrastructure', 'membership-fees'];
+        allow write: if isSuperAdmin();
+      }
+
+      // Public grade list used by registration pricing UI
+      match /settings/grades/list/{gradeId} {
+        allow read: if true;
+        allow write: if isSuperAdmin();
+      }
+
+      // Member directory contains personal data
+      match /members/{memberId} {
+        allow read: if isAuthenticated() || isSuperAdmin();
+        allow write: if isSuperAdmin();
+      }
+
+      // Verification codes are sensitive
+      match /verification_codes/{codeId} {
+        allow read, write: if isSuperAdmin();
+      }
+
+      // Notification templates are admin resources
+      match /notification-templates/{templateId} {
+        allow read, write: if isSuperAdmin();
+      }
+
+      // Default deny for unlisted society subcollections
+      match /{allSubcollections=**} {
+         allow read, write: if isSuperAdmin();
       }
     }
 
@@ -46,8 +92,27 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isSuperAdmin();
 
-      match /{document=**} {
-        allow read: if true;
+      // Public conference subcollections except explicitly restricted collections.
+      // Restricted collections are handled by dedicated rules below.
+      match /{subCollection}/{docPath=**} {
+        allow read: if !(subCollection in [
+          'registrations',
+          'external_attendees',
+          'guestbook_entries',
+          'vendor_requests',
+          'stamp_tour_progress',
+          'stamps',
+          'badge_tokens',
+          'users',
+          'access_logs',
+          'admins',
+          'private_config',
+          'notification_logs',
+          'conference_options',
+          'submissions',
+          'whitelists',
+          'vendors'
+        ]);
         allow write: if isSuperAdmin();
       }
 
@@ -73,17 +138,58 @@ service cloud.firestore {
         allow read, write: if isSuperAdmin();
       }
 
-      // Stamps: Stamp Tour (인증된 사용자면 생성 가능)
+      // Stamps: Stamp Tour
       match /stamps/{stampId} {
-        allow read: if true;
-        allow create: if isAuthenticated();
+        allow read: if isSuperAdmin() || isOwner(resource.data.userId);
+        allow create: if isSuperAdmin();
         allow update, delete: if isSuperAdmin();
+      }
+
+      // Stamp Tour Config
+      match /settings/stamp_tour {
+        allow read: if true;
+        allow write: if isSuperAdmin();
+      }
+
+      // Stamp Tour Progress
+      match /stamp_tour_progress/{userId} {
+        allow read: if isSuperAdmin() || isOwner(userId);
+        allow create, update: if isSuperAdmin();
+        allow delete: if isSuperAdmin();
+      }
+
+      // Guestbook entries: Require vendor consent flow
+      match /guestbook_entries/{entryId} {
+        allow read: if isSuperAdmin() || isVendorMember(resource.data.vendorId) || isOwner(resource.data.userId);
+        allow create, update, delete: if isSuperAdmin();
+      }
+
+      // Submissions: owner can read own abstracts in MyPage
+      match /submissions/{submissionId} {
+        allow read: if isSuperAdmin() || isOwner(resource.data.userId);
+        allow write: if isSuperAdmin();
+      }
+
+      // Vendor sponsorship requests
+      match /vendor_requests/{requestId} {
+        allow read: if isSuperAdmin() || isVendorMember(resource.data.vendorId);
+        allow create, update: if isSuperAdmin() ||
+          (isVendorMember(request.resource.data.vendorId) && request.resource.data.vendorId == requestId);
+        allow delete: if isSuperAdmin();
       }
     }
 
     // Collection Group Query Rules
     match /{path=**}/sponsors/{sponsorId} {
       allow read: if true;
+    }
+
+    match /{path=**}/guestbook_entries/{entryId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /{path=**}/submissions/{submissionId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
 
     // User Profile
@@ -108,36 +214,27 @@ service cloud.firestore {
       // - list: Allow authenticated users to query (for login page)
       // - get/write: Only authorized admin can access
       allow list: if isAuthenticated();
-      allow get, write: if isSuperAdmin() ||
-                        (isAuthenticated() && 
-                         resource.data.adminEmail == request.auth.token.email);
+      allow get, write: if isSuperAdmin() || isVendorMember(vendorId);
 
       // Subcollections - check parent vendor document
       // Using get() to fetch parent document for authorization
       match /settings/{document=**} {
-        allow read, write: if isSuperAdmin() ||
-          (isAuthenticated() && 
-           get(/databases/$(database)/documents/vendors/$(vendorId)).data.adminEmail == request.auth.token.email);
+        allow read, write: if isSuperAdmin() || isVendorMember(vendorId);
       }
 
       match /notification-templates/{templateId} {
-        allow read, write: if isSuperAdmin() ||
-          (isAuthenticated() && 
-           get(/databases/$(database)/documents/vendors/$(vendorId)).data.adminEmail == request.auth.token.email);
+        allow read, write: if isSuperAdmin() || isVendorMember(vendorId);
       }
 
       // Leads contain PII - strict access control
       match /leads/{leadId} {
-        allow read, create, update, delete: if isSuperAdmin() ||
-          (isAuthenticated() && 
-           get(/databases/$(database)/documents/vendors/$(vendorId)).data.adminEmail == request.auth.token.email);
+        allow read: if isSuperAdmin() || isVendorMember(vendorId);
+        allow create, update, delete: if isSuperAdmin();
       }
 
       // Audit logs for vendor operations
       match /audit_logs/{logId} {
-        allow read: if isSuperAdmin() ||
-          (isAuthenticated() && 
-           get(/databases/$(database)/documents/vendors/$(vendorId)).data.adminEmail == request.auth.token.email);
+        allow read: if isSuperAdmin() || isVendorMember(vendorId);
         allow create: if isAuthenticated();
         allow update, delete: if isSuperAdmin();
       }

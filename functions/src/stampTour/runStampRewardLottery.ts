@@ -3,7 +3,9 @@ import * as admin from "firebase-admin";
 
 import {
     assertStampTourAdmin,
+    getRewardDisplayLabel,
     getRequiredCount,
+    isRewardDrawCompleted,
     normalizeRewards,
     StampReward,
     StampTourConfig,
@@ -18,6 +20,7 @@ type StampProgressDoc = {
     lotteryStatus?: "PENDING" | "SELECTED" | "NOT_SELECTED";
     completedAt?: admin.firestore.Timestamp;
     lotteryExecutedAt?: admin.firestore.Timestamp;
+    rewardLabel?: string | null;
 };
 
 type CallablePayload = {
@@ -36,8 +39,18 @@ const shuffle = <T>(items: T[]) => {
 };
 
 const getSelectableRewards = (rewards: StampReward[]) => {
-    const primary = rewards.filter((reward) => reward.remainingQty > 0 && reward.name.length > 0 && !reward.isFallback);
-    const fallback = rewards.filter((reward) => reward.remainingQty > 0 && reward.name.length > 0 && reward.isFallback);
+    const primary = rewards.filter(
+        (reward) => reward.remainingQty > 0
+            && (reward.name.length > 0 || (reward.label || "").length > 0)
+            && !reward.isFallback
+            && !isRewardDrawCompleted(reward)
+    );
+    const fallback = rewards.filter(
+        (reward) => reward.remainingQty > 0
+            && (reward.name.length > 0 || (reward.label || "").length > 0)
+            && reward.isFallback
+            && !isRewardDrawCompleted(reward)
+    );
     return primary.length > 0 ? primary : fallback;
 };
 
@@ -164,20 +177,27 @@ export const runStampRewardLottery = functions
         const winners = shuffledEligible.slice(0, Math.min(shuffledEligible.length, rewardSlots.length));
         const executedAt = admin.firestore.Timestamp.now();
         const batch = db.batch();
-        const selectedParticipants: Array<{ userId: string; userName?: string | null; userOrg?: string | null; rewardName?: string }> = [];
-
+        const selectedParticipants: Array<{
+            userId: string;
+            userName?: string | null;
+            userOrg?: string | null;
+            rewardName?: string;
+            rewardLabel?: string;
+        }> = [];
         winners.forEach((entry, index) => {
             const selectedReward = rewardSlots[index];
             const rewardIndex = mutableRewards.findIndex((reward) => reward.id === selectedReward.id);
             if (rewardIndex >= 0) {
                 mutableRewards[rewardIndex].remainingQty = Math.max(0, (mutableRewards[rewardIndex].remainingQty || 0) - 1);
+                mutableRewards[rewardIndex].drawCompletedAt = executedAt;
             }
 
             selectedParticipants.push({
                 userId: entry.userId,
                 userName: entry.progress?.userName || null,
                 userOrg: entry.progress?.userOrg || null,
-                rewardName: selectedReward.name
+                rewardName: selectedReward.name,
+                rewardLabel: selectedReward.label || getRewardDisplayLabel(selectedReward)
             });
 
             batch.set(db.doc(`conferences/${confId}/stamp_tour_progress/${entry.userId}`), {
@@ -189,6 +209,7 @@ export const runStampRewardLottery = functions
                 completedAt: entry.progress?.completedAt || admin.firestore.Timestamp.now(),
                 rewardId: selectedReward.id,
                 rewardName: selectedReward.name,
+                rewardLabel: selectedReward.label || null,
                 rewardStatus: "REQUESTED",
                 lotteryStatus: "SELECTED",
                 requestedAt: executedAt,

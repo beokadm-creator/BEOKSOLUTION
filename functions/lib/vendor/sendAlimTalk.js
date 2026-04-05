@@ -35,8 +35,10 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendVendorAlimTalk = void 0;
 const functions = __importStar(require("firebase-functions"));
+const admin = __importStar(require("firebase-admin"));
 const notificationService_1 = require("../services/notificationService");
 const logAuditEvent_1 = require("../audit/logAuditEvent");
+const shared_1 = require("./shared");
 /**
  * Cloud Function: sendVendorAlimTalk
  *
@@ -65,6 +67,8 @@ exports.sendVendorAlimTalk = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('invalid-argument', 'Missing required parameters: vendorId, phone, templateCode, variables');
     }
     try {
+        const db = admin.firestore();
+        await (0, shared_1.assertVendorActor)(db, vendorId, context.auth);
         const notificationService = notificationService_1.NotificationService.getInstance();
         const result = await notificationService.sendAlimTalk({
             phone,

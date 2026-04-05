@@ -61,7 +61,7 @@ const GatePage: React.FC = () => {
                 const rulesSnap = await getDoc(rulesRef);
                 if (rulesSnap.exists()) {
                     const allRules = rulesSnap.data().rules || {};
-                    let allZones: any[] = [];
+                    const allZones: any[] = [];
                     Object.entries(allRules).forEach(([dateStr, rule]: [string, any]) => {
                         if (rule?.zones) {
                             rule.zones.forEach((z: any) => {
@@ -104,7 +104,7 @@ const GatePage: React.FC = () => {
         };
         init();
         setTimeout(() => inputRef.current?.focus(), 500);
-    }, [selectedConferenceId, cid]);
+    }, [selectedConferenceId, cid, selectedZoneId]);
 
     useEffect(() => {
         const confId = cid || selectedConferenceId;
@@ -144,7 +144,7 @@ const GatePage: React.FC = () => {
                 return s.split('').map(c => map[c] || c).join('').replace(/[^a-zA-Z0-9-]/g, '');
             };
 
-            let raw = decodeTypos(code).trim();
+            const raw = decodeTypos(code).trim();
             let id = raw;
             if (raw.toUpperCase().startsWith('BADGE-')) id = raw.substring(6);
 
@@ -215,7 +215,7 @@ const GatePage: React.FC = () => {
                     bE = new Date(Math.min(now.getTime(), new Date(`${ds}T${rule.end}:00+09:00`).getTime()));
                 }
                 if (bE > bS) {
-                    let diff = Math.floor((bE.getTime() - bS.getTime()) / 60000);
+                    const diff = Math.floor((bE.getTime() - bS.getTime()) / 60000);
                     let ded = 0;
                     if (rule?.breaks) {
                         rule.breaks.forEach((b: any) => {

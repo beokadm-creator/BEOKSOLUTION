@@ -4,11 +4,13 @@ import * as functions from "firebase-functions";
 export type StampReward = {
     id: string;
     name: string;
+    label?: string;
     remainingQty: number;
     totalQty?: number;
     weight?: number;
     order?: number;
     isFallback?: boolean;
+    drawCompletedAt?: admin.firestore.Timestamp;
 };
 
 export type CompletionRule = {
@@ -52,12 +54,23 @@ export const normalizeRewards = (rewards: StampReward[], mode: "RANDOM" | "FIXED
     return {
         ...reward,
         name: (reward.name || "").trim(),
+        label: (reward.label || "").trim(),
         totalQty,
         remainingQty,
         weight: mode === "RANDOM" ? Math.max(1, Math.floor(Number(reward.weight ?? 1) || 1)) : undefined,
         order: mode === "FIXED" ? Math.max(1, Math.floor(Number(reward.order ?? index + 1) || index + 1)) : undefined
     };
 });
+
+export const isRewardDrawCompleted = (reward: StampReward) => Boolean(reward.drawCompletedAt);
+
+export const getRewardDisplayLabel = (reward: Pick<StampReward, "label" | "name">) => {
+    const label = (reward.label || "").trim();
+    const name = (reward.name || "").trim();
+
+    if (label && name) return `${label} - ${name}`;
+    return label || name;
+};
 
 export const selectReward = (rewards: StampReward[], mode: "RANDOM" | "FIXED") => {
     if (mode === "RANDOM") {
@@ -75,14 +88,25 @@ export const selectReward = (rewards: StampReward[], mode: "RANDOM" | "FIXED") =
     return rewards.slice().sort((a, b) => (a.order || 0) - (b.order || 0))[0];
 };
 
-export const resolveSelectableRewards = (config: StampTourConfig) => {
+export const resolveSelectableRewards = (
+    config: StampTourConfig,
+    options?: {
+        excludeCompletedDraws?: boolean;
+    }
+) => {
     const mode: "RANDOM" | "FIXED" = config.rewardMode === "FIXED" ? "FIXED" : "RANDOM";
     const rewards = normalizeRewards(Array.isArray(config.rewards) ? config.rewards : [], mode);
     const primaryRewards = rewards.filter(
-        reward => reward.remainingQty > 0 && reward.name.length > 0 && !reward.isFallback
+        reward => reward.remainingQty > 0
+            && (reward.name.length > 0 || (reward.label || "").length > 0)
+            && !reward.isFallback
+            && (!options?.excludeCompletedDraws || !isRewardDrawCompleted(reward))
     );
     const fallbackRewards = rewards.filter(
-        reward => reward.remainingQty > 0 && reward.name.length > 0 && reward.isFallback
+        reward => reward.remainingQty > 0
+            && (reward.name.length > 0 || (reward.label || "").length > 0)
+            && reward.isFallback
+            && (!options?.excludeCompletedDraws || !isRewardDrawCompleted(reward))
     );
 
     return {

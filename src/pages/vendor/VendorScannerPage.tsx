@@ -1,15 +1,18 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useParams, useOutletContext } from 'react-router-dom';
 import { useVendor } from '../../hooks/useVendor';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Button } from '../../components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../../components/ui/card';
-import { QrCode, Camera, Keyboard, AlertCircle, CheckCircle2, Monitor, ChevronLeft } from 'lucide-react';
+import { Camera, Keyboard, AlertCircle, CheckCircle2, Monitor, ChevronLeft } from 'lucide-react';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external' }) {
-    const { vendorId } = useParams<{ vendorId: string }>();
-    const vendorLogic = useVendor(vendorId);
+    const { vendorId: paramVendorId } = useParams<{ vendorId: string }>();
+    const { activeVendorId } = useOutletContext<{ activeVendorId?: string | null }>();
+    const resolvedVendorId = activeVendorId || paramVendorId;
+    const vendorLogic = useVendor(resolvedVendorId);
 
     const {
         vendor,
@@ -19,18 +22,58 @@ export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external
         scanBadge,
         scanResult,
         processVisit,
+        conferenceFeatures,
         loading,
         error,
-        resetScan
     } = vendorLogic;
 
     const [qrInput, setQrInput] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
+    const [showGuestbookPopup, setShowGuestbookPopup] = useState(false);
+    const [guestbookMessage, setGuestbookMessage] = useState('');
 
     // Camera Scan State
     const [isScanning, setIsScanning] = useState(false);
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const [cameraError, setCameraError] = useState<string | null>(null);
+
+    type ScanUser = {
+        affiliation?: string;
+        organization?: string;
+        affiliations?: unknown;
+        name?: string;
+    };
+
+    type ScanReg = {
+        affiliation?: string;
+        organization?: string;
+        type?: string;
+        category?: string;
+    };
+
+    const getAffiliationLabel = (user: ScanUser, reg: ScanReg) => {
+        const affiliations = user.affiliations;
+        if (Array.isArray(affiliations)) {
+            const first = affiliations[0];
+            if (first && typeof first === 'object' && 'name' in first) {
+                const name = (first as { name?: string }).name;
+                if (name) return name;
+            }
+        }
+        if (affiliations && typeof affiliations === 'object') {
+            const record = affiliations as Record<string, { name?: string }>;
+            const firstKey = Object.keys(record)[0];
+            if (firstKey && record[firstKey]?.name) {
+                return record[firstKey].name || '-';
+            }
+        }
+
+        return user.affiliation || reg.affiliation || reg.organization || '-';
+    };
+
+    const getRegistrationLabel = (reg: ScanReg) => {
+        return reg.type || reg.category || '-';
+    };
 
     useEffect(() => {
         // Stop scanner on unmount
@@ -57,7 +100,34 @@ export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external
         }
     };
 
-    const startScanner = () => {
+    const handleAgree = () => {
+        if (conferenceFeatures.guestbookEnabled) {
+            setShowGuestbookPopup(true);
+            return;
+        }
+        processVisit(true);
+    };
+
+    const submitGuestbook = async (message: string) => {
+        await processVisit(true, message);
+        setGuestbookMessage('');
+        setShowGuestbookPopup(false);
+    };
+
+    const stopScanner = useCallback(() => {
+        if (scannerRef.current) {
+            scannerRef.current.stop().then(() => {
+                scannerRef.current?.clear();
+                scannerRef.current = null;
+                setIsScanning(false);
+            }).catch(err => {
+                console.error("Scanner stop fail:", err);
+                setIsScanning(false);
+            });
+        }
+    }, []);
+
+    const startScanner = useCallback(() => {
         if (mode === 'external') return; // Prevent camera in external mode
         if (isScanning) return;
         setIsScanning(true);
@@ -76,7 +146,7 @@ export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external
                         scanBadge(decodedText);
                         stopScanner(); // Stop after successful scan
                     },
-                    (errorMessage) => {
+                    () => {
                         // ignore general frame scan errors
                     }
                 ).catch((err) => {
@@ -86,27 +156,16 @@ export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external
                 });
             }
         }, 300);
-    };
+    }, [mode, isScanning, scanBadge, stopScanner]);
 
-    const stopScanner = () => {
-        if (scannerRef.current) {
-            scannerRef.current.stop().then(() => {
-                scannerRef.current?.clear();
-                scannerRef.current = null;
-                setIsScanning(false);
-            }).catch(err => {
-                console.error("Scanner stop fail:", err);
-                setIsScanning(false);
-            });
-        }
-    };
 
     // Auto-start camera if in camera mode and not currently showing a result/error
     useEffect(() => {
         if (mode === 'camera' && !isScanning && !scanResult && !error && !cameraError) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             startScanner();
         }
-    }, [mode, isScanning, scanResult, error, cameraError]);
+    }, [mode, isScanning, scanResult, error, cameraError, startScanner]);
 
     if (mode === 'camera') {
         return (
@@ -182,12 +241,12 @@ export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external
 
                                         <div className="text-gray-400 font-bold">소속</div>
                                         <div className="font-medium text-gray-300 text-right leading-tight">
-                                            {((scanResult.user as any).affiliations)?.[0]?.name || (scanResult.user as any).affiliation || (scanResult.reg as any).affiliation || (scanResult.reg as any).organization || '-'}
+                                            {getAffiliationLabel(scanResult.user, scanResult.reg)}
                                         </div>
 
                                         <div className="text-gray-400 font-bold">등록 타입</div>
                                         <div className="font-bold text-indigo-300 text-right uppercase">
-                                            {(scanResult.reg as any).type || (scanResult.reg as any).category || '-'}
+                                            {getRegistrationLabel(scanResult.reg)}
                                         </div>
                                     </div>
                                 </div>
@@ -212,7 +271,7 @@ export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external
                                 </Button>
                                 <Button
                                     className="py-7 text-sm font-black bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-lg shadow-indigo-500/20"
-                                    onClick={() => processVisit(true)}
+                                    onClick={handleAgree}
                                     disabled={loading}
                                 >
                                     동의 및 저장
@@ -226,6 +285,37 @@ export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external
                         <LoadingSpinner text="처리 중..." />
                     </div>
                 )}
+                <Dialog open={showGuestbookPopup} onOpenChange={setShowGuestbookPopup}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>방명록 남기기</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-3">
+                            <p className="text-sm text-gray-500">동의가 완료되었습니다. 파트너 방명록 메시지를 남겨주세요.</p>
+                            <textarea
+                                value={guestbookMessage}
+                                onChange={(e) => setGuestbookMessage(e.target.value)}
+                                className="w-full h-28 border border-gray-200 rounded-lg p-3 text-sm"
+                                placeholder="예: 제품 설명 잘 들었습니다. 연락 부탁드립니다."
+                            />
+                        </div>
+                        <DialogFooter className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={() => submitGuestbook('')}
+                                className="flex-1"
+                            >
+                                메시지 없이 저장
+                            </Button>
+                            <Button
+                                onClick={() => submitGuestbook(guestbookMessage)}
+                                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white"
+                            >
+                                저장
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
         );
     }
@@ -311,12 +401,12 @@ export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external
 
                                 <div className="text-gray-500">Affiliation</div>
                                 <div className="font-medium text-gray-900 text-right">
-                                    {((scanResult.user as any).affiliations)?.[0]?.name || (scanResult.user as any).affiliation || (scanResult.reg as any).affiliation || (scanResult.reg as any).organization || 'N/A'}
+                                    {getAffiliationLabel(scanResult.user, scanResult.reg)}
                                 </div>
 
                                 <div className="text-gray-500">Registration Type</div>
                                 <div className="font-medium text-gray-900 text-right uppercase">
-                                    {(scanResult.reg as any).type || (scanResult.reg as any).category || 'N/A'}
+                                    {getRegistrationLabel(scanResult.reg)}
                                 </div>
                             </div>
                         </div>
@@ -341,7 +431,7 @@ export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external
                         </Button>
                         <Button
                             className="flex-1 py-6 text-base font-bold bg-indigo-600 hover:bg-indigo-700 text-white"
-                            onClick={() => processVisit(true)}
+                            onClick={handleAgree}
                             disabled={loading}
                         >
                             Accept & Save Lead
@@ -354,6 +444,37 @@ export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external
                     )}
                 </Card>
             )}
+            <Dialog open={showGuestbookPopup} onOpenChange={setShowGuestbookPopup}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>방명록 남기기</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                        <p className="text-sm text-gray-500">동의가 완료되었습니다. 파트너 방명록 메시지를 남겨주세요.</p>
+                        <textarea
+                            value={guestbookMessage}
+                            onChange={(e) => setGuestbookMessage(e.target.value)}
+                            className="w-full h-28 border border-gray-200 rounded-lg p-3 text-sm"
+                            placeholder="예: 제품 설명 잘 들었습니다. 연락 부탁드립니다."
+                        />
+                    </div>
+                    <DialogFooter className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => submitGuestbook('')}
+                            className="flex-1"
+                        >
+                            메시지 없이 저장
+                        </Button>
+                        <Button
+                            onClick={() => submitGuestbook(guestbookMessage)}
+                            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white"
+                        >
+                            저장
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

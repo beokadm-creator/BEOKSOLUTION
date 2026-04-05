@@ -33,9 +33,13 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache TTL
 /**
  * Clear conference cache (useful for testing or admin updates)
  */
-export const clearConferenceCache = (slug?: string) => {
+export const clearConferenceCache = (slug?: string, societyId?: string) => {
     if (slug) {
+        const key = societyId ? `${societyId}_${slug}` : slug;
+        // Clear both composite key and plain slug for backward compatibility
+        conferenceCache.delete(key);
         conferenceCache.delete(slug);
+        pendingRequests.delete(key);
         pendingRequests.delete(slug);
     } else {
         conferenceCache.clear();
@@ -88,6 +92,9 @@ export const useConference = (targetId?: string) => {
                 return;
             }
 
+            // Default cache key to slug; updated to composite key after societyId is determined
+            let cacheKey = slug || '';
+
             try {
                 fetchingSlugRef.current = slug;
 
@@ -99,31 +106,16 @@ export const useConference = (targetId?: string) => {
                     return;
                 }
 
-                // ✅ OPTIMIZATION: Check cache first
-                const cached = conferenceCache.get(slug);
-                const now = Date.now();
-                if (cached && (now - cached.timestamp < CACHE_TTL)) {
-                    console.log('[useConference] ✅ Using cached data for slug:', slug);
+                // Safety Guard: Ignore reserved admin routes
+                if (slug === 'admin' || slug === 'login') {
                     if (isMounted) {
-                        setData(cached.data);
+                        setData(prev => ({ ...prev, loading: false }));
                         clearTimeout(timeoutId);
                     }
                     return;
                 }
 
-                // ✅ OPTIMIZATION: Check if request is already pending
-                const pending = pendingRequests.get(slug);
-                if (pending) {
-                    console.log('[useConference] ⏳ Waiting for pending request for slug:', slug);
-                    const result = await pending;
-                    if (isMounted) {
-                        setData(result);
-                        clearTimeout(timeoutId);
-                    }
-                    return;
-                }
-
-                // Determine environment
+                // ✅ Determine societyId synchronously BEFORE cache lookup (cross-tenant contamination fix)
                 const hostname = window.location.hostname;
                 let societyId: string | null = null;
                 let isPlatform = false;
@@ -149,15 +141,8 @@ export const useConference = (targetId?: string) => {
                 });
 
                 if (isLocalhost || isFirebaseApp) {
-                    // On Localhost/Platform, if there is a slug, we treat it as Conference Mode for testing.
-                    // IMPORTANT: If we are in /admin/conf/..., the slug is passed.
-                    // If we are in /admin/society, the slug might be undefined or different.
-                    // For safety, on Dev/Firebase hosting, we allow cross-society access or default to platform
-                    
                     if (slug && slug !== 'admin' && slug !== 'login') {
                         isPlatform = false;
-                        // societyId is already set from societyParam if available
-                        // If not, try to extract from slug if it follows pattern society_conf
                         if (!societyId && slug.includes('_')) {
                             societyId = slug.split('_')[0];
                         }
@@ -183,18 +168,28 @@ export const useConference = (targetId?: string) => {
                     return;
                 }
 
-                // Safety Guard: Ignore reserved admin routes
-                if (slug === 'admin' || slug === 'login') {
+                // ✅ Cache key includes societyId to prevent cross-tenant data contamination
+                cacheKey = societyId ? `${societyId}_${slug}` : slug;
+
+                // ✅ OPTIMIZATION: Check cache first
+                const cached = conferenceCache.get(cacheKey);
+                const now = Date.now();
+                if (cached && (now - cached.timestamp < CACHE_TTL)) {
+                    console.log('[useConference] ✅ Using cached data for key:', cacheKey);
                     if (isMounted) {
-                        setData(prev => ({ ...prev, loading: false }));
+                        setData(cached.data);
                         clearTimeout(timeoutId);
                     }
                     return;
                 }
 
-                if (!slug) {
+                // ✅ OPTIMIZATION: Check if request is already pending
+                const pending = pendingRequests.get(cacheKey);
+                if (pending) {
+                    console.log('[useConference] ⏳ Waiting for pending request for key:', cacheKey);
+                    const result = await pending;
                     if (isMounted) {
-                        setData(prev => ({ ...prev, loading: false }));
+                        setData(result);
                         clearTimeout(timeoutId);
                     }
                     return;
@@ -355,14 +350,14 @@ export const useConference = (targetId?: string) => {
                     };
 
                     // ✅ OPTIMIZATION: Cache the result
-                    conferenceCache.set(slug, { data: result, timestamp: now });
-                    pendingRequests.delete(slug);
+                    conferenceCache.set(cacheKey, { data: result, timestamp: now });
+                    pendingRequests.delete(cacheKey);
 
                     return result;
                 })();
 
                 // Register pending request
-                pendingRequests.set(slug, fetchPromise);
+                pendingRequests.set(cacheKey, fetchPromise);
 
                 // Wait for fetch
                 const result = await fetchPromise;
@@ -373,7 +368,7 @@ export const useConference = (targetId?: string) => {
                 }
 
             } catch (err: unknown) {
-                pendingRequests.delete(slug);
+                pendingRequests.delete(cacheKey);
 
                 if (isMounted) {
                     // Handle permission errors gracefully

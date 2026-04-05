@@ -50,12 +50,12 @@ export const extractSocietyFromHost = (host: string): string | null => {
     // if it's not in the ignored list.
 
     if (parts.length >= 3) {
-        const firstPart = parts[0];
+        const firstPart = parts[0].toLowerCase();
         if (!DOMAIN_CONFIG.IGNORED_SUBDOMAINS.includes(firstPart)) {
             return firstPart;
         }
     } else if (parts.length > 2) {
-        const firstPart = parts[0];
+        const firstPart = parts[0].toLowerCase();
         if (!DOMAIN_CONFIG.IGNORED_SUBDOMAINS.includes(firstPart)) {
             return firstPart;
         }

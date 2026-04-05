@@ -282,7 +282,7 @@ export default function LegalAgreementModal({
                                         <div className="flex-1 min-w-0">
                                             <Label htmlFor="refundPolicy" className="text-sm sm:text-base font-medium cursor-pointer mb-1 sm:mb-2 block pr-6">
                                                 <span className="hidden sm:inline">
-                                                    {lang === 'ko' ? '대한디지털치의학회 학술대회 환불 규정에 동의합니다 (필수)' : 'Consent to Refund Policy (Required)'}
+                                                    {lang === 'ko' ? '본 학술대회 환불 규정에 동의합니다 (필수)' : 'Consent to Refund Policy (Required)'}
                                                 </span>
                                                 <span className="sm:hidden">
                                                     {lang === 'ko' ? '환불 규정 동의 (필수)' : 'Refund Policy (Required)'}

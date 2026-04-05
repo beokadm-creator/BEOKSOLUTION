@@ -94,6 +94,7 @@ export const logAuditEvent = functions.https.onCall(async (data, context) => {
 
     try {
         const timestamp = admin.firestore.Timestamp.now();
+        const db = admin.firestore();
 
         // Determine actor type
         let actorType: AuditActorType = 'PARTICIPANT';
@@ -238,6 +239,7 @@ export async function createAuditLogEntry(params: {
     } = params;
 
     const timestamp = admin.firestore.Timestamp.now();
+    const db = admin.firestore();
 
     const logEntry: Omit<AuditLog, 'id'> = {
         actorId,

@@ -41,17 +41,44 @@ const shuffle = (items) => {
     const copy = [...items];
     for (let i = copy.length - 1; i > 0; i -= 1) {
         const j = Math.floor(Math.random() * (i + 1));
-        const temp = copy[i];
-        copy[i] = copy[j];
-        copy[j] = temp;
+        [copy[i], copy[j]] = [copy[j], copy[i]];
     }
     return copy;
+};
+const getSelectableRewards = (rewards) => {
+    const primary = rewards.filter((reward) => reward.remainingQty > 0
+        && (reward.name.length > 0 || (reward.label || "").length > 0)
+        && !reward.isFallback
+        && !(0, shared_1.isRewardDrawCompleted)(reward));
+    const fallback = rewards.filter((reward) => reward.remainingQty > 0
+        && (reward.name.length > 0 || (reward.label || "").length > 0)
+        && reward.isFallback
+        && !(0, shared_1.isRewardDrawCompleted)(reward));
+    return primary.length > 0 ? primary : fallback;
+};
+const sanitizeDrawCounts = (requested, rewards) => {
+    const rewardMap = new Map(rewards.map((reward) => [reward.id, reward]));
+    return Object.entries(requested || {}).reduce((acc, [rewardId, rawCount]) => {
+        const reward = rewardMap.get(rewardId);
+        if (!reward)
+            return acc;
+        const safeCount = Math.max(0, Math.floor(Number(rawCount) || 0));
+        if (safeCount <= 0)
+            return acc;
+        acc[rewardId] = Math.min(safeCount, reward.remainingQty || 0);
+        return acc;
+    }, {});
+};
+const buildRewardSlots = (rewards, drawAllRemaining, drawCountsByRewardId) => {
+    if (drawAllRemaining) {
+        return rewards.flatMap((reward) => Array.from({ length: Math.max(0, reward.remainingQty || 0) }, () => reward));
+    }
+    return rewards.flatMap((reward) => Array.from({ length: Math.max(0, drawCountsByRewardId[reward.id] || 0) }, () => reward));
 };
 exports.runStampRewardLottery = functions
     .runWith({ ingressSettings: "ALLOW_ALL" })
     .https.onCall(async (data, context) => {
-    var _a, _b, _c, _d, _e, _f;
-    const { confId } = data;
+    const { confId, drawAllRemaining = false, drawCountsByRewardId } = (data || {});
     if (!confId) {
         throw new functions.https.HttpsError("invalid-argument", "confId is required.");
     }
@@ -74,19 +101,17 @@ exports.runStampRewardLottery = functions
     if (config.rewardFulfillmentMode !== "LOTTERY") {
         throw new functions.https.HttpsError("failed-precondition", "This stamp tour is not configured for scheduled lottery.");
     }
-    const lotteryScheduledAt = config.lotteryScheduledAt;
-    if (!lotteryScheduledAt) {
+    if (!config.lotteryScheduledAt) {
         throw new functions.https.HttpsError("failed-precondition", "Lottery schedule is not configured.");
     }
-    if (config.lotteryExecutedAt) {
-        throw new functions.https.HttpsError("failed-precondition", "Scheduled lottery has already been executed.");
-    }
-    if (lotteryScheduledAt.toMillis() > Date.now()) {
+    if (config.lotteryScheduledAt.toMillis() > Date.now()) {
         throw new functions.https.HttpsError("failed-precondition", "Lottery can only run after the scheduled time.");
     }
+    if (drawAllRemaining && config.lotteryExecutedAt) {
+        throw new functions.https.HttpsError("failed-precondition", "Scheduled lottery has already been executed.");
+    }
     const completionRule = config.completionRule || { type: "COUNT", requiredCount: 5 };
-    const boothCount = sponsorsSnap.size;
-    const requiredCount = (0, shared_1.getRequiredCount)(completionRule, boothCount);
+    const requiredCount = (0, shared_1.getRequiredCount)(completionRule, sponsorsSnap.size);
     if (requiredCount === 0) {
         throw new functions.https.HttpsError("failed-precondition", "No eligible booths configured.");
     }
@@ -105,89 +130,96 @@ exports.runStampRewardLottery = functions
     });
     const eligibleEntries = Array.from(stampCounts.entries())
         .filter(([, vendorIds]) => vendorIds.size >= requiredCount)
-        .map(([userId]) => ({
-        userId,
-        progress: progressMap.get(userId)
-    }))
+        .map(([userId]) => ({ userId, progress: progressMap.get(userId) }))
         .filter(({ progress }) => (progress === null || progress === void 0 ? void 0 : progress.rewardStatus) !== "REQUESTED"
         && (progress === null || progress === void 0 ? void 0 : progress.rewardStatus) !== "REDEEMED"
         && !(progress === null || progress === void 0 ? void 0 : progress.lotteryExecutedAt)
         && !!(progress === null || progress === void 0 ? void 0 : progress.completedAt)
-        && progress.completedAt.toMillis() <= lotteryScheduledAt.toMillis());
-    const { mode, rewards, selectableRewards } = (0, shared_1.resolveSelectableRewards)(config);
+        && progress.completedAt.toMillis() <= config.lotteryScheduledAt.toMillis());
     if (eligibleEntries.length === 0) {
         throw new functions.https.HttpsError("failed-precondition", "No eligible participants are waiting for lottery.");
     }
+    const normalizedRewards = (0, shared_1.normalizeRewards)(Array.isArray(config.rewards) ? config.rewards : [], config.rewardMode === "FIXED" ? "FIXED" : "RANDOM");
+    const selectableRewards = getSelectableRewards(normalizedRewards);
     if (selectableRewards.length === 0) {
         throw new functions.https.HttpsError("failed-precondition", config.soldOutMessage || "No rewards remain.");
     }
+    const safeDrawCounts = sanitizeDrawCounts(drawCountsByRewardId, selectableRewards);
+    const rewardSlots = buildRewardSlots(selectableRewards, drawAllRemaining, safeDrawCounts);
+    if (rewardSlots.length === 0) {
+        throw new functions.https.HttpsError("invalid-argument", "Select at least one reward slot to draw.");
+    }
+    const mutableRewards = normalizedRewards.map((reward) => ({ ...reward }));
     const shuffledEligible = shuffle(eligibleEntries);
-    const mutableRewards = rewards.map((reward) => ({ ...reward }));
-    const updates = [];
-    for (const entry of shuffledEligible) {
-        const currentlySelectable = mutableRewards.filter((reward) => reward.remainingQty > 0 && reward.name.length > 0 && !reward.isFallback);
-        const currentFallbacks = mutableRewards.filter((reward) => reward.remainingQty > 0 && reward.name.length > 0 && reward.isFallback);
-        const rewardPool = currentlySelectable.length > 0 ? currentlySelectable : currentFallbacks;
-        if (rewardPool.length === 0) {
-            updates.push({
-                userId: entry.userId,
-                rewardStatus: "NONE",
-                lotteryStatus: "NOT_SELECTED",
-                userName: ((_a = entry.progress) === null || _a === void 0 ? void 0 : _a.userName) || null,
-                userOrg: ((_b = entry.progress) === null || _b === void 0 ? void 0 : _b.userOrg) || null,
-                completedAt: (_c = entry.progress) === null || _c === void 0 ? void 0 : _c.completedAt
-            });
-            continue;
-        }
-        const selectedReward = (0, shared_1.selectReward)(rewardPool, mode);
+    const winners = shuffledEligible.slice(0, Math.min(shuffledEligible.length, rewardSlots.length));
+    const executedAt = admin.firestore.Timestamp.now();
+    const batch = db.batch();
+    const selectedParticipants = [];
+    winners.forEach((entry, index) => {
+        var _a, _b, _c, _d, _e;
+        const selectedReward = rewardSlots[index];
         const rewardIndex = mutableRewards.findIndex((reward) => reward.id === selectedReward.id);
         if (rewardIndex >= 0) {
-            mutableRewards[rewardIndex] = {
-                ...mutableRewards[rewardIndex],
-                remainingQty: Math.max(0, (mutableRewards[rewardIndex].remainingQty || 0) - 1)
-            };
+            mutableRewards[rewardIndex].remainingQty = Math.max(0, (mutableRewards[rewardIndex].remainingQty || 0) - 1);
+            mutableRewards[rewardIndex].drawCompletedAt = executedAt;
         }
-        updates.push({
+        selectedParticipants.push({
             userId: entry.userId,
+            userName: ((_a = entry.progress) === null || _a === void 0 ? void 0 : _a.userName) || null,
+            userOrg: ((_b = entry.progress) === null || _b === void 0 ? void 0 : _b.userOrg) || null,
+            rewardName: selectedReward.name,
+            rewardLabel: selectedReward.label || (0, shared_1.getRewardDisplayLabel)(selectedReward)
+        });
+        batch.set(db.doc(`conferences/${confId}/stamp_tour_progress/${entry.userId}`), {
+            userId: entry.userId,
+            conferenceId: confId,
+            userName: ((_c = entry.progress) === null || _c === void 0 ? void 0 : _c.userName) || null,
+            userOrg: ((_d = entry.progress) === null || _d === void 0 ? void 0 : _d.userOrg) || null,
+            isCompleted: true,
+            completedAt: ((_e = entry.progress) === null || _e === void 0 ? void 0 : _e.completedAt) || admin.firestore.Timestamp.now(),
             rewardId: selectedReward.id,
             rewardName: selectedReward.name,
+            rewardLabel: selectedReward.label || null,
             rewardStatus: "REQUESTED",
             lotteryStatus: "SELECTED",
-            userName: ((_d = entry.progress) === null || _d === void 0 ? void 0 : _d.userName) || null,
-            userOrg: ((_e = entry.progress) === null || _e === void 0 ? void 0 : _e.userOrg) || null,
-            completedAt: (_f = entry.progress) === null || _f === void 0 ? void 0 : _f.completedAt
-        });
-    }
-    const batch = db.batch();
-    const executedAt = admin.firestore.Timestamp.now();
-    batch.set(configRef, {
-        rewards: mutableRewards,
-        lotteryExecutedAt: executedAt
-    }, { merge: true });
-    updates.forEach((update) => {
-        const progressRef = db.doc(`conferences/${confId}/stamp_tour_progress/${update.userId}`);
-        batch.set(progressRef, {
-            userId: update.userId,
-            conferenceId: confId,
-            userName: update.userName || null,
-            userOrg: update.userOrg || null,
-            isCompleted: true,
-            completedAt: update.completedAt || admin.firestore.Timestamp.now(),
-            rewardId: update.rewardId || admin.firestore.FieldValue.delete(),
-            rewardName: update.rewardName || admin.firestore.FieldValue.delete(),
-            rewardStatus: update.rewardStatus,
-            lotteryStatus: update.lotteryStatus,
-            requestedAt: update.rewardStatus === "REQUESTED" ? executedAt : admin.firestore.FieldValue.delete(),
+            requestedAt: executedAt,
             requestedBy: adminActor.email || adminActor.uid,
             drawModeUsed: "ADMIN",
-            lotteryExecutedAt: executedAt
+            lotteryExecutedAt: drawAllRemaining ? executedAt : admin.firestore.FieldValue.delete()
         }, { merge: true });
     });
+    let totalNotSelected = 0;
+    if (drawAllRemaining) {
+        const nonWinners = shuffledEligible.slice(winners.length);
+        totalNotSelected = nonWinners.length;
+        nonWinners.forEach((entry) => {
+            var _a, _b, _c;
+            batch.set(db.doc(`conferences/${confId}/stamp_tour_progress/${entry.userId}`), {
+                userId: entry.userId,
+                conferenceId: confId,
+                userName: ((_a = entry.progress) === null || _a === void 0 ? void 0 : _a.userName) || null,
+                userOrg: ((_b = entry.progress) === null || _b === void 0 ? void 0 : _b.userOrg) || null,
+                isCompleted: true,
+                completedAt: ((_c = entry.progress) === null || _c === void 0 ? void 0 : _c.completedAt) || admin.firestore.Timestamp.now(),
+                rewardStatus: "NONE",
+                lotteryStatus: "NOT_SELECTED",
+                requestedBy: adminActor.email || adminActor.uid,
+                drawModeUsed: "ADMIN",
+                lotteryExecutedAt: executedAt
+            }, { merge: true });
+        });
+    }
+    batch.set(configRef, {
+        rewards: mutableRewards,
+        ...(drawAllRemaining ? { lotteryExecutedAt: executedAt } : {})
+    }, { merge: true });
     await batch.commit();
     return {
         totalEligible: eligibleEntries.length,
-        totalSelected: updates.filter((update) => update.lotteryStatus === "SELECTED").length,
-        totalNotSelected: updates.filter((update) => update.lotteryStatus === "NOT_SELECTED").length
+        totalSelected: selectedParticipants.length,
+        totalNotSelected,
+        selectedParticipants,
+        drawMode: drawAllRemaining ? "ALL" : "PARTIAL"
     };
 });
 //# sourceMappingURL=runStampRewardLottery.js.map

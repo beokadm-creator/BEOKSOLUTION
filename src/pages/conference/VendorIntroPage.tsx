@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { VendorProfile } from '../../hooks/useVendor';
 
 const VendorIntroPage: React.FC = () => {
-    const { slug, vid } = useParams();
+    const { vid } = useParams();
     const navigate = useNavigate();
     const [vendor, setVendor] = useState<VendorProfile | null>(null);
     const [loading, setLoading] = useState(true);
@@ -18,6 +18,14 @@ const VendorIntroPage: React.FC = () => {
                 const vendorSnap = await getDoc(vendorRef);
                 if (vendorSnap.exists()) {
                     setVendor({ id: vendorSnap.id, ...vendorSnap.data() } as VendorProfile);
+                    return;
+                }
+
+                const q = query(collection(db, 'vendors'), where('slug', '==', vid), limit(1));
+                const querySnapshot = await getDocs(q);
+                if (!querySnapshot.empty) {
+                    const docData = querySnapshot.docs[0];
+                    setVendor({ id: docData.id, ...docData.data() } as VendorProfile);
                 }
             } catch (error) {
                 console.error("Error fetching vendor", error);

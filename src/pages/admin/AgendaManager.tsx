@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useCMS } from '../../hooks/useCMS';
 import { Agenda, Speaker } from '../../types/schema';
 import { Timestamp, collection, getDocs, query, where } from 'firebase/firestore';
@@ -28,6 +28,7 @@ const AgendaManager: React.FC = () => {
     const [agendaForm, setAgendaForm] = useState<Partial<Agenda>>({});
     const [speakerForm, setSpeakerForm] = useState<Partial<Speaker>>({});
     const [sessionType, setSessionType] = useState<string>('');
+    const agendaSyncInitializedRef = useRef(false);
 
     useEffect(() => {
         if (!confId) return;
@@ -57,19 +58,25 @@ const AgendaManager: React.FC = () => {
     }, [confId, selectedAgendaId]);
 
     useEffect(() => {
-        if (selectedAgendaId && confId) {
-            const selected = agendas.find(a => a.id === selectedAgendaId);
-            if (selected) {
-                 
-                setAgendaForm({ ...selected });
-                 
-                setSessionType(selected.sessionType || '');
+        // Only sync when selectedAgendaId actually changes, not on every render
+        if (!agendaSyncInitializedRef.current || selectedAgendaId !== agendaForm.id) {
+            if (selectedAgendaId && confId) {
+                const selected = agendas.find(a => a.id === selectedAgendaId);
+                if (selected) {
+                    setTimeout(() => {
+                        setAgendaForm({ ...selected });
+                        setSessionType(selected.sessionType || '');
+                    }, 0);
+                }
+            } else {
+                setTimeout(() => {
+                    setAgendaForm({});
+                    setSessionType('');
+                }, 0);
             }
-        } else {
-            setAgendaForm({});
-            setSessionType('');
+            agendaSyncInitializedRef.current = true;
         }
-    }, [selectedAgendaId, agendas, confId]);
+    }, [selectedAgendaId, agendas, confId, agendaForm.id]);
 
     const handleCreateNew = () => {
         setSelectedAgendaId(null);

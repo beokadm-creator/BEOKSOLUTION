@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useOutletContext } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
 import { Bell, MessageSquare, Settings } from 'lucide-react';
 import PartnerInfraSettings from './PartnerInfraSettings';
 import PartnerTemplatesPage from './PartnerTemplatesPage';
 
 export default function PartnerNotificationSettingsPage() {
-    const { vendorId } = useParams<{ vendorId: string }>();
+    const { vendorId: paramVendorId } = useParams<{ vendorId: string }>();
+    const { activeVendorId } = useOutletContext<{ activeVendorId?: string | null }>();
+    const vendorId = activeVendorId || paramVendorId;
     const [activeTab, setActiveTab] = useState('infrastructure');
 
     if (!vendorId) {

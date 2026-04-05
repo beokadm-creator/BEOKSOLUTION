@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAdminStore } from '../../store/adminStore';
 import { Sponsor, SponsorDoc, SponsorTier, Vendor } from '../../types/schema';
-import { Timestamp, collection, getDocs, doc, setDoc, updateDoc, deleteDoc, writeBatch, deleteField } from 'firebase/firestore';
+import { Timestamp, collection, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -20,6 +20,7 @@ const SponsorManager: React.FC = () => {
   const [globalVendors, setGlobalVendors] = useState<Vendor[]>([]);
   const [selectedSponsorId, setSelectedSponsorId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [stampTourEnabled, setStampTourEnabled] = useState(false);
 
   // Form state
   const [form, setForm] = useState<Partial<SponsorDoc>>({
@@ -33,6 +34,10 @@ const SponsorManager: React.FC = () => {
     if (!confId) return;
     setLoading(true);
     try {
+      const confSnap = await getDoc(doc(db, 'conferences', confId));
+      const features = confSnap.exists() ? confSnap.data().features : undefined;
+      setStampTourEnabled(features?.stampTourEnabled === true);
+
       const spRef = collection(db, `conferences/${confId}/sponsors`);
       const spSnap = await getDocs(spRef);
       const list = spSnap.docs.map(d => ({ id: d.id, ...d.data() } as Sponsor));
@@ -86,6 +91,7 @@ const SponsorManager: React.FC = () => {
       const now = Timestamp.now();
 
       // Build data object without undefined fields (Firestore doesn't accept undefined)
+      const stampAllowed = stampTourEnabled === true;
       const data: Record<string, unknown> = {
         name: form.name.trim(),
         logoUrl: form.logoUrl.trim(),
@@ -93,7 +99,7 @@ const SponsorManager: React.FC = () => {
         websiteUrl: form.websiteUrl.trim(),
         order: form.order ?? sponsors.length + 1,
         isActive: form.isActive ?? true,
-        isStampTourParticipant: form.isStampTourParticipant ?? false,
+        isStampTourParticipant: stampAllowed ? (form.isStampTourParticipant ?? false) : false,
         createdAt: form.createdAt || now,
         updatedAt: now,
       };
@@ -358,7 +364,7 @@ const SponsorManager: React.FC = () => {
                     </p>
                   </div>
 
-                  {form.vendorId && (
+                  {form.vendorId && stampTourEnabled && (
                     <div className="flex items-center gap-2 pt-2 border-t border-slate-200 mt-2">
                       <input
                         type="checkbox"
@@ -372,9 +378,14 @@ const SponsorManager: React.FC = () => {
                       </Label>
                     </div>
                   )}
-                  {form.vendorId && !(form.isStampTourParticipant ?? false) && (
+                  {form.vendorId && stampTourEnabled && !(form.isStampTourParticipant ?? false) && (
                     <p className="text-xs text-slate-500 ml-6">
                       체크하지 않으면 '단순 리드(방명록) 수집 모드'로만 동작하며, 사용자 명찰의 스탬프 보드에는 노출되지 않습니다.
+                    </p>
+                  )}
+                  {form.vendorId && !stampTourEnabled && (
+                    <p className="text-xs text-slate-500 mt-2">
+                      {/* 스폰서 관리 페이지에서 가져온 정보를 바탕으로 사용자에게 제공됩니다. */}
                     </p>
                   )}
                 </div>

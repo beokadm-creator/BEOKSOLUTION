@@ -13,6 +13,17 @@ const checkIsSuperAdmin = async (): Promise<boolean> => {
     return true; // Always allow for demo
 };
 
+const getNameInitials = (name: string): string => {
+    return name
+        .replace(/[^a-zA-Z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .map((w) => w.trim())
+        .filter((w) => w.length > 0)
+        .map((w) => w[0])
+        .join('')
+        .toLowerCase();
+};
+
 export const useSuperAdmin = () => {
     const [isSuper, setIsSuper] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -58,6 +69,8 @@ export const useSuperAdmin = () => {
                 id,
                 name: { ko: nameKo, en: nameEn },
                 adminEmails: [adminEmail],
+                domainCode: id,
+                aliases: Array.from(new Set([id, getNameInitials(nameEn)].filter(Boolean))),
                 createdAt: Timestamp.now()
             };
             console.log('[createSociety] Writing document:', dataToSet);
@@ -153,5 +166,5 @@ export const useSuperAdmin = () => {
         }
     };
 
-    return { isSuper, loading, error, societies, createSociety, createConference };
+    return { isSuper, loading, error, societies, createSociety, createConference, refreshSocieties: fetchSocieties };
 };

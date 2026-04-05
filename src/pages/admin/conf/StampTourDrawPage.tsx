@@ -1,18 +1,40 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { collection, doc, onSnapshot, Timestamp } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { ArrowLeft, Eye, EyeOff, Maximize, Minimize, PlayCircle, Sparkles, Trophy } from "lucide-react";
+import {
+  ArrowLeft,
+  Eye,
+  EyeOff,
+  Maximize,
+  Minimize,
+  PlayCircle,
+  Sparkles,
+  Trophy
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { db, functions } from "@/firebase";
 import { cn } from "@/lib/utils";
 import type { StampTourConfig, StampTourProgress, StampTourReward } from "@/types/schema";
-import { maskStampTourParticipantName } from "@/utils/stampTour";
+import {
+  getSelectableStampTourRewards,
+  getStampTourRewardTitle,
+  isStampTourRewardDrawCompleted,
+  maskStampTourParticipantName
+} from "@/utils/stampTour";
 
-type DrawMode = "ALL" | "PARTIAL" | "DEMO";
-type DrawWinner = { userId: string; userName?: string | null; userOrg?: string | null; rewardName?: string };
+type DrawMode = "PARTIAL" | "DEMO";
+
+type DrawWinner = {
+  userId: string;
+  userName?: string | null;
+  userOrg?: string | null;
+  rewardName?: string;
+  rewardLabel?: string;
+};
+
 type DrawResult = {
   totalEligible: number;
   totalSelected: number;
@@ -25,7 +47,7 @@ const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve,
 
 const displayName = (name: string | null | undefined, masked: boolean) => {
   const safe = (name || "").trim();
-  if (!safe) return "이름 미등록";
+  if (!safe) return "Name unavailable";
   return masked ? maskStampTourParticipantName(safe) : safe;
 };
 
@@ -51,11 +73,13 @@ const shuffle = <T,>(items: T[]) => {
 };
 
 const demoRows: StampTourProgress[] = [
-  { id: "demo-1", userId: "demo-1", conferenceId: "demo", userName: "김현웅", userOrg: "연세대학교 치과병원", isCompleted: true, rewardStatus: "NONE" },
-  { id: "demo-2", userId: "demo-2", conferenceId: "demo", userName: "박민수", userOrg: "서울치과의사회", isCompleted: true, rewardStatus: "NONE" },
-  { id: "demo-3", userId: "demo-3", conferenceId: "demo", userName: "이서준", userOrg: "가톨릭대학교 치과대학", isCompleted: true, rewardStatus: "NONE" },
-  { id: "demo-4", userId: "demo-4", conferenceId: "demo", userName: "정도윤", userOrg: "보건솔루션", isCompleted: true, rewardStatus: "NONE" }
+  { id: "demo-1", userId: "demo-1", conferenceId: "demo", userName: "Demo User 1", userOrg: "Booth A", isCompleted: true, rewardStatus: "NONE" },
+  { id: "demo-2", userId: "demo-2", conferenceId: "demo", userName: "Demo User 2", userOrg: "Booth B", isCompleted: true, rewardStatus: "NONE" },
+  { id: "demo-3", userId: "demo-3", conferenceId: "demo", userName: "Demo User 3", userOrg: "Booth C", isCompleted: true, rewardStatus: "NONE" },
+  { id: "demo-4", userId: "demo-4", conferenceId: "demo", userName: "Demo User 4", userOrg: "Booth D", isCompleted: true, rewardStatus: "NONE" }
 ];
+
+const dualLabel = (ko: string, en: string) => `${ko} / ${en}`;
 
 export default function StampTourDrawPage() {
   const { cid } = useParams<{ cid: string }>();
@@ -78,13 +102,16 @@ export default function StampTourDrawPage() {
 
   useEffect(() => {
     if (!cid) return;
+
     const unsubConfig = onSnapshot(doc(db, `conferences/${cid}/settings`, "stamp_tour"), (snap) => {
       setConfig(snap.exists() ? (snap.data() as StampTourConfig) : null);
       setLoading(false);
     });
+
     const unsubRows = onSnapshot(collection(db, `conferences/${cid}/stamp_tour_progress`), (snap) => {
-      setRows(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<StampTourProgress, "id">) })));
+      setRows(snap.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<StampTourProgress, "id">) })));
     });
+
     return () => {
       unsubConfig();
       unsubRows();
@@ -125,15 +152,16 @@ export default function StampTourDrawPage() {
 
   const selectableRewards = useMemo(() => {
     const rewards = Array.isArray(config?.rewards) ? config.rewards : [];
-    const primary = rewards.filter((reward) => reward.remainingQty > 0 && reward.name && !reward.isFallback);
-    const fallback = rewards.filter((reward) => reward.remainingQty > 0 && reward.name && reward.isFallback);
-    return primary.length > 0 ? primary : fallback;
+    return getSelectableStampTourRewards(rewards, { excludeCompletedDraws: true });
   }, [config]);
 
-  const selectedSlots = useMemo(
-    () => Object.values(selectedCounts).reduce((sum, count) => sum + count, 0),
-    [selectedCounts]
-  );
+  const selectedSlots = useMemo(() => {
+    const selectableIds = new Set(selectableRewards.map((reward) => reward.id));
+    return Object.entries(selectedCounts).reduce(
+      (sum, [rewardId, count]) => sum + (selectableIds.has(rewardId) ? count : 0),
+      0
+    );
+  }, [selectableRewards, selectedCounts]);
 
   const reelRows = useMemo(() => {
     const source = eligible.length > 0 ? eligible : completed.length > 0 ? completed : demoRows;
@@ -148,9 +176,14 @@ export default function StampTourDrawPage() {
     return () => window.clearInterval(timer);
   }, [phase, reelRows.length]);
 
-  const drawOpen = Boolean(nowMs !== null && config?.lotteryScheduledAt && config.lotteryScheduledAt.toMillis() <= nowMs);
+  const drawOpen = Boolean(
+    nowMs !== null
+    && config?.lotteryScheduledAt
+    && config.lotteryScheduledAt.toMillis() <= nowMs
+  );
 
   const setRewardCount = (reward: StampTourReward, next: number) => {
+    if (isStampTourRewardDrawCompleted(reward)) return;
     setSelectedCounts((prev) => ({
       ...prev,
       [reward.id]: Math.max(0, Math.min(next, reward.remainingQty))
@@ -180,25 +213,28 @@ export default function StampTourDrawPage() {
 
   const runDraw = async (mode: DrawMode) => {
     if (mode !== "DEMO") {
-      if (!cid || !config?.enabled || config.rewardFulfillmentMode !== "LOTTERY") return setError("예약 추첨형 설정에서만 사용할 수 있습니다.");
-      if (!drawOpen) return setError("지정된 추첨 시각 이후에만 추첨할 수 있습니다.");
-      if (mode === "PARTIAL" && selectedSlots <= 0) return setError("부분 추첨은 경품 수량을 먼저 선택해야 합니다.");
-      if (eligible.length === 0) return setError("현재 회차 추첨 대상자가 없습니다.");
+      if (!cid || !config?.enabled || config.rewardFulfillmentMode !== "LOTTERY") {
+        return setError("This page only works for lottery-based rewards.");
+      }
+      if (!drawOpen) return setError("The draw can only start after the scheduled time.");
+      if (mode === "PARTIAL" && selectedSlots <= 0) return setError("Select at least one reward slot first.");
+      if (eligible.length === 0) return setError("There are no eligible participants to draw.");
     }
 
     if (mode === "DEMO") {
-      const rewards = selectableRewards.flatMap((reward) => {
+      const rewardTitles = selectableRewards.flatMap((reward) => {
         const count = selectedCounts[reward.id] || 0;
         const useCount = selectedSlots > 0 ? count : Math.min(1, reward.remainingQty);
-        return Array.from({ length: useCount }, () => reward.name);
+        return Array.from({ length: useCount }, () => getStampTourRewardTitle(reward) || reward.name);
       });
       const winners = shuffle(eligible.length > 0 ? eligible : demoRows)
-        .slice(0, Math.max(1, rewards.length))
+        .slice(0, Math.max(1, rewardTitles.length))
         .map((row, index) => ({
           userId: row.userId,
           userName: row.userName,
           userOrg: row.userOrg,
-          rewardName: rewards[index] || "현장 경품"
+          rewardName: rewardTitles[index] || "Prize",
+          rewardLabel: rewardTitles[index] || undefined
         }));
       return playResult({
         totalEligible: (eligible.length > 0 ? eligible : demoRows).length,
@@ -213,21 +249,21 @@ export default function StampTourDrawPage() {
       const callable = httpsCallable(functions, "runStampRewardLottery");
       const response = await callable({
         confId: cid,
-        drawAllRemaining: mode === "ALL",
-        drawCountsByRewardId: mode === "PARTIAL" ? selectedCounts : undefined
+        drawAllRemaining: false,
+        drawCountsByRewardId: selectedCounts
       });
       const payload = response.data as Partial<DrawResult>;
       await playResult({
         totalEligible: payload.totalEligible || 0,
         totalSelected: payload.totalSelected || 0,
         totalNotSelected: payload.totalNotSelected || 0,
-        drawMode: payload.drawMode || mode,
+        drawMode: payload.drawMode === "ALL" ? "PARTIAL" : (payload.drawMode || mode),
         selectedParticipants: Array.isArray(payload.selectedParticipants) ? payload.selectedParticipants : []
       });
       setSelectedCounts({});
     } catch (e) {
       setPhase("idle");
-      setError(e instanceof Error ? e.message : "추첨 실행에 실패했습니다.");
+      setError(e instanceof Error ? e.message : "Draw failed.");
     }
   };
 
@@ -240,120 +276,216 @@ export default function StampTourDrawPage() {
     await boxRef.current.requestFullscreen();
   };
 
-  if (loading) return <div className="p-8 text-sm text-slate-500">추첨 화면을 불러오는 중입니다...</div>;
+  if (loading) return <div className="p-8 text-sm text-slate-500">{dualLabel("추첨 화면 불러오는 중", "Loading draw screen")}</div>;
 
   return (
-    <div ref={boxRef} className="min-h-full bg-[radial-gradient(circle_at_top,#dbeafe_0%,#eff6ff_40%,#ffffff_100%)] p-6 md:p-8">
+    <div
+      ref={boxRef}
+      className="min-h-full bg-[radial-gradient(circle_at_top,#dbeafe_0%,#eff6ff_40%,#ffffff_100%)] p-6 md:p-8"
+    >
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <Link to={cid ? `/admin/conf/${cid}/settings#stamp-tour` : "/admin/society"} className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-900">
-              <ArrowLeft className="h-4 w-4" /> 설정으로 돌아가기
+            <Link
+              to={cid ? `/admin/conf/${cid}/settings#stamp-tour` : "/admin/society"}
+              className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-900"
+            >
+              <ArrowLeft className="h-4 w-4" /> {dualLabel("설정으로 돌아가기", "Back to settings")}
             </Link>
             <div className="mt-3 flex items-center gap-3">
-              <div className="rounded-2xl bg-slate-900 p-3 text-white"><Trophy className="h-7 w-7" /></div>
+              <div className="rounded-2xl bg-slate-900 p-3 text-white">
+                <Trophy className="h-7 w-7" />
+              </div>
               <div>
-                <h1 className="text-3xl font-black text-slate-900">스탬프투어 추첨 전용 화면</h1>
-                <p className="text-sm text-slate-600">단수 추첨, 복수 추첨, 전체 추첨, 데모 리허설을 이 화면에서 운영합니다.</p>
+                <h1 className="text-3xl font-black text-slate-900">{dualLabel("스탬프투어 추첨 관리자", "Stamp Tour Draw Console")}</h1>
+                <p className="text-sm text-slate-600">
+                  {dualLabel("관리자가 추첨할 상품을 선택하고 바로 추첨을 시작할 수 있습니다.", "Select the reward target and start the draw immediately.")}
+                </p>
               </div>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => setMasked((prev) => !prev)}>
               {masked ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
-              {masked ? "공개용 마스킹" : "관리자용 실명"}
+              {masked ? dualLabel("이름 마스킹", "Mask names") : dualLabel("이름 표시", "Show names")}
             </Button>
             <Button variant="outline" onClick={() => void toggleFullscreen()}>
               {fullscreen ? <Minimize className="mr-2 h-4 w-4" /> : <Maximize className="mr-2 h-4 w-4" />}
-              {fullscreen ? "전체화면 종료" : "전체화면 표시"}
+              {fullscreen ? dualLabel("전체화면 종료", "Exit fullscreen") : dualLabel("전체화면", "Fullscreen")}
             </Button>
             <Button variant="outline" onClick={() => void runDraw("DEMO")}>
-              <PlayCircle className="mr-2 h-4 w-4" /> 데모 리허설
+              <PlayCircle className="mr-2 h-4 w-4" /> {dualLabel("데모", "Demo")}
             </Button>
           </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
-          <Card className="border-0 ring-1 ring-slate-200"><CardContent className="p-5"><div className="text-xs font-semibold text-slate-400">전체 완료자</div><div className="mt-1 text-3xl font-black">{completed.length}</div></CardContent></Card>
-          <Card className="border-0 ring-1 ring-slate-200"><CardContent className="p-5"><div className="text-xs font-semibold text-slate-400">이번 회차 대상</div><div className="mt-1 text-3xl font-black">{eligible.length}</div></CardContent></Card>
-          <Card className="border-0 ring-1 ring-slate-200"><CardContent className="p-5"><div className="text-xs font-semibold text-slate-400">예약 시각</div><div className="mt-1 text-lg font-black">{formatKst(config?.lotteryScheduledAt)}</div></CardContent></Card>
-          <Card className="border-0 ring-1 ring-slate-200"><CardContent className="p-5"><div className="text-xs font-semibold text-slate-400">선택 수량</div><div className="mt-1 text-3xl font-black">{selectedSlots}</div></CardContent></Card>
+          <Card className="border-0 ring-1 ring-slate-200">
+            <CardContent className="p-5">
+              <div className="text-xs font-semibold text-slate-400">{dualLabel("완료자", "Completed")}</div>
+              <div className="mt-1 text-3xl font-black">{completed.length}</div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 ring-1 ring-slate-200">
+            <CardContent className="p-5">
+              <div className="text-xs font-semibold text-slate-400">{dualLabel("현재 추첨 대상", "Eligible now")}</div>
+              <div className="mt-1 text-3xl font-black">{eligible.length}</div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 ring-1 ring-slate-200">
+            <CardContent className="p-5">
+              <div className="text-xs font-semibold text-slate-400">{dualLabel("예약 시각", "Scheduled time")}</div>
+              <div className="mt-1 text-lg font-black">{formatKst(config?.lotteryScheduledAt)}</div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 ring-1 ring-slate-200">
+            <CardContent className="p-5">
+              <div className="text-xs font-semibold text-slate-400">{dualLabel("선택 수량", "Selected slots")}</div>
+              <div className="mt-1 text-3xl font-black">{selectedSlots}</div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[1fr_1.1fr]">
           <Card className="border-0 ring-1 ring-slate-200">
             <CardContent className="space-y-4 p-6">
               <div>
-                <h2 className="text-xl font-black">경품별 추첨 수량 선택</h2>
-                <p className="text-sm text-slate-500">예: 1등 경품 1개만 먼저 선택하면 단수 추첨, 여러 경품 수량을 올리면 복수 추첨입니다.</p>
+                <h2 className="text-xl font-black">{dualLabel("추첨 대상 선택", "Draw target")}</h2>
+                <p className="text-sm text-slate-500">
+                  {dualLabel("추첨할 상품 또는 등수를 선택한 뒤 시작 버튼을 눌러 주세요.", "Select the reward or rank, then press Start.")}
+                </p>
               </div>
+
               <div className="space-y-3">
+                {selectableRewards.length === 0 && (
+                  <div className="rounded-2xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">
+                    {dualLabel("선택 가능한 상품이 없습니다.", "No selectable rewards are available.")}
+                  </div>
+                )}
                 {selectableRewards.map((reward) => {
                   const count = selectedCounts[reward.id] || 0;
+                  const isLocked = isStampTourRewardDrawCompleted(reward);
+                  const title = getStampTourRewardTitle(reward) || reward.name;
                   return (
-                    <div key={reward.id} className={cn("rounded-2xl border p-4", count > 0 ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200")}>
-                      <div className="flex items-center justify-between">
+                    <div
+                      key={reward.id}
+                      className={cn(
+                        "rounded-2xl border p-4",
+                        count > 0 ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200",
+                        isLocked && "border-slate-200 bg-slate-100 text-slate-400"
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-3">
                         <div>
-                          <div className="text-sm font-black">{reward.name}</div>
-                          <div className={cn("text-xs", count > 0 ? "text-slate-200" : "text-slate-500")}>남은 수량 {reward.remainingQty}개</div>
+                          <div className="text-sm font-black">{title}</div>
+                          <div className={cn("text-xs", count > 0 ? "text-slate-200" : "text-slate-500")}>
+                            {dualLabel(`잔여 수량 ${reward.remainingQty}`, `Remaining ${reward.remainingQty}`)}
+                          </div>
+                          {isLocked && (
+                            <div className="mt-1 text-xs font-semibold text-rose-500">
+                              {dualLabel("이미 추첨이 끝난 상품입니다.", "This reward has already been drawn.")}
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
-                          <Button variant="outline" onClick={() => setRewardCount(reward, count - 1)}>-1</Button>
+                          <Button variant="outline" disabled={isLocked} onClick={() => setRewardCount(reward, count - 1)}>
+                            -1
+                          </Button>
                           <div className="w-8 text-center text-lg font-black">{count}</div>
-                          <Button variant="outline" onClick={() => setRewardCount(reward, count + 1)}>+1</Button>
+                          <Button variant="outline" disabled={isLocked} onClick={() => setRewardCount(reward, count + 1)}>
+                            +1
+                          </Button>
                         </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
+
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+                {dualLabel("현재 선택", "Current selection")}: {selectedSlots > 0 ? `${selectedSlots}` : dualLabel("선택 없음", "Nothing selected")}
+              </div>
+
               <div className="flex flex-wrap gap-2">
                 <Button onClick={() => void runDraw("PARTIAL")} className="bg-slate-900 text-white">
-                  <Sparkles className="mr-2 h-4 w-4" /> 선택 경품 추첨
+                  <Sparkles className="mr-2 h-4 w-4" /> {dualLabel("추첨 시작", "Start draw")}
                 </Button>
-                <Button variant="outline" onClick={() => void runDraw("ALL")}>전체 일괄 추첨</Button>
               </div>
-              {error && <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
-              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">공개 화면 기본값은 `김*웅 / 연세대학교 치과병원`처럼 이름 일부 마스킹과 소속 공개입니다.</div>
+
+              {error && (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {error}
+                </div>
+              )}
             </CardContent>
           </Card>
 
           <Card className="border-0 bg-slate-950 text-white shadow-2xl">
             <CardContent className="space-y-5 p-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-black">추첨 애니메이션</h2>
+                <h2 className="text-2xl font-black">{dualLabel("추첨 애니메이션", "Animation")}</h2>
                 <div className="rounded-full bg-white/10 px-4 py-2 text-sm">
-                  {phase === "idle" ? "대기 중" : phase === "spinning" ? "후보 순환 중" : phase === "revealing" ? "당첨자 공개 중" : "공개 완료"}
+                  {phase === "idle"
+                    ? dualLabel("대기", "Idle")
+                    : phase === "spinning"
+                      ? dualLabel("회전 중", "Spinning")
+                      : phase === "revealing"
+                        ? dualLabel("공개 중", "Revealing")
+                        : dualLabel("완료", "Done")}
                 </div>
               </div>
+
               <div className="space-y-3 rounded-[2rem] border border-white/10 bg-white/5 p-5">
                 {[-2, -1, 0, 1, 2].map((offset) => {
                   const index = (reelIndex + offset + reelRows.length) % reelRows.length;
                   const row = reelRows[index];
                   const center = offset === 0;
-                  const winner = activeWinnerId === row.userId && (phase === "revealing" || phase === "done");
+                  const isActiveWinner = center
+                    && activeWinnerId === row.userId
+                    && (phase === "revealing" || phase === "done");
+
                   return (
-                    <div key={`${row.userId}-${offset}`} className={cn("flex items-center justify-between rounded-3xl px-5 py-4 transition-all", center ? "bg-white/12" : "bg-white/[0.04]", winner && "ring-1 ring-amber-200 bg-amber-300/20")}>
+                    <div
+                      key={`${row.userId}-${offset}`}
+                      className={cn(
+                        "flex items-center justify-between rounded-3xl px-5 py-4 transition-all",
+                        center ? "bg-white/12" : "bg-white/[0.04]",
+                        isActiveWinner && "ring-1 ring-amber-200 bg-amber-300/20"
+                      )}
+                    >
                       <div>
                         <div className="text-xl font-black">{displayName(row.userName, masked)}</div>
-                        <div className="text-sm text-slate-300">{row.userOrg || "소속 미등록"}</div>
+                        <div className="text-sm text-slate-300">{row.userOrg || dualLabel("소속 없음", "Org unavailable")}</div>
                       </div>
-                      <div className="text-xs uppercase tracking-[0.2em] text-slate-400">{winner ? "Winner" : center ? "Now" : "Candidate"}</div>
+                      <div className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                        {isActiveWinner ? dualLabel("당첨", "Winner") : center ? dualLabel("현재", "Now") : dualLabel("후보", "Candidate")}
+                      </div>
                     </div>
                   );
                 })}
               </div>
+
               <div className="space-y-3">
                 {(revealed.length > 0 ? revealed : result?.selectedParticipants || []).map((winner) => (
-                  <div key={`${winner.userId}-${winner.rewardName || "reward"}`} className="rounded-2xl bg-amber-50 px-4 py-4 text-slate-900">
-                    <div className="text-xs font-semibold text-amber-700">당첨</div>
+                  <div
+                    key={`${winner.userId}-${winner.rewardName || "reward"}`}
+                    className="rounded-2xl bg-amber-50 px-4 py-4 text-slate-900"
+                  >
+                    <div className="text-xs font-semibold text-amber-700">{dualLabel("당첨자", "Winner")}</div>
                     <div className="mt-1 text-lg font-black">{displayName(winner.userName, masked)}</div>
-                    <div className="text-sm text-slate-600">{winner.userOrg || "소속 미등록"}</div>
-                    <div className="mt-2 text-sm font-semibold text-amber-800">지급 상품: {winner.rewardName || "경품 배정 완료"}</div>
+                    <div className="text-sm text-slate-600">{winner.userOrg || dualLabel("소속 없음", "Org unavailable")}</div>
+                    <div className="mt-2 text-sm font-semibold text-amber-800">
+                      {dualLabel("상품", "Reward")}: {winner.rewardLabel || winner.rewardName || dualLabel("배정 완료", "Assigned")}
+                    </div>
                   </div>
                 ))}
               </div>
-              {result && <div className="rounded-2xl bg-white/10 px-4 py-3 text-sm">대상 {result.totalEligible}명, 당첨 {result.totalSelected}명, 미당첨 {result.totalNotSelected}명</div>}
+
+              {result && (
+                <div className="rounded-2xl bg-white/10 px-4 py-3 text-sm">
+                  {dualLabel("대상", "Eligible")} {result.totalEligible} / {dualLabel("당첨", "Winners")} {result.totalSelected} / {dualLabel("미당첨", "Not selected")} {result.totalNotSelected}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -81,11 +81,13 @@ export default function VendorLayout() {
 
   // Use the hook with RESOLVED ID
   const vendorLogic = useVendor(resolvedVid || '');
-  const { vendor, loading, error, scanResult, scanBadge, processVisit, resetScan, visits } = vendorLogic;
+  const { vendor, loading, error, scanResult, scanBadge, processVisit, resetScan, visits, conferenceFeatures } = vendorLogic;
 
   // Local UI State
   const [isScanning, setIsScanning] = useState(false);
   const [showConsentPopup, setShowConsentPopup] = useState(false);
+  const [showGuestbookPopup, setShowGuestbookPopup] = useState(false);
+  const [guestbookMessage, setGuestbookMessage] = useState('');
   const scannerRef = useRef<Html5Qrcode | null>(null);
 
   // Trigger Consent Popup when scanResult is available
@@ -164,9 +166,24 @@ export default function VendorLayout() {
 
   // Handle Consent
   const handleConsent = async (agreed: boolean) => {
-      await processVisit(agreed);
+      if (agreed) {
+          if (conferenceFeatures.guestbookEnabled) {
+              setShowConsentPopup(false);
+              setShowGuestbookPopup(true);
+              return;
+          }
+          await processVisit(true);
+          setShowConsentPopup(false);
+          return;
+      }
+      await processVisit(false);
       setShowConsentPopup(false);
-      // Optional: Auto restart scanner?
+  };
+
+  const submitGuestbook = async (message: string) => {
+      await processVisit(true, message);
+      setGuestbookMessage('');
+      setShowGuestbookPopup(false);
   };
 
   if (!vid) return <div>Invalid Vendor ID</div>;
@@ -329,6 +346,42 @@ export default function VendorLayout() {
                         className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
                      >
                          동의 (Agree)
+                     </Button>
+                 </DialogFooter>
+             </DialogContent>
+         </Dialog>
+
+         <Dialog open={showGuestbookPopup} onOpenChange={setShowGuestbookPopup}>
+             <DialogContent className="sm:max-w-md bg-zinc-900 border border-zinc-800 text-white">
+                 <DialogHeader>
+                     <DialogTitle className="text-xl font-bold">방명록 남기기</DialogTitle>
+                     <DialogDescription className="text-zinc-400 pt-2">
+                         동의가 완료되었습니다. 파트너 방명록 메시지를 남겨주세요.
+                     </DialogDescription>
+                 </DialogHeader>
+                 <div className="space-y-3">
+                     <textarea
+                         value={guestbookMessage}
+                         onChange={(e) => setGuestbookMessage(e.target.value)}
+                         className="w-full h-28 rounded-lg border border-zinc-700 bg-zinc-950 p-3 text-sm text-white"
+                         placeholder="예: 제품 설명 잘 들었습니다. 연락 부탁드립니다."
+                     />
+                 </div>
+                 <DialogFooter className="flex gap-2 sm:justify-end mt-4">
+                     <Button
+                         type="button"
+                         variant="ghost"
+                         onClick={() => submitGuestbook('')}
+                         className="flex-1 sm:flex-none text-zinc-400 hover:text-white hover:bg-zinc-800"
+                     >
+                         메시지 없이 저장
+                     </Button>
+                     <Button
+                         type="button"
+                         onClick={() => submitGuestbook(guestbookMessage)}
+                         className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                     >
+                         저장
                      </Button>
                  </DialogFooter>
              </DialogContent>

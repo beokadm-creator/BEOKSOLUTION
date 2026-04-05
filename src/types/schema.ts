@@ -284,7 +284,7 @@ export interface MembershipPaymentHistory {
   userName: string; // 결제한 회원 이름
   feeTierId: string; // 선택한 등급 ID
   amount: number; // 결제 금액
-  paymentMethod: 'TOSS' | 'NICE'; // 결제 수단
+  paymentMethod: 'TOSS'; // 결제 수단
   paymentStatus: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
   orderId: string; // PG사 주문번호
   paymentDetails: {
@@ -1058,12 +1058,14 @@ export type StampTourLotteryStatus = 'PENDING' | 'SELECTED' | 'NOT_SELECTED';
 export interface StampTourReward {
   id: string;
   name: string;
+  label?: string;
   imageUrl?: string;
   totalQty: number;
   remainingQty: number;
   weight?: number; // RANDOM mode
   order?: number; // FIXED mode
   isFallback?: boolean;
+  drawCompletedAt?: Timestamp;
 }
 
 export interface StampTourConfig {
@@ -1095,6 +1097,7 @@ export interface StampTourProgress {
   completedAt?: Timestamp;
   rewardId?: string;
   rewardName?: string;
+  rewardLabel?: string;
   rewardStatus: StampTourRewardStatus;
   drawModeUsed?: StampTourDrawMode;
   lotteryStatus?: StampTourLotteryStatus;

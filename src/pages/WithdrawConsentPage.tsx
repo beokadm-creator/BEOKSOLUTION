@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
@@ -14,16 +14,23 @@ export default function WithdrawConsentPage() {
     const [status, setStatus] = useState<'loading' | 'confirm' | 'processing' | 'success' | 'error'>('loading');
     const [message, setMessage] = useState('');
     const [withdrawnCount, setWithdrawnCount] = useState(0);
+    const initializedRef = useRef(false);
 
     useEffect(() => {
-        // Check if user is authenticated
+        // Check if user is authenticated (only run once)
+        if (initializedRef.current) return;
+        initializedRef.current = true;
+
         if (!auth.user) {
-            setStatus('error');
-            setMessage('로그인이 필요합니다.');
+            // Defer setState to avoid synchronous setState warning
+            setTimeout(() => {
+                setStatus('error');
+                setMessage('로그인이 필요합니다.');
+            }, 0);
             return;
         }
 
-        setStatus('confirm');
+        setTimeout(() => setStatus('confirm'), 0);
     }, [auth.user]);
 
     const handleWithdraw = async () => {

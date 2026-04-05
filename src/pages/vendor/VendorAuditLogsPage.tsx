@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useOutletContext } from 'react-router-dom';
 import { collection, query, where, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Button } from '../../components/ui/button';
@@ -9,7 +9,9 @@ import LoadingSpinner from '../../components/common/LoadingSpinner';
 import type { AuditLog, AuditAction } from '../../types/schema';
 
 export default function VendorAuditLogsPage() {
-    const { vendorId } = useParams<{ vendorId: string }>();
+    const { vendorId: paramVendorId } = useParams<{ vendorId: string }>();
+    const { activeVendorId } = useOutletContext<{ activeVendorId?: string | null }>();
+    const vendorId = activeVendorId || paramVendorId;
     const [logs, setLogs] = useState<AuditLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -123,7 +125,9 @@ export default function VendorAuditLogsPage() {
             'STAMP_CREATED': '스탬프 생성',
             'ALIMTALK_SENT': '알림톡 발송',
             'ALIMTALK_FAILED': '알림톡 실패',
+            'CONSENT_GIVEN': '동의 획득',
             'CONSENT_WITHDRAWN': '동의 철회',
+            'GUESTBOOK_SIGN': '방명록 작성',
             'VENDOR_LOGIN': '벤더 로그인',
             'VENDOR_SETTINGS_CHANGED': '설정 변경'
         };
@@ -193,7 +197,9 @@ export default function VendorAuditLogsPage() {
                                 <option value="LEAD_CREATED">리드 생성</option>
                                 <option value="ALIMTALK_SENT">알림톡 발송</option>
                                 <option value="ALIMTALK_FAILED">알림톡 실패</option>
+                                <option value="CONSENT_GIVEN">동의 획득</option>
                                 <option value="CONSENT_WITHDRAWN">동의 철회</option>
+                                <option value="GUESTBOOK_SIGN">방명록 작성</option>
                                 <option value="VENDOR_LOGIN">로그인</option>
                             </select>
                         </div>

@@ -70,6 +70,7 @@ exports.withdrawConsent = functions.https.onCall(async (data, context) => {
     }
     try {
         const timestamp = admin.firestore.Timestamp.now();
+        const db = admin.firestore();
         let withdrawnCount = 0;
         const maxBatchSize = 500;
         // Query all leads for this visitor

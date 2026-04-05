@@ -54,6 +54,7 @@ exports.scheduledDataCleanup = functions.pubsub
     .onRun(async (context) => {
     const db = admin.firestore();
     const now = admin.firestore.Timestamp.now();
+    const db = admin.firestore();
     const threeYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 1095 * 24 * 60 * 60 * 1000));
     const twoYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 730 * 24 * 60 * 60 * 1000));
     const fiveYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 1825 * 24 * 60 * 60 * 1000));
@@ -166,6 +167,7 @@ exports.manualDataCleanup = functions.https.onCall(async (data, context) => {
     try {
         const { dryRun = false } = data;
         const now = admin.firestore.Timestamp.now();
+        const db = admin.firestore();
         const threeYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 1095 * 24 * 60 * 60 * 1000));
         const twoYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 730 * 24 * 60 * 60 * 1000));
         const fiveYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 1825 * 24 * 60 * 60 * 1000));

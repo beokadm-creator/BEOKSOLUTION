@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useConference } from '../../hooks/useConference';
 import { useCMS } from '../../hooks/useCMS';
 import toast from 'react-hot-toast';
@@ -11,20 +11,25 @@ const PageEditor: React.FC = () => {
     const [slug, setSlug] = useState('');
     const [title, setTitle] = useState('');
     const [content, setContent] = useState(''); // Simple Text Area for now
+    const prevSelectedPageRef = useRef<string | null>(null);
 
     useEffect(() => {
-        if (selectedPageId) {
-            const page = pages.find(p => p.id === selectedPageId);
-            if (page) {
-                 
-                setSlug(page.slug);
-                 
-                setTitle(page.title.ko);
-                 
-                setContent(page.content.ko);
+        if (selectedPageId !== prevSelectedPageRef.current) {
+            if (selectedPageId) {
+                const page = pages.find(p => p.id === selectedPageId);
+                if (page) {
+                    setTimeout(() => {
+                        setSlug(page.slug);
+                        setTitle(page.title.ko);
+                        setContent(page.content.ko);
+                    }, 0);
+                }
+            } else {
+                setTimeout(() => {
+                    setSlug(''); setTitle(''); setContent('');
+                }, 0);
             }
-        } else {
-            setSlug(''); setTitle(''); setContent('');
+            prevSelectedPageRef.current = selectedPageId;
         }
     }, [selectedPageId, pages]);
 

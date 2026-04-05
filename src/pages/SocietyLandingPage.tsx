@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
@@ -24,6 +24,7 @@ import PresidentGreetingSection from '../components/society/sections/PresidentGr
 import ConferenceListSection from '../components/society/sections/ConferenceListSection';
 import NoticesSection from '../components/society/sections/NoticesSection';
 import MyPageSection from '../components/society/sections/MyPageSection';
+import { resolveSocietyByIdentifier } from '../utils/societyResolver';
 
 const SocietyLandingPage: React.FC = () => {
     const authHook = useAuth('');
@@ -56,7 +57,17 @@ const SocietyLandingPage: React.FC = () => {
 
     useEffect(() => {
         if (window.location.pathname.endsWith('/mypage')) {
-            window.location.href = 'https://kadd.eregi.co.kr/mypage';
+            const host = window.location.hostname;
+            if (host.includes('localhost') || host.includes('127.0.0.1')) {
+                window.location.href = '/mypage';
+                return;
+            }
+            const parts = host.split('.');
+            const sub = parts.length >= 3 && parts[0] !== 'www' && parts[0] !== 'admin' && parts[0] !== 'eregi'
+                ? parts[0]
+                : '';
+            const target = sub ? `https://${sub}.eregi.co.kr/mypage` : '/mypage';
+            window.location.href = target;
         }
     }, []);
 
@@ -89,10 +100,11 @@ const SocietyLandingPage: React.FC = () => {
 
         const fetchData = async () => {
             try {
-                const socRef = doc(db, 'societies', societyId);
-                const socSnap = await getDoc(socRef);
+                const resolvedSociety = await resolveSocietyByIdentifier(societyId);
+                let resolvedSocietyId: string | null = null;
+                let resolvedDomainCode: string | null = null;
 
-                if (!socSnap.exists()) {
+                if (!resolvedSociety) {
                     const fallbackSociety: Society = {
                         id: societyId,
                         name: { ko: `${societyId.toUpperCase()} 학회`, en: `${societyId.toUpperCase()} Society` },
@@ -101,12 +113,30 @@ const SocietyLandingPage: React.FC = () => {
                     };
                     setSociety(fallbackSociety);
                 } else {
-                    const socData = { id: socSnap.id, ...socSnap.data() } as Society;
+                    resolvedSocietyId = resolvedSociety.id;
+                    resolvedDomainCode = typeof resolvedSociety.data.domainCode === 'string'
+                        ? resolvedSociety.data.domainCode
+                        : null;
+                    const socData = {
+                        id: resolvedSociety.id,
+                        ...resolvedSociety.data,
+                        domainCode: resolvedDomainCode || societyId
+                    } as Society;
                     setSociety(socData);
                 }
 
                 const confRef = collection(db, 'conferences');
-                const variations = [societyId, societyId.toLowerCase(), societyId.toUpperCase()];
+                const variations = [
+                    societyId,
+                    societyId.toLowerCase(),
+                    societyId.toUpperCase(),
+                    resolvedSocietyId || undefined,
+                    resolvedSocietyId?.toLowerCase() || undefined,
+                    resolvedSocietyId?.toUpperCase() || undefined,
+                    resolvedDomainCode || undefined,
+                    resolvedDomainCode?.toLowerCase() || undefined,
+                    resolvedDomainCode?.toUpperCase() || undefined
+                ].filter((value): value is string => Boolean(value));
                 const q = query(confRef, where('societyId', 'in', [...new Set(variations)]));
                 const confSnaps = await getDocs(q);
 
@@ -138,6 +168,7 @@ const SocietyLandingPage: React.FC = () => {
         const host = window.location.hostname;
         const isDev = host === 'localhost' || host === '127.0.0.1' || host.includes('.web.app') || host.includes('firebaseapp.com');
         const societyParam = new URLSearchParams(window.location.search).get('society');
+        const societyDomainCode = (society as Society & { domainCode?: string }).domainCode || society.id;
         
         let base: string;
         if (isDev) {
@@ -145,12 +176,12 @@ const SocietyLandingPage: React.FC = () => {
             const suffix = societyParam ? `?society=${societyParam}` : '';
             base = `/${conf.slug}${suffix}`;
             if (path) base = `/${conf.slug}/${path}${suffix}`;
-        } else if (host.startsWith(society.id)) {
+        } else if (host.startsWith(societyDomainCode)) {
             // 서브도메인 환경 (kadd.eregi.co.kr)
             base = `/${conf.slug}`;
         } else {
             // 프로덕션: 서브도메인 URL 생성
-            base = `${window.location.protocol}//${society.id}.eregi.co.kr/${conf.slug}`;
+            base = `${window.location.protocol}//${societyDomainCode}.eregi.co.kr/${conf.slug}`;
         }
         
         return path && !isDev ? `${base}/${path}` : base;

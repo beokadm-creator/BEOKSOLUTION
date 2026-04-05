@@ -31,9 +31,13 @@ const MmInput: React.FC<{
 
     // 외부에서 valuePx가 바뀌면 로컬 상태를 동기화 (포커스 중이 아닐 때만)
     const isFocused = useRef(false);
+    const prevValuePxRef = useRef(valuePx);
     useEffect(() => {
-        if (!isFocused.current) {
-            setLocalVal(valuePx !== undefined ? String(toMm(valuePx)) : '');
+        if (!isFocused.current && valuePx !== prevValuePxRef.current) {
+            setTimeout(() => {
+                setLocalVal(valuePx !== undefined ? String(toMm(valuePx)) : '');
+            }, 0);
+            prevValuePxRef.current = valuePx;
         }
     }, [valuePx]);
 
@@ -73,6 +77,7 @@ const BadgeEditorPage: React.FC = () => {
     const [canvasSize, setCanvasSize] = useState({ width: 400, height: 600 });
     const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
     const [bgUrl, setBgUrl] = useState<string | undefined>(undefined);
+    const prevBadgeLayoutRef = useRef(info?.badgeLayout);
 
     const previewData = {
         NAME: '홍길동',
@@ -85,14 +90,16 @@ const BadgeEditorPage: React.FC = () => {
     };
 
     useEffect(() => {
-        if (info?.badgeLayout) {
-
-            setElements(info.badgeLayout.elements || []);
-            setCanvasSize({
-                width: info.badgeLayout.width || 400,
-                height: info.badgeLayout.height || 600
-            });
-            setBgUrl(info.badgeLayout.backgroundImageUrl);
+        if (info?.badgeLayout && info.badgeLayout !== prevBadgeLayoutRef.current) {
+            setTimeout(() => {
+                setElements(info.badgeLayout.elements || []);
+                setCanvasSize({
+                    width: info.badgeLayout.width || 400,
+                    height: info.badgeLayout.height || 600
+                });
+                setBgUrl(info.badgeLayout.backgroundImageUrl);
+            }, 0);
+            prevBadgeLayoutRef.current = info.badgeLayout;
         }
     }, [info]);
 

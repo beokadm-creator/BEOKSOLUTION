@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebase';
 import { Society } from '../types/schema';
 import { extractSocietyFromHost } from '../utils/domainHelper';
+import { resolveSocietyByIdentifier } from '../utils/societyResolver';
 
 export const useSociety = () => {
     const [society, setSociety] = useState<Society | null>(null);
@@ -48,10 +47,9 @@ export const useSociety = () => {
             }
 
             try {
-                const docRef = doc(db, 'societies', societyId);
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists()) {
-                    setSociety({ id: docSnap.id, ...docSnap.data() } as Society);
+                const resolved = await resolveSocietyByIdentifier(societyId);
+                if (resolved) {
+                    setSociety({ id: resolved.id, ...resolved.data } as Society);
                 } else {
                     console.error(`[useSociety] Society document not found: ${societyId}`);
                     setError('Society not found');

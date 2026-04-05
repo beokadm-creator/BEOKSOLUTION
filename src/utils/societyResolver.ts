@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
+import { collection, getDoc, getDocs, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 type SocietyLike = {
@@ -21,11 +21,10 @@ const getNameInitials = (name?: string): string => {
     const words = name
         .replace(/[^a-zA-Z0-9\s]/g, ' ')
         .split(/\s+/)
-        .map((word) => word.trim())
-        .filter((word) => word.length > 0);
-
+        .map((w) => w.trim())
+        .filter((w) => w.length > 0);
     if (!words.length) return '';
-    return words.map((word) => word[0]).join('').toLowerCase();
+    return words.map((w) => w[0]).join('').toLowerCase();
 };
 
 export const resolveSocietyByIdentifier = async (
@@ -42,10 +41,10 @@ export const resolveSocietyByIdentifier = async (
     }
 
     const snap = await getDocs(collection(db, 'societies'));
-    const matched = snap.docs.find((snapshot) => {
-        const data = snapshot.data() as SocietyLike;
-        const idMatch = normalize(snapshot.id) === key;
-        const idCompactMatch = compact(snapshot.id) === keyCompact && keyCompact.length > 0;
+    const matched = snap.docs.find((d) => {
+        const data = d.data() as SocietyLike;
+        const idMatch = normalize(d.id) === key;
+        const idCompactMatch = compact(d.id) === keyCompact && keyCompact.length > 0;
         const domainMatch = normalize(data.domainCode) === key;
         const domainCompactMatch = compact(data.domainCode) === keyCompact && keyCompact.length > 0;
         const slugMatch = normalize(data.slug) === key;
@@ -54,25 +53,12 @@ export const resolveSocietyByIdentifier = async (
         const nameEnCompactMatch = compact(data.name?.en) === keyCompact && keyCompact.length > 0;
         const nameEnInitialsMatch = getNameInitials(data.name?.en) === key;
         const aliasMatch = Array.isArray(data.aliases)
-            ? data.aliases.map((alias) => normalize(alias)).includes(key)
+            ? data.aliases.map((a) => normalize(a)).includes(key)
             : false;
         const aliasCompactMatch = Array.isArray(data.aliases)
-            ? data.aliases.map((alias) => compact(alias)).includes(keyCompact)
+            ? data.aliases.map((a) => compact(a)).includes(keyCompact)
             : false;
-
-        return (
-            idMatch
-            || idCompactMatch
-            || domainMatch
-            || domainCompactMatch
-            || slugMatch
-            || slugCompactMatch
-            || nameEnMatch
-            || nameEnCompactMatch
-            || nameEnInitialsMatch
-            || aliasMatch
-            || aliasCompactMatch
-        );
+        return idMatch || idCompactMatch || domainMatch || domainCompactMatch || slugMatch || slugCompactMatch || nameEnMatch || nameEnCompactMatch || nameEnInitialsMatch || aliasMatch || aliasCompactMatch;
     });
 
     if (!matched) return null;

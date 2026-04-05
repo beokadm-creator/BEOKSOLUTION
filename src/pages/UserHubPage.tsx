@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, collection, query, where, getDocs, doc, serverTimestamp, getDoc, collectionGroup, orderBy, updateDoc, deleteDoc, onSnapshot, Timestamp } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, doc, serverTimestamp, getDoc, collectionGroup, orderBy, updateDoc, deleteDoc, onSnapshot, Timestamp, setDoc, limit } from 'firebase/firestore';
 import { useMemberVerification } from '../hooks/useMemberVerification';
 import { useAuth } from '../hooks/useAuth';
 import { useSociety } from '../hooks/useSociety';
@@ -25,6 +25,7 @@ import { Submission, ConferenceUser } from '../types/schema';
 import { normalizeUserData } from '../utils/userDataMapper';
 import { safeFormatDate } from '../utils/dateUtils';
 import { DOMAIN_CONFIG, extractSocietyFromHost } from '../utils/domainHelper';
+import { resolveSocietyByIdentifier } from '../utils/societyResolver';
 
 interface Stringable {
     ko?: string;
@@ -46,6 +47,101 @@ const forceString = (val: unknown): string => {
         }
         return String(val);
     } catch { return ''; }
+};
+
+const getSafeConferenceSlug = (slug?: string): string => {
+    if (!slug) return '';
+    const trimmed = slug.trim();
+    if (!trimmed || trimmed === 'unknown') return '';
+    return trimmed;
+};
+
+const getSocietyIdFromSlug = (slug?: string): string => {
+    const safeSlug = getSafeConferenceSlug(slug);
+    if (!safeSlug || !safeSlug.includes('_')) return '';
+    return safeSlug.split('_')[0] || '';
+};
+
+const normalizeSocietyKey = (value: unknown): string => forceString(value).trim().toLowerCase();
+
+const getTimeValue = (d: unknown): number => {
+    if (!d) return 0;
+    if (typeof d === 'object' && d !== null && 'toMillis' in d && typeof (d as { toMillis?: () => number }).toMillis === 'function') {
+        return (d as { toMillis: () => number }).toMillis();
+    }
+    if (typeof d === 'object' && d !== null && 'toDate' in d && typeof (d as { toDate?: () => Date }).toDate === 'function') {
+        return (d as { toDate: () => Date }).toDate().getTime();
+    }
+    if (d instanceof Date) return d.getTime();
+    if (typeof d === 'string') return new Date(d).getTime();
+    return 0;
+};
+
+const isCanceledLike = (status: unknown): boolean => {
+    const raw = forceString(status);
+    if (!raw) return false;
+    const s = raw.toUpperCase();
+    const normalized = s.replace(/[\s-]+/g, '_');
+    return [
+        'CANCELED',
+        'CANCELLED',
+        'CANCEL',
+        'CANCELLATION',
+        'REFUND',
+        'REJECT',
+        'DENIED',
+        'FAILED',
+        'EXPIRED',
+        'VOID',
+        'VOIDED',
+        'ABORT',
+        'WITHDRAW',
+        '취소',
+        '환불',
+        '거절',
+        '실패',
+        '만료',
+        '무효'
+    ].some(k => s.includes(k) || normalized.includes(k));
+};
+
+const isPaidLike = (r: UserReg): boolean => {
+    const p = forceString(r.paymentStatus).toUpperCase();
+    const s = forceString(r.status).toUpperCase();
+    const paidKeywords = ['PAID', 'COMPLETED', 'SUCCESS', 'SUCCEEDED', 'APPROVED', 'DONE', '결제완료'];
+    return paidKeywords.some((k) => p === k || s === k || p.includes(k) || s.includes(k));
+};
+
+const isPendingLike = (r: UserReg): boolean => {
+    const p = forceString(r.paymentStatus).toUpperCase();
+    const s = forceString(r.status).toUpperCase();
+    const allow = ['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT', 'WAITING_FOR_DEPOSIT', 'WAITING_DEPOSIT', 'DEPOSIT_WAITING', '입금대기'];
+    return allow.includes(p) || allow.includes(s);
+};
+
+const isVisibleActiveReg = (r: UserReg): boolean => {
+    if (isCanceledLike(r.paymentStatus) || isCanceledLike(r.status)) return false;
+    return isPaidLike(r) || isPendingLike(r);
+};
+
+const pickLatestVisibleReg = (regs: UserReg[]): UserReg | null => {
+    if (!regs.length) return null;
+    const sorted = [...regs].sort((a, b) => getTimeValue(b.paymentDate) - getTimeValue(a.paymentDate));
+    const latestCanceled = sorted.find((r) => isCanceledLike(r.paymentStatus) || isCanceledLike(r.status));
+    const latestActive = sorted.find((r) => isVisibleActiveReg(r));
+
+    if (!latestActive) return null;
+    if (!latestCanceled) return latestActive;
+
+    const canceledAt = getTimeValue(latestCanceled.paymentDate);
+    const activeAt = getTimeValue(latestActive.paymentDate);
+
+    // Conservative rule: if cancel time is unknown or newer/equal, hide from "등록학회"
+    if (canceledAt === 0) return null;
+    if (activeAt === 0) return null;
+    if (activeAt <= canceledAt) return null;
+
+    return latestActive;
 };
 
 interface UserReg {
@@ -79,6 +175,15 @@ interface Affiliation {
     grade?: string;
     expiry?: string | Timestamp;
     expiryDate?: string | Timestamp;
+}
+
+interface ConsentHistoryEntry {
+    id: string;
+    vendorName: string;
+    conferenceId: string;
+    conferenceName: string;
+    message?: string;
+    timestamp?: Timestamp;
 }
 
 // [Step 512-Des] Visual Gratification: CountUp Animation
@@ -130,6 +235,9 @@ const UserHubPage: React.FC = () => {
 
     const [regs, setRegs] = useState<UserReg[]>([]);
     const [abstracts, setAbstracts] = useState<Submission[]>([]);
+    const [guestbookEntries, setGuestbookEntries] = useState<ConsentHistoryEntry[]>([]);
+    const [societyScopeKeys, setSocietyScopeKeys] = useState<Set<string>>(new Set());
+    const [scopeResolved, setScopeResolved] = useState(false);
     const healingAttempted = useRef<{ [key: string]: boolean }>({});
     const realtimeRetryCount = useRef(0);
     const MAX_REALTIME_RETRIES = 3;
@@ -142,8 +250,9 @@ const UserHubPage: React.FC = () => {
     const [totalPoints, setTotalPoints] = useState(0);
     const [societies, setSocieties] = useState<Array<{ id: string; name: string | { ko?: string; en?: string };[key: string]: unknown }>>([]);
 
-    // Profile (Locked by default)
+    // Profile
     const [profile, setProfile] = useState({ displayName: '', phoneNumber: '', affiliation: '', licenseNumber: '', email: '' });
+    const [profileSaving, setProfileSaving] = useState(false);
 
     // Modal State
     const [showCertModal, setShowCertModal] = useState(false);
@@ -155,6 +264,94 @@ const UserHubPage: React.FC = () => {
     // [Fix-Step 263] Use Hook
     const { verifyMember, loading: verifyLoading } = useMemberVerification();
     const verifyFormInitializedRef = useRef(false);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const initSocietyScope = async () => {
+            if (!cancelled) {
+                setScopeResolved(false);
+                setRegs([]);
+            }
+            const hostSociety = extractSocietyFromHost(window.location.hostname);
+            const scopedSocietyFromQuery = normalizeSocietyKey(searchParams.get('scopeSociety'));
+            const highlightSlug = getSafeConferenceSlug(searchParams.get('highlight') || '');
+
+            let inferredSocietyFromHighlight = '';
+            if (highlightSlug) {
+                try {
+                    const confById = await getDoc(doc(getFirestore(), 'conferences', highlightSlug));
+                    if (confById.exists()) {
+                        inferredSocietyFromHighlight = normalizeSocietyKey((confById.data() as { societyId?: string }).societyId);
+                    } else {
+                        const q = query(
+                            collection(getFirestore(), 'conferences'),
+                            where('slug', '==', highlightSlug),
+                            limit(1)
+                        );
+                        const snap = await getDocs(q);
+                        if (!snap.empty) {
+                            inferredSocietyFromHighlight = normalizeSocietyKey((snap.docs[0].data() as { societyId?: string }).societyId);
+                        }
+                    }
+                } catch {
+                    inferredSocietyFromHighlight = '';
+                }
+            }
+
+            const seedSociety = scopedSocietyFromQuery || hostSociety || inferredSocietyFromHighlight;
+            if (!seedSociety) {
+                if (!cancelled) {
+                    setSocietyScopeKeys(new Set());
+                    setScopeResolved(true);
+                }
+                return;
+            }
+
+            try {
+                const resolved = await resolveSocietyByIdentifier(seedSociety);
+                if (cancelled) return;
+
+                const keys = new Set<string>();
+                keys.add(normalizeSocietyKey(seedSociety));
+
+                if (resolved) {
+                    keys.add(normalizeSocietyKey(resolved.id));
+                    keys.add(normalizeSocietyKey((resolved.data as { domainCode?: string }).domainCode));
+                    const aliases = (resolved.data as { aliases?: string[] }).aliases;
+                    if (Array.isArray(aliases)) {
+                        aliases.forEach((a) => keys.add(normalizeSocietyKey(a)));
+                    }
+                }
+
+                setSocietyScopeKeys(new Set(Array.from(keys).filter(Boolean)));
+            } catch {
+                if (!cancelled) {
+                    setSocietyScopeKeys(new Set([normalizeSocietyKey(seedSociety)]));
+                }
+            } finally {
+                if (!cancelled) {
+                    setScopeResolved(true);
+                }
+            }
+        };
+
+        initSocietyScope();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [searchParams]);
+
+    const isInSocietyScope = useCallback((societyId?: string, slug?: string) => {
+        if (!scopeResolved) return false;
+        if (!societyScopeKeys.size) return true;
+        const candidates = [
+            normalizeSocietyKey(societyId),
+            normalizeSocietyKey(getSocietyIdFromSlug(slug))
+        ].filter(Boolean);
+        return candidates.some((c) => societyScopeKeys.has(c));
+    }, [societyScopeKeys, scopeResolved]);
 
     const fetchUserData = useCallback(async (u: ConferenceUser) => {
         const db = getFirestore();
@@ -197,7 +394,11 @@ const UserHubPage: React.FC = () => {
                     logger.debug('UserHub', 'Participations query returned', { count: participationsSnap.size });
                     if (!participationsSnap.empty) {
                         const nonMemberParticipation = participationsSnap.docs[0].data();
-                        const confSlug = nonMemberParticipation.slug || nonMemberParticipation.conferenceId || nonMemberParticipation.conferenceSlug || `${DOMAIN_CONFIG.DEFAULT_SOCIETY}_2026spring`;
+                        const confSlug = forceString(
+                            nonMemberParticipation.slug ||
+                            nonMemberParticipation.conferenceId ||
+                            nonMemberParticipation.conferenceSlug
+                        );
 
                         // [Non-member detection] users/{uid} doesn't exist but participations do
                         logger.debug('UserHub', 'Non-member detected', { uid: u.id, hasParticipations: participationsSnap.size, confSlug });
@@ -237,7 +438,8 @@ const UserHubPage: React.FC = () => {
             // Query submissions across ALL conferences where user is submitter
             // Use collectionGroup to search conferences/{confId}/submissions
             // [Safety] Use parameter u instead of outer scope user to avoid null reference
-            if (!u.id) {
+            const queryUserId = forceString(u.id || u.uid);
+            if (!queryUserId) {
                 logger.warn('UserHub', 'User UID is null, skipping abstracts fetch');
                 setAbstracts([]);
                 setLoading(false);
@@ -245,7 +447,7 @@ const UserHubPage: React.FC = () => {
             }
 
             const submissionsRef = collectionGroup(db, 'submissions');
-            const q = query(submissionsRef, where('userId', '==', u.uid), orderBy('submittedAt', 'desc'));
+            const q = query(submissionsRef, where('userId', '==', queryUserId), orderBy('submittedAt', 'desc'));
             const snap = await getDocs(q);
 
             const userAbstracts = snap.docs.map(d => ({
@@ -253,8 +455,16 @@ const UserHubPage: React.FC = () => {
                 ...d.data()
             }));
 
-            setAbstracts(userAbstracts as any);
-            logger.debug('UserHub', 'Abstracts fetched', { count: userAbstracts.length });
+            const scopedAbstracts = (userAbstracts as Array<Record<string, unknown>>).filter((absData) => {
+                const absSlug = forceString(
+                    absData.slug || absData.conferenceSlug || absData.confId || absData.conferenceId
+                );
+                const absSociety = forceString(absData.societyId || getSocietyIdFromSlug(absSlug));
+                return isInSocietyScope(absSociety, absSlug);
+            });
+
+            setAbstracts(scopedAbstracts as any);
+            logger.debug('UserHub', 'Abstracts fetched', { count: scopedAbstracts.length });
         } catch (absErr) {
             logger.error('UserHub', 'Abstracts fetch error', absErr);
             const errorMsg = absErr instanceof Error ? absErr.message : String(absErr);
@@ -268,9 +478,108 @@ const UserHubPage: React.FC = () => {
             }
         }
 
+        try {
+            let rawEntries: Array<{
+                id: string;
+                vendorName?: string;
+                conferenceId?: string;
+                message?: string;
+                timestamp?: Timestamp;
+            }> = [];
+
+            try {
+                const guestbookRef = collectionGroup(db, 'guestbook_entries');
+                const guestbookQuery = query(guestbookRef, where('userId', '==', u.id));
+                const guestbookSnap = await getDocs(guestbookQuery);
+                rawEntries = guestbookSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Array<{
+                    id: string;
+                    vendorName?: string;
+                    conferenceId?: string;
+                    message?: string;
+                    timestamp?: Timestamp;
+                }>;
+            } catch (indexErr) {
+                const indexMsg = indexErr instanceof Error ? indexErr.message : String(indexErr);
+                if (!indexMsg.includes('COLLECTION_GROUP_ASC index')) {
+                    throw indexErr;
+                }
+
+                // Fallback without collection-group index: query each participated conference subcollection.
+                const participationsSnap = await getDocs(collection(db, `users/${u.id}/participations`));
+                const confIds = Array.from(new Set(
+                    participationsSnap.docs
+                        .map((d) => forceString(d.data().slug || d.data().conferenceId || d.data().conferenceSlug))
+                        .filter(Boolean)
+                ));
+
+                const confGuestbookSnaps = await Promise.all(
+                    confIds.map(async (confId) => {
+                        try {
+                            const confQ = query(collection(db, `conferences/${confId}/guestbook_entries`), where('userId', '==', u.id));
+                            return await getDocs(confQ);
+                        } catch {
+                            return null;
+                        }
+                    })
+                );
+
+                rawEntries = confGuestbookSnaps
+                    .filter((s): s is NonNullable<typeof s> => !!s)
+                    .flatMap((snap) => snap.docs.map((d) => ({ id: d.id, ...d.data() }))) as Array<{
+                        id: string;
+                        vendorName?: string;
+                        conferenceId?: string;
+                        message?: string;
+                        timestamp?: Timestamp;
+                    }>;
+            }
+
+            const confIds = Array.from(new Set(rawEntries.map(e => forceString(e.conferenceId)).filter(Boolean)));
+            const confNameMap = new Map<string, string>();
+            const confSocietyMap = new Map<string, string>();
+
+            await Promise.all(confIds.map(async (confId) => {
+                try {
+                    const confSnap = await getDoc(doc(db, 'conferences', confId));
+                    if (confSnap.exists()) {
+                        const confData = confSnap.data() as { title?: unknown; societyId?: string };
+                        confNameMap.set(confId, forceString(confData.title) || confId);
+                        confSocietyMap.set(confId, forceString(confData.societyId) || getSocietyIdFromSlug(confId));
+                    } else {
+                        confNameMap.set(confId, confId);
+                        confSocietyMap.set(confId, getSocietyIdFromSlug(confId));
+                    }
+                } catch {
+                    confNameMap.set(confId, confId);
+                    confSocietyMap.set(confId, getSocietyIdFromSlug(confId));
+                }
+            }));
+
+            const entries: ConsentHistoryEntry[] = rawEntries.map((entry) => {
+                const confId = forceString(entry.conferenceId);
+                return {
+                    id: entry.id,
+                    vendorName: forceString(entry.vendorName) || 'Unknown Booth',
+                    conferenceId: confId,
+                    conferenceName: confNameMap.get(confId) || confId,
+                    message: forceString(entry.message),
+                    timestamp: entry.timestamp
+                };
+            }).filter((entry) => isInSocietyScope(confSocietyMap.get(entry.conferenceId), entry.conferenceId));
+            entries.sort((a, b) => {
+                const at = a.timestamp?.toMillis ? a.timestamp.toMillis() : 0;
+                const bt = b.timestamp?.toMillis ? b.timestamp.toMillis() : 0;
+                return bt - at;
+            });
+            setGuestbookEntries(entries);
+        } catch (guestErr) {
+            logger.error('UserHub', 'Guestbook fetch error', guestErr);
+            setGuestbookEntries([]);
+        }
+
         setLoading(false);
         // setSyncStatus('connected'); // Handled by realtime listener
-    }, []);
+    }, [isInSocietyScope]);
 
     // Initialize verifyForm with user name when user data changes
 
@@ -449,23 +758,31 @@ const UserHubPage: React.FC = () => {
                         const uniqueConfSlugs = [...new Set(participationData.map(p => p.confSlug))];
                         const uniqueSocietyIds = [...new Set(participationData.map(p => {
                             const d = p.data;
-                            let sid = d.societyId;
+                            let sid = d.societyId as string;
                             if (!sid || sid === 'unknown') {
-                                sid = p.confSlug.includes('_') ? p.confSlug.split('_')[0] : DOMAIN_CONFIG.DEFAULT_SOCIETY;
+                                sid = p.confSlug.includes('_') ? p.confSlug.split('_')[0] : '';
                             }
                             return sid as string;
-                        }))];
+                        }).filter(Boolean))];
 
                         // [PERF] Step 2: Batch fetch all unique conferences and societies in parallel
                         const [confDocs, societyDocs] = await Promise.all([
-                            Promise.all(uniqueConfSlugs.map(slug => getDoc(doc(db, 'conferences', slug)))),
+                            Promise.all(uniqueConfSlugs.map(async (slug) => {
+                                const byId = await getDoc(doc(db, 'conferences', slug));
+                                if (byId.exists()) return byId.data();
+
+                                const bySlugQ = query(collection(db, 'conferences'), where('slug', '==', slug), limit(1));
+                                const bySlugSnap = await getDocs(bySlugQ);
+                                if (!bySlugSnap.empty) return bySlugSnap.docs[0].data();
+                                return null;
+                            })),
                             Promise.all(uniqueSocietyIds.map(sid => getDoc(doc(db, 'societies', sid))))
                         ]);
 
                         // [PERF] Step 3: Build lookup Maps (O(1) access)
                         const confCache = new Map<string, any>();
-                        confDocs.forEach((snap, i) => {
-                            if (snap.exists()) confCache.set(uniqueConfSlugs[i], snap.data());
+                        confDocs.forEach((confData, i) => {
+                            if (confData) confCache.set(uniqueConfSlugs[i], confData);
                         });
 
                         const societyCache = new Map<string, any>();
@@ -511,7 +828,7 @@ const UserHubPage: React.FC = () => {
 
                             let societyId = data.societyId as string;
                             if (!societyId || societyId === 'unknown') {
-                                societyId = confSlug.includes('_') ? confSlug.split('_')[0] : DOMAIN_CONFIG.DEFAULT_SOCIETY;
+                                societyId = (cData?.societyId as string) || (confSlug.includes('_') ? confSlug.split('_')[0] : '');
                             }
 
                             const socData = societyCache.get(societyId);
@@ -533,7 +850,7 @@ const UserHubPage: React.FC = () => {
                                 societyName: socName,
                                 earnedPoints: Number(data.earnedPoints || 0),
                                 slug: forceString(data.slug || data.conferenceId || data.conferenceSlug || confSlug),
-                                societyId: forceString(data.societyId === 'unknown' ? cData?.societyId || societyId || DOMAIN_CONFIG.DEFAULT_SOCIETY : data.societyId || cData?.societyId || societyId || DOMAIN_CONFIG.DEFAULT_SOCIETY),
+                                societyId: forceString(data.societyId === 'unknown' ? cData?.societyId || societyId || '' : data.societyId || cData?.societyId || societyId || ''),
                                 location: loc,
                                 dates,
                                 paymentStatus: currentPaymentStatus,
@@ -560,64 +877,16 @@ const UserHubPage: React.FC = () => {
 
                         const activeRegs: UserReg[] = [];
 
-                        grouped.forEach((regs, slug) => {
-                            // 1. Check for ANY PAID registration -> Show it
-                            const paidReg = regs.find(r => {
-                                const p = (r.paymentStatus || '').toUpperCase();
-                                const s = (r.status || '').toUpperCase();
-                                const isCanceled = ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED', '결제취소', '취소', '환불'].some(c => p.includes(c) || s.includes(c));
-                                if (isCanceled) return false;
-                                // CRITICAL: Only trust 'PAID' labels. Including 'COMPLETED' but prioritizing 'PAID' from the actual registration record.
-                                return p === 'PAID' || s === 'PAID' || s === 'COMPLETED';
-                            });
-
-                            if (paidReg) {
-                                activeRegs.push(paidReg);
-                                return;
-                            }
-
-                            // 2. Check for ANY CANCELED/REFUNDED -> Hide (User canceled)
-                            const hasCancel = regs.some(r => {
-                                const p = (r.paymentStatus || '').toUpperCase();
-                                const s = (r.status || '').toUpperCase();
-                                return ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED', '결제취소', '취소', '환불'].some(c => p.includes(c) || s.includes(c));
-                            });
-
-                            if (hasCancel) return;
-
-                            // 3. Otherwise check latest registration
-                            regs.sort((a, b) => {
-                                const getTime = (d: any) => {
-                                    if (!d) return 0;
-                                    if (d.toMillis) return d.toMillis();
-                                    if (d.toDate) return d.toDate().getTime();
-                                    if (d instanceof Date) return d.getTime();
-                                    if (typeof d === 'string') return new Date(d).getTime();
-                                    return 0;
-                                };
-                                return getTime(b.paymentDate) - getTime(a.paymentDate);
-                            });
-
-                            const latest = regs[0];
-                            const pStatus = (latest.paymentStatus || '').toUpperCase();
-                            const status = (latest.status || '').toUpperCase();
-
-                            // WHITE-LIST STRATEGY: Only allow known valid unfinished/active statuses
-                            // NOTE: COMPLETED is included for legacy/confirmed registrations.
-                            const isPending = ['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT', 'COMPLETED'].includes(pStatus) ||
-                                ['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT', 'COMPLETED'].includes(status) ||
-                                pStatus === 'WAITING_FOR_DEPOSIT' || status === 'WAITING_FOR_DEPOSIT';
-
-                            if (isPending) {
-                                activeRegs.push(latest);
-                            } else {
-                                logger.debug('UserHub', `Hiding conference ${slug} - status not in allowlist: p=${pStatus}, s=${status}`);
-                            }
+                        grouped.forEach((groupedRegs) => {
+                            const visibleReg = pickLatestVisibleReg(groupedRegs);
+                            if (visibleReg) activeRegs.push(visibleReg);
                         });
 
 
-                        setRegs(activeRegs);
-                        setTotalPoints(activeRegs.reduce((acc, r) => acc + (r.earnedPoints ?? 0), 0));
+                        const visibleRegs = activeRegs.filter(isVisibleActiveReg);
+                        const scopedRegs = visibleRegs.filter((r) => isInSocietyScope(r.societyId, r.slug));
+                        setRegs(scopedRegs);
+                        setTotalPoints(scopedRegs.reduce((acc, r) => acc + (r.earnedPoints ?? 0), 0));
                         setSyncStatus('connected');
                         setLoading(false);
                     } catch (err) {
@@ -652,17 +921,25 @@ const UserHubPage: React.FC = () => {
                     const uniqueSocIds = [...new Set(enrichedDocs.map(p => {
                         const d = p.data;
                         let sid = d.societyId as string;
-                        if (!sid || sid === 'unknown') sid = p.confSlug.includes('_') ? p.confSlug.split('_')[0] : DOMAIN_CONFIG.DEFAULT_SOCIETY;
+                        if (!sid || sid === 'unknown') sid = p.confSlug.includes('_') ? p.confSlug.split('_')[0] : '';
                         return sid;
-                    }))];
+                    }).filter(Boolean))];
 
                     const [confDocs, socDocs] = await Promise.all([
-                        Promise.all(uniqueConfSlugs.map(slug => getDoc(doc(db, 'conferences', slug)))),
+                        Promise.all(uniqueConfSlugs.map(async (slug) => {
+                            const byId = await getDoc(doc(db, 'conferences', slug));
+                            if (byId.exists()) return byId.data();
+
+                            const bySlugQ = query(collection(db, 'conferences'), where('slug', '==', slug), limit(1));
+                            const bySlugSnap = await getDocs(bySlugQ);
+                            if (!bySlugSnap.empty) return bySlugSnap.docs[0].data();
+                            return null;
+                        })),
                         Promise.all(uniqueSocIds.map(sid => getDoc(doc(db, 'societies', sid))))
                     ]);
 
                     const confCache = new Map<string, any>();
-                    confDocs.forEach((snap, i) => { if (snap.exists()) confCache.set(uniqueConfSlugs[i], snap.data()); });
+                    confDocs.forEach((confData, i) => { if (confData) confCache.set(uniqueConfSlugs[i], confData); });
 
                     const socCache = new Map<string, any>();
                     socDocs.forEach((snap, i) => { if (snap.exists()) socCache.set(uniqueSocIds[i], snap.data()); });
@@ -692,7 +969,7 @@ const UserHubPage: React.FC = () => {
 
                         let societyId = data.societyId as string;
                         if (!societyId || societyId === 'unknown') {
-                            societyId = confSlug.includes('_') ? confSlug.split('_')[0] : DOMAIN_CONFIG.DEFAULT_SOCIETY;
+                            societyId = (cData?.societyId as string) || (confSlug.includes('_') ? confSlug.split('_')[0] : '');
                         }
 
                         const socData = socCache.get(societyId);
@@ -712,7 +989,7 @@ const UserHubPage: React.FC = () => {
                             societyName: socName,
                             earnedPoints: Number(data.earnedPoints || 0),
                             slug: forceString(data.slug || data.conferenceId || data.conferenceSlug || confSlug),
-                            societyId: forceString(data.societyId === 'unknown' ? cData?.societyId || societyId || DOMAIN_CONFIG.DEFAULT_SOCIETY : data.societyId || cData?.societyId || societyId || DOMAIN_CONFIG.DEFAULT_SOCIETY),
+                            societyId: forceString(data.societyId === 'unknown' ? cData?.societyId || societyId || '' : data.societyId || cData?.societyId || societyId || ''),
                             location: loc,
                             dates,
                             paymentStatus: data.paymentStatus,
@@ -736,64 +1013,15 @@ const UserHubPage: React.FC = () => {
 
                     const activeRegs: UserReg[] = [];
 
-                    grouped.forEach((regs, slug) => {
-                        // 1. Check for ANY PAID registration -> Show it
-                        // NOTE: COMPLETED in participations means registration confirmed.
-                        const paidReg = regs.find(r => {
-                            const p = (r.paymentStatus || '').toUpperCase();
-                            const s = (r.status || '').toUpperCase();
-                            const isCanceled = ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED', '결제취소', '취소', '환불'].some(c => p.includes(c) || s.includes(c));
-                            if (isCanceled) return false;
-                            // CRITICAL: Only trust 'PAID' or 'COMPLETED' labels (if not canceled).
-                            return p === 'PAID' || s === 'PAID' || s === 'COMPLETED';
-                        });
-
-                        if (paidReg) {
-                            activeRegs.push(paidReg);
-                            return;
-                        }
-
-                        // 2. Check for ANY CANCELED/REFUNDED -> Hide (User canceled)
-                        const hasCancel = regs.some(r => {
-                            const p = (r.paymentStatus || '').toUpperCase();
-                            const s = (r.status || '').toUpperCase();
-                            return ['CANCELED', 'REFUNDED', 'REFUND_REQUESTED', 'CANCELLED', '결제취소', '취소', '환불'].some(c => p.includes(c) || s.includes(c));
-                        });
-
-                        if (hasCancel) return;
-
-                        // 3. Otherwise check latest registration
-                        regs.sort((a, b) => {
-                            const getTime = (d: any) => {
-                                if (!d) return 0;
-                                if (d.toMillis) return d.toMillis();
-                                if (d.toDate) return d.toDate().getTime();
-                                if (d instanceof Date) return d.getTime();
-                                if (typeof d === 'string') return new Date(d).getTime();
-                                return 0;
-                            };
-                            return getTime(b.paymentDate) - getTime(a.paymentDate);
-                        });
-
-                        const latest = regs[0];
-                        const pStatus = (latest.paymentStatus || '').toUpperCase();
-                        const status = (latest.status || '').toUpperCase();
-
-                        // WHITE-LIST STRATEGY: Only allow known valid unfinished/active statuses
-                        // NOTE: COMPLETED is included for legacy/confirmed registrations.
-                        const isPending = ['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT', 'COMPLETED'].includes(pStatus) ||
-                            ['PENDING', 'READY', 'SUBMITTED', 'PENDING_PAYMENT', 'COMPLETED'].includes(status) ||
-                            pStatus === 'WAITING_FOR_DEPOSIT' || status === 'WAITING_FOR_DEPOSIT';
-
-                        if (isPending) {
-                            activeRegs.push(latest);
-                        } else {
-                            logger.debug('UserHub', `Hiding conference ${slug} - status not in allowlist: p=${pStatus}, s=${status}`);
-                        }
+                    grouped.forEach((groupedRegs) => {
+                        const visibleReg = pickLatestVisibleReg(groupedRegs);
+                        if (visibleReg) activeRegs.push(visibleReg);
                     });
 
-                    setRegs(activeRegs);
-                    setTotalPoints(activeRegs.reduce((acc, r) => acc + (r.earnedPoints ?? 0), 0));
+                    const visibleRegs = activeRegs.filter(isVisibleActiveReg);
+                    const scopedRegs = visibleRegs.filter((r) => isInSocietyScope(r.societyId, r.slug));
+                    setRegs(scopedRegs);
+                    setTotalPoints(scopedRegs.reduce((acc, r) => acc + (r.earnedPoints ?? 0), 0));
 
                     setSyncStatus('connected');
                 } catch (processError) {
@@ -839,13 +1067,19 @@ const UserHubPage: React.FC = () => {
             if (unsubscribe) unsubscribe();
             if (retryTimer) clearTimeout(retryTimer);
         };
-    }, [user]);
+    }, [user, isInSocietyScope]);
 
     const handleEventClick = (r: UserReg) => {
         const currentHost = window.location.hostname;
-        const targetHost = `${r.societyId}.${DOMAIN_CONFIG.BASE_DOMAIN}`;
-        // [Step 403-D] Redirect to main mypage (not conference-specific mypage)
-        const cleanPath = `/mypage`;
+        const eventSlug = getSafeConferenceSlug(r.slug);
+        const fallbackSocietyFromHost = extractSocietyFromHost(currentHost);
+        const safeSocietyId = forceString(
+            r.societyId && r.societyId !== 'unknown'
+                ? r.societyId
+                : getSocietyIdFromSlug(eventSlug) || fallbackSocietyFromHost
+        );
+        const targetHost = safeSocietyId ? `${safeSocietyId}.${DOMAIN_CONFIG.BASE_DOMAIN}` : currentHost;
+        const cleanPath = eventSlug ? `/${eventSlug}` : '/mypage';
 
         if (currentHost === targetHost || currentHost.includes('localhost')) {
             navigate(cleanPath);
@@ -867,7 +1101,11 @@ const UserHubPage: React.FC = () => {
         const targetHost = `${safeSocietyId}.${DOMAIN_CONFIG.BASE_DOMAIN}`;
 
         // [CRITICAL FIX] Safely extract slug with fallback
-        const badgeSlug = r.slug && r.slug !== 'unknown' && r.slug !== '' ? r.slug : `${DOMAIN_CONFIG.DEFAULT_SOCIETY}_2026spring`;
+        const badgeSlug = getSafeConferenceSlug(r.slug);
+        if (!badgeSlug) {
+            toast.error('학술대회 정보가 없어 디지털 명찰로 이동할 수 없습니다.');
+            return;
+        }
         const cleanPath = `/${badgeSlug}/badge`;
 
         console.log('[UserHub] Badge click - Registration slug:', r.slug, 'Badge slug:', badgeSlug, 'Society ID:', safeSocietyId);
@@ -938,11 +1176,39 @@ const UserHubPage: React.FC = () => {
         }
     };
 
+    const handleProfileFieldChange = (field: 'displayName' | 'phoneNumber' | 'affiliation' | 'licenseNumber', value: string) => {
+        setProfile(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleSaveProfile = async () => {
+        if (!user?.uid) return;
+        setProfileSaving(true);
+        try {
+            const db = getFirestore();
+            const userRef = doc(db, 'users', user.uid);
+            await setDoc(userRef, {
+                name: profile.displayName || '',
+                phone: profile.phoneNumber || '',
+                organization: profile.affiliation || '',
+                licenseNumber: profile.licenseNumber || '',
+                email: profile.email || user.email || '',
+                updatedAt: serverTimestamp()
+            }, { merge: true });
+            toast.success('기본 정보가 저장되었습니다.');
+        } catch (error) {
+            logger.error('UserHub', 'Profile save failed', error);
+            toast.error('기본 정보 저장에 실패했습니다.');
+        } finally {
+            setProfileSaving(false);
+        }
+    };
+
     // [Step 404] Seamless Loading: Removed blocking loader for Skeleton UI
     // if (loading) return <LoadingSpinner />;
 
     const hostname = window.location.hostname;
     const isMain = hostname === DOMAIN_CONFIG.BASE_DOMAIN || hostname.startsWith('www') || hostname.includes('firebaseapp') || hostname.includes('localhost');
+    const visibleRegs = regs.filter(isVisibleActiveReg);
 
     // Dynamic page title based on fetched society name from database
     const getSocietyName = (): string => {
@@ -970,14 +1236,19 @@ const UserHubPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-20 pt-20">
+        <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,_#dbeafe_0%,_#f8fafc_45%,_#f1f5f9_100%)] pb-20 pt-20">
             <EregiNavigation />
 
-            <div className="max-w-4xl mx-auto px-6">
+            <div className="max-w-5xl mx-auto px-3 sm:px-6">
                 {/* TITLE & SYNC STATUS */}
-                <div className="flex justify-between items-center mb-8 mt-8">
-                    <h1 className="text-2xl font-heading-2 text-slate-900">{pageTitle}</h1>
-                    <div className="flex items-center gap-4">
+                <div className="mb-8 mt-8 rounded-2xl border border-slate-200/70 bg-white/80 backdrop-blur-sm px-5 py-5 shadow-sm">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p className="text-xs font-semibold tracking-wide text-blue-700 uppercase mb-1">My eRegi</p>
+                            <h1 className="text-2xl font-heading-2 text-slate-900">{pageTitle}</h1>
+                            <p className="text-sm text-slate-500 mt-1">등록, 초록, 인증, 개인정보 제공 이력을 한 화면에서 확인할 수 있습니다.</p>
+                        </div>
+                        <div className="flex items-center gap-4">
                         {/* [Step 512-Des] Sync Status Indicator */}
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-full border border-gray-100 shadow-sm">
                             <div className={`w-2 h-2 rounded-full transition-colors duration-500 ${syncStatus === 'connected' ? 'bg-green-500' :
@@ -991,13 +1262,14 @@ const UserHubPage: React.FC = () => {
                         </div>
                     </div>
                 </div>
+                </div>
 
                 {/* [REMOVED] Guest Warning Banner - Anonymous registration deprecated
                     See docs/ANONYMOUS_CLEANUP_ANALYSIS.md for details
                     All users now have full accounts with email/password authentication */}
 
                 {/* INFO WIDGET GRID */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                     {/* 1. Conferences Card */}
                     <DataWidget
                         title="My Conferences"
@@ -1025,12 +1297,14 @@ const UserHubPage: React.FC = () => {
                 </div>
 
                 {/* TABS */}
-                <div className="flex gap-4 border-b mb-6 overflow-x-auto no-scrollbar flex-nowrap min-w-0">
-                    <button onClick={() => setActiveTab('EVENTS')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'EVENTS' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>등록학회</button>
-                    <button onClick={() => setActiveTab('ABSTRACTS')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'ABSTRACTS' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>초록 내역</button>
+                <div className="mb-6 overflow-x-auto no-scrollbar min-w-0">
+                    <div className="inline-flex w-full min-w-max gap-2 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
+                    <button onClick={() => setActiveTab('EVENTS')} className={`px-4 py-2 rounded-xl whitespace-nowrap text-sm font-semibold transition-all ${activeTab === 'EVENTS' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-slate-100'}`}>등록학회</button>
+                    <button onClick={() => setActiveTab('ABSTRACTS')} className={`px-4 py-2 rounded-xl whitespace-nowrap text-sm font-semibold transition-all ${activeTab === 'ABSTRACTS' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-slate-100'}`}>초록 내역</button>
                     {/* [SIMPLIFIED] Anonymous check removed - all users have full accounts */}
-                    <button onClick={() => setActiveTab('CERTS')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'CERTS' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>학회 인증</button>
-                    <button onClick={() => setActiveTab('PROFILE')} className={`pb-2 px-2 whitespace-nowrap transition-colors ${activeTab === 'PROFILE' ? 'border-b-2 border-blue-600 font-bold text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>내 정보</button>
+                    <button onClick={() => setActiveTab('CERTS')} className={`px-4 py-2 rounded-xl whitespace-nowrap text-sm font-semibold transition-all ${activeTab === 'CERTS' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-slate-100'}`}>학회 인증</button>
+                    <button onClick={() => setActiveTab('PROFILE')} className={`px-4 py-2 rounded-xl whitespace-nowrap text-sm font-semibold transition-all ${activeTab === 'PROFILE' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-slate-100'}`}>내 정보</button>
+                    </div>
                 </div>
 
                 {/* 1. EVENTS (FIXED LINKS & TITLES) */}
@@ -1050,7 +1324,7 @@ const UserHubPage: React.FC = () => {
                                 ))}
                             </>
                         )}
-                        {!loading && regs.length === 0 && (
+                        {!loading && visibleRegs.length === 0 && (
                             <div className="flex flex-col items-center justify-center py-16 px-4 bg-white rounded-xl border-2 border-dashed border-gray-200 text-center">
                                 <div className="w-20 h-20 bg-blue-50 text-blue-200 rounded-full flex items-center justify-center mb-6">
                                     <Calendar className="w-10 h-10 text-blue-400" />
@@ -1068,11 +1342,11 @@ const UserHubPage: React.FC = () => {
                                 </Button>
                             </div>
                         )}
-                        {regs.map(r => (
-                            <div key={r.id} onClick={() => handleEventClick(r)} className="eregi-card cursor-pointer flex flex-col group animate-in fade-in slide-in-from-bottom-2 duration-500">
+                        {visibleRegs.map(r => (
+                            <div key={r.id} onClick={() => handleEventClick(r)} className="eregi-card cursor-pointer flex flex-col group animate-in fade-in slide-in-from-bottom-2 duration-500 border border-slate-200 bg-white/95 hover:shadow-lg hover:-translate-y-0.5 transition-all">
                                 <div className="flex flex-col mb-4">
                                     <div className="flex items-center text-sm text-[#24669e] font-bold mb-2">
-                                        <span>[{r.societyName}]</span>
+                                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 border border-blue-100">[{r.societyName}]</span>
                                     </div>
                                     <h3 className="font-heading-3 text-slate-900 mb-2 group-hover:text-[#1b4d77] transition-colors">{r.conferenceName}</h3>
                                     <div className="text-body-sm text-slate-500 flex flex-col gap-1">
@@ -1080,7 +1354,7 @@ const UserHubPage: React.FC = () => {
                                         <span>📍 {r.location}</span>
                                     </div>
                                 </div>
-                                <div className="mt-auto border-t border-slate-100 pt-4 flex items-center justify-between">
+                                <div className="mt-auto border-t border-slate-100 pt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                                     <span className={r.earnedPoints ? "bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold" :
                                         (r.status === 'PENDING_PAYMENT' || r.paymentStatus === 'WAITING_FOR_DEPOSIT') ? "bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-xs font-bold border border-orange-100" :
                                             "bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-xs"}>
@@ -1088,17 +1362,21 @@ const UserHubPage: React.FC = () => {
                                             (r.status === 'PENDING_PAYMENT' || r.paymentStatus === 'WAITING_FOR_DEPOSIT') ? '입금 대기 (가상계좌)' :
                                                 `[STATUS] ${r.paymentStatus || r.status}`}
                                     </span>
-                                    <div className="flex gap-2">
+                                    <div className="flex flex-wrap gap-2">
                                         <Button
                                             size="sm"
                                             variant="outline"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 const currentLang = searchParams.get('lang') || 'ko';
-                                                const safeSlug = r.slug && r.slug !== 'unknown' && r.slug !== '' ? r.slug : `${DOMAIN_CONFIG.DEFAULT_SOCIETY}_2026spring`;
+                                                const safeSlug = getSafeConferenceSlug(r.slug);
+                                                if (!safeSlug) {
+                                                    toast.error('학술대회 정보가 없어 초록 페이지로 이동할 수 없습니다.');
+                                                    return;
+                                                }
                                                 navigate(`/${safeSlug}/abstracts?lang=${currentLang}`);
                                             }}
-                                            className="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs gap-1.5 shadow-sm border border-slate-200"
+                                            className="w-full sm:w-auto justify-center bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs gap-1.5 shadow-sm border border-slate-200"
                                         >
                                             <FileText size={14} /> 초록 접수/확인
                                         </Button>
@@ -1106,7 +1384,7 @@ const UserHubPage: React.FC = () => {
                                             size="sm"
                                             variant="outline"
                                             onClick={(e) => handleQrClick(e, r)}
-                                            className="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs gap-1.5 shadow-sm border border-slate-200"
+                                            className="w-full sm:w-auto justify-center bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs gap-1.5 shadow-sm border border-slate-200"
                                         >
                                             <QrCode size={14} /> 등록 확인증 (QR)
                                         </Button>
@@ -1115,7 +1393,7 @@ const UserHubPage: React.FC = () => {
                                                 size="sm"
                                                 variant="outline"
                                                 onClick={(e) => handleReceiptClick(e, r)}
-                                                className="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs gap-1.5 shadow-sm border border-slate-200"
+                                                className="w-full sm:w-auto justify-center bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs gap-1.5 shadow-sm border border-slate-200"
                                             >
                                                 <Printer size={14} /> 영수증
                                             </Button>
@@ -1129,7 +1407,7 @@ const UserHubPage: React.FC = () => {
                                                     setSelectedVirtualAccountReg(r);
                                                     setShowVirtualAccountModal(true);
                                                 }}
-                                                className="bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold text-xs gap-1.5 shadow-sm border border-orange-200"
+                                                className="w-full sm:w-auto justify-center bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold text-xs gap-1.5 shadow-sm border border-orange-200"
                                             >
                                                 <CreditCard size={14} /> 계좌 확인
                                             </Button>
@@ -1138,6 +1416,40 @@ const UserHubPage: React.FC = () => {
                                 </div>
                             </div>
                         ))}
+                        {!loading && false && (
+                            <div className="bg-white rounded-xl border border-gray-200 p-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-bold text-gray-900">방명록 기록</h3>
+                                    <span className="text-xs font-semibold text-gray-500">{guestbookEntries.length}건</span>
+                                </div>
+                                {guestbookEntries.length === 0 ? (
+                                    <div className="text-sm text-gray-500 bg-gray-50 border border-gray-100 rounded-lg p-4">
+                                        아직 남긴 방명록이 없습니다.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {guestbookEntries.map(entry => (
+                                            <div key={entry.id} className="flex flex-col gap-1 border border-gray-100 rounded-lg p-4">
+                                                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                                                    <span className="font-semibold text-gray-700">{entry.conferenceName}</span>
+                                                    <span className="text-gray-300">•</span>
+                                                    <span>{entry.vendorName}</span>
+                                                    {entry.timestamp?.toDate && (
+                                                        <>
+                                                            <span className="text-gray-300">•</span>
+                                                            <span>{entry.timestamp.toDate().toLocaleString()}</span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                <div className="text-sm text-gray-700 whitespace-pre-wrap">
+                                                    {entry.message || '메시지 없음'}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1267,7 +1579,25 @@ const UserHubPage: React.FC = () => {
                                                 e.stopPropagation();
                                                 // [Fix-Step 410-D] Correct Edit URL with proper query string
                                                 const currentHost = window.location.hostname;
-                                                const targetHost = `${(abs as any).confId}.${DOMAIN_CONFIG.BASE_DOMAIN}`;
+                                                const absData = abs as any;
+                                                const abstractSlug = getSafeConferenceSlug(
+                                                    forceString(absData.slug || absData.conferenceSlug || absData.confId || absData.conferenceId)
+                                                );
+                                                if (!abstractSlug) {
+                                                    toast.error('학술대회 정보가 없어 초록 수정 페이지로 이동할 수 없습니다.');
+                                                    return;
+                                                }
+                                                const fallbackSocietyFromHost = extractSocietyFromHost(currentHost);
+                                                const abstractSocietyId = forceString(
+                                                    absData.societyId ||
+                                                    getSocietyIdFromSlug(abstractSlug) ||
+                                                    fallbackSocietyFromHost
+                                                );
+                                                if (!abstractSocietyId) {
+                                                    toast.error('학회 정보를 찾을 수 없어 초록 수정 페이지로 이동할 수 없습니다.');
+                                                    return;
+                                                }
+                                                const targetHost = `${abstractSocietyId}.${DOMAIN_CONFIG.BASE_DOMAIN}`;
                                                 const token = getRootCookie('eregi_session');
 
                                                 // If we are on the same domain or localhost, use React Router if possible, 
@@ -1277,10 +1607,10 @@ const UserHubPage: React.FC = () => {
 
                                                 if (currentHost === targetHost || currentHost.includes('localhost') || currentHost === DOMAIN_CONFIG.BASE_DOMAIN) {
                                                     // Use the slug-based route we just confirmed in App.tsx: /:slug/abstracts
-                                                    navigate(`/${(abs as any).confId}/abstracts?mode=edit&id=${abs.id}`);
+                                                    navigate(`/${abstractSlug}/abstracts?mode=edit&id=${abs.id}`);
                                                 } else {
                                                     // Cross-domain redirect
-                                                    const authUrl = `https://${targetHost}/${(abs as any).confId}/abstracts?mode=edit&id=${abs.id}${token ? `&token=${token}` : ''}`;
+                                                    const authUrl = `https://${targetHost}/${abstractSlug}/abstracts?mode=edit&id=${abs.id}${token ? `&token=${token}` : ''}`;
                                                     window.location.href = authUrl;
                                                 }
                                             }}
@@ -1297,7 +1627,12 @@ const UserHubPage: React.FC = () => {
 
                                                 try {
                                                     const db = getFirestore();
-                                                    const confId = (abs as any).confId;
+                                                    const confId = forceString(
+                                                        (abs as any).confId ||
+                                                        (abs as any).conferenceId ||
+                                                        (abs as any).slug ||
+                                                        (abs as any).conferenceSlug
+                                                    );
                                                     if (!confId) {
                                                         toast.error("유효하지 않은 컨퍼런스 ID입니다.");
                                                         return;
@@ -1326,7 +1661,7 @@ const UserHubPage: React.FC = () => {
 
                 {/* 4. PROFILE (LOCKED READ-ONLY) */}
                 {activeTab === 'PROFILE' && (
-                    <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+                    <div className="bg-white/95 p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200">
                         <h3 className="font-bold text-lg mb-6">내 정보 확인</h3>
                         {loading ? (
                             <div className="space-y-4">
@@ -1339,13 +1674,52 @@ const UserHubPage: React.FC = () => {
                             </div>
                         ) : (
                             <>
-                                <p className="text-sm text-red-500 mb-4 bg-red-50 p-2 rounded">※ 정보 수정은 인증 후 가능합니다 (현재 읽기 전용)</p>
-                                <div className="space-y-4 opacity-70">
-                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">이름</label><input type="text" className="w-full border p-3 rounded-lg bg-gray-100" value={profile.displayName} disabled /></div>
-                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">전화번호</label><input type="text" className="w-full border p-3 rounded-lg bg-gray-100" value={profile.phoneNumber} disabled /></div>
-                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">소속</label><input type="text" className="w-full border p-3 rounded-lg bg-gray-100" value={profile.affiliation} disabled /></div>
-                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">면허번호</label><input type="text" className="w-full border p-3 rounded-lg bg-gray-100" value={profile.licenseNumber} disabled /></div>
+                                <p className="text-sm text-gray-600 mb-4 bg-gray-50 p-2 rounded">기본 정보는 여기에서 바로 수정할 수 있습니다.</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">이름</label><input type="text" className="w-full border p-3 rounded-lg bg-white" value={profile.displayName} onChange={(e) => handleProfileFieldChange('displayName', e.target.value)} /></div>
+                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">전화번호</label><input type="text" className="w-full border p-3 rounded-lg bg-white" value={profile.phoneNumber} onChange={(e) => handleProfileFieldChange('phoneNumber', e.target.value)} /></div>
+                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">소속</label><input type="text" className="w-full border p-3 rounded-lg bg-white" value={profile.affiliation} onChange={(e) => handleProfileFieldChange('affiliation', e.target.value)} /></div>
+                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">면허번호</label><input type="text" className="w-full border p-3 rounded-lg bg-white" value={profile.licenseNumber} onChange={(e) => handleProfileFieldChange('licenseNumber', e.target.value)} /></div>
                                     <div><label className="block text-sm font-medium text-gray-700 mb-1">이메일</label><input type="text" className="w-full border p-3 rounded-lg bg-gray-100" value={profile.email} disabled /></div>
+                                </div>
+                                <div className="mt-4 flex justify-end">
+                                    <button
+                                        onClick={handleSaveProfile}
+                                        disabled={profileSaving}
+                                        className="w-full sm:w-auto px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+                                    >
+                                        {profileSaving ? '저장 중...' : '기본 정보 저장'}
+                                    </button>
+                                </div>
+                                <div className="mt-8 border-t border-gray-100 pt-6">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h4 className="text-lg font-bold text-gray-900">내 정보 제공 이력</h4>
+                                        <span className="text-xs font-semibold text-gray-500">{guestbookEntries.length}건</span>
+                                    </div>
+                                    {guestbookEntries.length === 0 ? (
+                                        <div className="text-sm text-gray-500 bg-gray-50 border border-gray-100 rounded-lg p-4">
+                                            아직 제3자 정보 제공 이력이 없습니다.
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {guestbookEntries.map((entry) => (
+                                                <div key={entry.id} className="flex flex-col gap-1 border border-gray-100 rounded-lg p-4">
+                                                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                                                        <span className="font-semibold text-gray-700">{entry.conferenceName}</span>
+                                                        <span className="text-gray-300">•</span>
+                                                        <span>{entry.vendorName}</span>
+                                                        {entry.timestamp?.toDate && (
+                                                            <>
+                                                                <span className="text-gray-300">•</span>
+                                                                <span>{entry.timestamp.toDate().toLocaleString()}</span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-sm text-emerald-700 font-semibold">동의 완료</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </>
                         )}

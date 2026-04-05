@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useOutletContext } from 'react-router-dom';
 import { useVendor, VendorProfile } from '../../hooks/useVendor';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -10,24 +10,30 @@ import { Settings, Building2, Link as LinkIcon, Image as ImageIcon, Save, AlertC
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 export default function VendorSettingsPage() {
-    const { vendorId } = useParams<{ vendorId: string }>();
-    const vendorLogic = useVendor(vendorId);
+    const { vendorId: paramVendorId } = useParams<{ vendorId: string }>();
+    const { activeVendorId } = useOutletContext<{ activeVendorId?: string | null }>();
+    const resolvedVendorId = activeVendorId || paramVendorId;
+    const vendorLogic = useVendor(resolvedVendorId);
 
     const { vendor, loading, updateVendorProfile, error } = vendorLogic;
 
     const [formData, setFormData] = useState<Partial<VendorProfile>>({});
     const [isSaving, setIsSaving] = useState(false);
+    const prevVendorRef = useRef<typeof vendor | undefined>(undefined);
 
     // Sync form data when vendor data loads or changes
     useEffect(() => {
-        if (vendor) {
-            setFormData({
-                name: vendor.name || '',
-                description: vendor.description || '',
-                logoUrl: vendor.logoUrl || '',
-                homeUrl: vendor.homeUrl || '',
-                productUrl: vendor.productUrl || ''
-            });
+        if (vendor && vendor !== prevVendorRef.current) {
+            setTimeout(() => {
+                setFormData({
+                    name: vendor.name || '',
+                    description: vendor.description || '',
+                    logoUrl: vendor.logoUrl || '',
+                    homeUrl: vendor.homeUrl || '',
+                    productUrl: vendor.productUrl || ''
+                });
+            }, 0);
+            prevVendorRef.current = vendor;
         }
     }, [vendor]);
 

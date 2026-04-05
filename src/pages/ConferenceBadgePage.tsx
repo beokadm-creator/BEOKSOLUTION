@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useMemo, useState } from "react";
+﻿import React, { useLayoutEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, Timestamp, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -7,6 +7,13 @@ import QRCode from "react-qr-code";
 import { useAuth } from "../hooks/useAuth";
 import { db, functions } from "../firebase";
 import { getStampMissionTargetCount } from "../utils/stampTour";
+import {
+    getBadgeDisplayAffiliation,
+    getBadgeDisplayName,
+    isBadgeIssued,
+    type BadgeRecordSource
+} from "../utils/badgeRecord";
+import { resolveConferenceIdFromRoute } from "../utils/conferenceRoute";
 
 type TimestampLike = {
     toDate: () => Date;
@@ -96,11 +103,12 @@ const parseConferenceEndAt = (raw: unknown): Date | null => {
 const ConferenceBadgePage: React.FC = () => {
     const { slug } = useParams();
     const { auth } = useAuth();
+    const confId = resolveConferenceIdFromRoute(slug);
 
     const [uiData, setUiData] = useState<BadgeUiData | null>(null);
     const [zones, setZones] = useState<AttendanceZone[]>([]);
     const [liveMinutes, setLiveMinutes] = useState(0);
-    const [msg, setMsg] = useState("초기화 중...");
+    const [msg, setMsg] = useState("珥덇린??以?..");
     const [conferenceEnded, setConferenceEnded] = useState(false);
     const [conferenceChecked, setConferenceChecked] = useState(false);
     const [totalVendors, setTotalVendors] = useState(0);
@@ -111,9 +119,20 @@ const ConferenceBadgePage: React.FC = () => {
     const [guestbookEntries, setGuestbookEntries] = useState<Array<{ vendorName: string; message?: string; timestamp?: Timestamp }>>([]);
     const [rewardRequesting, setRewardRequesting] = useState(false);
     const [rewardMessage, setRewardMessage] = useState("");
+    const [badgeLang, setBadgeLang] = useState<"ko" | "en">("ko");
+
+    const t = (ko: string, en: string) => (
+        badgeLang === "ko" ? ko : en
+    );
+
+    const formatMinutes = (minutes: number) => (
+        badgeLang === "ko"
+            ? `${Math.floor(minutes / 60)}시간 ${minutes % 60}분`
+            : `${Math.floor(minutes / 60)}h ${minutes % 60}m`
+    );
 
     useLayoutEffect(() => {
-        if (!slug) {
+        if (!confId) {
             setConferenceEnded(false);
             setConferenceChecked(true);
             return;
@@ -122,7 +141,7 @@ const ConferenceBadgePage: React.FC = () => {
         let cancelled = false;
         (async () => {
             try {
-                const confSnap = await getDoc(doc(db, "conferences", slug));
+                const confSnap = await getDoc(doc(db, "conferences", confId));
                 if (!confSnap.exists()) {
                     if (!cancelled) {
                         setConferenceEnded(false);
@@ -149,38 +168,43 @@ const ConferenceBadgePage: React.FC = () => {
         return () => {
             cancelled = true;
         };
-    }, [slug]);
+    }, [confId]);
 
     useLayoutEffect(() => {
-        if (!slug) {
-            setMsg("유효하지 않은 학회 경로입니다.");
+        if (!confId) {
+            setMsg("?좏슚?섏? ?딆? ?숉쉶 寃쎈줈?낅땲??");
             return;
         }
         if (!conferenceChecked) {
-            setMsg("행사 종료 여부를 확인하는 중입니다...");
+            setMsg("?됱궗 醫낅즺 ?щ?瑜??뺤씤?섎뒗 以묒엯?덈떎...");
             return;
         }
         if (conferenceEnded) {
-            setMsg("종료된 학회입니다.");
+            setMsg("醫낅즺???숉쉶?낅땲??");
             return;
         }
         if (!auth.user) {
-            setMsg("인증이 만료되었습니다. 다시 접속해 주세요.");
+            setMsg("?몄쬆??留뚮즺?섏뿀?듬땲?? ?ㅼ떆 ?묒냽??二쇱꽭??");
             return;
         }
 
-        setMsg("명찰 정보를 불러오는 중입니다...");
+        setMsg("紐낆같 ?뺣낫瑜?遺덈윭?ㅻ뒗 以묒엯?덈떎...");
         const userId = auth.user.id;
         const registrationQuery = query(
-            collection(db, `conferences/${slug}/registrations`),
+            collection(db, `conferences/${confId}/registrations`),
             where("userId", "==", userId),
             where("paymentStatus", "==", "PAID"),
             orderBy("createdAt", "desc")
         );
+        const externalAttendeeQuery = query(
+            collection(db, `conferences/${confId}/external_attendees`),
+            where("userId", "==", userId),
+            where("paymentStatus", "==", "PAID")
+        );
 
         import("firebase/firestore").then(async ({ doc, getDoc }) => {
             try {
-                const rulesSnap = await getDoc(doc(db, `conferences/${slug}/settings/attendance`));
+                const rulesSnap = await getDoc(doc(db, `conferences/${confId}/settings/attendance`));
                 if (!rulesSnap.exists()) return;
 
                 const attendanceSettings = rulesSnap.data() as AttendanceSettings;
@@ -197,10 +221,13 @@ const ConferenceBadgePage: React.FC = () => {
             }
         });
 
-        const unsubscribe = onSnapshot(registrationQuery, (snapshot) => {
+        const processSnapshot = (
+            snapshot: Awaited<ReturnType<typeof getDocs>>,
+            source: BadgeRecordSource
+        ) => {
             if (snapshot.empty) {
                 setUiData(null);
-                setMsg("등록 정보를 찾을 수 없습니다.");
+                setMsg("?깅줉 ?뺣낫瑜?李얠쓣 ???놁뒿?덈떎.");
                 return;
             }
 
@@ -208,24 +235,25 @@ const ConferenceBadgePage: React.FC = () => {
             const paymentStatus = registration?.paymentStatus || "UNKNOWN";
             if (paymentStatus !== "PAID") {
                 setUiData(null);
-                setMsg(`결제가 완료되지 않았습니다. 결제 상태: ${paymentStatus}`);
+                setMsg(`寃곗젣媛 ?꾨즺?섏? ?딆븯?듬땲?? 寃곗젣 ?곹깭: ${paymentStatus}`);
                 return;
             }
 
             const regId = snapshot.docs[0].id;
+            const issued = isBadgeIssued(registration, source);
             const voucherQr = String(registration.confirmationQr || regId);
             const badgeQr = String(registration.badgeQr || `BADGE-${regId}`);
-            const qrValue = registration.badgeIssued ? badgeQr : voucherQr;
+            const qrValue = issued ? badgeQr : voucherQr;
             const baseMinutes = Number(registration.totalMinutes || 0);
 
             setUiData({
                 status: String(registration.attendanceStatus || "OUTSIDE"),
                 zone: String(registration.attendanceStatus === "INSIDE" ? (registration.currentZone || "Inside") : "OUTSIDE"),
-                name: String(registration.userName || registration.name || "이름 없음"),
-                aff: String(registration.affiliation || registration.organization || registration.userAffiliation || registration.userInfo?.affiliation || "소속 없음"),
+                name: getBadgeDisplayName(registration),
+                aff: getBadgeDisplayAffiliation(registration),
                 id: String(regId),
                 userId: String(registration.userId || regId),
-                issued: !!registration.badgeIssued,
+                issued,
                 qrValue,
                 receiptNumber: String(registration.receiptNumber || registration.orderId || "-"),
                 lastCheckIn: registration.lastCheckIn,
@@ -233,10 +261,47 @@ const ConferenceBadgePage: React.FC = () => {
             });
             setLiveMinutes(baseMinutes);
             setMsg("");
-        });
+        };
 
-        return () => unsubscribe();
-    }, [slug, auth.user, conferenceChecked, conferenceEnded]);
+        let unsubscribe = () => { };
+        let cancelled = false;
+
+        (async () => {
+            try {
+                const registrationSnapshot = await getDocs(registrationQuery);
+                if (cancelled) return;
+
+                if (!registrationSnapshot.empty) {
+                    processSnapshot(registrationSnapshot, "REGULAR");
+                    unsubscribe = onSnapshot(registrationQuery, (snapshot) => processSnapshot(snapshot, "REGULAR"));
+                    return;
+                }
+
+                const externalAttendeeSnapshot = await getDocs(externalAttendeeQuery);
+                if (cancelled) return;
+
+                if (!externalAttendeeSnapshot.empty) {
+                    processSnapshot(externalAttendeeSnapshot, "EXTERNAL");
+                    unsubscribe = onSnapshot(externalAttendeeQuery, (snapshot) => processSnapshot(snapshot, "EXTERNAL"));
+                    return;
+                }
+
+                setUiData(null);
+                setMsg("?깅줉 ?뺣낫瑜?李얠쓣 ???놁뒿?덈떎.");
+            } catch (error) {
+                console.error("[ConferenceBadgePage] Failed to load badge data", error);
+                if (!cancelled) {
+                    setUiData(null);
+                    setMsg("?곗씠?곕? 遺덈윭?ㅻ뒗 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.");
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+            unsubscribe();
+        };
+    }, [confId, auth.user, conferenceChecked, conferenceEnded]);
 
     useLayoutEffect(() => {
         if (!uiData) return;
@@ -287,14 +352,14 @@ const ConferenceBadgePage: React.FC = () => {
     }, [uiData, zones]);
 
     useLayoutEffect(() => {
-        if (!slug || !uiData?.userId) return;
+        if (!confId || !uiData?.userId) return;
 
         let unsubscribeStamps = () => { };
         let unsubscribeProgress = () => { };
 
         const fetchStampTour = async () => {
             try {
-                const configSnap = await getDoc(doc(db, `conferences/${slug}/settings`, "stamp_tour"));
+                const configSnap = await getDoc(doc(db, `conferences/${confId}/settings`, "stamp_tour"));
                 if (configSnap.exists()) {
                     const cfg = configSnap.data() as Partial<StampTourConfig>;
                     setStampConfig({
@@ -316,7 +381,7 @@ const ConferenceBadgePage: React.FC = () => {
                 }
 
                 const sponsorsSnap = await getDocs(
-                    query(collection(db, `conferences/${slug}/sponsors`), where("isStampTourParticipant", "==", true))
+                    query(collection(db, `conferences/${confId}/sponsors`), where("isStampTourParticipant", "==", true))
                 );
                 const boothCandidates = sponsorsSnap.docs.map((snapshot) => {
                     const sponsor = snapshot.data() as { vendorId?: string; name?: string };
@@ -329,7 +394,7 @@ const ConferenceBadgePage: React.FC = () => {
                 setTotalVendors(boothCandidates.length);
 
                 unsubscribeStamps = onSnapshot(
-                    query(collection(db, `conferences/${slug}/stamps`), where("userId", "==", uiData.userId)),
+                    query(collection(db, `conferences/${confId}/stamps`), where("userId", "==", uiData.userId)),
                     (snapshot) => {
                         const uniqueVendors = Array.from(new Set(
                             snapshot.docs
@@ -341,14 +406,14 @@ const ConferenceBadgePage: React.FC = () => {
                 );
 
                 unsubscribeProgress = onSnapshot(
-                    doc(db, `conferences/${slug}/stamp_tour_progress/${uiData.userId}`),
+                    doc(db, `conferences/${confId}/stamp_tour_progress/${uiData.userId}`),
                     (snapshot) => {
                         setStampProgress(snapshot.exists() ? snapshot.data() as StampProgress : {});
                     }
                 );
 
                 const guestbookSnap = await getDocs(
-                    query(collection(db, `conferences/${slug}/guestbook_entries`), where("userId", "==", uiData.userId))
+                    query(collection(db, `conferences/${confId}/guestbook_entries`), where("userId", "==", uiData.userId))
                 );
                 setGuestbookEntries(
                     guestbookSnap.docs.map((guestbookDoc) => {
@@ -371,7 +436,7 @@ const ConferenceBadgePage: React.FC = () => {
             unsubscribeStamps();
             unsubscribeProgress();
         };
-    }, [slug, uiData?.userId]);
+    }, [confId, uiData?.userId]);
 
     const orderedBooths = useMemo(() => {
         if (!stampConfig?.enabled) return [];
@@ -412,14 +477,14 @@ const ConferenceBadgePage: React.FC = () => {
         && !completedBeforeLotteryCutoff;
 
     const handleRewardRequest = async () => {
-        if (!slug || !uiData?.userId || !stampConfig?.enabled) return;
+        if (!confId || !uiData?.userId || !stampConfig?.enabled) return;
 
         setRewardRequesting(true);
         setRewardMessage("");
         try {
             const requestReward = httpsCallable(functions, "requestStampReward");
             const response = await requestReward({
-                confId: slug,
+                confId,
                 userName: uiData.name,
                 userOrg: uiData.aff
             });
@@ -427,11 +492,11 @@ const ConferenceBadgePage: React.FC = () => {
             const payload = response.data as { rewardName?: string };
             setRewardMessage(
                 payload.rewardName
-                    ? `상품 수령 요청이 접수되었습니다. ${payload.rewardName}`
-                    : "상품 수령 요청이 접수되었습니다."
+                    ? t(`상품 요청이 접수되었습니다. ${payload.rewardName}`, `Reward request received. ${payload.rewardName}`)
+                    : t("상품 요청이 접수되었습니다.", "Reward request received.")
             );
         } catch (error) {
-            setRewardMessage(error instanceof Error ? error.message : "요청 처리에 실패했습니다.");
+            setRewardMessage(error instanceof Error ? error.message : t("요청 처리에 실패했습니다.", "Request failed."));
         } finally {
             setRewardRequesting(false);
         }
@@ -448,16 +513,32 @@ const ConferenceBadgePage: React.FC = () => {
     if (!uiData) {
         return (
             <div className="flex min-h-screen items-center justify-center p-10 text-center">
-                명찰 정보를 불러오지 못했습니다.
+                {t("명찰 정보를 불러오지 못했습니다.", "Unable to load badge information.")}
             </div>
         );
     }
 
     return (
         <div className="flex min-h-screen flex-col items-center bg-white p-4 font-sans">
+            <div className="mb-3 flex w-full max-w-sm justify-end gap-2">
+                <button
+                    type="button"
+                    onClick={() => setBadgeLang("ko")}
+                    className={`rounded-full px-3 py-1 text-xs font-bold ${badgeLang === "ko" ? "bg-blue-600 text-white" : "border border-blue-200 bg-white text-blue-700"}`}
+                >
+                    KO
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setBadgeLang("en")}
+                    className={`rounded-full px-3 py-1 text-xs font-bold ${badgeLang === "en" ? "bg-blue-600 text-white" : "border border-blue-200 bg-white text-blue-700"}`}
+                >
+                    EN
+                </button>
+            </div>
             <div className={`w-full max-w-sm rounded-3xl border-4 p-8 text-center shadow-2xl transition-all ${uiData.issued ? "border-blue-600" : "border-gray-300"}`}>
                 <h1 className="mb-6 text-xl font-bold uppercase tracking-wide text-gray-800">
-                    {uiData.issued ? "Mobile Access Badge" : "Registration Voucher"}
+                    {uiData.issued ? t("디지털 명찰", "Digital Badge") : t("등록 확인 바우처", "Registration Voucher")}
                 </h1>
 
                 <div className="mb-6 inline-block rounded-2xl border border-gray-100 bg-white p-4 shadow-inner">
@@ -470,18 +551,18 @@ const ConferenceBadgePage: React.FC = () => {
                 {uiData.issued ? (
                     <>
                         <div className={`mt-6 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-lg font-bold ${uiData.status === "INSIDE" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                            {uiData.status === "INSIDE" ? "입장 중 (INSIDE)" : "퇴장 상태 (OUTSIDE)"}
+                            {uiData.status === "INSIDE" ? t("입장 중 (INSIDE)", "Inside (INSIDE)") : t("퇴장 상태 (OUTSIDE)", "Outside (OUTSIDE)")}
                         </div>
                         {liveMinutes > 0 && (
                             <div className="mt-3 flex items-center justify-between rounded-xl border border-purple-100 bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700">
-                                <span>총 체류 시간</span>
-                                <span>{Math.floor(liveMinutes / 60)}시간 {liveMinutes % 60}분</span>
+                                <span>{t("총 체류 시간", "Total stay")}</span>
+                                <span>{formatMinutes(liveMinutes)}</span>
                             </div>
                         )}
                     </>
                 ) : (
                     <div className="mt-6 rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-500">
-                        현장 데스크에서 QR 코드를 제시해 주세요.
+                        {t("현장 데스크에서 QR 코드를 보여 주세요.", "Please show this QR code at the registration desk.")}
                     </div>
                 )}
             </div>
@@ -489,11 +570,11 @@ const ConferenceBadgePage: React.FC = () => {
             {uiData.issued && stampConfig?.enabled && (
                 <div className="mt-6 w-full max-w-sm space-y-4">
                     <div className="rounded-3xl border-2 border-dashed border-indigo-400 bg-indigo-50 p-6 text-center shadow-md">
-                        <h3 className="mb-2 text-xl font-bold text-indigo-900">부스 스탬프 투어</h3>
-                        <p className="mb-4 text-sm text-indigo-700">참여 부스를 방문하고 스탬프를 모아보세요.</p>
+                        <h3 className="mb-2 text-xl font-bold text-indigo-900">{t("스탬프 투어", "Stamp Tour")}</h3>
+                        <p className="mb-4 text-sm text-indigo-700">{t("참여 부스를 방문하고 스탬프를 모아보세요.", "Visit participating booths and collect stamps.")}</p>
 
                         <div className="mb-2 flex items-center justify-between text-sm font-bold text-indigo-800">
-                            <span>현재 진행 상황</span>
+                            <span>{t("현재 진행 현황", "Current progress")}</span>
                             <span className="rounded-full bg-white px-3 py-1 text-indigo-600 shadow-sm">
                                 {myStamps.length} / {requiredCount || totalVendors}
                             </span>
@@ -509,7 +590,7 @@ const ConferenceBadgePage: React.FC = () => {
                         {isCompleted && (
                             <div className="mt-4 space-y-2">
                                 <div className="text-sm font-semibold text-indigo-900">
-                                    {stampConfig.completionMessage || "스탬프 투어를 완료했습니다."}
+                                    {stampConfig.completionMessage || t("스탬프 투어를 완료했습니다.", "Stamp tour completed.")}
                                 </div>
                                 {rewardStatus === "NONE" && canParticipantDraw && (
                                     <button
@@ -518,42 +599,42 @@ const ConferenceBadgePage: React.FC = () => {
                                         onClick={handleRewardRequest}
                                         disabled={rewardRequesting}
                                     >
-                                        상품 수령 요청
+                                        {rewardRequesting ? t("처리 중...", "Processing...") : t("상품 요청", "Request reward")}
                                     </button>
                                 )}
                                 {rewardStatus === "NONE" && !canParticipantDraw && isInstantReward && (
                                     <div className="rounded-xl bg-sky-100 py-2 text-sm font-semibold text-sky-700">
-                                        관리자 추첨 대기 중
+                                        {t("관리자 추첨 대기 중", "Waiting for admin draw")}
                                     </div>
                                 )}
                                 {!isInstantReward && lotteryStatus === "PENDING" && (
                                     <div className="rounded-xl bg-sky-100 py-2 text-sm font-semibold text-sky-700">
-                                        예약 추첨 대기 중
+                                        {t("예약 추첨 대기 중", "Scheduled draw pending")}
                                     </div>
                                 )}
                                 {!isInstantReward && lotteryStatus === "PENDING" && stampConfig.lotteryScheduledAt && (
                                     <div className="text-xs text-indigo-700">
-                                        추첨 예정: {stampConfig.lotteryScheduledAt.toDate().toLocaleString("ko-KR")}
+                                        {t("추첨 예정", "Scheduled draw")}: {stampConfig.lotteryScheduledAt.toDate().toLocaleString(badgeLang === "ko" ? "ko-KR" : "en-US")}
                                     </div>
                                 )}
                                 {missedLotteryCutoff && (
                                     <div className="rounded-xl bg-slate-100 py-2 text-sm font-semibold text-slate-600">
-                                        예약 추첨 마감 이후에 미션을 완료해 이번 회차 추첨 대상에서는 제외되었습니다.
+                                        {t("예약 추첨 마감 이후 완료되어 이번 추첨 대상에서 제외되었습니다.", "Completed after the draw cutoff, so excluded from this round.")}
                                     </div>
                                 )}
                                 {rewardStatus === "REQUESTED" && (
                                     <div className="rounded-xl bg-amber-100 py-2 text-sm font-semibold text-amber-700">
-                                        상품 수령 요청 완료 (인포데스크 확인)
+                                        {t("상품 요청 완료", "Reward request submitted")}
                                     </div>
                                 )}
                                 {rewardStatus === "REDEEMED" && (
                                     <div className="rounded-xl bg-emerald-100 py-2 text-sm font-semibold text-emerald-700">
-                                        상품 수령 완료
+                                        {t("상품 수령 완료", "Reward redeemed")}
                                     </div>
                                 )}
                                 {!isInstantReward && lotteryStatus === "NOT_SELECTED" && (
                                     <div className="rounded-xl bg-slate-100 py-2 text-sm font-semibold text-slate-600">
-                                        이번 추첨에서는 미당첨입니다.
+                                        {t("이번 추첨에서는 미당첨입니다.", "Not selected in this draw.")}
                                     </div>
                                 )}
                                 {rewardMessage && (
@@ -564,16 +645,16 @@ const ConferenceBadgePage: React.FC = () => {
                     </div>
 
                     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <h4 className="mb-3 text-sm font-bold text-slate-800">참여 부스 안내</h4>
+                        <h4 className="mb-3 text-sm font-bold text-slate-800">{t("참여 부스 안내", "Participating booths")}</h4>
                         {stampBooths.length === 0 ? (
-                            <div className="text-xs text-slate-400">참여 부스가 없습니다.</div>
+                            <div className="text-xs text-slate-400">{t("참여 부스가 없습니다.", "No participating booths.")}</div>
                         ) : (
                             <div className="space-y-2">
                                 {stampBooths.map((booth) => (
                                     <div key={booth.id} className="flex items-center justify-between text-sm">
                                         <span className="font-medium text-slate-700">{booth.name}</span>
                                         <span className={`rounded-full px-2 py-1 text-xs ${booth.isStamped ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500"}`}>
-                                            {booth.isStamped ? "스탬프 완료" : "미완료"}
+                                            {booth.isStamped ? t("스탬프 완료", "Stamped") : t("미완료", "Pending")}
                                         </span>
                                     </div>
                                 ))}
@@ -582,9 +663,9 @@ const ConferenceBadgePage: React.FC = () => {
                     </div>
 
                     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <h4 className="mb-3 text-sm font-bold text-slate-800">방명록 참여 업체</h4>
+                        <h4 className="mb-3 text-sm font-bold text-slate-800">{t("방명록 참여 업체", "Guestbook booths")}</h4>
                         {guestbookEntries.length === 0 ? (
-                            <div className="text-xs text-slate-400">방명록 참여 업체가 없습니다.</div>
+                            <div className="text-xs text-slate-400">{t("방명록 참여 업체가 없습니다.", "No guestbook booth entries.")}</div>
                         ) : (
                             <div className="space-y-2">
                                 {guestbookEntries.map((entry, index) => (

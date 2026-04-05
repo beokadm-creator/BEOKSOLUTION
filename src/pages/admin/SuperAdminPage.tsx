@@ -10,19 +10,20 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../..
 import { LogOut, Plus, Building2, Calendar, Edit, Save, Users, Settings, Trash2, Key, ShieldCheck, Search, Filter, Activity, CheckCircle2, Store } from 'lucide-react';
 import { auth, functions } from '../../firebase';
 import { httpsCallable } from 'firebase/functions';
-import { doc, updateDoc, getDocs, collection, getDoc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDocs, collection, getDoc, setDoc, deleteDoc, addDoc, query, where, limit, collectionGroup, Timestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 import { Badge } from '../../components/ui/badge';
 import { Textarea } from '../../components/ui/textarea';
 
 const SuperAdminPage: React.FC = () => {
-    const { societies, createSociety, createConference, loading } = useSuperAdmin();
+    const { societies, createSociety, createConference, refreshSocieties, loading } = useSuperAdmin();
     const [activeTab, setActiveTab] = useState<'SOCIETY' | 'CONFERENCE' | 'MEMBERS' | 'CODES' | 'SETTINGS' | 'MONITORING' | 'VENDORS'>('SOCIETY');
 
     const [socNameKo, setSocNameKo] = useState('');
     const [socNameEn, setSocNameEn] = useState('');
     const [socAdmin, setSocAdmin] = useState('');
+    const [socDomainCode, setSocDomainCode] = useState('');
 
     const [selectedSocId, setSelectedSocId] = useState('');
     const [slug, setSlug] = useState('');
@@ -58,20 +59,35 @@ const SuperAdminPage: React.FC = () => {
     const [termsPrivacyEn, setTermsPrivacyEn] = useState('');
     const [loadingSettings, setLoadingSettings] = useState(false);
 
-    const [editingSoc, setEditingSoc] = useState<{ id: string; name: { ko: string; en?: string }; description?: { ko?: string }; homepageUrl?: string; adminEmails?: string[] } | null>(null);
+    const [editingSoc, setEditingSoc] = useState<{ id: string; name: { ko: string; en?: string }; description?: { ko?: string }; homepageUrl?: string; adminEmails?: string[]; domainCode?: string; aliases?: string[] } | null>(null);
     const [editDescKo, setEditDescKo] = useState('');
     const [editHomepage, setEditHomepage] = useState('');
+    const [editDomainCode, setEditDomainCode] = useState('');
+    const [editAliases, setEditAliases] = useState('');
+    const [deletingSocietyId, setDeletingSocietyId] = useState<string | null>(null);
 
     // Vendors State
-    const [vendors, setVendors] = useState<Array<{ id: string; name: string; description?: string; logoUrl?: string; adminEmail?: string }>>([]);
+    const [vendors, setVendors] = useState<Array<{ id: string; name: string; slug?: string; description?: string; logoUrl?: string; adminEmail?: string }>>([]);
     const [loadingVendors, setLoadingVendors] = useState(false);
     const [newVendorName, setNewVendorName] = useState('');
     const [newVendorDesc, setNewVendorDesc] = useState('');
     const [newVendorEmail, setNewVendorEmail] = useState('');
-    const [editingVendor, setEditingVendor] = useState<{ id: string; name: string; description?: string; logoUrl?: string; adminEmail?: string } | null>(null);
+    const [newVendorSlug, setNewVendorSlug] = useState('');
+    const [editingVendor, setEditingVendor] = useState<{ id: string; name: string; slug?: string; description?: string; logoUrl?: string; adminEmail?: string } | null>(null);
     const [editVendorName, setEditVendorName] = useState('');
     const [editVendorDesc, setEditVendorDesc] = useState('');
     const [editVendorEmail, setEditVendorEmail] = useState('');
+    const [editVendorSlug, setEditVendorSlug] = useState('');
+    const [vendorRequests, setVendorRequests] = useState<Array<{
+        id: string;
+        vendorId: string;
+        vendorName?: string;
+        conferenceId: string;
+        status: 'PENDING' | 'APPROVED' | 'REJECTED';
+        requesterEmail?: string;
+        requestedAt?: Timestamp;
+    }>>([]);
+    const [loadingVendorRequests, setLoadingVendorRequests] = useState(false);
 
     // Monitoring state
     const today = new Date().toISOString().split('T')[0];
@@ -93,9 +109,7 @@ const SuperAdminPage: React.FC = () => {
     const resolveAlert = async (alertId: string, alertPath: string) => {
         setResolvingAlertId(alertId);
         try {
-            const { httpsCallable } = await import('firebase/functions');
-            const { functions: firebaseFunctions } = await import('../../firebase');
-            const resolveAlertFunction = httpsCallable(firebaseFunctions, 'resolveDataIntegrityAlert');
+            const resolveAlertFunction = httpsCallable(functions, 'resolveDataIntegrityAlert');
 
             await resolveAlertFunction({ alertPath });
             toast.success('알림이 해결되었습니다');
@@ -177,18 +191,55 @@ const SuperAdminPage: React.FC = () => {
         }
     }, []);
 
+    const fetchVendorRequests = useCallback(async () => {
+        setLoadingVendorRequests(true);
+        try {
+            const snap = await getDocs(collectionGroup(db, 'vendor_requests'));
+            const data = snap.docs.map(d => {
+                const parentConf = d.ref.parent.parent;
+                return {
+                    id: d.id,
+                    conferenceId: (d.data().conferenceId as string) || parentConf?.id || '',
+                    ...d.data()
+                };
+            }) as any[];
+            setVendorRequests(data);
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to load vendor requests');
+        } finally {
+            setLoadingVendorRequests(false);
+        }
+    }, []);
+
     useEffect(() => {
         if (activeTab === 'VENDORS') {
             fetchVendors();
+            fetchVendorRequests();
         }
-    }, [activeTab, fetchVendors]);
+    }, [activeTab, fetchVendors, fetchVendorRequests]);
+
+    const vendorSlugify = (value: string) => {
+        return value
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9가-힣]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+    };
 
     const handleCreateVendor = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newVendorName.trim()) return;
+        const computedSlug = newVendorSlug.trim() || vendorSlugify(newVendorName);
         try {
+            const existing = await getDocs(query(collection(db, 'vendors'), where('slug', '==', computedSlug)));
+            if (!existing.empty) {
+                toast.error('이미 사용 중인 슬러그입니다. 다른 슬러그를 입력해주세요.');
+                return;
+            }
             await addDoc(collection(db, 'vendors'), {
                 name: newVendorName.trim(),
+                slug: computedSlug,
                 description: newVendorDesc.trim(),
                 adminEmail: newVendorEmail.trim(),
                 createdAt: new Date()
@@ -197,6 +248,7 @@ const SuperAdminPage: React.FC = () => {
             setNewVendorName('');
             setNewVendorDesc('');
             setNewVendorEmail('');
+            setNewVendorSlug('');
             fetchVendors();
         } catch (error) {
             console.error(error);
@@ -207,12 +259,21 @@ const SuperAdminPage: React.FC = () => {
     const handleUpdateVendor = async (id: string) => {
         if (!editVendorName.trim()) return;
         try {
-            await updateDoc(doc(db, 'vendors', id), {
+            const computedSlug = editVendorSlug.trim() || vendorSlugify(editVendorName);
+            const existing = await getDocs(query(collection(db, 'vendors'), where('slug', '==', computedSlug)));
+            const conflict = existing.docs.find(d => d.id !== id);
+            if (conflict) {
+                toast.error('이미 사용 중인 슬러그입니다. 다른 슬러그를 입력해주세요.');
+                return;
+            }
+            const updates: Record<string, unknown> = {
                 name: editVendorName.trim(),
+                slug: computedSlug,
                 description: editVendorDesc.trim(),
                 adminEmail: editVendorEmail.trim(),
                 updatedAt: new Date()
-            });
+            };
+            await updateDoc(doc(db, 'vendors', id), updates);
             toast.success('Vendor updated');
             setEditingVendor(null);
             fetchVendors();
@@ -231,6 +292,56 @@ const SuperAdminPage: React.FC = () => {
         } catch (error) {
             console.error(error);
             toast.error('Failed to delete vendor');
+        }
+    };
+
+    const handleApproveVendorRequest = async (request: { vendorId: string; conferenceId: string }) => {
+        try {
+            const vendorSnap = await getDoc(doc(db, 'vendors', request.vendorId));
+            if (!vendorSnap.exists()) {
+                toast.error('Vendor not found.');
+                return;
+            }
+            const vendorData = vendorSnap.data() as { name?: string; description?: string; logoUrl?: string; homeUrl?: string };
+
+            await setDoc(doc(db, `conferences/${request.conferenceId}/sponsors/${request.vendorId}`), {
+                name: vendorData.name || request.vendorId,
+                logoUrl: vendorData.logoUrl || '',
+                description: vendorData.description || '',
+                websiteUrl: vendorData.homeUrl || '',
+                isActive: true,
+                vendorId: request.vendorId,
+                isStampTourParticipant: false,
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+            }, { merge: true });
+
+            await updateDoc(doc(db, `conferences/${request.conferenceId}/vendor_requests/${request.vendorId}`), {
+                status: 'APPROVED',
+                reviewedAt: Timestamp.now(),
+                reviewedBy: auth.currentUser?.email || 'super_admin'
+            });
+
+            toast.success('Request approved and sponsor linked.');
+            fetchVendorRequests();
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to approve request');
+        }
+    };
+
+    const handleRejectVendorRequest = async (request: { vendorId: string; conferenceId: string }) => {
+        try {
+            await updateDoc(doc(db, `conferences/${request.conferenceId}/vendor_requests/${request.vendorId}`), {
+                status: 'REJECTED',
+                reviewedAt: Timestamp.now(),
+                reviewedBy: auth.currentUser?.email || 'super_admin'
+            });
+            toast.success('Request rejected.');
+            fetchVendorRequests();
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to reject request');
         }
     };
 
@@ -370,13 +481,19 @@ const SuperAdminPage: React.FC = () => {
         if (!socNameEn) return toast.error("사회명 (영어) 필수");
 
         const toastId = toast.loading("Creating society...");
-        const societyId = socNameEn.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); // Generate ID from English name
+        const computedId = socNameEn.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        const societyId = (socDomainCode || computedId).toLowerCase().replace(/[^a-z0-9-]+/g, '').replace(/^-+|-+$/g, '');
+        if (!societyId) {
+            toast.error("유효한 학회 도메인 코드(sid)를 입력하세요.", { id: toastId });
+            return;
+        }
         try {
             await createSociety(societyId, socNameKo, socNameEn, socAdmin);
             toast.success("Society created.", { id: toastId });
             setSocNameKo('');
             setSocNameEn('');
             setSocAdmin('');
+            setSocDomainCode('');
         } catch (e) {
             console.error("Create Society Error:", e);
             toast.error(`Failed: ${e instanceof Error ? e.message : 'Unknown error'}`, { id: toastId });
@@ -390,15 +507,75 @@ const SuperAdminPage: React.FC = () => {
             await updateDoc(societyRef, {
                 name: { ko: editDescKo },
                 description: { ko: editDescKo },
-                homepageUrl: editHomepage
+                homepageUrl: editHomepage,
+                domainCode: (editDomainCode || societyId).toLowerCase().trim(),
+                aliases: Array.from(
+                    new Set(
+                        editAliases
+                            .split(',')
+                            .map((a) => a.trim().toLowerCase())
+                            .filter(Boolean)
+                    )
+                )
             });
             toast.success("Updated.", { id: toastId });
             setEditingSoc(null);
             setEditDescKo('');
             setEditHomepage('');
+            setEditDomainCode('');
+            setEditAliases('');
+            await refreshSocieties();
         } catch (e) {
             console.error("Update Society Error:", e);
             toast.error(`Failed: ${e instanceof Error ? e.message : 'Unknown error'}`, { id: toastId });
+        }
+    };
+
+    const handleDeleteSociety = async (societyId: string, societyName: string) => {
+        const safetyCode = `DELETE ${societyId}`;
+        const confirmed = window.confirm(
+            `"${societyName}" 학회를 삭제하시겠습니까?\n\n주의: 삭제 후 복구할 수 없습니다.\n연결 데이터가 없는 경우에만 삭제됩니다.`
+        );
+        if (!confirmed) return;
+        const typed = window.prompt(`2차 확인: 아래 문구를 정확히 입력하세요.\n${safetyCode}`);
+        if (typed !== safetyCode) {
+            toast.error('2차 확인 문구가 일치하지 않아 삭제를 취소했습니다.');
+            return;
+        }
+
+        setDeletingSocietyId(societyId);
+        const toastId = toast.loading("학회 삭제 준비 중...");
+        try {
+            const societySnap = await getDoc(doc(db, 'societies', societyId));
+            const societyData = societySnap.exists() ? societySnap.data() as { domainCode?: string } : {};
+            const domainCode = (societyData.domainCode || societyId).toLowerCase();
+            const societyKeys = Array.from(new Set([societyId, domainCode].filter(Boolean)));
+            const confSnap = await getDocs(
+                societyKeys.length === 1
+                    ? query(collection(db, 'conferences'), where('societyId', '==', societyKeys[0]), limit(1))
+                    : query(collection(db, 'conferences'), where('societyId', 'in', societyKeys.slice(0, 10)), limit(1))
+            );
+            if (!confSnap.empty) {
+                toast.error('연결된 학술대회가 있어 삭제할 수 없습니다. 먼저 학술대회 정리 후 다시 시도하세요.', { id: toastId });
+                return;
+            }
+
+            const codeSnap = await getDocs(collection(db, 'societies', societyId, 'verification_codes'));
+            if (!codeSnap.empty) {
+                await Promise.all(codeSnap.docs.map((d) => deleteDoc(d.ref)));
+            }
+
+            await deleteDoc(doc(db, 'societies', societyId));
+            if (editingSoc?.id === societyId) {
+                setEditingSoc(null);
+            }
+            await refreshSocieties();
+            toast.success('학회가 삭제되었습니다.', { id: toastId });
+        } catch (e) {
+            console.error("Delete Society Error:", e);
+            toast.error(`삭제 실패: ${e instanceof Error ? e.message : 'Unknown error'}`, { id: toastId });
+        } finally {
+            setDeletingSocietyId(null);
         }
     };
 
@@ -408,8 +585,10 @@ const SuperAdminPage: React.FC = () => {
 
         const toastId = toast.loading("Creating conference...");
         try {
+            const selectedSoc = societies.find((s) => s.id === selectedSocId) as (typeof societies[number] & { domainCode?: string }) | undefined;
+            const conferenceSocietyId = (selectedSoc?.domainCode || selectedSocId).toLowerCase();
             await createConference({
-                societyId: selectedSocId,
+                societyId: conferenceSocietyId,
                 slug,
                 title: { ko: titleKo, en: titleEn || undefined },
                 description: { ko: '' },
@@ -497,16 +676,16 @@ const SuperAdminPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#1a1a1a] text-gray-200 p-6">
+        <div className="min-h-screen bg-slate-100 text-slate-900 p-4 sm:p-6">
             <header className="mb-6">
                 <div className="max-w-7xl mx-auto">
                     <div className="flex items-center justify-between mb-4">
                         <h1 className="text-3xl font-bold text-[#fbbf24] tracking-wider">ROOT CONTROL</h1>
-                        <Button variant="outline" className="border-[#333] text-gray-400 hover:bg-[#333] hover:text-white" onClick={() => auth.signOut()}>
+                        <Button variant="outline" className="border-slate-300 text-slate-600 hover:bg-slate-200 hover:text-slate-900" onClick={() => auth.signOut()}>
                             <LogOut className="w-5 h-5" />
                         </Button>
                     </div>
-                    <nav className="bg-[#2a2a2a] rounded-xl p-2 flex gap-2">
+                    <nav className="bg-white rounded-xl p-2 flex gap-2 border border-slate-200 shadow-sm">
                         {[
                             { id: 'SOCIETY', label: 'Societies', icon: <Building2 className="w-4 h-4" /> },
                             { id: 'CONFERENCE', label: 'Conferences', icon: <Calendar className="w-4 h-4" /> },
@@ -519,7 +698,7 @@ const SuperAdminPage: React.FC = () => {
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as 'SOCIETY' | 'CONFERENCE' | 'MEMBERS' | 'CODES' | 'SETTINGS' | 'MONITORING' | 'VENDORS')}
-                                className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === tab.id ? 'bg-[#fbbf24] text-black' : 'bg-[#1e1e1e] text-gray-400 hover:bg-[#333] hover:text-white'}`}
+                                className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === tab.id ? 'bg-[#fbbf24] text-black' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'}`}
                             >
                                 {tab.icon}
                                 {tab.label}
@@ -543,18 +722,27 @@ const SuperAdminPage: React.FC = () => {
                                 <form onSubmit={handleCreateSociety} className="space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
-                                            <Label className="text-xs font-semibold text-gray-400 uppercase">사회명 (한글)</Label>
-                                            <Input value={socNameKo} onChange={e => setSocNameKo(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-[#fbbf24]" placeholder="예: 한국기계정보학회" />
+                                            <Label className="text-xs font-semibold text-slate-500 uppercase">사회명 (한글)</Label>
+                                            <Input value={socNameKo} onChange={e => setSocNameKo(e.target.value)} className="bg-white border-slate-300 focus:border-[#fbbf24]" placeholder="예: 한국기계정보학회" />
                                         </div>
                                         <div className="space-y-1.5">
-                                            <Label className="text-xs font-semibold text-gray-400 uppercase">사회명 (영어)</Label>
-                                            <Input value={socNameEn} onChange={e => setSocNameEn(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-[#fbbf24]" placeholder="Optional: Korea Association..." />
+                                            <Label className="text-xs font-semibold text-slate-500 uppercase">사회명 (영어)</Label>
+                                            <Input value={socNameEn} onChange={e => setSocNameEn(e.target.value)} className="bg-white border-slate-300 focus:border-[#fbbf24]" placeholder="Optional: Korea Association..." />
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
-                                            <Label className="text-xs font-semibold text-gray-400 uppercase">관리자 이메일</Label>
-                                            <Input type="email" value={socAdmin} onChange={e => setSocAdmin(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-[#fbbf24]" placeholder="admin@society.org" />
+                                            <Label className="text-xs font-semibold text-slate-500 uppercase">관리자 이메일</Label>
+                                            <Input type="email" value={socAdmin} onChange={e => setSocAdmin(e.target.value)} className="bg-white border-slate-300 focus:border-[#fbbf24]" placeholder="admin@society.org" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-slate-500 uppercase">학회 도메인 코드 (sid)</Label>
+                                            <Input
+                                                value={socDomainCode}
+                                                onChange={e => setSocDomainCode(e.target.value.toLowerCase())}
+                                                className="bg-white border-slate-300 focus:border-[#fbbf24]"
+                                                placeholder="예: kaid"
+                                            />
                                         </div>
                                     </div>
                                     <Button type="submit" className="w-full bg-[#fbbf24] hover:bg-[#e0a520] text-black font-bold">
@@ -572,24 +760,37 @@ const SuperAdminPage: React.FC = () => {
                             <CardContent>
                                 <div className="space-y-2">
                                     {societies.map(s => (
-                                        <div key={s.id} className="flex items-center justify-between p-4 bg-[#2a2a2a] rounded-lg border border-[#333]">
+                                        <div key={s.id} className="flex items-center justify-between p-4 bg-white rounded-lg border border-slate-200">
                                             <div className="flex-1">
-                                                <div className="font-semibold text-gray-200">{s.name.ko}</div>
-                                                <div className="text-xs text-gray-400">{s.adminEmails.join(', ')}</div>
+                                                <div className="font-semibold text-slate-900">{s.name.ko}</div>
+                                                <div className="text-xs text-slate-500">ID: {s.id} / Domain: {(s as { domainCode?: string }).domainCode || '-'}</div>
+                                                <div className="text-xs text-slate-500">{s.adminEmails.join(', ')}</div>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white" onClick={() => {
-                                                    setEditingSoc({ id: s.id, name: s.name, description: s.description, homepageUrl: s.homepageUrl, adminEmails: s.adminEmails });
+                                                <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-900" onClick={() => {
+                                                    setEditingSoc({ id: s.id, name: s.name, description: s.description, homepageUrl: s.homepageUrl, adminEmails: s.adminEmails, domainCode: (s as { domainCode?: string }).domainCode, aliases: (s as { aliases?: string[] }).aliases });
                                                     setEditDescKo(s.name.ko);
                                                     setEditHomepage(s.homepageUrl || '');
+                                                    setEditDomainCode(((s as { domainCode?: string }).domainCode || s.id).toLowerCase());
+                                                    setEditAliases(((s as { aliases?: string[] }).aliases || []).join(', '));
                                                 }}>
                                                     <Edit className="w-4 h-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="text-red-400 hover:text-red-300"
+                                                    disabled={deletingSocietyId === s.id}
+                                                    onClick={() => handleDeleteSociety(s.id, s.name.ko)}
+                                                    title="Delete Society"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
                                                 </Button>
                                             </div>
                                         </div>
                                     ))}
                                     {societies.length === 0 && (
-                                        <div className="text-center py-12 text-gray-400">
+                                        <div className="text-center py-12 text-slate-500">
                                             <Building2 className="w-12 h-12 mx-auto mb-2 opacity-20" />
                                             <p>No societies yet. Create one above.</p>
                                         </div>
@@ -609,18 +810,26 @@ const SuperAdminPage: React.FC = () => {
                                 <CardContent>
                                     <div className="space-y-4">
                                         <div className="space-y-1.5">
-                                            <Label className="text-xs font-semibold text-gray-400 uppercase">사회명</Label>
+                                            <Label className="text-xs font-semibold text-slate-500 uppercase">사회명</Label>
                                             <Input value={editDescKo} onChange={e => setEditDescKo(e.target.value)} className="bg-white" placeholder="사회명 입력" />
                                         </div>
                                         <div className="space-y-1.5">
-                                            <Label className="text-xs font-semibold text-gray-400 uppercase">홈페이지 URL</Label>
+                                            <Label className="text-xs font-semibold text-slate-500 uppercase">홈페이지 URL</Label>
                                             <Input value={editHomepage} onChange={e => setEditHomepage(e.target.value)} className="bg-white" placeholder="https://..." />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-slate-500 uppercase">Domain Code (sid)</Label>
+                                            <Input value={editDomainCode} onChange={e => setEditDomainCode(e.target.value.toLowerCase())} className="bg-white" placeholder="예: kaid" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-slate-500 uppercase">Aliases (comma separated)</Label>
+                                            <Input value={editAliases} onChange={e => setEditAliases(e.target.value)} className="bg-white" placeholder="예: kaid, k-a-i-d" />
                                         </div>
                                         <div className="flex gap-2">
                                             <Button onClick={() => handleUpdateSociety(editingSoc.id)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold flex-1">
                                                 <Save className="w-4 h-4 mr-2" /> Save Changes
                                             </Button>
-                                            <Button onClick={() => setEditingSoc(null)} variant="outline">
+                                            <Button onClick={() => { setEditingSoc(null); setEditDomainCode(''); setEditAliases(''); }} variant="outline">
                                                 Cancel
                                             </Button>
                                         </div>
@@ -643,9 +852,9 @@ const SuperAdminPage: React.FC = () => {
                             <CardContent className="space-y-6">
                                 <form onSubmit={handleCreateConference} className="space-y-4">
                                     <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold text-gray-400 uppercase">Select Society</Label>
+                                        <Label className="text-xs font-semibold text-slate-500 uppercase">Select Society</Label>
                                         <select
-                                            className="w-full p-3 bg-[#2a2a2a] border border-[#333] rounded-lg text-gray-200 focus:border-green-600"
+                                            className="w-full p-3 bg-white border border-slate-300 rounded-lg text-slate-900 focus:border-green-600"
                                             value={selectedSocId}
                                             onChange={e => setSelectedSocId(e.target.value)}
                                         >
@@ -655,32 +864,32 @@ const SuperAdminPage: React.FC = () => {
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
-                                            <Label className="text-xs font-semibold text-gray-400 uppercase">Conference Slug</Label>
-                                            <Input value={slug} onChange={e => setSlug(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-green-600" placeholder="e.g., 2026spring" />
+                                            <Label className="text-xs font-semibold text-slate-500 uppercase">Conference Slug</Label>
+                                            <Input value={slug} onChange={e => setSlug(e.target.value)} className="bg-white border-slate-300 focus:border-green-600" placeholder="e.g., 2026spring" />
                                         </div>
                                         <div className="space-y-1.5">
-                                            <Label className="text-xs font-semibold text-gray-400 uppercase">Start Date</Label>
-                                            <Input type="date" value={start} onChange={e => setStart(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-green-600" />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-1.5">
-                                            <Label className="text-xs font-semibold text-gray-400 uppercase">Title (한국어)</Label>
-                                            <Input value={titleKo} onChange={e => setTitleKo(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-green-600" placeholder="예: 2026년 춘계학술대회" />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label className="text-xs font-semibold text-gray-400 uppercase">Title (English)</Label>
-                                            <Input value={titleEn} onChange={e => setTitleEn(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-green-600" placeholder="Optional: Spring Conference 2026" />
+                                            <Label className="text-xs font-semibold text-slate-500 uppercase">Start Date</Label>
+                                            <Input type="date" value={start} onChange={e => setStart(e.target.value)} className="bg-white border-slate-300 focus:border-green-600" />
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
-                                            <Label className="text-xs font-semibold text-gray-400 uppercase">End Date</Label>
-                                            <Input type="date" value={end} onChange={e => setEnd(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-green-600" />
+                                            <Label className="text-xs font-semibold text-slate-500 uppercase">Title (한국어)</Label>
+                                            <Input value={titleKo} onChange={e => setTitleKo(e.target.value)} className="bg-white border-slate-300 focus:border-green-600" placeholder="예: 2026년 춘계학술대회" />
                                         </div>
                                         <div className="space-y-1.5">
-                                            <Label className="text-xs font-semibold text-gray-400 uppercase">Location</Label>
-                                            <Input value={location} onChange={e => setLocation(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-green-600" placeholder="예: 서울 코엑스" />
+                                            <Label className="text-xs font-semibold text-slate-500 uppercase">Title (English)</Label>
+                                            <Input value={titleEn} onChange={e => setTitleEn(e.target.value)} className="bg-white border-slate-300 focus:border-green-600" placeholder="Optional: Spring Conference 2026" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-slate-500 uppercase">End Date</Label>
+                                            <Input type="date" value={end} onChange={e => setEnd(e.target.value)} className="bg-white border-slate-300 focus:border-green-600" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-slate-500 uppercase">Location</Label>
+                                            <Input value={location} onChange={e => setLocation(e.target.value)} className="bg-white border-slate-300 focus:border-green-600" placeholder="예: 서울 코엑스" />
                                         </div>
                                     </div>
                                     <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white font-bold">
@@ -1443,10 +1652,14 @@ const SuperAdminPage: React.FC = () => {
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 <form onSubmit={handleCreateVendor} className="space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                         <div className="space-y-1.5">
                                             <Label className="text-xs font-semibold text-gray-400 uppercase">Vendor Name</Label>
                                             <Input required value={newVendorName} onChange={e => setNewVendorName(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-indigo-500 text-gray-200" placeholder="e.g. ABC IT Solutions" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-gray-400 uppercase">Slug (Optional)</Label>
+                                            <Input value={newVendorSlug} onChange={e => setNewVendorSlug(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-indigo-500 text-gray-200" placeholder="e.g. shinhung" />
                                         </div>
                                         <div className="space-y-1.5">
                                             <Label className="text-xs font-semibold text-gray-400 uppercase">Admin Email (Optional)</Label>
@@ -1481,6 +1694,7 @@ const SuperAdminPage: React.FC = () => {
                                                     <div className="text-xs text-gray-400">
                                                         {v.description || 'No description'}
                                                         {v.adminEmail ? ` • Admin: ${v.adminEmail}` : ' • No Admin Email'}
+                                                        • Slug: <span className="font-mono">{v.slug || vendorSlugify(v.name)}</span>
                                                         • ID: <span className="font-mono">{v.id}</span>
                                                     </div>
                                                 </div>
@@ -1490,6 +1704,7 @@ const SuperAdminPage: React.FC = () => {
                                                         setEditVendorName(v.name);
                                                         setEditVendorDesc(v.description || '');
                                                         setEditVendorEmail(v.adminEmail || '');
+                                                        setEditVendorSlug(v.slug || vendorSlugify(v.name));
                                                     }}>
                                                         <Edit className="w-4 h-4" />
                                                     </Button>
@@ -1528,6 +1743,10 @@ const SuperAdminPage: React.FC = () => {
                                             <Input type="email" value={editVendorEmail} onChange={e => setEditVendorEmail(e.target.value)} className="bg-white" placeholder="admin@vendor.com" />
                                         </div>
                                         <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-gray-400 uppercase">Slug</Label>
+                                            <Input value={editVendorSlug} onChange={e => setEditVendorSlug(e.target.value)} className="bg-white" placeholder="vendor-slug" />
+                                        </div>
+                                        <div className="space-y-1.5">
                                             <Label className="text-xs font-semibold text-gray-400 uppercase">Description</Label>
                                             <Input value={editVendorDesc} onChange={e => setEditVendorDesc(e.target.value)} className="bg-white" placeholder="Description" />
                                         </div>
@@ -1543,6 +1762,53 @@ const SuperAdminPage: React.FC = () => {
                                 </CardContent>
                             </Card>
                         )}
+
+                        <Card className="shadow-lg border-t-4 border-t-emerald-600">
+                            <CardHeader>
+                                <CardTitle>Vendor Sponsorship Requests</CardTitle>
+                                <CardDescription>Review and approve vendor requests to join conferences</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {loadingVendorRequests ? (
+                                    <div className="py-12 flex justify-center"><LoadingSpinner /></div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {vendorRequests.length === 0 && (
+                                            <div className="text-center py-8 text-gray-400">
+                                                <p>No pending requests.</p>
+                                            </div>
+                                        )}
+                                        {vendorRequests.filter(req => req.status === 'PENDING').map(req => (
+                                            <div key={`${req.conferenceId}_${req.vendorId}`} className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 p-4 bg-[#2a2a2a] rounded-lg border border-[#333]">
+                                                <div className="flex-1 text-sm text-gray-300">
+                                                    <div className="font-semibold text-gray-100">{req.vendorName || req.vendorId}</div>
+                                                    <div className="text-xs text-gray-400">
+                                                        Conf: <span className="font-mono">{req.conferenceId}</span>
+                                                        {req.requesterEmail ? ` · ${req.requesterEmail}` : ''}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Button
+                                                        size="sm"
+                                                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                        onClick={() => handleApproveVendorRequest({ vendorId: req.vendorId, conferenceId: req.conferenceId })}
+                                                    >
+                                                        Approve
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => handleRejectVendorRequest({ vendorId: req.vendorId, conferenceId: req.conferenceId })}
+                                                    >
+                                                        Reject
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
                     </div>
                 )}
             </main>
