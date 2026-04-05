@@ -515,12 +515,12 @@ export default function ConferenceSettingsPage() {
             const payload = response.data as { rewardName?: string };
             toast.success(
                 payload.rewardName
-                    ? `${row.userName || row.id} ??????袁④뎬?????????꾩룆梨띰쭕?? ${payload.rewardName}`
-                    : `${row.userName || row.id} ??????袁④뎬??????????꾩룆梨띰쭕???????????`
+                    ? `${row.userName || row.id} 추첨 결과: ${payload.rewardName}`
+                    : `${row.userName || row.id} 추첨 완료 (보상 없음)`
             );
         } catch (error) {
             console.error('Admin reward draw failed:', error);
-            toast.error(error instanceof Error ? error.message : '??????⑤㈇????????좊틣??????????袁④뎬?????遺얘턁????傭?끆???嶺뚮?猷볠꽴???????????쇰뮝??????????????怨몄）.');
+            toast.error(error instanceof Error ? error.message : '관리자 추첨에 실패했습니다. 다시 시도해 주세요.');
         } finally {
             setDrawingUserId(null);
         }
@@ -541,7 +541,7 @@ export default function ConferenceSettingsPage() {
                 ...prev,
                 welcomeMessageImages: [...(prev.welcomeMessageImages || []), url]
             }));
-            toast.success('??????遺얘턁???????????ル뭽?? ??????袁④뎬????????????/ Image added');
+            toast.success('이미지가 추가되었습니다.');
         } catch {
             // Error already handled in handleImageUpload
         }
@@ -559,7 +559,7 @@ export default function ConferenceSettingsPage() {
             <div className="flex h-[50vh] items-center justify-center">
                 <div className="text-center space-y-3">
                     <Info className="w-10 h-10 text-slate-300 mx-auto" />
-                    <p className="text-slate-500 font-medium">??????⑤㈇????????좊틣???欲꼲???듯렡???????롮쾸???????????븍툖???紐꽺?? ????鶯ㅺ동??????????轝꿸섣?????耀붾굝???????</p>
+                    <p className="text-slate-500 font-medium">학술대회 ID를 확인할 수 없습니다. 올바른 경로로 접근해 주세요.</p>
                 </div>
             </div>
         );
@@ -583,8 +583,8 @@ export default function ConferenceSettingsPage() {
             <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-slate-200 shadow-sm transition-all">
                 <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Conference settings</h1>
-                        <p className="text-sm text-slate-500 font-medium mt-0.5">Basic conference information and visual settings</p>
+                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">학술대회 설정</h1>
+                        <p className="text-sm text-slate-500 font-medium mt-0.5">기본 정보 및 화면 설정을 관리합니다</p>
                     </div>
                     <Button
                         onClick={handleSave}
@@ -616,11 +616,10 @@ export default function ConferenceSettingsPage() {
                             <div className="p-2.5 bg-blue-50 rounded-xl text-blue-600">
                                 <Calendar className="w-6 h-6" />
                             </div>
-                            <h2 className="text-xl font-bold text-slate-800">Basic info</h2>
+                            <h2 className="text-xl font-bold text-slate-800">기본 정보</h2>
                         </div>
                         <p className="text-slate-500 leading-relaxed text-sm">
-                            학술대회의 기본 정보를 설정합니다. 제목, 부제, 일정, 장소 등 참가자에게 표시되는 핵심 정보를 입력하세요.<br />
-                            일정은 한국 표준시(KST) 기준으로 저장되며, 시작일과 종료일을 정확히 입력해야 등록 및 프로그램 일정이 올바르게 표시됩니다.
+                            학술대회 제목, 일정, 장소 등 핵심 정보를 설정합니다.
                         </p>
                         <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 mt-4">
                             <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 mb-2">
@@ -691,11 +690,10 @@ export default function ConferenceSettingsPage() {
                             <div className="p-2.5 bg-purple-50 rounded-xl text-purple-600">
                                 <FileText className="w-6 h-6" />
                             </div>
-                            <h2 className="text-xl font-bold text-slate-800">Abstract deadlines</h2>
+                            <h2 className="text-xl font-bold text-slate-800">초록 마감일</h2>
                         </div>
                         <p className="text-slate-500 leading-relaxed text-sm">
-                            초록 접수 및 수정 마감일을 설정합니다. 이 기간이 지난 후에는 참가자가 초록을 제출하거나 수정할 수 없습니다.<br />
-                            마감일이 지난 후에도 관리자는 대시보드에서 개별적으로 초록을 관리할 수 있습니다.
+                            초록 접수 및 수정 마감일을 설정합니다. 마감일 이후에는 참가자가 초록을 제출하거나 수정할 수 없습니다.
                         </p>
                     </div>
 
@@ -742,11 +740,10 @@ export default function ConferenceSettingsPage() {
                             <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600">
                                 <Info className="w-6 h-6" />
                             </div>
-                            <h2 className="text-xl font-bold text-slate-800">Feature toggles</h2>
+                            <h2 className="text-xl font-bold text-slate-800">기능 설정</h2>
                         </div>
                         <p className="text-slate-500 leading-relaxed text-sm">
-                            학술대회에서 사용할 추가 기능을 활성화하거나 비활성화합니다. 각 기능은 ON/OFF로 설정할 수 있으며,<br />
-                            필요한 기능만 활성화하여 참가자에게 최적화된 경험을 제공하세요.
+                            학술대회에서 사용할 추가 기능을 ON/OFF로 설정합니다.
                         </p>
                     </div>
 
@@ -755,8 +752,8 @@ export default function ConferenceSettingsPage() {
                             <CardContent className="p-6 md:p-8 space-y-6">
                                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
                                     <div className="space-y-0.5">
-                                        <Label className="text-sm font-bold text-slate-700">Guestbook enabled</Label>
-                                        <p className="text-xs text-slate-500">방명록 기능을 활성화합니다. 참가자가 학술대회 페이지에서 방명록을 남길 수 있으며, 초록 제출 기간에만 노출됩니다. 필요하지 않은 경우 OFF로 설정하세요.</p>
+                                        <Label className="text-sm font-bold text-slate-700">방명록</Label>
+                                        <p className="text-xs text-slate-500">참가자가 방명록을 남길 수 있습니다.</p>
                                     </div>
                                     <Switch
                                         checked={data.features.guestbookEnabled}
@@ -770,8 +767,8 @@ export default function ConferenceSettingsPage() {
 
                                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
                                     <div className="space-y-0.5">
-                                        <Label className="text-sm font-bold text-slate-700">Stamp tour enabled</Label>
-                                        <p className="text-xs text-slate-500">스탬프 투어 기능을 활성화합니다. 참가자가 부스를 방문하고 스탬프를 모아 보상을 받을 수 있는 기능입니다. 부스와 보상 설정이 필요합니다.</p>
+                                        <Label className="text-sm font-bold text-slate-700">스탬프 투어</Label>
+                                        <p className="text-xs text-slate-500">참가자가 부스를 방문하고 스탬프를 모아 보상을 받을 수 있습니다.</p>
                                     </div>
                                     <Switch
                                         checked={data.features.stampTourEnabled}
@@ -798,11 +795,10 @@ export default function ConferenceSettingsPage() {
                                     <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600">
                                         <Info className="w-6 h-6" />
                                     </div>
-                                    <h2 className="text-xl font-bold text-slate-800">Stamp tour settings</h2>
+                                    <h2 className="text-xl font-bold text-slate-800">스탬프 투어 설정</h2>
                                 </div>
                                 <p className="text-slate-500 leading-relaxed text-sm">
-                                    스탬프 투어의 세부 설정을 구성합니다. 완료 조건, 보상 방식, 추첨 설정 등 참가자 경험에 영향을 미치는 핵심 옵션을 설정하세요.<br />
-                                    보상은 참가자 완료 후 즉시 지급하거나, 관리자가 지정한 시간에 일괄 추첨으로 지급할 수 있습니다.
+                                    완료 조건, 보상 방식, 추첨 설정 등 스탬프 투어 세부 옵션을 설정합니다.
                                 </p>
                                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
                                     <div className="text-xs font-semibold text-slate-500 mb-1">스탬프 투어 종료일시(KST)</div>
@@ -815,7 +811,7 @@ export default function ConferenceSettingsPage() {
                                     <CardContent className="p-6 md:p-8 space-y-6">
                                         {/* Completion Rule */}
                                         <div className="space-y-2">
-                                            <Label className="text-base font-medium text-slate-700">Completion rule</Label>
+                                            <Label className="text-base font-medium text-slate-700">완료 조건</Label>
                                             <div className="flex items-center gap-4">
                                                 <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                                                     <input
@@ -865,7 +861,7 @@ export default function ConferenceSettingsPage() {
 
                                         {/* Booth Order */}
                                         <div className="space-y-2">
-                                            <Label className="text-base font-medium text-slate-700">Booth display order</Label>
+                                            <Label className="text-base font-medium text-slate-700">부스 정렬 순서</Label>
                                             <select
                                                 value={stampTourConfig.boothOrderMode}
                                                 onChange={(e) => setStampTourConfig(prev => ({
@@ -874,8 +870,8 @@ export default function ConferenceSettingsPage() {
                                                 }))}
                                                 className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                                             >
-                                                <option value="SPONSOR_ORDER">Use sponsor order</option>
-                                                <option value="CUSTOM">Use custom order</option>
+                                                <option value="SPONSOR_ORDER">스폰서 순서</option>
+                                                <option value="CUSTOM">사용자 지정</option>
                                             </select>
 
                                             {stampTourConfig.boothOrderMode === 'CUSTOM' && (
@@ -940,7 +936,7 @@ export default function ConferenceSettingsPage() {
 
                                         {/* Reward Mode */}
                                         <div className="space-y-2">
-                                            <Label className="text-base font-medium text-slate-700">Reward distribution mode</Label>
+                                            <Label className="text-base font-medium text-slate-700">보상 배분 방식</Label>
                                             <select
                                                 value={stampTourConfig.rewardMode}
                                                 onChange={(e) => setStampTourConfig(prev => ({
@@ -949,16 +945,16 @@ export default function ConferenceSettingsPage() {
                                                 }))}
                                                 className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                                             >
-                                                <option value="RANDOM">Random draw</option>
-                                                <option value="FIXED">Fixed order</option>
+                                                <option value="RANDOM">랜덤 추첨</option>
+                                                <option value="FIXED">고정 순서</option>
                                             </select>
                                             <p className="text-xs text-slate-500">
-                                                랜덤 추첨 시 가중치에 따라 무작위로 보상이 배분됩니다. 고정 순서 시 설정한 순서대로 보상이 지급됩니다. 가중치가 높을수록 당첨 확률이 높아지며, 참가자가 많은 경우 예정 추첨 모드를 권장합니다.
+                                                랜덤 추첨 시 가중치에 따라 무작위 배분됩니다. 고정 순서 시 설정한 순서대로 지급됩니다.
                                             </p>
                                         </div>
 
                                         <div className="space-y-2">
-                                            <Label className="text-base font-medium text-slate-700">Who can run the draw</Label>
+                                            <Label className="text-base font-medium text-slate-700">추첨 실행 권한</Label>
                                             <select
                                                 value={stampTourConfig.drawMode}
                                                 onChange={(e) => setStampTourConfig(prev => ({
@@ -967,12 +963,12 @@ export default function ConferenceSettingsPage() {
                                                 }))}
                                                 className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                                             >
-                                                <option value="PARTICIPANT">Participant device only</option>
-                                                <option value="ADMIN">Admin screen only</option>
-                                                <option value="BOTH">Participant and admin</option>
+                                                <option value="PARTICIPANT">참가자 기기</option>
+                                                <option value="ADMIN">관리자 화면</option>
+                                                <option value="BOTH">참가자 + 관리자</option>
                                             </select>
                                             <p className="text-xs text-slate-500">
-                                                참가자 기기에서만 추첨을 실행할 수 있습니다. 관리자 화면에서는 추첨 결과만 확인할 수 있으며, 참가자가 직접 추첨을 실행하게 됩니다.
+                                                참가자가 직접 추첨할지, 관리자 화면에서만 추첨할지 선택합니다.
                                             </p>
                                         </div>
 
@@ -986,17 +982,17 @@ export default function ConferenceSettingsPage() {
                                                 }))}
                                                 className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                                             >
-                                                <option value="INSTANT">Instant reward</option>
-                                                <option value="LOTTERY">Scheduled lottery</option>
+                                                <option value="INSTANT">즉시 지급</option>
+                                                <option value="LOTTERY">예정 추첨</option>
                                             </select>
                                             <p className="text-xs text-slate-500">
-                                                즉시 지급 시 참가자가 스탬프를 완료하면 즉시 보상이 지급됩니다. 예정 추첨 시 관리자가 지정한 시간에 일괄 추첨이 진행되며, 추첨 시간 이후에 참가자가 결과를 확인할 수 있습니다.
+                                                즉시 지급 시 완료 즉시 보상이 지급됩니다. 예정 추첨 시 지정한 시간에 일괄 추첨됩니다.
                                             </p>
                                         </div>
 
                                         {stampTourConfig.rewardFulfillmentMode === 'LOTTERY' && (
                                             <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                                                <Label className="text-base font-medium text-slate-700">Lottery schedule</Label>
+                                                <Label className="text-base font-medium text-slate-700">추첨 일정</Label>
                                                 <Input
                                                     type="datetime-local"
                                                     value={stampTourConfig.lotteryScheduledAt ? (() => {
@@ -1025,11 +1021,11 @@ export default function ConferenceSettingsPage() {
                                                     }}
                                                 />
                                                 <p className="text-xs text-slate-500">
-                                                    스탬프 투어 완료 후 지정된 추첨 시각에 보상 추첨이 자동으로 진행됩니다. 추첨 시각 이후 참가자가 결과를 확인할 수 있으며, 관리자도 이 화면에서 결과를 확인할 수 있습니다.
+                                                    스탬프 투어 완료 후 지정된 시각에 보상 추첨이 자동 진행됩니다.
                                                 </p>
                                                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white px-3 py-3 ring-1 ring-slate-200">
                                                     <div className="text-sm text-slate-600">
-                                                        지금 추첨을 실행하면 모든 완료 참가자를 대상으로 보상이 추첨됩니다. 이미 추첨된 참가자는 제외되며, 추첨 후 결과를 변경할 수 없습니다.
+                                                        지금 실행하면 모든 완료 참가자를 대상으로 추첨됩니다. 이미 추첨된 참가자는 제외되며, 결과는 변경할 수 없습니다.
                                                     </div>
                                                     <Button
                                                         type="button"
@@ -1046,7 +1042,7 @@ export default function ConferenceSettingsPage() {
                                         {/* Rewards */}
                                         <div className="space-y-3">
                                             <div className="flex items-center justify-between">
-                                                <Label className="text-base font-medium text-slate-700">Reward list</Label>
+                                                <Label className="text-base font-medium text-slate-700">보상 목록</Label>
                                                 <Button
                                                     type="button"
                                                     variant="outline"
@@ -1084,22 +1080,22 @@ export default function ConferenceSettingsPage() {
                                                                     </div>
                                                                     {isStampTourRewardDrawCompleted(reward) && (
                                                                         <div className="mt-1 text-xs font-semibold text-rose-500">
-                                                                            This reward is locked because its draw has already finished.
+                                                                            추첨이 완료되어 잠긴 보상입니다.
                                                                         </div>
                                                                     )}
                                                                 </div>
                                                                 <div className="text-xs font-semibold text-slate-500">
                                                                     {selectableLotteryRewards.some((item) => item.id === reward.id)
-                                                                        ? 'Selectable'
-                                                                        : 'Locked'}
+                                                                        ? '선택 가능'
+                                                                        : '잠김'}
                                                                 </div>
                                                             </div>
                                                             <div className="grid grid-cols-1 gap-3 text-xs font-semibold text-slate-500 md:grid-cols-4">
-                                                                <div>Rank label</div>
-                                                                <div>Reward name</div>
-                                                                <div>Total quantity: initial stock prepared for this reward</div>
-                                                                <div>Remaining quantity: stock still available for drawing</div>
-                                                            </div>
+                                                                 <div>순위 라벨</div>
+                                                                 <div>보상명</div>
+                                                                 <div>총 수량 (초기 재고)</div>
+                                                                 <div>남은 수량 (추첨 가능)</div>
+                                                             </div>
                                                             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                                                                 <Input
                                                                     value={reward.label || ''}
@@ -1110,7 +1106,7 @@ export default function ConferenceSettingsPage() {
                                                                             rewards: prev.rewards.map((r, i) => i === idx ? { ...r, label: value } : r)
                                                                         }));
                                                                     }}
-                                                                    placeholder="e.g. 1st prize"
+                                                                    placeholder="예: 1등상"
                                                                 />
                                                                 <Input
                                                                     value={reward.name}
@@ -1121,7 +1117,7 @@ export default function ConferenceSettingsPage() {
                                                                             rewards: prev.rewards.map((r, i) => i === idx ? { ...r, name: value } : r)
                                                                         }));
                                                                     }}
-                                                                    placeholder="Reward name"
+                                                                    placeholder="보상명"
                                                                 />
                                                                 <Input
                                                                     type="number"
@@ -1138,7 +1134,7 @@ export default function ConferenceSettingsPage() {
                                                                             } : r)
                                                                         }));
                                                                     }}
-                                                                    placeholder="Image URL (optional)"
+                                                                    placeholder="이미지 URL (옵션)"
                                                                 />
                                                                 <Input
                                                                     type="number"
@@ -1151,7 +1147,7 @@ export default function ConferenceSettingsPage() {
                                                                             rewards: prev.rewards.map((r, i) => i === idx ? { ...r, remainingQty: value } : r)
                                                                         }));
                                                                     }}
-                                                                        placeholder="Weight"
+                                                                        placeholder="가중치"
                                                                 />
                                                             </div>
 
@@ -1184,7 +1180,7 @@ export default function ConferenceSettingsPage() {
                                                                                 rewards: prev.rewards.map((r, i) => i === idx ? { ...r, weight: value } : r)
                                                                             }));
                                                                         }}
-                                                                        placeholder="Display order"
+                                                                        placeholder="표시 순서"
                                                                     />
                                                                 ) : (
                                                                     <Input
@@ -1198,7 +1194,7 @@ export default function ConferenceSettingsPage() {
                                                                                 rewards: prev.rewards.map((r, i) => i === idx ? { ...r, order: value } : r)
                                                                             }));
                                                                         }}
-                                                                        placeholder="Sold out message"
+                                                                        placeholder="매진 메시지"
                                                                     />
                                                                 )}
                                                                 <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
@@ -1260,9 +1256,9 @@ export default function ConferenceSettingsPage() {
                                 <Card className="border-0 shadow-sm ring-1 ring-slate-200 bg-white overflow-hidden rounded-2xl">
                                     <CardContent className="p-6 md:p-8 space-y-4">
                                         <div className="flex items-center justify-between">
-                                            <h3 className="text-lg font-bold text-slate-800">Live status</h3>
+                                            <h3 className="text-lg font-bold text-slate-800">실시간 현황</h3>
                                             <div className="text-xs text-slate-500 font-semibold">
-                                                ??????꾩룆梨띰쭕?? 완료: {stampTourProgress.filter(p => p.isCompleted).length}명
+                                                스탬프 투어 완료: {stampTourProgress.filter(p => p.isCompleted).length}명
                                             </div>
                                         </div>
 
@@ -1287,7 +1283,7 @@ export default function ConferenceSettingsPage() {
                                                         <div className="text-sm">
                                                             <div className="font-semibold text-slate-700">{row.userName || row.userId}</div>
                                                             <div className="text-xs text-slate-500">{row.userOrg || '-'}</div>
-                                                            <div className="text-xs text-slate-500">{row.rewardLabel ? `${row.rewardLabel}${row.rewardName ? ` - ${row.rewardName}` : ""}` : row.rewardName || "Reward pending"}</div>
+                                                            <div className="text-xs text-slate-500">{row.rewardLabel ? `${row.rewardLabel}${row.rewardName ? ` - ${row.rewardName}` : ""}` : row.rewardName || "보상 대기중"}</div>
                                                         </div>
                                                         <div className="flex items-center gap-2">
                                                             <span className={`text-xs px-2 py-1 rounded-full font-semibold ${(row.rewardStatus || 'NONE') === 'REDEEMED' ? 'bg-emerald-100 text-emerald-700' : (row.rewardStatus || 'NONE') === 'REQUESTED' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
@@ -1300,7 +1296,7 @@ export default function ConferenceSettingsPage() {
                                                                     onClick={() => void handleAdminRewardDraw(row)}
                                                                     disabled={drawingUserId === row.id}
                                                                 >
-                                                                    {drawingUserId === row.id ? "Drawing..." : "Admin draw"}
+                                                                    {drawingUserId === row.id ? "추첨 중..." : "관리자 추첨"}
                                                                 </Button>
                                                             )}
                                                             {(row.rewardStatus || 'NONE') === 'REQUESTED' && (
@@ -1339,11 +1335,10 @@ export default function ConferenceSettingsPage() {
                             <div className="p-2.5 bg-red-50 rounded-xl text-red-600">
                                 <MapPin className="w-6 h-6" />
                             </div>
-                            <h2 className="text-xl font-bold text-slate-800">Venue info</h2>
+                            <h2 className="text-xl font-bold text-slate-800">장소 정보</h2>
                         </div>
                         <p className="text-slate-500 leading-relaxed text-sm">
-                            학술대회가 열리는 장소의 정보를 입력합니다. 장소명과 주소는 참가자에게 표시되며, 지도 링크를 추가하면 참가자가 쉽게 위치를 확인할 수 있습니다. <br />
-                            장소명과 주소는 한국어와 영어로 각각 입력할 수 있습니다. 네이버 지도 링크와 구글 맵 임베드 URL을 등록하면 참가자가 길을 찾을 때 유용합니다.
+                            장소 정보를 입력합니다. 장소명과 주소는 참가자에게 표시되며, 지도 링크를 추가하면 위치 확인이 편리합니다.
                         </p>
                     </div>
 
@@ -1429,14 +1424,13 @@ export default function ConferenceSettingsPage() {
                             <div className="p-2.5 bg-purple-50 rounded-xl text-purple-600">
                                 <ImageIcon className="w-6 h-6" />
                             </div>
-                            <h2 className="text-xl font-bold text-slate-800">Visual assets</h2>
+                            <h2 className="text-xl font-bold text-slate-800">비주얼 에셋</h2>
                         </div>
                         <p className="text-slate-500 leading-relaxed text-sm">
-                            학술대회에 사용할 배너와 포스터 이미지를 등록합니다. 등록 후 즉시 참가자에게 반영됩니다.<br />
-                            배너는 학술대회 페이지 상단에, 포스터는 인쇄물 등에 활용되는 안내 이미지입니다. 등록된 이미지는 언어별로 다르게 설정할 수 있습니다.
+                            배너와 포스터 이미지를 등록합니다. 등록 후 즉시 참가자에게 반영됩니다.
                         </p>
                         <div className="mt-4 p-4 bg-purple-50/50 rounded-xl border border-purple-100">
-                            <h4 className="font-semibold text-purple-900 text-sm mb-2">Recommended image size</h4>
+                            <h4 className="font-semibold text-purple-900 text-sm mb-2">권장 이미지 크기</h4>
                             <ul className="text-xs text-purple-800 space-y-1.5 list-disc list-inside">
                                 <li>메인 배너 권장 크기: 1920 x 600 px</li>
                                 <li>포스터 / 안내 이미지: A4 비율 권장</li>
@@ -1504,8 +1498,7 @@ export default function ConferenceSettingsPage() {
                             <h2 className="text-xl font-bold text-slate-800">환영사 / 인사말</h2>
                         </div>
                         <p className="text-slate-500 leading-relaxed text-sm">
-                            학술대회 환영사를 작성합니다. 학술대회 페이지에 표시되는 인사말로, 참가자에게 학술대회의 목적과 환영의 메시지를 전달합니다.<br />
-                            HTML 형식으로 작성할 수 있으며, 한국어와 영어 각각 입력하세요. 저장 후 즉시 반영됩니다.
+                            환영사를 작성합니다. HTML 형식이 가능하며, 한국어와 영어 각각 입력 후 저장하면 즉시 반영됩니다.
                         </p>
                     </div>
 
