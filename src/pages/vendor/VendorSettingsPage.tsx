@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useOutletContext } from 'react-router-dom';
 import { useVendor, VendorProfile } from '../../hooks/useVendor';
 import { Button } from '../../components/ui/button';
@@ -19,17 +19,21 @@ export default function VendorSettingsPage() {
 
     const [formData, setFormData] = useState<Partial<VendorProfile>>({});
     const [isSaving, setIsSaving] = useState(false);
+    const prevVendorRef = useRef<typeof vendor | undefined>(undefined);
 
     // Sync form data when vendor data loads or changes
     useEffect(() => {
-        if (vendor) {
-            setFormData({
-                name: vendor.name || '',
-                description: vendor.description || '',
-                logoUrl: vendor.logoUrl || '',
-                homeUrl: vendor.homeUrl || '',
-                productUrl: vendor.productUrl || ''
-            });
+        if (vendor && vendor !== prevVendorRef.current) {
+            setTimeout(() => {
+                setFormData({
+                    name: vendor.name || '',
+                    description: vendor.description || '',
+                    logoUrl: vendor.logoUrl || '',
+                    homeUrl: vendor.homeUrl || '',
+                    productUrl: vendor.productUrl || ''
+                });
+            }, 0);
+            prevVendorRef.current = vendor;
         }
     }, [vendor]);
 

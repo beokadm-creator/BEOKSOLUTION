@@ -418,7 +418,7 @@ export default function VendorDashboardPage() {
                                             </td>
                                             <td className="px-6 py-4 text-emerald-700 font-semibold">동의 완료</td>
                                             <td className="px-6 py-4 text-xs text-gray-500 font-mono tracking-tight">
-                                                {g.timestamp?.toLocaleString ? g.timestamp.toLocaleString() : new Date(g.timestamp || Date.now()).toLocaleString()}
+                                                {g.timestamp?.toLocaleString ? g.timestamp.toLocaleString() : g.timestamp ? new Date(g.timestamp).toLocaleString() : '-'}
                                             </td>
                                         </tr>
                                     ))}

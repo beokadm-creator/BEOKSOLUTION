@@ -385,7 +385,7 @@ const SponsorManager: React.FC = () => {
                   )}
                   {form.vendorId && !stampTourEnabled && (
                     <p className="text-xs text-slate-500 mt-2">
-                      ?ㅽ꺃???ъ뼱?뒗 ?됱궗 ?ㅼ젙?먯꽌 ?쒗뻾 ???⑥쓣 ?숈뼱?쒖빞 ?ъ슜?섏쓽?덈떎.
+                      {/* 스폰서 관리 페이지에서 가져온 정보를 바탕으로 사용자에게 제공됩니다. */}
                     </p>
                   )}
                 </div>

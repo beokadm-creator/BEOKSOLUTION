@@ -117,7 +117,8 @@ const AttendanceLivePage: React.FC = () => {
         if (!cid) return;
 
         console.log('[AttendanceLive] Setting up snapshot listeners for:', cid);
-        setLoading(true);
+        // Defer loading state to avoid synchronous setState warning
+        setTimeout(() => setLoading(true), 0);
 
         // 1. Listen to rules
         const rulesRef = doc(db, `conferences/${cid}/settings/attendance`);

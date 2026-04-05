@@ -1041,7 +1041,7 @@ export default function RegistrationPage() {
             {/* FOOTER - WideFooterPreview */}
             <WideFooterPreview
                 society={footerInfo ? {
-                    name: societyName || info?.societyId,  // Firestore??????????ル뒌????饔낅떽?????嶺뚮ㅎ?닺짆?????μ떜媛?걫??곷퉮??????????
+                    name: societyName || info?.societyId,  // Use societyName from Firestore if available, fallback to societyId
                     footerInfo
                 } : undefined}
                 language={language}

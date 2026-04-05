@@ -231,7 +231,7 @@ export default function SocietyDashboardPage() {
         } finally {
             setLoading(false);
         }
-    }, [conferenceSocietyKeys, effectiveSocietyDocId]);
+    }, [conferenceSocietyKeys, effectiveSocietyDocId, effectiveDomainCode]);
 
     const fetchVendorRequests = useCallback(async (confList: Conference[]) => {
         setLoadingVendorRequests(true);

@@ -38,13 +38,17 @@ const VendorDashboard: React.FC<Props> = ({ confId: initialConfId }) => {
     const [pDesc, setPDesc] = useState('');
     const [pHome, setPHome] = useState('');
     const [pProduct, setPProduct] = useState('');
+    const prevVendorRef = useRef<typeof vendor | undefined>(undefined);
 
     useEffect(() => {
-        if (vendor) {
-            setPName(vendor.name || '');
-            setPDesc(vendor.description || '');
-            setPHome(vendor.homeUrl || '');
-            setPProduct(vendor.productUrl || '');
+        if (vendor && vendor !== prevVendorRef.current) {
+            setTimeout(() => {
+                setPName(vendor.name || '');
+                setPDesc(vendor.description || '');
+                setPHome(vendor.homeUrl || '');
+                setPProduct(vendor.productUrl || '');
+            }, 0);
+            prevVendorRef.current = vendor;
         }
     }, [vendor]);
 

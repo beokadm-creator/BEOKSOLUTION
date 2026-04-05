@@ -6,6 +6,21 @@ import { db } from '../firebase';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { LogOut, Building2, PanelLeftClose, PanelLeft, LayoutDashboard, QrCode, Settings, Users, Bell } from 'lucide-react';
 
+// URL에서 추출한 vendorId 또는 첫 번째 벤더 ID - utility functions
+const slugify = (value: string) => {
+    return value
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9가-힣]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+};
+
+const getVendorSlug = (v: { id: string; name?: string; slug?: string } | undefined | null) => {
+    if (!v) return null;
+    const fallback = v.name ? slugify(v.name) : '';
+    return (v.slug && v.slug.trim()) || fallback || v.id;
+};
+
 export default function VendorPortalLayout() {
     const [loading, setLoading] = useState(true);
     const [authorized, setAuthorized] = useState(false);
@@ -16,21 +31,6 @@ export default function VendorPortalLayout() {
     const { vendorId: urlVendorId } = useParams<{ vendorId: string }>();
 
     const isCameraMode = location.pathname.includes('/scanner/camera');
-
-    // URL에서 추출한 vendorId 또는 첫 번째 벤더 ID
-    const slugify = (value: string) => {
-        return value
-            .toLowerCase()
-            .trim()
-            .replace(/[^a-z0-9가-힣]+/g, '-')
-            .replace(/^-+|-+$/g, '');
-    };
-
-    const getVendorSlug = (v: { id: string; name?: string; slug?: string } | undefined | null) => {
-        if (!v) return null;
-        const fallback = v.name ? slugify(v.name) : '';
-        return (v.slug && v.slug.trim()) || fallback || v.id;
-    };
 
     const resolveVendorId = () => {
         if (!urlVendorId) return null;
