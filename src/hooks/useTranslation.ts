@@ -7,10 +7,20 @@ const translationCache = new Map<string, { data: unknown; timestamp: number }>()
 const pendingTranslations = new Map<string, Promise<unknown>>();
 const CACHE_TTL = 5 * 60 * 1000;
 
-export const clearTranslationCache = (slug?: string) => {
+export const clearTranslationCache = (slug?: string, societyId?: string) => {
     if (slug) {
-        translationCache.delete(slug);
-        pendingTranslations.delete(slug);
+        const prefix = societyId ? `${societyId}_${slug}` : slug;
+        // Clear all language variants for this tenant+slug combination
+        for (const key of [...translationCache.keys()]) {
+            if (key === `${prefix}_ko` || key === `${prefix}_en` || key === `${slug}_ko` || key === `${slug}_en`) {
+                translationCache.delete(key);
+            }
+        }
+        for (const key of [...pendingTranslations.keys()]) {
+            if (key === `${prefix}_ko` || key === `${prefix}_en` || key === `${slug}_ko` || key === `${slug}_en`) {
+                pendingTranslations.delete(key);
+            }
+        }
     } else {
         translationCache.clear();
         pendingTranslations.clear();
@@ -54,7 +64,10 @@ export const useTranslation = (slug: string): UseTranslationResult => {
     useEffect(() => {
         if (!slug) return;
 
-        const cacheKey = `${slug}_${currentLang}`;
+        // ✅ Determine societyId BEFORE cache lookup to prevent cross-tenant cache contamination
+        const hostSociety = extractSocietyFromHost(window.location.hostname);
+        const preSocietyId = hostSociety || (slug.includes('_') ? slug.split('_')[0] : null);
+        const cacheKey = `${preSocietyId || 'unknown'}_${slug}_${currentLang}`;
         const cached = translationCache.get(cacheKey);
         const now = Date.now();
 
@@ -77,6 +90,7 @@ export const useTranslation = (slug: string): UseTranslationResult => {
 
         const fetchPromise = (async () => {
             try {
+                // Reuse pre-resolved societyId from cache key computation
                 const hostSociety = extractSocietyFromHost(window.location.hostname);
                 const inferredSociety = hostSociety || (slug.includes('_') ? slug.split('_')[0] : null);
 
