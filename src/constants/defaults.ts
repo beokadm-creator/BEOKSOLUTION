@@ -13,7 +13,7 @@ export const DEFAULT_SOCIETY_FEATURES = {
 
 export const APP_VERSION = 'v356';
 
-export const SUPER_ADMINS = ['aaron@beoksolution.com', 'test@eregi.co.kr', 'any@eregi.co.kr'];
+export const SUPER_ADMINS = ['aaron@beoksolution.com'];
 
 // ==========================================
 // Footer Constants

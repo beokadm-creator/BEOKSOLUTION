@@ -9,8 +9,7 @@ service cloud.firestore {
 
     function isSuperAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email == 'aaron@beoksolution.com' || 
-        request.auth.token.email == 'test@eregi.co.kr' ||
+        request.auth.token.email == 'aaron@beoksolution.com' ||
         request.auth.token.admin == true
       );
     }
@@ -29,6 +28,12 @@ service cloud.firestore {
         vendorDoc(vendorId).adminEmail == request.auth.token.email ||
         (vendorDoc(vendorId).staffEmails != null && request.auth.token.email in vendorDoc(vendorId).staffEmails)
       );
+    }
+
+    // Super Admin Lookup (authenticated users can read to check admin status)
+    match /super_admins/{email} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
     }
 
     // Global Admin Access

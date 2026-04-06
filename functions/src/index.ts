@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+ 
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import cors from 'cors';
@@ -655,8 +655,8 @@ export const getNhnAlimTalkTemplates = functions
 
         try {
             // NHN Cloud ??ㅻ쾹?????깆젧 (嶺뚮ㅄ維獄????깅뤂 ???됰뎄)
-            const appKey = 'Ik6GEBC22p5Qliqk';
-            const secretKey = 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme';
+            const appKey = process.env.NHN_APP_KEY || '';
+            const secretKey = process.env.NHN_SECRET_KEY || '';
 
             // senderKey??Firestore??????브퀗???(???깅뤂????⑤챷逾?
             const db = admin.firestore();
@@ -1186,7 +1186,10 @@ export const mintCrossDomainToken = functions
 // --------------------------------------------------------------------------
 import * as crypto from 'crypto';
 
-const LINK_SECRET = process.env.LINK_SECRET || 'eregi_v2_secure_link_key_2026';
+const LINK_SECRET = process.env.LINK_SECRET;
+if (!LINK_SECRET) {
+    throw new Error('LINK_SECRET environment variable is required but not set');
+}
 
 export const verifyAccessLink = functions
     .runWith({ enforceAppCheck: false, ingressSettings: 'ALLOW_ALL' })

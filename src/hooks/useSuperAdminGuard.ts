@@ -20,28 +20,19 @@ export const useSuperAdminGuard = () => {
                 return;
             }
 
-            // Check Email
-            const email = user.email || '';
-            const isAaron = email === 'aaron@beoksolution.com';
+            const email = (user.email || '').toLowerCase();
 
-            if (isAaron) {
-                setAuthorized(true);
-                setChecking(false);
-                return;
-            }
-
-            // Check Firestore Collection
+            // Primary: Check Firestore super_admins collection
             try {
                 const docRef = doc(db, 'super_admins', email);
                 const docSnap = await getDoc(docRef);
 
-                if (docSnap.exists()) {
+                if (docSnap.exists() && docSnap.data()?.role === 'SUPER_ADMIN') {
                     setAuthorized(true);
                 } else {
-                    // Not authorized
                     toast.error("Access Denied: Not a Super Admin");
                     setAuthorized(false);
-                    navigate('/'); // Or /403
+                    navigate('/');
                 }
             } catch (error) {
                 console.error("Super Admin Check Failed", error);
@@ -53,8 +44,8 @@ export const useSuperAdminGuard = () => {
         });
 
         return () => unsubscribe();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+         
+    }, [navigate]);
 
     return { authorized, checking };
 };

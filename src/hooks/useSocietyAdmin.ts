@@ -1,9 +1,31 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { SUPER_ADMINS } from '../constants/defaults';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import { resolveSocietyByIdentifier } from '../utils/societyResolver';
 
 const EMPTY_ADMIN_STATE = { isAdmin: false, loading: false, permissions: null, isSocietyAdmin: false };
+
+/**
+ * Check if an email is a super admin.
+ * Primary: Firestore `super_admins` collection lookup.
+ * Fallback: hardcoded SUPER_ADMINS array (for offline/outage resilience).
+ */
+const checkIsSuperAdmin = async (email: string): Promise<boolean> => {
+    if (!email) return false;
+    try {
+        const docRef = doc(db, 'super_admins', email.toLowerCase());
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.role === 'SUPER_ADMIN') return true;
+        }
+    } catch {
+        // Firestore unavailable — fallback below
+    }
+    return SUPER_ADMINS.includes(email);
+};
 
 export const useSocietyAdmin = (societyId: string | undefined, userEmail: string | undefined | null) => {
     const { pathname } = useLocation();
@@ -28,8 +50,6 @@ export const useSocietyAdmin = (societyId: string | undefined, userEmail: string
              return;
         }
         
-        console.log('🛡️ [useSocietyAdmin] Checking admin rights:', { societyId, userEmail });
-        
         const checkAdmin = async () => {
             if (!societyId) {
                 return;
@@ -42,10 +62,9 @@ export const useSocietyAdmin = (societyId: string | undefined, userEmail: string
             }
 
             try {
-                const isSuperAdmin = SUPER_ADMINS.includes(userEmail || '');
+                const isSuperAdminResult = await checkIsSuperAdmin(userEmail);
                 
-                if (isSuperAdmin) {
-                    console.log('🛡️ [useSocietyAdmin] SUPER_ADMIN access granted');
+                if (isSuperAdminResult) {
                     setIsSocietyAdmin(true);
                     setLoading(false);
                     return;
@@ -57,15 +76,11 @@ export const useSocietyAdmin = (societyId: string | undefined, userEmail: string
                     const data = resolved.data;
                     const isAuthorized = data.adminEmails && Array.isArray(data.adminEmails) && data.adminEmails.includes(userEmail);
                     
-                    console.log('🛡️ [useSocietyAdmin] Society data:', { societyId, resolvedSocietyId: resolved.id, isAuthorized });
-                    
                     setIsSocietyAdmin(isAuthorized);
                 } else {
-                    console.warn('🛡️ [useSocietyAdmin] Society document not found:', societyId);
                     setIsSocietyAdmin(false);
                 }
-            } catch (error) {
-                console.error('🛡️ [useSocietyAdmin] Error checking society admin:', error);
+            } catch {
                 setIsSocietyAdmin(false);
             } finally {
                 setLoading(false);
@@ -83,5 +98,5 @@ export const useSocietyAdmin = (societyId: string | undefined, userEmail: string
         if (!societyId) return EMPTY_ADMIN_STATE;
         
         return { isAdmin, loading, permissions, isSocietyAdmin };
-    }, [isAdmin, loading, permissions, isSocietyAdmin, societyId, isSuperPath]); 
+    }, [isAdmin, loading, isSocietyAdmin, societyId, isSuperPath]); 
 };

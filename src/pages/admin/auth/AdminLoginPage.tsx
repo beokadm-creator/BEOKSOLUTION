@@ -44,13 +44,17 @@ const AdminLoginPage: React.FC = () => {
                 return; // Stop here
             }
 
-            // 3. LOGIC: Clean Redirect (society 파라미터에 따라 분기)
+            // 3. Set secure time-limited pending token for AdminGuard race condition bridge
+            const tokenData = {
+                ts: Date.now(),
+                sig: btoa(JSON.stringify({ exp: Date.now() + 30000 }))
+            };
+            sessionStorage.setItem('eregi_admin_pending', JSON.stringify(tokenData));
+
+            // 4. LOGIC: Clean Redirect (society 파라미터에 따라 분기)
             toast.success("Welcome, Super Admin");
-            // Wait a brief moment for auth state to propagate, then navigate
-            setTimeout(() => {
-                const redirectPath = societyParam ? '/admin/society' : '/super';
-                navigate(redirectPath, { replace: true });
-            }, 500);
+            const redirectPath = societyParam ? '/admin/society' : '/super';
+            navigate(redirectPath, { replace: true });
 
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Unknown error';

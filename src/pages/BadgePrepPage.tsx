@@ -346,10 +346,10 @@ const BadgePrepPage: React.FC = () => {
 
   if (loading || validating) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center font-sans">
+      <div className="min-h-screen bg-[#f0f5fa] flex items-center justify-center font-sans">
         <div className="text-center">
-          <Loader2 className="w-16 h-16 animate-spin text-indigo-600 mx-auto mb-4" />
-          <p className="text-xl font-medium text-gray-600">데이터 로드 중...</p>
+          <Loader2 className="w-12 h-12 animate-spin text-[#003366] mx-auto mb-4" />
+          <p className="text-base font-medium text-gray-500">데이터 로드 중...</p>
         </div>
       </div>
     );
@@ -357,18 +357,18 @@ const BadgePrepPage: React.FC = () => {
 
   if (error || !result?.valid) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center font-sans p-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 text-center">
-          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="w-10 h-10 text-red-600" />
+      <div className="min-h-screen bg-[#f0f5fa] flex items-center justify-center font-sans p-4">
+        <div className="max-w-sm w-full bg-white rounded-2xl shadow-lg border border-[#c3daee] p-8 text-center">
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-5">
+            <AlertCircle className="w-8 h-8 text-red-600" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">유효하지 않은 링크</h1>
-          <p className="text-gray-600 mb-6">
+          <h1 className="text-xl font-bold text-gray-900 mb-2">유효하지 않은 링크</h1>
+          <p className="text-sm text-gray-500 mb-6">
             {error || '이 링크는 만료되었거나 유효하지 않습니다.'}
           </p>
           <button
             onClick={() => navigate(`/${publicSlug}`)}
-            className="inline-block w-full py-3 px-6 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors text-center"
+            className="inline-block w-full py-3 px-6 bg-[#003366] text-white font-bold rounded-xl hover:bg-[#002244] transition-colors text-center text-sm"
           >
             학술대회 홈페이지로 이동
           </button>
@@ -382,73 +382,52 @@ const BadgePrepPage: React.FC = () => {
     const reg = result.registration;
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 flex flex-col items-center justify-center p-4 font-sans">
+      <div className="min-h-screen bg-[#f0f5fa] flex flex-col items-center justify-center p-4 font-sans">
         <div className="w-full max-w-sm">
-          {/* Temporary Voucher Card - Visually Distinct from Issued Badge */}
-          <div className="bg-white border-4 border-amber-300 rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden">
-            {refreshing && (
-              <div className="absolute top-3 right-3 z-10">
-                <RefreshCw className="w-5 h-5 text-amber-600 animate-spin" />
-              </div>
-            )}
-
-            {/* Pending Badge Indicator - Top Banner */}
-            <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-amber-400 to-orange-400 py-2 px-4">
-              <div className="flex items-center justify-center gap-2 text-white">
-                <Clock className="w-4 h-4 animate-pulse" />
-                <span className="text-xs font-bold tracking-wide">BADGE PENDING</span>
-              </div>
+          {/* Voucher Card */}
+          <div className="bg-white border border-amber-200 rounded-2xl text-center shadow-lg overflow-hidden">
+            {/* Pending Banner */}
+            <div className="bg-amber-500 py-2.5 px-4 flex items-center justify-center gap-2 text-white">
+              <Clock className="w-4 h-4" />
+              <span className="text-xs font-bold tracking-wide">명찰 발급 대기 중</span>
+              {refreshing && <RefreshCw className="w-3.5 h-3.5 animate-spin ml-1" />}
             </div>
 
-            {/* Watermark Background */}
-            <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none mt-8">
-              <div className="text-8xl font-black text-gray-900 transform -rotate-12">TEMPORARY</div>
-            </div>
-
-            {/* Content Container - Relative to sit above watermark */}
-            <div className="relative z-10 mt-8">
-              {/* Header with Icon */}
-              <div className="mb-4">
-                <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <FileText className="w-8 h-8 text-amber-600" />
-                </div>
-                <h1 className="text-xl font-black mb-1 tracking-wide text-amber-700">
-                  등록 확인 바우처
-                </h1>
-                <p className="text-xs font-medium text-amber-600 uppercase tracking-wider">Registration Voucher</p>
+            <div className="p-6">
+              {/* Header */}
+              <div className="mb-5">
+                <h1 className="text-lg font-bold text-gray-900 mb-0.5">등록 확인 바우처</h1>
+                <p className="text-xs text-gray-400 uppercase tracking-wider">Registration Voucher</p>
               </div>
 
-              {/* Warning Notice */}
-              <div className="bg-amber-50 border-2 border-amber-200 rounded-xl py-2 px-3 mb-4">
-                <p className="text-xs font-bold text-amber-800">
-                  ⚠️ 현장 인포데스크에서 QR을 스캔하여<br />디지털 명찰을 발급받아야 합니다
+              {/* Notice */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl py-2.5 px-3 mb-5">
+                <p className="text-xs font-semibold text-amber-800">
+                  현장 인포데스크에서 QR을 스캔하여 디지털 명찰을 발급받으세요
                 </p>
               </div>
 
-              {/* Organization */}
-              <p className="text-sm text-gray-600 font-medium mb-1">{reg.affiliation || '-'}</p>
+              {/* Organization + Name */}
+              <p className="text-sm text-gray-500 font-medium mb-1">{reg.affiliation || '-'}</p>
+              <h2 className="text-3xl font-black text-gray-900 mb-5 tracking-tight">{reg.name}</h2>
 
-              {/* Name */}
-              <h2 className="text-3xl font-black text-gray-900 mb-4 tracking-tight">{reg.name}</h2>
-
-              <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl py-3 px-4 mb-4 border border-amber-200">
-                <div className="flex flex-col items-center">
-                  <p className="text-[10px] font-bold text-amber-600 uppercase mb-0.5">Receipt Number</p>
-                  <p className="text-xl font-black text-amber-700 tracking-wider">{reg.receiptNumber}</p>
-                </div>
+              {/* Receipt */}
+              <div className="bg-[#f0f5fa] rounded-xl py-2.5 px-4 mb-4 border border-[#c3daee]">
+                <p className="text-[10px] font-bold text-[#003366] uppercase tracking-wider mb-0.5">접수번호</p>
+                <p className="text-lg font-black text-[#003366] tracking-wider">{reg.receiptNumber}</p>
               </div>
 
               {/* License Number */}
               {reg.licenseNumber && reg.licenseNumber !== '-' && (
-                <div className="bg-gray-50 rounded-lg py-2 px-3 mb-4">
-                  <p className="text-xs font-semibold text-gray-600">면허번호</p>
+                <div className="bg-gray-50 rounded-lg py-2 px-3 mb-4 text-left">
+                  <p className="text-xs text-gray-500 font-medium">면허번호</p>
                   <p className="text-sm font-bold text-gray-800">{reg.licenseNumber}</p>
                 </div>
               )}
 
-              {/* QR Code - The Main Element */}
-              <div className="bg-white p-3 inline-block rounded-2xl shadow-lg border-2 border-amber-200 mb-4">
-                <div className="text-xs font-semibold text-gray-500 mb-2">인포데스크 제시용 QR</div>
+              {/* QR Code */}
+              <div className="bg-white p-3 inline-block rounded-xl shadow-sm border border-gray-100 mb-4">
+                <p className="text-[10px] font-semibold text-gray-400 mb-2 uppercase tracking-wider">인포데스크 제시용</p>
                 <QRCodeSVG
                   key={voucherQrValue}
                   value={voucherQrValue}
@@ -459,28 +438,17 @@ const BadgePrepPage: React.FC = () => {
               </div>
 
               {/* Instruction */}
-              <div className="bg-amber-100 border border-amber-300 rounded-xl py-3 px-4">
-                <p className="text-sm font-bold text-amber-900 flex items-center justify-center gap-2">
-                  <User className="w-4 h-4" />
-                  현장 인포데스크에 QR 제시
-                </p>
-                <p className="text-xs text-amber-700 mt-1">디지털 명찰을 발급받으세요</p>
+              <div className="bg-[#f0f5fa] border border-[#c3daee] rounded-xl py-2.5 px-4 flex items-center justify-center gap-2">
+                <User className="w-4 h-4 text-[#003366] shrink-0" />
+                <p className="text-sm font-semibold text-[#003366]">현장 인포데스크에 QR 제시</p>
               </div>
             </div>
           </div>
 
-          {/* Refresh Indicator */}
-          {refreshing && (
-            <div className="mt-4 text-center text-sm text-amber-700 font-medium flex items-center justify-center gap-2 bg-white/80 rounded-lg py-2 px-4">
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              명찰 발급 상태 확인 중...
-            </div>
-          )}
-
           {/* Home Button */}
           <button
             onClick={() => navigate(`/${publicSlug}`)}
-            className="block w-full mt-4 py-3 px-6 bg-white text-amber-700 font-bold rounded-xl hover:bg-amber-50 transition-colors text-center border-2 border-amber-200 shadow-md"
+            className="block w-full mt-4 py-3 px-6 bg-white text-[#003366] font-bold rounded-xl hover:bg-[#f0f5fa] transition-colors text-center border border-[#c3daee] shadow-sm text-sm"
           >
             학술대회 홈페이지
           </button>
@@ -495,16 +463,16 @@ const BadgePrepPage: React.FC = () => {
 
     // ISSUED BADGE STATE
     return (
-      <div className="min-h-[100dvh] bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 flex flex-col p-4 font-sans">
+      <div className="min-h-[100dvh] bg-[#f0f5fa] flex flex-col p-4 font-sans">
         <div className="w-full max-w-sm mx-auto flex-1 flex flex-col justify-center py-6">
-          {/* Digital Badge Card - Professional Name Tag */}
-          <div className="bg-white border-0 md:border-4 border-emerald-500 rounded-[2rem] overflow-hidden shadow-2xl flex flex-col relative z-10 ring-1 ring-black/5">
+          {/* Digital Badge Card */}
+          <div className="bg-white border border-[#c3daee] rounded-2xl overflow-hidden shadow-lg flex flex-col">
 
-            {/* Issued Badge Header - Always Visible */}
-            <div className="bg-gradient-to-r from-emerald-600 to-green-500 py-3 px-4 shadow-sm">
+            {/* Issued Badge Header */}
+            <div className="bg-[#003366] py-3 px-4">
               <div className="flex items-center justify-center gap-2 text-white">
-                <CheckCircle className="w-5 h-5 drop-shadow-sm" />
-                <span className="text-sm font-bold tracking-wider drop-shadow-sm">DIGITAL BADGE ISSUED</span>
+                <CheckCircle className="w-4 h-4" />
+                <span className="text-sm font-bold tracking-wider">디지털 명찰 발급 완료</span>
               </div>
             </div>
 
@@ -518,7 +486,7 @@ const BadgePrepPage: React.FC = () => {
 
               {/* License Number Chip */}
               {reg.licenseNumber && reg.licenseNumber !== '-' && (
-                <div className="bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full py-1.5 px-4 mb-6 inline-flex items-center shadow-sm">
+                <div className="bg-[#f0f5fa] text-[#003366] border border-[#c3daee] rounded-full py-1.5 px-4 mb-6 inline-flex items-center">
                   <span className="text-xs font-bold tracking-wide">면허번호 : {reg.licenseNumber}</span>
                 </div>
               )}
@@ -541,27 +509,27 @@ const BadgePrepPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Tabbed Interface - Compact & Clean */}
-            <div className="bg-gray-50/80 border-t border-gray-100 p-2">
+            {/* Tabbed Interface */}
+            <div className="bg-[#f0f5fa] border-t border-[#c3daee] p-2">
               <Tabs defaultValue="status" className="w-full">
                 <TabsList className="grid grid-cols-5 w-full h-auto p-1 bg-white border border-gray-200 shadow-sm rounded-xl">
-                  <TabsTrigger value="status" className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 rounded-lg transition-all">
+                  <TabsTrigger value="status" className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-[#f0f5fa] data-[state=active]:text-[#003366] rounded-lg transition-all">
                     <User className="w-4 h-4" />
                     <span className="text-[10px] font-bold">상태</span>
                   </TabsTrigger>
-                  <TabsTrigger value="sessions" className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 rounded-lg transition-all">
+                  <TabsTrigger value="sessions" className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-[#f0f5fa] data-[state=active]:text-[#003366] rounded-lg transition-all">
                     <TrendingUp className="w-4 h-4" />
                     <span className="text-[10px] font-bold">수강</span>
                   </TabsTrigger>
-                  <TabsTrigger value="materials" className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 rounded-lg transition-all">
+                  <TabsTrigger value="materials" className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-[#f0f5fa] data-[state=active]:text-[#003366] rounded-lg transition-all">
                     <FileText className="w-4 h-4" />
                     <span className="text-[10px] font-bold">자료</span>
                   </TabsTrigger>
-                  <TabsTrigger value="program" className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 rounded-lg transition-all">
+                  <TabsTrigger value="program" className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-[#f0f5fa] data-[state=active]:text-[#003366] rounded-lg transition-all">
                     <Calendar className="w-4 h-4" />
                     <span className="text-[10px] font-bold">일정</span>
                   </TabsTrigger>
-                  <TabsTrigger value="translation" className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 rounded-lg transition-all">
+                  <TabsTrigger value="translation" className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-[#f0f5fa] data-[state=active]:text-[#003366] rounded-lg transition-all">
                     <Languages className="w-4 h-4" />
                     <span className="text-[10px] font-bold">번역</span>
                   </TabsTrigger>
@@ -582,23 +550,23 @@ const BadgePrepPage: React.FC = () => {
                   </div>
 
                   {(liveAttendance?.currentZone || reg.currentZone) && (liveAttendance?.status || reg.attendanceStatus) === 'INSIDE' && (
-                    <div className="bg-blue-50/50 border border-blue-100 rounded-xl py-3 px-4 flex justify-between items-center">
-                      <p className="text-xs text-blue-600 font-bold">현재 위치</p>
-                      <p className="text-sm font-black text-blue-800 flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-blue-500" />
+                    <div className="bg-[#f0f5fa] border border-[#c3daee] rounded-xl py-3 px-4 flex justify-between items-center">
+                      <p className="text-xs text-[#003366] font-bold">현재 위치</p>
+                      <p className="text-sm font-black text-[#003366] flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-[#003366]" />
                         {liveAttendance?.currentZone || reg.currentZone}
                       </p>
                     </div>
                   )}
 
                   {liveMinutes > 0 && (
-                    <div className="bg-purple-50/50 border border-purple-100 rounded-xl py-3 px-4 flex justify-between items-center">
+                    <div className="bg-[#f0f5fa] border border-[#c3daee] rounded-xl py-3 px-4 flex justify-between items-center">
                       <div className="flex flex-col text-left">
-                        <p className="text-xs text-purple-600 font-bold">인정 수강 시간 (실시간)</p>
-                        {(liveAttendance?.status || reg.attendanceStatus) === 'INSIDE' && <p className="text-[10px] text-purple-400">현재 수강 시간 포함</p>}
+                        <p className="text-xs text-[#003366] font-bold">인정 수강 시간 (실시간)</p>
+                        {(liveAttendance?.status || reg.attendanceStatus) === 'INSIDE' && <p className="text-[10px] text-[#24669e]">현재 수강 시간 포함</p>}
                       </div>
-                      <p className="text-sm font-black text-purple-800 flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-purple-500" />
+                      <p className="text-sm font-black text-[#003366] flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-[#003366]" />
                         {Math.floor(liveMinutes / 60)}시간 {liveMinutes % 60}분
                       </p>
                     </div>
@@ -618,8 +586,8 @@ const BadgePrepPage: React.FC = () => {
                       <span className={`text-3xl font-black tracking-tight ${isCompleted ? 'text-emerald-600' : 'text-gray-900'}`}>
                         {isCompleted ? '이수 완료' : '진행 중'}
                       </span>
-                      <span className="text-sm font-bold text-gray-500 mt-2 bg-gray-50 px-4 py-2 rounded-lg">
-                        누적 인정 시간: <span className="text-purple-600">{Math.floor(liveMinutes / 60)}시간 {liveMinutes % 60}분</span>
+                      <span className="text-sm font-bold text-gray-500 mt-2 bg-[#f0f5fa] px-4 py-2 rounded-lg">
+                        누적 인정 시간: <span className="text-[#003366]">{Math.floor(liveMinutes / 60)}시간 {liveMinutes % 60}분</span>
                       </span>
                     </div>
                   </div>
@@ -722,11 +690,11 @@ const BadgePrepPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Home Button - Floating Bottom aesthetics */}
-          <div className="mt-6 text-center">
+          {/* Home Button */}
+          <div className="mt-4">
             <button
-            onClick={() => navigate(`/${publicSlug}`)}
-              className="inline-flex items-center justify-center py-3 px-8 bg-white/80 backdrop-blur-sm text-emerald-800 font-bold rounded-full hover:bg-white transition-colors border border-emerald-100 shadow-sm text-sm"
+              onClick={() => navigate(`/${publicSlug}`)}
+              className="w-full py-3 px-6 bg-white text-[#003366] font-bold rounded-xl hover:bg-[#f0f5fa] transition-colors border border-[#c3daee] shadow-sm text-sm"
             >
               학술대회 홈페이지로 이동
             </button>
