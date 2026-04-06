@@ -232,70 +232,86 @@ export default function DashboardPage() {
 
     return (
         <div className="p-8 max-w-7xl mx-auto space-y-8">
-            <div>
-                <h1 className="text-3xl font-bold text-slate-900">Event Dashboard</h1>
-                <p className="text-slate-500 mt-1">Overview for <span className="font-semibold text-[#003366]">{safeText(selectedConferenceTitle) || selectedConferenceSlug}</span></p>
+            {/* 페이지 헤더 */}
+            <div className="flex items-start justify-between pb-6 border-b border-slate-200">
+                <div className="flex items-start gap-4">
+                    <div className="w-1 h-12 rounded-full bg-[#003366] shrink-0 mt-1" />
+                    <div>
+                        <p className="text-xs font-bold text-[#24669e] uppercase tracking-widest mb-1">Event Dashboard</p>
+                        <h1 className="text-3xl font-bold text-slate-900 leading-tight">
+                            {safeText(selectedConferenceTitle) || selectedConferenceSlug}
+                        </h1>
+                    </div>
+                </div>
+                <Button
+                    onClick={handleExportReport}
+                    disabled={isExporting}
+                    className="bg-[#003366] hover:bg-[#002244] text-white flex items-center gap-2 shrink-0"
+                >
+                    {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    종합 보고서
+                </Button>
             </div>
 
+            {/* 통계 카드 */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <DataWidget
-                    title="Total Registrations"
+                    title="총 등록 인원"
                     value={stats.totalRegistrations}
-                    subValue="All time"
+                    subValue="결제 완료 기준"
                     icon={Users}
                     variant="primary"
                 />
                 <DataWidget
-                    title="Completed Payments"
+                    title="결제 완료"
                     value={stats.completedPayments}
-                    subValue="Paid attendees"
+                    subValue="PAID 상태"
                     icon={Ticket}
                     variant="success"
                 />
                 <DataWidget
-                    title="Canceled/Refunded"
+                    title="취소 / 환불"
                     value={stats.pendingPayments}
-                    subValue="Not active"
+                    subValue="비활성 건수"
                     icon={AlertCircle}
                     variant="primary"
                 />
                 <DataWidget
-                    title="Total Revenue"
+                    title="총 수익"
                     value={`₩${stats.totalRevenue.toLocaleString()}`}
                     subValue="Gross revenue"
                     icon={CreditCard}
                 />
             </div>
 
-            {/* Quick Actions or Recent Activity could go here */}
+            {/* 하단 카드 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="col-span-1">
-                    <CardHeader>
-                        <CardTitle>Recent Activity</CardTitle>
+                <Card className="border-[#c3daee] shadow-sm">
+                    <CardHeader className="bg-[#f0f5fa] border-b border-[#c3daee] rounded-t-xl pb-4">
+                        <CardTitle className="text-base font-bold text-slate-800">최근 활동</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-sm text-gray-500 text-center py-8">
-                            No recent activity to display.
+                    <CardContent className="p-6">
+                        <div className="flex flex-col items-center justify-center py-10 text-center">
+                            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                                <AlertCircle className="w-6 h-6 text-slate-300" />
+                            </div>
+                            <p className="text-sm text-slate-400 font-medium">표시할 활동이 없습니다</p>
                         </div>
                     </CardContent>
                 </Card>
-                <Card className="col-span-1">
-                    <CardHeader>
-                        <CardTitle>Quick Actions</CardTitle>
+                <Card className="border-[#c3daee] shadow-sm">
+                    <CardHeader className="bg-[#f0f5fa] border-b border-[#c3daee] rounded-t-xl pb-4">
+                        <CardTitle className="text-base font-bold text-slate-800">빠른 실행</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-2 gap-4">
-                            {/* Add quick action buttons here if needed */}
-                            <Button
-                                onClick={handleExportReport}
-                                disabled={isExporting}
-                                className="w-full flex items-center justify-center gap-2 col-span-2"
-                                variant="outline"
-                            >
-                                {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                                종합 보고서 다운로드 (Excel)
-                            </Button>
-                        </div>
+                    <CardContent className="p-6">
+                        <Button
+                            onClick={handleExportReport}
+                            disabled={isExporting}
+                            className="w-full bg-[#003366] hover:bg-[#002244] text-white flex items-center justify-center gap-2 h-12"
+                        >
+                            {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                            종합 보고서 다운로드 (Excel)
+                        </Button>
                     </CardContent>
                 </Card>
             </div>

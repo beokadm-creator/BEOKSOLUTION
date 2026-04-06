@@ -441,7 +441,7 @@ export default function SocietyDashboardPage() {
             <div className="bg-white border-b sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white shadow-md">
+                        <div className="w-8 h-8 bg-[#003366] rounded-lg flex items-center justify-center text-white shadow-md">
                             <Layout size={18} />
                         </div>
                         <div>
@@ -455,16 +455,16 @@ export default function SocietyDashboardPage() {
             <div className="max-w-7xl mx-auto p-6 space-y-8">
                 {/* Stats Row */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <StatCard label="Total Members" value={stats.totalMembers} icon={<Users className="text-[#003366]" />} subtext="Registered Users" />
-                    <StatCard label="Active Events" value={stats.activeConfs} icon={<Activity className="text-emerald-600" />} subtext="Currently Live" />
-                    <StatCard label="Total Events" value={stats.totalConfs} icon={<BarChart3 className="text-[#003366]" />} subtext="Historical Data" />
+                    <StatCard label="Total Members" value={stats.totalMembers} icon={<Users className="text-[#003366]" />} subtext="Registered Users" accent="#003366" />
+                    <StatCard label="Active Events" value={stats.activeConfs} icon={<Activity className="text-emerald-600" />} subtext="Currently Live" accent="#10b981" />
+                    <StatCard label="Total Events" value={stats.totalConfs} icon={<BarChart3 className="text-[#003366]" />} subtext="Historical Data" accent="#003366" />
                 </div>
 
                 {/* Sponsor Requests */}
-                <Card className="border border-slate-200 shadow-sm">
-                    <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <Card className="border border-[#c3daee] shadow-sm">
+                    <CardHeader className="bg-[#f0f5fa] border-b border-[#c3daee] rounded-t-xl flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                         <div>
-                            <CardTitle>스폰서 참여 요청</CardTitle>
+                            <CardTitle className="text-base font-bold text-slate-800">스폰서 참여 요청</CardTitle>
                             <p className="text-sm text-slate-500">학회 담당이 스폰서 요청을 승인/거절합니다.</p>
                         </div>
                         {loadingVendorRequests && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
@@ -477,7 +477,7 @@ export default function SocietyDashboardPage() {
                         ) : (
                             vendorRequests.filter(r => r.status === 'PENDING').map(req => {
                                 return (
-                                    <div key={key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border border-slate-200 rounded-xl p-4 bg-white">
+                                    <div key={req.id} className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border border-[#c3daee] rounded-xl p-4 bg-white">
                                         <div>
                                             <div className="font-semibold text-slate-900">{req.vendorName || req.vendorId}</div>
                                             <div className="text-xs text-slate-500">
@@ -505,14 +505,17 @@ export default function SocietyDashboardPage() {
                 {/* Conferences Section */}
                 <div className="space-y-6">
                     <div className="flex justify-between items-center">
-                        <div>
-                            <h2 className="text-2xl font-bold text-slate-900">Events Management</h2>
-                            <p className="text-sm text-slate-500">Manage your conferences and academic meetings.</p>
+                        <div className="flex items-start gap-3">
+                            <div className="w-1 h-10 rounded-full bg-[#003366] shrink-0 mt-1" />
+                            <div>
+                                <p className="text-xs font-bold text-[#24669e] uppercase tracking-widest mb-0.5">Conference Management</p>
+                                <h2 className="text-2xl font-bold text-slate-900">Events</h2>
+                            </div>
                         </div>
 
                         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                             <DialogTrigger asChild>
-                                <Button className="bg-slate-900 hover:bg-slate-800 text-white shadow-lg rounded-xl h-11 px-6">
+                                <Button className="bg-[#003366] hover:bg-[#002244] text-white shadow-lg rounded-xl h-11 px-6">
                                     <Plus className="w-4 h-4 mr-2" />
                                     Create New Event
                                 </Button>
@@ -616,7 +619,7 @@ export default function SocietyDashboardPage() {
                                 <p className="text-slate-500 max-w-sm mt-2 mb-6">
                                     Get started by creating your first conference or academic meeting event.
                                 </p>
-                                <Button onClick={() => setIsCreateOpen(true)} className="bg-slate-900">
+                                <Button onClick={() => setIsCreateOpen(true)} className="bg-[#003366] hover:bg-[#002244]">
                                     Create First Event
                                 </Button>
                             </CardContent>
@@ -698,17 +701,15 @@ export default function SocietyDashboardPage() {
     );
 }
 
-function StatCard({ label, value, icon, subtext }: { label: string; value: string | number; icon: React.ReactNode; subtext: string }) {
+function StatCard({ label, value, icon, subtext, accent = '#003366' }: { label: string; value: string | number; icon: React.ReactNode; subtext: string; accent?: string }) {
     return (
-        <Card className="border shadow-sm hover:shadow-md transition-all rounded-xl overflow-hidden">
+        <Card className="border border-[#c3daee] shadow-sm hover:shadow-md transition-all rounded-xl overflow-hidden" style={{ borderTop: `3px solid ${accent}` }}>
             <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
-                    <div className="p-3 bg-slate-50 rounded-xl">
+                    <div className="p-3 bg-[#f0f5fa] rounded-xl">
                         {icon}
                     </div>
-                    <Badge variant="secondary" className="bg-slate-100 text-slate-500 font-normal">
-                        {subtext}
-                    </Badge>
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{subtext}</p>
                 </div>
                 <div>
                     <p className="text-sm font-medium text-slate-500">{label}</p>
