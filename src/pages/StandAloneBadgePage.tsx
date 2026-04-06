@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { SESSION_KEYS } from '../utils/cookie';
 import { RefreshCw, CheckCircle, Loader2, Clock, FileText, Calendar, Languages, Download, User, MapPin, TrendingUp, Sparkles, Gift } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import LangToggle from '../components/badge/LangToggle';
 import { functions } from '../firebase';
 import { getStampMissionTargetCount } from '../utils/stampTour';
 import {
@@ -115,7 +116,7 @@ const StandAloneBadgePage: React.FC = () => {
     const [rewardRequesting, setRewardRequesting] = useState(false);
     const [rewardMessage, setRewardMessage] = useState('');
     const [rewardAnimationOpen, setRewardAnimationOpen] = useState(false);
-    const [msg, setMsg] = useState("珥덇린??以?..");
+    const [msg, setMsg] = useState("로딩 중...");
     const [refreshing, setRefreshing] = useState(false);
     const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const lastQueryRef = useRef<Query | null>(null);
@@ -608,9 +609,9 @@ const StandAloneBadgePage: React.FC = () => {
         }
     };
     if (msg && status !== "READY") return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center font-sans">
+        <div className="min-h-screen bg-[#f0f5fa] flex items-center justify-center font-sans">
             <div className="text-center">
-                <Loader2 className="w-16 h-16 animate-spin text-indigo-600 mx-auto mb-4" />
+                <Loader2 className="w-16 h-16 animate-spin text-[#003366] mx-auto mb-4" />
                 <p className="text-xl font-medium text-gray-600">{msg}</p>
             </div>
         </div>
@@ -634,20 +635,7 @@ const StandAloneBadgePage: React.FC = () => {
             <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 flex flex-col items-center justify-center p-4 font-sans">
                 <div className="w-full max-w-sm">
                     <div className="mb-3 flex justify-end gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setBadgeLang('ko')}
-                            className={`rounded-full px-3 py-1 text-xs font-bold ${badgeLang === 'ko' ? 'bg-amber-600 text-white' : 'bg-white text-amber-700 border border-amber-200'}`}
-                        >
-                            KO
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setBadgeLang('en')}
-                            className={`rounded-full px-3 py-1 text-xs font-bold ${badgeLang === 'en' ? 'bg-amber-600 text-white' : 'bg-white text-amber-700 border border-amber-200'}`}
-                        >
-                            EN
-                        </button>
+                        <LangToggle badgeLang={badgeLang} setBadgeLang={setBadgeLang} />
                     </div>
                     {/* Temporary Voucher Card - Visually Distinct from Issued Badge */}
                     <div className="bg-white border-4 border-amber-300 rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden">
@@ -760,32 +748,19 @@ const StandAloneBadgePage: React.FC = () => {
 
     // ISSUED BADGE STATE
     return (
-        <div className="min-h-[100dvh] bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 flex flex-col p-4 font-sans">
+        <div className="min-h-[100dvh] bg-[#f0f5fa] flex flex-col p-4 font-sans">
             <div className="w-full max-w-sm mx-auto flex-1 flex flex-col justify-center py-6">
                 <div className="mb-3 flex justify-end gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setBadgeLang('ko')}
-                        className={`rounded-full px-3 py-1 text-xs font-bold ${badgeLang === 'ko' ? 'bg-emerald-600 text-white' : 'bg-white text-emerald-700 border border-emerald-200'}`}
-                    >
-                        KO
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setBadgeLang('en')}
-                        className={`rounded-full px-3 py-1 text-xs font-bold ${badgeLang === 'en' ? 'bg-emerald-600 text-white' : 'bg-white text-emerald-700 border border-emerald-200'}`}
-                    >
-                        EN
-                    </button>
+                    <LangToggle badgeLang={badgeLang} setBadgeLang={setBadgeLang} />
                 </div>
                 {/* Digital Badge Card - Professional Name Tag */}
-                <div className="bg-white border-0 md:border-4 border-emerald-500 rounded-[2rem] overflow-hidden shadow-2xl flex flex-col relative z-10 ring-1 ring-black/5">
+                <div className="bg-white border border-[#c3daee] rounded-2xl overflow-hidden shadow-lg flex flex-col">
 
                     {/* Issued Badge Header - Always Visible */}
-                    <div className="bg-gradient-to-r from-emerald-600 to-green-500 py-3 px-4 shadow-sm">
+                    <div className="bg-[#003366] py-3 px-4">
                         <div className="flex items-center justify-center gap-2 text-white">
-                            <CheckCircle className="w-5 h-5 drop-shadow-sm" />
-                            <span className="text-sm font-bold tracking-wider drop-shadow-sm">{t('디지털 명찰 발급 완료', 'DIGITAL BADGE ISSUED')}</span>
+                            <CheckCircle className="w-5 h-5" />
+                            <span className="text-sm font-bold tracking-wider">{t('디지털 명찰 발급 완료', 'Digital Badge Issued')}</span>
                         </div>
                     </div>
 
