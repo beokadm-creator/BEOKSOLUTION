@@ -94,7 +94,7 @@ export default function BatchExitPage() {
               value={confId}
               onChange={(e) => setConfId(e.target.value)}
               placeholder="e.g., kap_2026spring"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366]"
               disabled={processing}
             />
             <p className="text-xs text-gray-500 mt-1">
@@ -113,7 +113,7 @@ export default function BatchExitPage() {
               value={zoneId}
               onChange={(e) => setZoneId(e.target.value)}
               placeholder="e.g., main_hall, room_a"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366]"
               disabled={processing}
             />
             <p className="text-xs text-gray-500 mt-1">
@@ -132,7 +132,7 @@ export default function BatchExitPage() {
               value={scannerId}
               onChange={(e) => setScannerId(e.target.value)}
               placeholder="e.g., admin@eregi.co.kr"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366]"
               disabled={processing}
             />
             <p className="text-xs text-gray-500 mt-1">
@@ -179,9 +179,9 @@ export default function BatchExitPage() {
       )}
 
       {/* Info Box */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mt-6">
-        <h3 className="text-lg font-semibold text-blue-800 mb-2">ℹ️ What This Does</h3>
-        <ul className="list-disc list-inside space-y-1 text-blue-700 text-sm">
+      <div className="bg-[#f0f5fa] border border-[#c3daee] rounded-lg p-6 mt-6">
+        <h3 className="text-lg font-semibold text-[#003366] mb-2">ℹ️ What This Does</h3>
+        <ul className="list-disc list-inside space-y-1 text-[#24669e] text-sm">
           <li>Creates EXIT records for all attendees who forgot to scan exit</li>
           <li>Updates ENTRY logs to mark them as exited</li>
           <li>Optionally filters by zone/location</li>

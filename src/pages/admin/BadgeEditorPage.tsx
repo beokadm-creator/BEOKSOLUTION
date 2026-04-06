@@ -47,7 +47,7 @@ const MmInput: React.FC<{
             step={step}
             value={localVal}
             placeholder={placeholder}
-            className={`border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 ${className}`}
+            className={`border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#003366] ${className}`}
             onFocus={() => { isFocused.current = true; }}
             onChange={e => setLocalVal(e.target.value)}
             onBlur={e => {
@@ -231,7 +231,7 @@ const BadgeEditorPage: React.FC = () => {
                 <div>
                     <div className="flex items-center justify-between mb-6">
                         <h2 className="text-xl font-bold text-slate-900">명찰 레이아웃 편집기</h2>
-                        <Button onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-700">
+                        <Button onClick={handleSave} disabled={saving} className="bg-[#003366] hover:bg-[#002244]">
                             <Save className="w-4 h-4 mr-2" />
                             {saving ? '저장 중...' : '저장'}
                         </Button>
@@ -259,7 +259,7 @@ const BadgeEditorPage: React.FC = () => {
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="h-10 text-xs flex gap-2 items-center justify-center bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                                    className="h-10 text-xs flex gap-2 items-center justify-center bg-[#f0f5fa] border-[#c3daee] text-[#003366] hover:bg-[#e1ecf6]"
                                     onClick={alignCenter}
                                 >
                                     <Maximize className="w-4 h-4 rotate-90" />
@@ -336,7 +336,7 @@ const BadgeEditorPage: React.FC = () => {
                         <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-5">
                             {/* 헤더: 타입 + 삭제 */}
                             <div className="flex justify-between items-center">
-                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold tracking-wider">{elements[selectedIndices[0]].type}</span>
+                                <span className="px-2 py-0.5 bg-[#f0f5fa] text-[#003366] rounded text-[10px] font-bold tracking-wider">{elements[selectedIndices[0]].type}</span>
                                 <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50 h-8 font-medium text-xs" onClick={() => {
                                     setElements(elements.filter((_, i) => i !== selectedIndices[0]));
                                     setSelectedIndices([]);
@@ -357,7 +357,7 @@ const BadgeEditorPage: React.FC = () => {
                                             elements[selectedIndices[0]].textAlign === 'center' ? 'left' : 'center'
                                         )}
                                         className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${elements[selectedIndices[0]].textAlign === 'center'
-                                            ? 'bg-blue-500' : 'bg-slate-200'
+                                            ? 'bg-[#003366]' : 'bg-slate-200'
                                             }`}
                                     >
                                         <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${elements[selectedIndices[0]].textAlign === 'center' ? 'translate-x-6' : 'translate-x-1'
@@ -435,8 +435,8 @@ const BadgeEditorPage: React.FC = () => {
                             )}
                         </div>
                     ) : selectedIndices.length > 1 ? (
-                        <div className="h-40 flex flex-col items-center justify-center border-2 border-dashed border-slate-100 rounded-2xl bg-blue-50/20">
-                            <Maximize className="w-8 h-8 text-blue-300 mb-2" />
+                        <div className="h-40 flex flex-col items-center justify-center border-2 border-dashed border-slate-100 rounded-2xl bg-[#f0f5fa]/20">
+                            <Maximize className="w-8 h-8 text-[#c3daee] mb-2" />
                         </div>
                     ) : (
                         <div className="h-40 flex flex-col items-center justify-center border-2 border-dashed border-slate-100 rounded-2xl bg-slate-50/50">
@@ -520,7 +520,7 @@ const DraggableNode: React.FC<DraggableNodeProps> = ({ el, idx, isSelected, prev
             <div
                 ref={nodeRef}
                 id={`badge-el-${idx}`}
-                className={`absolute cursor-move select-none transition-shadow ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50/20 z-10 shadow-lg' : 'hover:ring-1 hover:ring-slate-300'}`}
+                className={`absolute cursor-move select-none transition-shadow ${isSelected ? 'ring-2 ring-[#003366] bg-[#f0f5fa]/20 z-10 shadow-lg' : 'hover:ring-1 hover:ring-slate-300'}`}
                 style={{
                     left: 0,
                     top: 0,

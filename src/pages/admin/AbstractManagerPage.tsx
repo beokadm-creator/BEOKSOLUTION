@@ -161,7 +161,7 @@ export default function AbstractManagerPage() {
             case 'accepted_oral':
                 return <Badge className="bg-green-100 text-green-800 border-green-200 hover:bg-green-200 px-3 py-1 shadow-none">Oral Accepted</Badge>;
             case 'accepted_poster':
-                return <Badge className="bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200 px-3 py-1 shadow-none">Poster Accepted</Badge>;
+                return <Badge className="bg-[#f0f5fa] text-[#003366] border-[#c3daee] hover:bg-[#f0f5fa] px-3 py-1 shadow-none">Poster Accepted</Badge>;
             case 'rejected':
                 return <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 hover:bg-red-100 shadow-none">Rejected</Badge>;
             default:
@@ -236,7 +236,7 @@ export default function AbstractManagerPage() {
                     </span>
                     <a 
                         href={reg ? `/admin/registrations/${reg.id}` : '#'} 
-                        className="font-medium hover:underline hover:text-blue-600 flex items-center gap-1"
+                        className="font-medium hover:underline hover:text-[#003366] flex items-center gap-1"
                         target="_blank" rel="noreferrer"
                     >
                         {name}
@@ -358,16 +358,16 @@ export default function AbstractManagerPage() {
                             </TableRow>
                         ) : (
                             submissions.map((sub) => (
-                                <TableRow key={sub.id} className="hover:bg-blue-50/30 transition-colors group">
+                                <TableRow key={sub.id} className="hover:bg-[#f0f5fa]/30 transition-colors group">
                                     <TableCell className="align-top py-6 text-center">
-                                        <div className="w-4 h-4 border rounded border-gray-300 mx-auto mt-1 cursor-pointer hover:border-blue-500"></div>
+                                        <div className="w-4 h-4 border rounded border-gray-300 mx-auto mt-1 cursor-pointer hover:border-[#003366]"></div>
                                     </TableCell>
                                     <TableCell className="py-6 pl-6 align-top">
                                         <div className="font-bold text-gray-900 text-lg leading-snug mb-1">{sub.title.ko}</div>
                                         <div className="text-sm text-gray-500 font-medium mb-2">{sub.title.en}</div>
-                                        <div className="flex items-center gap-2 text-sm text-[#003366] font-semibold bg-blue-50 inline-flex px-2 py-1 rounded">
+                                        <div className="flex items-center gap-2 text-sm text-[#003366] font-semibold bg-[#f0f5fa] inline-flex px-2 py-1 rounded">
                                             <span>{sub.authors.find(a => a.isPresenter)?.name}</span>
-                                            <span className="text-xs text-blue-400 font-normal border-l border-blue-200 pl-2 ml-1">Presentation Author</span>
+                                            <span className="text-xs text-[#24669e] font-normal border-l border-[#c3daee] pl-2 ml-1">Presentation Author</span>
                                         </div>
                                         {getSubmitterInfo(sub)}
                                     </TableCell>
@@ -379,7 +379,7 @@ export default function AbstractManagerPage() {
                                     </TableCell>
                                     <TableCell className="py-6 align-top">
                                         {sub.fileUrl && (
-                                            <Button variant="ghost" size="sm" asChild className="h-8 text-gray-500 hover:text-[#003366] hover:bg-blue-50">
+                                            <Button variant="ghost" size="sm" asChild className="h-8 text-gray-500 hover:text-[#003366] hover:bg-[#f0f5fa]">
                                                 <a href={sub.fileUrl} target="_blank" rel="noopener noreferrer">
                                                     <Download className="w-4 h-4 mr-1.5" />
                                                     Download
@@ -403,10 +403,10 @@ export default function AbstractManagerPage() {
                                             <Button
                                                 size="sm"
                                                 variant="outline"
-                                                className="h-8 w-24 justify-start text-blue-700 border-blue-200 hover:bg-blue-50 hover:text-blue-800 bg-white"
+                                                className="h-8 w-24 justify-start text-[#003366] border-[#c3daee] hover:bg-[#f0f5fa] hover:text-[#002244] bg-white"
                                                 onClick={() => handleJudgeClick(sub, 'accepted_poster')}
                                             >
-                                                <span className="w-2 h-2 rounded-full bg-blue-500 mr-2"></span> 포스터 승인
+                                                <span className="w-2 h-2 rounded-full bg-[#003366] mr-2"></span> 포스터 승인
                                             </Button>
                                             <Button
                                                 size="sm"
@@ -446,7 +446,7 @@ export default function AbstractManagerPage() {
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">결과:</span>
                             {judgeAction === 'accepted_oral' && <Badge className="bg-green-600 hover:bg-green-700">구두 발표 승인</Badge>}
-                            {judgeAction === 'accepted_poster' && <Badge className="bg-blue-600 hover:bg-blue-700">포스터 발표 승인</Badge>}
+                            {judgeAction === 'accepted_poster' && <Badge className="bg-[#003366] hover:bg-[#002244]">포스터 발표 승인</Badge>}
                             {judgeAction === 'rejected' && <Badge variant="destructive">반려 (Rejected)</Badge>}
                         </div>
 

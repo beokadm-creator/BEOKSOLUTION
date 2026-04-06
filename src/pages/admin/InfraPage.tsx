@@ -173,7 +173,7 @@ export default function InfraPage() {
 
     if (loading) return (
         <div className="flex flex-col items-center justify-center min-h-[50vh]">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4" />
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#003366] mb-4" />
             <p className="text-slate-500 font-medium">Loading infrastructure settings...</p>
         </div>
     );
@@ -194,18 +194,18 @@ export default function InfraPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* 1. Domestic Payment Gateway */}
                 <Card className="border-none shadow-lg shadow-slate-200/50 overflow-hidden bg-white rounded-2xl">
-                    <CardHeader className="bg-blue-50/50 border-b border-blue-100 pb-4">
+                    <CardHeader className="bg-[#f0f5fa]/50 border-b border-[#c3daee] pb-4">
                         <div className="flex items-start justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="p-2.5 bg-blue-100 rounded-xl text-blue-600">
+                                <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
                                     <CreditCard className="w-5 h-5" />
                                 </div>
                                 <div>
                                     <CardTitle className="text-lg font-bold text-slate-800">Domestic Payment (PG)</CardTitle>
-                                    <CardDescription className="text-blue-600/80 font-medium mt-0.5">Korean Issued Cards (KRW)</CardDescription>
+                                    <CardDescription className="text-[#003366]/80 font-medium mt-0.5">Korean Issued Cards (KRW)</CardDescription>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-blue-100 shadow-sm">
+                            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-[#c3daee] shadow-sm">
                                 <span className={`w-2 h-2 rounded-full ${settings.payment.domestic.isTestMode ? 'bg-amber-400' : 'bg-green-500 animate-pulse'}`} />
                                 <span className="text-xs font-bold text-slate-600 uppercase">
                                     {settings.payment.domestic.isTestMode ? 'Test Mode' : 'Live Mode'}
@@ -227,7 +227,7 @@ export default function InfraPage() {
                                         }
                                     }))}
                                 >
-                                    <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-slate-200 focus:ring-blue-500/20 font-medium">
+                                    <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-slate-200 focus:ring-[#003366]/20 font-medium">
                                         <SelectValue placeholder="Select a Provider" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -238,7 +238,7 @@ export default function InfraPage() {
                                 </Select>
                             </div>
 
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between group hover:border-blue-200 transition-colors">
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between group hover:border-[#c3daee] transition-colors">
                                 <div className="space-y-0.5">
                                     <Label className="text-sm font-bold text-slate-700">Sandbox Environment</Label>
                                     <p className="text-xs text-slate-500">Enable for testing transactions without real charges.</p>
@@ -290,18 +290,18 @@ export default function InfraPage() {
 
                 {/* 2. Global Payment Gateway */}
                 <Card className="border-none shadow-lg shadow-slate-200/50 overflow-hidden bg-white rounded-2xl h-fit">
-                    <CardHeader className="bg-indigo-50/50 border-b border-indigo-100 pb-4">
+                    <CardHeader className="bg-[#f0f5fa]/50 border-b border-[#c3daee] pb-4">
                         <div className="flex items-start justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="p-2.5 bg-indigo-100 rounded-xl text-indigo-600">
+                                <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
                                     <Globe className="w-5 h-5" />
                                 </div>
                                 <div>
                                     <CardTitle className="text-lg font-bold text-slate-800">Global Payment (PG)</CardTitle>
-                                    <CardDescription className="text-indigo-600/80 font-medium mt-0.5">International Cards (KRW Settlement)</CardDescription>
+                                    <CardDescription className="text-[#003366]/80 font-medium mt-0.5">International Cards (KRW Settlement)</CardDescription>
                                 </div>
                             </div>
-                            <Badge variant={settings.payment.global.enabled ? 'default' : 'secondary'} className={settings.payment.global.enabled ? "bg-indigo-600 hover:bg-indigo-700 h-7" : "bg-slate-200 text-slate-500 h-7"}>
+                            <Badge variant={settings.payment.global.enabled ? 'default' : 'secondary'} className={settings.payment.global.enabled ? "bg-[#003366] hover:bg-[#002244] h-7" : "bg-slate-200 text-slate-500 h-7"}>
                                 {settings.payment.global.enabled ? 'Enabled' : 'Disabled'}
                             </Badge>
                         </div>
@@ -315,7 +315,7 @@ export default function InfraPage() {
                             </div>
                         </div>
 
-                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between group hover:border-indigo-200 transition-colors">
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between group hover:border-[#c3daee] transition-colors">
                             <div className="space-y-0.5">
                                 <Label className="text-sm font-bold text-slate-700">Accept Global Payments</Label>
                                 <p className="text-xs text-slate-500">Allow payments via Visa, Mastercard, JCB from overseas.</p>
@@ -326,7 +326,7 @@ export default function InfraPage() {
                                     ...prev,
                                     payment: { ...prev.payment, global: { ...prev.payment.global, enabled: e.target.checked } }
                                 }))}
-                                className="data-[state=checked]:bg-indigo-600"
+                                className="data-[state=checked]:bg-[#003366]"
                             />
                         </div>
 
@@ -410,7 +410,7 @@ export default function InfraPage() {
                                 </Badge>
                             </div>
 
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between group hover:border-emerald-200 transition-colors">
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between group hover:border-[#c3daee] transition-colors">
                                 <div className="space-y-0.5">
                                     <Label className="text-sm font-bold text-slate-700">Enable NHN AlimTalk</Label>
                                     <p className="text-xs text-slate-500">Use NHN Cloud for this society's notifications</p>
@@ -433,9 +433,9 @@ export default function InfraPage() {
 
                             {settings.notification.nhnAlimTalk?.enabled && (
                                 <div className="space-y-4 pt-2 animate-in fade-in slide-in-from-top-4 duration-300">
-                                    <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex gap-3">
-                                        <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                                        <div className="text-xs text-blue-900 leading-relaxed">
+                                    <div className="bg-[#f0f5fa] border border-[#c3daee] p-4 rounded-xl flex gap-3">
+                                        <Info className="w-5 h-5 text-[#003366] shrink-0 mt-0.5" />
+                                        <div className="text-xs text-slate-900 leading-relaxed">
                                             <p className="font-bold mb-1">Society-Specific Configuration</p>
                                             Only <span className="font-bold">senderKey</span> is society-specific. The appKey and secretKey are system-wide common settings managed by the administrator. Obtain senderKey from your KakaoTalk channel registration in NHN Cloud Console.
                                         </div>
@@ -505,14 +505,14 @@ export default function InfraPage() {
 
                 {/* 4. Email Service */}
                 <Card className="border-none shadow-lg shadow-slate-200/50 overflow-hidden bg-white rounded-2xl h-fit">
-                    <CardHeader className="bg-purple-50/50 border-b border-purple-100 pb-4">
+                    <CardHeader className="bg-[#f0f5fa]/50 border-b border-[#c3daee] pb-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2.5 bg-purple-100 rounded-xl text-purple-600">
+                            <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
                                 <Mail className="w-5 h-5" />
                             </div>
                             <div>
                                 <CardTitle className="text-lg font-bold text-slate-800">Email Service (SMTP)</CardTitle>
-                                <CardDescription className="text-purple-600/80 font-medium mt-0.5">Receipts & System Emails</CardDescription>
+                                <CardDescription className="text-[#003366]/80 font-medium mt-0.5">Receipts & System Emails</CardDescription>
                             </div>
                         </div>
                     </CardHeader>

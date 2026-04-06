@@ -127,7 +127,7 @@ const VoucherLinkSection: React.FC<VoucherLinkSectionProps> = ({
             {(tokenStatus === 'active' || tokenStatus === 'issued' || tokenStatus === 'expired') && badgePrepUrl && (
                 <div className="space-y-3">
                     <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${tokenStatus === 'active' ? 'bg-green-100 text-green-700' :
-                        tokenStatus === 'issued' ? 'bg-blue-100 text-blue-700' :
+                        tokenStatus === 'issued' ? 'bg-[#f0f5fa] text-[#003366]' :
                             'bg-gray-100 text-gray-500'
                         }`}>
                         <CheckCircle2 className="w-3 h-3" />
@@ -156,7 +156,7 @@ const VoucherLinkSection: React.FC<VoucherLinkSectionProps> = ({
                             size="sm"
                             variant="outline"
                             onClick={() => window.open(badgePrepUrl, '_blank')}
-                            className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+                            className="flex-1 text-[#003366] border-[#c3daee] hover:bg-[#f0f5fa]"
                         >
                             <ExternalLink className="w-4 h-4 mr-1" />
                             바우처 열기
@@ -169,7 +169,7 @@ const VoucherLinkSection: React.FC<VoucherLinkSectionProps> = ({
                             variant="outline"
                             onClick={onResend}
                             disabled={isProcessing}
-                            className="w-full text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                            className="w-full text-[#003366] border-[#c3daee] hover:bg-[#f0f5fa]"
                         >
                             <MessageCircle className="w-4 h-4 mr-1" />
                             알림톡 재발송
@@ -1162,7 +1162,7 @@ const ExternalAttendeePage: React.FC = () => {
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                <Loader2 className="w-8 h-8 animate-spin text-[#003366]" />
             </div>
         );
     }
@@ -1197,7 +1197,7 @@ const ExternalAttendeePage: React.FC = () => {
                                 </CardTitle>
                                 <CardDescription>
                                     외부 참석자를 한 명씩 수동으로 등록합니다. <br />
-                                    <span className="text-blue-600 font-semibold">* 등록 시 회원 계정이 자동으로 생성됩니다. (비밀번호 미입력 시 전화번호 뒷 6자리)</span>
+                                    <span className="text-[#003366] font-semibold">* 등록 시 회원 계정이 자동으로 생성됩니다. (비밀번호 미입력 시 전화번호 뒷 6자리)</span>
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
@@ -1219,7 +1219,7 @@ const ExternalAttendeePage: React.FC = () => {
                                                     id="noEmail"
                                                     checked={noEmail}
                                                     onChange={(e) => handleNoEmailChange(e.target.checked)}
-                                                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                                    className="w-4 h-4 text-[#003366] rounded border-gray-300 focus:ring-[#003366]"
                                                 />
                                                 <label htmlFor="noEmail" className="text-xs text-gray-500 cursor-pointer select-none">이메일 없음</label>
                                             </div>
@@ -1315,7 +1315,7 @@ const ExternalAttendeePage: React.FC = () => {
                                 </CardTitle>
                                 <CardDescription>
                                     엑셀(.xlsx) 또는 CSV 파일로 외부 참석자를 일괄 등록합니다. <br />
-                                    <span className="text-blue-600 font-semibold">* 등록된 모든 참석자에 대해 회원 계정이 자동 생성됩니다.</span>
+                                    <span className="text-[#003366] font-semibold">* 등록된 모든 참석자에 대해 회원 계정이 자동 생성됩니다.</span>
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
@@ -1435,7 +1435,7 @@ const ExternalAttendeePage: React.FC = () => {
                                         size="sm"
                                         onClick={handleBatchCreateAccount}
                                         disabled={isProcessing}
-                                        className="mr-2 text-blue-600 border-blue-200 hover:bg-blue-50 relative overflow-hidden"
+                                        className="mr-2 text-[#003366] border-[#c3daee] hover:bg-[#f0f5fa] relative overflow-hidden"
                                     >
                                         <span className="relative z-10 flex items-center">
                                             {isProcessing && progress > 0 ? (
@@ -1452,7 +1452,7 @@ const ExternalAttendeePage: React.FC = () => {
                                         </span>
                                         {isProcessing && progress > 0 && (
                                             <div
-                                                className="absolute bottom-0 left-0 top-0 bg-blue-100 transition-all duration-300"
+                                                className="absolute bottom-0 left-0 top-0 bg-[#f0f5fa] transition-all duration-300"
                                                 style={{ width: `${progress}%`, zIndex: 0 }}
                                             />
                                         )}
@@ -1491,7 +1491,7 @@ const ExternalAttendeePage: React.FC = () => {
                                             size="sm"
                                             onClick={() => handleBulkResendNotification('selected')}
                                             disabled={isProcessing || selectedIds.length === 0}
-                                            className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                                            className="text-[#003366] border-[#c3daee] hover:bg-[#f0f5fa]"
                                         >
                                             <MessageCircle className="w-4 h-4 mr-2" />
                                             선택 발송 ({selectedIds.length})
@@ -1501,7 +1501,7 @@ const ExternalAttendeePage: React.FC = () => {
                                             size="sm"
                                             onClick={() => handleBulkResendNotification('all')}
                                             disabled={isProcessing || externalAttendees.length === 0}
-                                            className="text-white bg-indigo-600 border-indigo-600 hover:bg-indigo-700"
+                                            className="text-white bg-[#003366] border-[#003366] hover:bg-[#002244]"
                                         >
                                             <MessageCircle className="w-4 h-4 mr-2" />
                                             전체 발송 (전체)
@@ -1525,9 +1525,9 @@ const ExternalAttendeePage: React.FC = () => {
                                         <thead className="bg-gray-50">
                                             <tr>
                                                 <th className="px-4 py-3 w-10 text-center">
-                                                    <button onClick={toggleSelectAll} className="p-1 hover:bg-blue-50 rounded">
+                                                    <button onClick={toggleSelectAll} className="p-1 hover:bg-[#f0f5fa] rounded">
                                                         {selectedIds.length === externalAttendees.length && externalAttendees.length > 0 ? (
-                                                            <CheckSquare size={18} className="text-blue-600 inline" />
+                                                            <CheckSquare size={18} className="text-[#003366] inline" />
                                                         ) : (
                                                             <Square size={18} className="text-gray-300 inline" />
                                                         )}
@@ -1545,11 +1545,11 @@ const ExternalAttendeePage: React.FC = () => {
                                             {externalAttendees.map(attendee => {
                                                 const hasAccount = attendee.authCreated || (attendee.userId && !attendee.userId.startsWith('EXT-'));
                                                 return (
-                                                    <tr key={attendee.id} className={`border-t hover:bg-gray-50 transition-colors ${selectedIds.includes(attendee.id) ? 'bg-blue-50/50' : ''}`}>
+                                                    <tr key={attendee.id} className={`border-t hover:bg-gray-50 transition-colors ${selectedIds.includes(attendee.id) ? 'bg-[#f0f5fa]/50' : ''}`}>
                                                         <td className="px-4 py-3 text-center" onClick={(e) => toggleSelection(e, attendee.id)}>
-                                                            <button className="p-1 hover:bg-blue-50 rounded">
+                                                            <button className="p-1 hover:bg-[#f0f5fa] rounded">
                                                                 {selectedIds.includes(attendee.id) ? (
-                                                                    <CheckSquare size={18} className="text-blue-600 inline" />
+                                                                    <CheckSquare size={18} className="text-[#003366] inline" />
                                                                 ) : (
                                                                     <Square size={18} className="text-gray-300 inline" />
                                                                 )}
@@ -1576,7 +1576,7 @@ const ExternalAttendeePage: React.FC = () => {
                                                                 <Button
                                                                     size="sm"
                                                                     variant="default"
-                                                                    className='bg-blue-600 hover:bg-blue-700 h-7 text-xs'
+                                                                    className='bg-[#003366] hover:bg-[#002244] h-7 text-xs'
                                                                     onClick={() => handleCreateAccount(attendee)}
                                                                     disabled={isProcessing}
                                                                 >
@@ -1606,7 +1606,7 @@ const ExternalAttendeePage: React.FC = () => {
                                                                     <Button
                                                                         size="sm"
                                                                         variant="outline"
-                                                                        className="h-6 px-2 text-[10px] text-blue-700 font-bold bg-blue-50 hover:bg-blue-100"
+                                                                        className="h-6 px-2 text-[10px] text-[#003366] font-bold bg-[#f0f5fa] hover:bg-[#f0f5fa]"
                                                                         onClick={() => handleBixolonPrint(attendee)}
                                                                         disabled={bixolonPrinting}
                                                                         title="명찰 프린트"
@@ -1632,7 +1632,7 @@ const ExternalAttendeePage: React.FC = () => {
                                                                 <Button
                                                                     size="sm"
                                                                     variant="ghost"
-                                                                    className="h-8 w-8 p-0 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50"
+                                                                    className="h-8 w-8 p-0 text-[#003366] hover:text-[#002244] hover:bg-[#f0f5fa]"
                                                                     onClick={() => handleResendNotification(attendee)}
                                                                     title="알림톡 발송"
                                                                 >
@@ -1692,7 +1692,7 @@ const ExternalAttendeePage: React.FC = () => {
                                     </div>
                                     <div>
                                         <span className="text-gray-500">등록비</span>
-                                        <p className="font-bold text-blue-700">₩{selectedAttendee.amount.toLocaleString()}</p>
+                                        <p className="font-bold text-[#003366]">₩{selectedAttendee.amount.toLocaleString()}</p>
                                     </div>
                                     <div>
                                         <span className="text-gray-500">영수증 번호</span>
@@ -1721,10 +1721,10 @@ const ExternalAttendeePage: React.FC = () => {
 
                             {/* 비밀번호 */}
                             {selectedAttendee.password && (
-                                <div className="p-4 bg-blue-50 rounded border border-blue-200">
+                                <div className="p-4 bg-[#f0f5fa] rounded border border-[#c3daee]">
                                     <p className="text-sm text-gray-600 mb-2">마이페이지 로그인 비밀번호</p>
                                     <div className="flex items-center gap-2">
-                                        <span className="text-lg font-mono font-bold text-blue-800">
+                                        <span className="text-lg font-mono font-bold text-[#003366]">
                                             {selectedAttendee.password}
                                         </span>
                                         <Button

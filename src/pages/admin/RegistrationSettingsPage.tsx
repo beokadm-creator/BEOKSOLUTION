@@ -201,9 +201,9 @@ const RegistrationSettingsPage: React.FC = () => {
     if (!cid) {
         return (
             <div className="p-8 max-w-4xl mx-auto text-center">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 max-w-md mx-auto">
-                    <h2 className="text-xl font-semibold text-blue-800 mb-4">컨퍼런스를 선택해주세요</h2>
-                    <p className="text-blue-600">사이드바에서 관리할 컨퍼런스를 선택한 후 등록 설정을 관리할 수 있습니다.</p>
+                <div className="bg-[#f0f5fa] border border-[#c3daee] rounded-lg p-8 max-w-md mx-auto">
+                    <h2 className="text-xl font-semibold text-[#003366] mb-4">컨퍼런스를 선택해주세요</h2>
+                    <p className="text-[#003366]">사이드바에서 관리할 컨퍼런스를 선택한 후 등록 설정을 관리할 수 있습니다.</p>
                 </div>
             </div>
         );

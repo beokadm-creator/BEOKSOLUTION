@@ -1,6 +1,6 @@
 import { useBixolon } from '../../hooks/useBixolon';
 // import { BadgeElement } from '../../types/schema';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useExcel } from '../../hooks/useExcel';
 import { useRegistrationsPagination } from '../../hooks/useRegistrationsPagination';
@@ -568,7 +568,7 @@ const RegistrationListPage: React.FC = () => {
 
     if (loading) return (
         <div className="p-8 flex flex-col items-center">
-            <Loader2 className="animate-spin w-8 h-8 text-blue-600 mb-4" />
+            <Loader2 className="animate-spin w-8 h-8 text-[#003366] mb-4" />
             <div className="text-gray-500 text-sm font-mono mb-4">
                 Loading registrations...
             </div>
@@ -611,7 +611,7 @@ const RegistrationListPage: React.FC = () => {
                         onClick={() => prepareBulkSend('selected')}
                         disabled={isProcessing || selectedIds.length === 0}
                         variant="secondary"
-                        className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 py-2 px-4 h-auto text-sm"
+                        className="bg-[#f0f5fa] hover:bg-[#f0f5fa] text-[#003366] border-[#c3daee] py-2 px-4 h-auto text-sm"
                     >
                         <MessageCircle size={14} className="mr-1.5" />
                         선택 발송 ({selectedIds.length})
@@ -620,7 +620,7 @@ const RegistrationListPage: React.FC = () => {
                         onClick={() => prepareBulkSend('all')}
                         disabled={isProcessing || filteredData.length === 0}
                         variant="secondary"
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white border-none py-2 px-4 h-auto text-sm"
+                        className="bg-[#003366] hover:bg-[#002244] text-white border-none py-2 px-4 h-auto text-sm"
                     >
                         <MessageCircle size={14} className="mr-1.5" />
                         전체 발송 (전체)
@@ -643,9 +643,9 @@ const RegistrationListPage: React.FC = () => {
                     <thead className="bg-[#f0f5fa] border-b border-[#e1ecf6]">
                         <tr>
                             <th className="p-4 w-10">
-                                <button onClick={toggleSelectAll} className="p-1 hover:bg-blue-50 rounded">
+                                <button onClick={toggleSelectAll} className="p-1 hover:bg-[#f0f5fa] rounded">
                                     {selectedIds.length === filteredData.length && filteredData.length > 0 ? (
-                                        <CheckSquare size={18} className="text-blue-600" />
+                                        <CheckSquare size={18} className="text-[#003366]" />
                                     ) : (
                                         <Square size={18} className="text-gray-300" />
                                     )}
@@ -670,13 +670,13 @@ const RegistrationListPage: React.FC = () => {
                         {filteredData.map(r => (
                             <tr
                                 key={r.id}
-                                className={`hover:bg-slate-50 cursor-pointer transition-colors ${selectedIds.includes(r.id) ? 'bg-blue-50/50' : ''}`}
+                                className={`hover:bg-slate-50 cursor-pointer transition-colors ${selectedIds.includes(r.id) ? 'bg-[#f0f5fa]/50' : ''}`}
                                 onClick={() => navigate(`/admin/conf/${conferenceId}/registrations/${r.id}`)}
                             >
                                 <td className="p-4" onClick={(e) => toggleSelection(e, r.id)}>
                                     <div className="flex justify-center">
                                         {selectedIds.includes(r.id) ? (
-                                            <CheckSquare size={18} className="text-blue-600" />
+                                            <CheckSquare size={18} className="text-[#003366]" />
                                         ) : (
                                             <Square size={18} className="text-gray-300" />
                                         )}
@@ -693,7 +693,7 @@ const RegistrationListPage: React.FC = () => {
                                     <div>{(r.amount || 0).toLocaleString()}원</div>
                                     {r.options && r.options.length > 0 && (
                                         <div className="text-[10px] mt-1">
-                                            <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-bold">
+                                            <span className="bg-[#f0f5fa] text-[#003366] px-1.5 py-0.5 rounded border border-[#c3daee] font-bold">
                                                 + 옵션 ({r.options.length})
                                             </span>
                                         </div>
@@ -724,7 +724,7 @@ const RegistrationListPage: React.FC = () => {
                                                 <EregiButton
                                                     onClick={(e) => handleIssueBadge(e, r)}
                                                     variant="secondary"
-                                                    className="px-3 py-1 text-xs h-auto bg-white border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-100"
+                                                    className="px-3 py-1 text-xs h-auto bg-white border-slate-200 hover:bg-[#f0f5fa] hover:text-[#003366] hover:border-[#c3daee]"
                                                 >
                                                     명찰 발급
                                                 </EregiButton>
@@ -733,7 +733,7 @@ const RegistrationListPage: React.FC = () => {
                                         <EregiButton
                                             onClick={(e) => handleBixolonPrint(e, r)}
                                             variant="secondary"
-                                            className="px-2 py-1 text-xs h-auto bg-blue-50 border-blue-200 hover:bg-blue-100 text-blue-700 font-bold"
+                                            className="px-2 py-1 text-xs h-auto bg-[#f0f5fa] border-[#c3daee] hover:bg-[#f0f5fa] text-[#003366] font-bold"
                                             title="명찰 프린트"
                                             disabled={bixolonPrinting}
                                         >
@@ -742,7 +742,7 @@ const RegistrationListPage: React.FC = () => {
                                         <EregiButton
                                             onClick={(e) => handleResendNotification(e, r)}
                                             variant="secondary"
-                                            className="px-2 py-1 text-xs h-auto bg-indigo-50 border-indigo-200 hover:bg-indigo-100 text-indigo-700"
+                                            className="px-2 py-1 text-xs h-auto bg-[#f0f5fa] border-[#c3daee] hover:bg-[#f0f5fa] text-[#003366]"
                                             title="알림톡 발송"
                                             disabled={isProcessing}
                                         >
@@ -853,7 +853,7 @@ const RegistrationListPage: React.FC = () => {
 
                         {/* Header */}
                         <div className={`px-6 py-4 flex items-center gap-3 ${bulkModal.step === 'done' ? 'bg-green-600' :
-                            bulkModal.step === 'processing' ? 'bg-blue-600' : 'bg-amber-500'
+                            bulkModal.step === 'processing' ? 'bg-[#003366]' : 'bg-amber-500'
                             }`}>
                             {bulkModal.step === 'confirm' && <AlertTriangle className="w-6 h-6 text-white" />}
                             {bulkModal.step === 'processing' && <Loader2 className="w-6 h-6 text-white animate-spin" />}
@@ -917,14 +917,14 @@ const RegistrationListPage: React.FC = () => {
                                             value={bulkModal.confirmInput}
                                             onChange={e => setBulkModal(prev => ({ ...prev, confirmInput: e.target.value }))}
                                             placeholder={`${bulkModal.targetIds.length} 입력`}
-                                            className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 focus:border-indigo-400 focus:outline-none text-lg font-bold text-center"
+                                            className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 focus:border-[#003366] focus:outline-none text-lg font-bold text-center"
                                         />
                                     </div>
 
                                     {/* Server-side Note */}
-                                    <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl">
-                                        <ShieldCheck className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-                                        <p className="text-xs text-blue-700"><strong>안전:</strong> 화면을 닫아도 서버에서 멈춰지 않고 처리됩니다.</p>
+                                    <div className="flex items-start gap-2 p-3 bg-[#f0f5fa] border border-[#c3daee] rounded-xl">
+                                        <ShieldCheck className="w-4 h-4 text-[#003366] mt-0.5 shrink-0" />
+                                        <p className="text-xs text-[#003366]"><strong>안전:</strong> 화면을 닫아도 서버에서 멈춰지 않고 처리됩니다.</p>
                                     </div>
 
                                     {/* Buttons */}
@@ -941,7 +941,7 @@ const RegistrationListPage: React.FC = () => {
                                                 !bulkModal.checks.every(Boolean) ||
                                                 bulkModal.confirmInput.trim() !== String(bulkModal.targetIds.length)
                                             }
-                                            className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                                            className="flex-1 py-2.5 bg-[#003366] text-white rounded-xl font-bold hover:bg-[#002244] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                                         >
                                             발송 시작
                                         </button>
@@ -952,14 +952,14 @@ const RegistrationListPage: React.FC = () => {
                             {/* STEP 2: Processing */}
                             {bulkModal.step === 'processing' && (
                                 <div className="py-8 text-center space-y-4">
-                                    <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto" />
+                                    <Loader2 className="w-12 h-12 text-[#24669e] animate-spin mx-auto" />
                                     <div>
                                         <p className="font-bold text-gray-800 text-lg">{bulkModal.targetIds.length}명 발송 중...</p>
                                         <p className="text-sm text-gray-500 mt-1">30명 병렬 토큰 생성 → NHN 배치 전송</p>
                                     </div>
-                                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                                        <p className="text-sm text-blue-700 font-medium">✅ 이 창을 닫아도 안전합니다</p>
-                                        <p className="text-xs text-blue-600 mt-1">서버에서 자동 완료 후 결과를 저장합니다.</p>
+                                    <div className="p-4 bg-[#f0f5fa] border border-[#c3daee] rounded-xl">
+                                        <p className="text-sm text-[#003366] font-medium">✅ 이 창을 닫아도 안전합니다</p>
+                                        <p className="text-xs text-[#24669e] mt-1">서버에서 자동 완료 후 결과를 저장합니다.</p>
                                     </div>
                                 </div>
                             )}
@@ -984,9 +984,9 @@ const RegistrationListPage: React.FC = () => {
                                             <p className="text-3xl font-extrabold text-gray-700">{bulkModal.result.skipped}</p>
                                             <p className="text-xs text-gray-600 mt-1">스킵 (전화번호 없음 등)</p>
                                         </div>
-                                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-center">
-                                            <p className="text-3xl font-extrabold text-blue-700">{bulkModal.result.tokenGenerated}</p>
-                                            <p className="text-xs text-blue-600 mt-1">토큰 발급</p>
+                                        <div className="p-4 bg-[#f0f5fa] border border-[#c3daee] rounded-xl text-center">
+                                            <p className="text-3xl font-extrabold text-[#003366]">{bulkModal.result.tokenGenerated}</p>
+                                            <p className="text-xs text-[#24669e] mt-1">토큰 발급</p>
                                         </div>
                                     </div>
                                     {bulkModal.result.failed > 0 && (

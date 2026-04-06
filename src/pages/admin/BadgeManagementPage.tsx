@@ -164,7 +164,7 @@ const BadgeManagementPage: React.FC = () => {
     if (loading) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-gray-50">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                <Loader2 className="h-8 w-8 animate-spin text-[#003366]" />
             </div>
         );
     }
@@ -276,9 +276,9 @@ const BadgeManagementPage: React.FC = () => {
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-6">
-                                <div className="rounded-xl border border-blue-200 bg-blue-50 p-6">
-                                    <h3 className="mb-2 font-semibold text-blue-900">명찰 에디터</h3>
-                                    <p className="mb-4 text-sm text-blue-700">
+                                <div className="rounded-xl border border-[#c3daee] bg-[#f0f5fa] p-6">
+                                    <h3 className="mb-2 font-semibold text-[#003366]">명찰 에디터</h3>
+                                    <p className="mb-4 text-sm text-[#003366]">
                                         배경, 필드 위치, 텍스트 스타일을 시각적으로 조정할 수 있습니다.
                                     </p>
                                     <Button onClick={() => navigate(`/admin/conf/${cid}/badge-editor`)} className="w-full">
@@ -294,7 +294,7 @@ const BadgeManagementPage: React.FC = () => {
                                             type="checkbox"
                                             checked={badgeLayoutEnabled}
                                             onChange={(event) => setBadgeLayoutEnabled(event.target.checked)}
-                                            className="h-5 w-5 rounded text-blue-600"
+                                            className="h-5 w-5 rounded text-[#003366]"
                                         />
                                     </div>
                                     <p className="text-sm text-gray-500">

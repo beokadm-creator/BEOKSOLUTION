@@ -159,7 +159,7 @@ const VoucherLinkSection: React.FC<VoucherLinkSectionProps> = ({
             {(tokenStatus === 'active' || tokenStatus === 'issued' || tokenStatus === 'expired') && badgePrepUrl && (
                 <div className="space-y-3">
                     <div className={"inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold " + (tokenStatus === 'active' ? 'bg-green-100 text-green-700' :
-                        tokenStatus === 'issued' ? 'bg-blue-100 text-blue-700' :
+                        tokenStatus === 'issued' ? 'bg-[#f0f5fa] text-[#003366]' :
                             'bg-gray-100 text-gray-500')
                     }>
                         <CheckCircle2 className="w-3 h-3" />
@@ -188,7 +188,7 @@ const VoucherLinkSection: React.FC<VoucherLinkSectionProps> = ({
                             size="sm"
                             variant="outline"
                             onClick={() => window.open(badgePrepUrl, '_blank')}
-                            className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+                            className="flex-1 text-[#003366] border-[#c3daee] hover:bg-[#f0f5fa]"
                         >
                             <ExternalLink className="w-4 h-4 mr-1" />
                             바우처 열기
@@ -201,7 +201,7 @@ const VoucherLinkSection: React.FC<VoucherLinkSectionProps> = ({
                             variant="outline"
                             onClick={onResend}
                             disabled={isProcessing}
-                            className="w-full text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                            className="w-full text-[#003366] border-[#c3daee] hover:bg-[#f0f5fa]"
                         >
                             <MessageCircle className="w-4 h-4 mr-1" />
                             알림톡 재발송
@@ -563,7 +563,7 @@ const RegistrationDetailPage: React.FC = () => {
                     <h3 className="text-sm font-bold text-gray-500 mb-1">등록상태 (Status)</h3>
                     <span className={`px-2 py-1 rounded font-bold ${data.status === 'PAID' ? 'bg-green-100 text-green-800' :
                         data.status === 'REFUND_REQUESTED' ? 'bg-yellow-100 text-yellow-800' :
-                            data.status === 'REFUNDED' ? 'bg-blue-100 text-blue-800' :
+                            data.status === 'REFUNDED' ? 'bg-[#f0f5fa] text-[#003366]' :
                                 data.status === 'CANCELED' ? 'bg-red-100 text-red-800' :
                                     'bg-gray-100 text-gray-800'
                         }`}>
@@ -605,7 +605,7 @@ const RegistrationDetailPage: React.FC = () => {
                     {isEditing ? (
                         <input
                             type="text"
-                            className="border p-2 rounded w-full border-blue-400 bg-blue-50"
+                            className="border p-2 rounded w-full border-[#003366] bg-[#f0f5fa]"
                             value={editData.userName}
                             onChange={(e) => setEditData({ ...editData, userName: e.target.value })}
                         />
@@ -618,7 +618,7 @@ const RegistrationDetailPage: React.FC = () => {
                     {isEditing ? (
                         <input
                             type="text"
-                            className="border p-2 rounded w-full border-blue-400 bg-blue-50"
+                            className="border p-2 rounded w-full border-[#003366] bg-[#f0f5fa]"
                             value={editData.userOrg}
                             onChange={(e) => setEditData({ ...editData, userOrg: e.target.value })}
                         />
@@ -636,7 +636,7 @@ const RegistrationDetailPage: React.FC = () => {
                     {isEditing ? (
                         <input
                             type="text"
-                            className="border p-2 rounded w-full border-blue-400 bg-blue-50"
+                            className="border p-2 rounded w-full border-[#003366] bg-[#f0f5fa]"
                             value={editData.userPhone}
                             onChange={(e) => setEditData({ ...editData, userPhone: e.target.value })}
                         />
@@ -650,7 +650,7 @@ const RegistrationDetailPage: React.FC = () => {
                     {isEditing ? (
                         <input
                             type="text"
-                            className="border p-2 rounded w-full border-blue-400 bg-blue-50"
+                            className="border p-2 rounded w-full border-[#003366] bg-[#f0f5fa]"
                             value={editData.licenseNumber}
                             onChange={(e) => setEditData({ ...editData, licenseNumber: e.target.value })}
                         />
@@ -667,7 +667,7 @@ const RegistrationDetailPage: React.FC = () => {
 
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">결제금액 (Amount)</h3>
-                    <p className="text-xl font-bold text-blue-600">{Number(data.amount).toLocaleString()}원</p>
+                    <p className="text-xl font-bold text-[#003366]">{Number(data.amount).toLocaleString()}원</p>
                 </div>
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">결제수단 (Payment)</h3>
@@ -723,7 +723,7 @@ const RegistrationDetailPage: React.FC = () => {
                         {/* Total */}
                         <div className="flex justify-between items-center pt-3 border-t-2 border-gray-200">
                             <span className="font-bold text-gray-900">최종 결제 금액 (Total Amount)</span>
-                            <span className="text-xl font-bold text-blue-600">
+                            <span className="text-xl font-bold text-[#003366]">
                                 {Number(data.amount).toLocaleString()}원
                             </span>
                         </div>
@@ -783,20 +783,20 @@ const RegistrationDetailPage: React.FC = () => {
             )}
 
             {canManualApprove && (
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <h3 className="font-bold mb-3 flex items-center gap-2 text-blue-800">
+                <div className="mt-6 p-4 bg-[#f0f5fa] rounded-lg border border-[#c3daee]">
+                    <h3 className="font-bold mb-3 flex items-center gap-2 text-[#003366]">
                         <CheckCircle className="w-4 h-4" /> 수동 관리 (Manual Action)
                     </h3>
                     <div className="flex gap-3 items-center">
                         <Button
                             variant="default"
                             onClick={handleManualApprove}
-                            className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+                            className="bg-[#003366] hover:bg-[#002244] text-white flex items-center gap-2"
                         >
                             <CheckCircle className="w-4 h-4" />
                             {data.status === 'PAID' ? '결제 상태 강제 정정 (Fix Payment Status)' : '수동 결제 완료 처리 (Force Approve)'}
                         </Button>
-                        <p className="text-sm text-blue-600 ml-2">
+                        <p className="text-sm text-[#003366] ml-2">
                             * 실제 결제가 되었으나 시스템 오류로 대기 상태인 경우 사용하세요.
                         </p>
                     </div>

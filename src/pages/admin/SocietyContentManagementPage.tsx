@@ -213,7 +213,7 @@ const SocietyContentManagementPage: React.FC = () => {
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-6 py-3 bg-[#003366] text-white rounded-xl font-bold hover:bg-[#002244] transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Save size={20} />
           {saving ? '저장 중 / Saving...' : '저장 / Save'}
@@ -228,7 +228,7 @@ const SocietyContentManagementPage: React.FC = () => {
           type="button"
           onClick={() => setPreviewLang('ko')}
           className={`px-4 py-2 rounded-lg font-bold text-sm transition ${previewLang === 'ko'
-            ? 'bg-blue-600 text-white'
+            ? 'bg-[#003366] text-white'
             : 'bg-white text-slate-600 hover:bg-slate-100'
             }`}
         >
@@ -238,7 +238,7 @@ const SocietyContentManagementPage: React.FC = () => {
           type="button"
           onClick={() => setPreviewLang('en')}
           className={`px-4 py-2 rounded-lg font-bold text-sm transition ${previewLang === 'en'
-            ? 'bg-blue-600 text-white'
+            ? 'bg-[#003366] text-white'
             : 'bg-white text-slate-600 hover:bg-slate-100'
             }`}
         >
@@ -371,7 +371,7 @@ const SocietyContentManagementPage: React.FC = () => {
           </div>
 
           {/* Preview */}
-          <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl p-6 border border-slate-200">
+          <div className="bg-[#f0f5fa] rounded-xl p-6 border border-[#c3daee]">
             <h3 className="text-sm font-bold text-slate-600 mb-3">미리보기 / Preview</h3>
 
             {/* Images */}
@@ -438,7 +438,7 @@ const SocietyContentManagementPage: React.FC = () => {
           </div>
 
           {/* Preview */}
-          <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl p-6 border border-slate-200">
+          <div className="bg-[#f0f5fa] rounded-xl p-6 border border-[#c3daee]">
             <h3 className="text-sm font-bold text-slate-600 mb-3">미리보기 / Preview</h3>
             <div
               className="prose prose-slate max-w-none text-slate-700"
@@ -469,7 +469,7 @@ const SocietyContentManagementPage: React.FC = () => {
               <select
                 value={newNotice.category}
                 onChange={(e) => setNewNotice({ ...newNotice, category: e.target.value as '공지' | '뉴스' | '안내' })}
-                className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500"
+                className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#003366]"
               >
                 <option value="공지">공지 / Notice</option>
                 <option value="뉴스">뉴스 / News</option>
@@ -486,7 +486,7 @@ const SocietyContentManagementPage: React.FC = () => {
                   type="text"
                   value={newNotice.titleKO}
                   onChange={(e) => setNewNotice({ ...newNotice, titleKO: e.target.value })}
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#003366]"
                   placeholder="공지 제목"
                 />
               </div>
@@ -498,7 +498,7 @@ const SocietyContentManagementPage: React.FC = () => {
                   type="text"
                   value={newNotice.titleEN}
                   onChange={(e) => setNewNotice({ ...newNotice, titleEN: e.target.value })}
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#003366]"
                   placeholder="Notice title"
                 />
               </div>
@@ -513,7 +513,7 @@ const SocietyContentManagementPage: React.FC = () => {
                   value={newNotice.contentKO}
                   onChange={(e) => setNewNotice({ ...newNotice, contentKO: e.target.value })}
                   rows={4}
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#003366] resize-none"
                   placeholder="공지 내용"
                 />
               </div>
@@ -525,7 +525,7 @@ const SocietyContentManagementPage: React.FC = () => {
                   value={newNotice.contentEN}
                   onChange={(e) => setNewNotice({ ...newNotice, contentEN: e.target.value })}
                   rows={4}
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#003366] resize-none"
                   placeholder="Notice content"
                 />
               </div>
@@ -534,7 +534,7 @@ const SocietyContentManagementPage: React.FC = () => {
             <button
               type="button"
               onClick={handleAddNotice}
-              className="flex items-center justify-center gap-2 w-full md:w-auto px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition"
+              className="flex items-center justify-center gap-2 w-full md:w-auto px-6 py-3 bg-[#003366] text-white rounded-xl font-bold hover:bg-[#002244] transition"
             >
               <Plus size={20} />
               추가 / Add Notice

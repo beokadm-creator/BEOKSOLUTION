@@ -136,10 +136,10 @@ export default function SocietyLayout() {
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors relative",
                     isActive
-                      ? "bg-[#003366] text-white border border-blue-400"
+                      ? "bg-[#003366] text-white border border-white/20"
                       : isFeatureActive
-                        ? "text-blue-200 hover:bg-[#003366]/50 hover:text-white"
-                        : "text-blue-300/50 hover:bg-[#003366]/30 hover:text-blue-300/70"
+                        ? "text-white/70 hover:bg-[#003366]/50 hover:text-white"
+                        : "text-white/30 hover:bg-[#003366]/30 hover:text-white/50"
                   )}
                 >
                   <item.icon className={cn(
@@ -162,11 +162,11 @@ export default function SocietyLayout() {
             })}
           </nav>
           <div className="p-4 border-t border-[#003366]">
-            <Button variant="ghost" className="w-full justify-start gap-2 text-blue-300 hover:text-white" onClick={() => auth.signOut()}>
+            <Button variant="ghost" className="w-full justify-start gap-2 text-white/60 hover:text-white" onClick={() => auth.signOut()}>
               <LogOut className="w-4 h-4" /> 로그아웃
             </Button>
           </div>
-          <div className="p-2 bg-[#00152b] text-[10px] text-blue-400 text-center">
+          <div className="p-2 bg-[#00152b] text-[10px] text-white/30 text-center">
             v{APP_VERSION}
           </div>
         </aside>
@@ -218,11 +218,11 @@ function SocietyIdMissingError() {
                 value={inputVal}
                 onChange={e => setInputVal(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleGo()}
-                className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003366]"
               />
               <button
                 onClick={handleGo}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition"
+                className="bg-[#003366] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#002244] transition"
               >
                 이동
               </button>
@@ -231,7 +231,7 @@ function SocietyIdMissingError() {
         )}
         <a
           href="/super"
-          className="block text-sm text-blue-600 hover:underline font-medium"
+          className="block text-sm text-[#003366] hover:underline font-medium"
         >
           슈퍼 어드민으로 이동 →
         </a>

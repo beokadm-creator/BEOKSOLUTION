@@ -183,7 +183,7 @@ export const NoticesManager = () => {
 
   const PRIORITY_OPTIONS = [
     { value: 'LOW' as NoticePriority, label: { ko: '일반', en: 'Normal' }, color: 'bg-gray-100 text-gray-700' },
-    { value: 'MEDIUM' as NoticePriority, label: { ko: '중요', en: 'Important' }, color: 'bg-blue-100 text-blue-700' },
+    { value: 'MEDIUM' as NoticePriority, label: { ko: '중요', en: 'Important' }, color: 'bg-[#f0f5fa] text-[#003366]' },
     { value: 'HIGH' as NoticePriority, label: { ko: '매우 중요', en: 'Very Important' }, color: 'bg-orange-100 text-orange-700' },
     { value: 'URGENT' as NoticePriority, label: { ko: '긴급', en: 'Urgent' }, color: 'bg-red-100 text-red-700' }
   ];
@@ -224,7 +224,7 @@ export const NoticesManager = () => {
                 type="text"
                 value={titleKo}
                 onChange={(e) => setTitleKo(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366]"
                 placeholder="한국어 제목 입력..."
               />
             </div>
@@ -236,7 +236,7 @@ export const NoticesManager = () => {
                 type="text"
                 value={titleEn}
                 onChange={(e) => setTitleEn(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366]"
                 placeholder="Enter English title..."
               />
             </div>
@@ -251,7 +251,7 @@ export const NoticesManager = () => {
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as NoticePriority)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366]"
               >
                 {PRIORITY_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>
@@ -267,7 +267,7 @@ export const NoticesManager = () => {
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as NoticeStatus)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366]"
               >
                 {STATUS_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>
@@ -282,7 +282,7 @@ export const NoticesManager = () => {
                   type="checkbox"
                   checked={isPinned}
                   onChange={(e) => setIsPinned(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                  className="w-4 h-4 text-[#003366] rounded focus:ring-2 focus:ring-[#003366]"
                 />
                 <span className="text-sm font-medium text-gray-700">
                   {language === 'ko' ? '상단 고정' : 'Pin to top'}
@@ -342,7 +342,7 @@ export const NoticesManager = () => {
                   type="text"
                   value={url}
                   onChange={(e) => handleVideoUrlChange(idx, e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366]"
                   placeholder="YouTube or video URL..."
                 />
                 <Button variant="outline" size="icon" onClick={() => removeVideoUrl(idx)}>
@@ -374,7 +374,7 @@ export const NoticesManager = () => {
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#003366]"></div>
         </div>
       ) : notices.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-lg">

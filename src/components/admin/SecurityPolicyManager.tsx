@@ -93,8 +93,8 @@ export default function SecurityPolicyManager() {
             {/* Header Section */}
             <div className="flex items-center justify-between pb-6 border-b border-[#222]">
                 <div className="flex items-center gap-4">
-                    <div className="p-3 bg-blue-500/10 rounded-2xl border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]">
-                        <Shield className="w-8 h-8 text-blue-500" />
+                    <div className="p-3 bg-[#003366]/20 rounded-2xl border border-[#003366]/30">
+                        <Shield className="w-8 h-8 text-[#c3daee]" />
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-white tracking-tight">Security Policy Manager</h1>
@@ -117,7 +117,7 @@ export default function SecurityPolicyManager() {
                 <Card className="lg:col-span-2 bg-[#111] border-[#222] shadow-2xl overflow-hidden">
                     <CardHeader className="border-b border-[#222] bg-[#151515]">
                         <CardTitle className="text-white flex items-center gap-2 text-lg">
-                            <Globe className="w-5 h-5 text-blue-400" />
+                            <Globe className="w-5 h-5 text-[#c3daee]" />
                             Allowed Origins
                         </CardTitle>
                         <CardDescription className="text-slate-500">
@@ -139,10 +139,10 @@ export default function SecurityPolicyManager() {
                                             value={newOrigin}
                                             onChange={(e) => setNewOrigin(e.target.value)}
                                             placeholder="https://dashboard.example.com"
-                                            className="bg-[#0a0a0a] border-[#333] text-white placeholder:text-slate-700 h-10 focus:ring-blue-500/20 focus:border-blue-500"
+                                            className="bg-[#0a0a0a] border-[#333] text-white placeholder:text-slate-700 h-10 focus:ring-[#003366]/30 focus:border-[#003366]"
                                         />
                                     </div>
-                                    <Button type="submit" disabled={saving || !newOrigin} className="bg-blue-600 hover:bg-blue-500 text-white h-10 px-6 font-medium shadow-[0_0_10px_rgba(37,99,235,0.2)]">
+                                    <Button type="submit" disabled={saving || !newOrigin} className="bg-[#003366] hover:bg-[#24669e] text-white h-10 px-6 font-medium">
                                         {saving ? <LoadingSpinner /> : <><Plus className="w-4 h-4 mr-2" /> Authorize</>}
                                     </Button>
                                 </form>
@@ -211,11 +211,11 @@ export default function SecurityPolicyManager() {
                         </CardContent>
                     </Card>
 
-                    <div className="p-4 rounded-lg border border-blue-900/30 bg-blue-900/10">
-                        <h4 className="text-blue-400 font-bold text-sm mb-2 flex items-center gap-2">
+                    <div className="p-4 rounded-lg border border-[#003366]/30 bg-[#003366]/10">
+                        <h4 className="text-[#c3daee] font-bold text-sm mb-2 flex items-center gap-2">
                             <AlertTriangle className="w-4 h-4" /> Best Practice
                         </h4>
-                        <p className="text-xs text-blue-200/60 leading-relaxed">
+                        <p className="text-xs text-[#c3daee]/60 leading-relaxed">
                             Restrict allowed origins only to trusted domains. Allowing wildcards or untrusted domains can expose user data to XSS attacks.
                         </p>
                     </div>

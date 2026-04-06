@@ -203,7 +203,7 @@ const AgendaManager: React.FC = () => {
             {/* 1. Header Area - Sticky */}
             <div className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm z-20">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+                    <div className="p-2 bg-[#f0f5fa] rounded-lg text-[#003366]">
                         <LayoutList className="w-5 h-5" />
                     </div>
                     <div>
@@ -222,7 +222,7 @@ const AgendaManager: React.FC = () => {
                                 window.open(`https://${societyId}.eregi.co.kr/${conferenceSlug}/program`, '_blank');
                             }
                         }}
-                        className="text-slate-600 hover:text-blue-600"
+                        className="text-slate-600 hover:text-[#003366]"
                     >
                         <ExternalLink className="w-4 h-4 mr-2" />
                         미리보기
@@ -251,23 +251,23 @@ const AgendaManager: React.FC = () => {
                                 className={cn(
                                     "p-4 rounded-xl border transition-all cursor-pointer group hover:shadow-md",
                                     selectedAgendaId === agenda.id
-                                        ? "bg-blue-50 border-blue-500 shadow-sm ring-1 ring-blue-500/20"
-                                        : "bg-white border-slate-200 hover:border-blue-300"
+                                        ? "bg-[#f0f5fa] border-[#003366] shadow-sm ring-1 ring-[#003366]/20"
+                                        : "bg-white border-slate-200 hover:border-[#c3daee]"
                                 )}
                             >
                                 <div className="flex justify-between items-start mb-2">
                                     <span className={cn(
                                         "text-[10px] px-2 py-0.5 rounded-full font-medium uppercase tracking-wide",
                                         agenda.sessionType === 'break' ? "bg-slate-100 text-slate-600" :
-                                            agenda.sessionType === 'keynote' ? "bg-purple-100 text-purple-700" :
-                                                "bg-blue-100 text-blue-700"
+                                            agenda.sessionType === 'keynote' ? "bg-[#f0f5fa] text-[#003366]" :
+                                                "bg-[#f0f5fa] text-[#003366]"
                                     )}>
                                         {agenda.sessionType || 'Session'}
                                     </span>
                                 </div>
                                 <h4 className={cn(
                                     "font-bold text-sm leading-snug mb-3 line-clamp-2",
-                                    selectedAgendaId === agenda.id ? "text-blue-900" : "text-slate-800"
+                                    selectedAgendaId === agenda.id ? "text-[#003366]" : "text-slate-800"
                                 )}>
                                     {agenda.title.ko || '제목 없음'}
                                 </h4>
@@ -296,8 +296,8 @@ const AgendaManager: React.FC = () => {
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
                                 <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                                    <Calendar className="w-5 h-5 text-blue-600" />
-                                    세션 상세 정보 {isNewSession && <span className="text-blue-500 text-sm font-normal">(새 세션 작성 중)</span>}
+                                    <Calendar className="w-5 h-5 text-[#003366]" />
+                                    세션 상세 정보 {isNewSession && <span className="text-[#24669e] text-sm font-normal">(새 세션 작성 중)</span>}
                                 </h2>
                                 {!isNewSession && (
                                     <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={handleDeleteAgenda}>
@@ -317,7 +317,7 @@ const AgendaManager: React.FC = () => {
                                                     setSessionType(e.target.value);
                                                     setAgendaForm(prev => ({ ...prev, sessionType: e.target.value }));
                                                 }}
-                                                className="w-full h-10 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                                className="w-full h-10 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#003366]/20 focus:border-[#003366] transition-all"
                                             >
                                                 <option value="">타입 선택</option>
                                                 <option value="keynote">Keynote / Plenary</option>
@@ -387,7 +387,7 @@ const AgendaManager: React.FC = () => {
                             <div className="space-y-4 pt-4">
                                 <div className="flex items-center justify-between">
                                     <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                                        <Mic2 className="w-5 h-5 text-purple-600" />
+                                        <Mic2 className="w-5 h-5 text-[#003366]" />
                                         참여 연자 및 좌장
                                     </h2>
                                     <div className="text-sm text-slate-500">
@@ -420,8 +420,8 @@ const AgendaManager: React.FC = () => {
                                                         className={cn(
                                                             "flex items-center gap-3 p-3 rounded-xl cursor-pointer border transition-all relative group",
                                                             speakerForm.id === sp.id
-                                                                ? "bg-white border-blue-500 shadow-sm ring-1 ring-blue-500/10"
-                                                                : "bg-white border-slate-200 hover:border-blue-300"
+                                                                ? "bg-white border-[#003366] shadow-sm ring-1 ring-[#003366]/10"
+                                                                : "bg-white border-slate-200 hover:border-[#c3daee]"
                                                         )}
                                                     >
                                                         <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0">
@@ -436,7 +436,7 @@ const AgendaManager: React.FC = () => {
                                                             <div className="text-xs text-slate-500 truncate">{sp.organization || '소속 없음'}</div>
                                                         </div>
                                                         {speakerForm.id === sp.id && (
-                                                            <ChevronRight className="w-4 h-4 text-blue-500" />
+                                                            <ChevronRight className="w-4 h-4 text-[#24669e]" />
                                                         )}
                                                         <button
                                                             onClick={(e) => handleDeleteSpeaker(e, sp.id)}
@@ -452,7 +452,7 @@ const AgendaManager: React.FC = () => {
                                         {/* Speaker Edit Form */}
                                         <div className="lg:w-2/3 p-6 overflow-y-auto bg-white">
                                             <div className="flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-                                                <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
+                                                <div className="w-8 h-8 rounded-full bg-[#f0f5fa] flex items-center justify-center text-[#003366]">
                                                     {speakerForm.id ? <User className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                                                 </div>
                                                 <div>

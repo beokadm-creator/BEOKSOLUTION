@@ -613,7 +613,7 @@ export default function ConferenceSettingsPage() {
                 <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
                     <div className="lg:col-span-4 space-y-3">
                         <div className="flex items-center gap-2">
-                            <div className="p-2.5 bg-blue-50 rounded-xl text-blue-600">
+                            <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
                                 <Calendar className="w-6 h-6" />
                             </div>
                             <h2 className="text-xl font-bold text-slate-800">기본 정보</h2>
@@ -652,7 +652,7 @@ export default function ConferenceSettingsPage() {
                                         value={data.subtitle || ''}
                                         onChange={(e) => setData(prev => ({ ...prev, subtitle: e.target.value }))}
                                         placeholder="예: Innovating the Future of Medicine"
-                                        className="h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-lg text-base"
+                                        className="h-11 border-slate-200 focus:border-[#003366] focus:ring-[#003366] rounded-lg text-base"
                                     />
                                 </div>
 
@@ -687,7 +687,7 @@ export default function ConferenceSettingsPage() {
                 <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
                     <div className="lg:col-span-4 space-y-3">
                         <div className="flex items-center gap-2">
-                            <div className="p-2.5 bg-purple-50 rounded-xl text-purple-600">
+                            <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
                                 <FileText className="w-6 h-6" />
                             </div>
                             <h2 className="text-xl font-bold text-slate-800">초록 마감일</h2>
@@ -737,7 +737,7 @@ export default function ConferenceSettingsPage() {
                 <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
                     <div className="lg:col-span-4 space-y-3">
                         <div className="flex items-center gap-2">
-                            <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600">
+                            <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
                                 <Info className="w-6 h-6" />
                             </div>
                             <h2 className="text-xl font-bold text-slate-800">기능 설정</h2>
@@ -776,7 +776,7 @@ export default function ConferenceSettingsPage() {
                                             ...prev,
                                             features: { ...prev.features, stampTourEnabled: e.target.checked }
                                         }))}
-                                        className="data-[state=checked]:bg-indigo-600"
+                                        className="data-[state=checked]:bg-[#003366]"
                                     />
                                 </div>
                             </CardContent>
@@ -792,7 +792,7 @@ export default function ConferenceSettingsPage() {
                         <section id="stamp-tour" className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
                             <div className="lg:col-span-4 space-y-3">
                                 <div className="flex items-center gap-2">
-                                    <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600">
+                                    <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
                                         <Info className="w-6 h-6" />
                                     </div>
                                     <h2 className="text-xl font-bold text-slate-800">스탬프 투어 설정</h2>
@@ -868,7 +868,7 @@ export default function ConferenceSettingsPage() {
                                                     ...prev,
                                                     boothOrderMode: e.target.value as StampTourBoothOrderMode
                                                 }))}
-                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366] bg-white"
                                             >
                                                 <option value="SPONSOR_ORDER">스폰서 순서</option>
                                                 <option value="CUSTOM">사용자 지정</option>
@@ -943,7 +943,7 @@ export default function ConferenceSettingsPage() {
                                                     ...prev,
                                                     rewardMode: e.target.value as StampTourRewardMode
                                                 }))}
-                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366] bg-white"
                                             >
                                                 <option value="RANDOM">랜덤 추첨</option>
                                                 <option value="FIXED">고정 순서</option>
@@ -961,7 +961,7 @@ export default function ConferenceSettingsPage() {
                                                     ...prev,
                                                     drawMode: e.target.value as StampTourDrawMode
                                                 }))}
-                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366] bg-white"
                                             >
                                                 <option value="PARTICIPANT">참가자 기기</option>
                                                 <option value="ADMIN">관리자 화면</option>
@@ -980,7 +980,7 @@ export default function ConferenceSettingsPage() {
                                                     ...prev,
                                                     rewardFulfillmentMode: e.target.value as StampTourRewardFulfillmentMode
                                                 }))}
-                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366] bg-white"
                                             >
                                                 <option value="INSTANT">즉시 지급</option>
                                                 <option value="LOTTERY">예정 추첨</option>
@@ -1421,7 +1421,7 @@ export default function ConferenceSettingsPage() {
                 <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
                     <div className="lg:col-span-4 space-y-3">
                         <div className="flex items-center gap-2">
-                            <div className="p-2.5 bg-purple-50 rounded-xl text-purple-600">
+                            <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
                                 <ImageIcon className="w-6 h-6" />
                             </div>
                             <h2 className="text-xl font-bold text-slate-800">비주얼 에셋</h2>
@@ -1429,9 +1429,9 @@ export default function ConferenceSettingsPage() {
                         <p className="text-slate-500 leading-relaxed text-sm">
                             배너와 포스터 이미지를 등록합니다. 등록 후 즉시 참가자에게 반영됩니다.
                         </p>
-                        <div className="mt-4 p-4 bg-purple-50/50 rounded-xl border border-purple-100">
-                            <h4 className="font-semibold text-purple-900 text-sm mb-2">권장 이미지 크기</h4>
-                            <ul className="text-xs text-purple-800 space-y-1.5 list-disc list-inside">
+                        <div className="mt-4 p-4 bg-[#f0f5fa]/50 rounded-xl border border-[#c3daee]">
+                            <h4 className="font-semibold text-[#003366] text-sm mb-2">권장 이미지 크기</h4>
+                            <ul className="text-xs text-[#003366] space-y-1.5 list-disc list-inside">
                                 <li>메인 배너 권장 크기: 1920 x 600 px</li>
                                 <li>포스터 / 안내 이미지: A4 비율 권장</li>
                                 <li>지원 형식: JPG, PNG (최대 5MB)</li>

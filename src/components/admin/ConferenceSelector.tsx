@@ -78,7 +78,7 @@ const ConferenceSelector: React.FC = () => {
         return (
             <div className="px-4 pb-4">
                 <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-[#c3daee] border-t-transparent rounded-full animate-spin" />
                     <span className="text-sm text-slate-400">로딩 중...</span>
                 </div>
             </div>
@@ -132,7 +132,7 @@ const ConferenceSelector: React.FC = () => {
             </div>
             
             <select 
-                className="w-full h-10 rounded-md border border-slate-600 bg-slate-800 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full h-10 rounded-md border border-slate-600 bg-slate-800 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003366] focus:border-transparent"
                 value={selectedConferenceId || ''} 
                 onChange={(e) => handleConferenceChange(e.target.value)}
             >
@@ -147,8 +147,8 @@ const ConferenceSelector: React.FC = () => {
             </select>
             
             {selectedConference && (
-                <div className="mt-3 p-2 bg-blue-600 rounded-md">
-                    <p className="text-xs text-blue-100">
+                <div className="mt-3 p-2 bg-[#003366] rounded-md">
+                    <p className="text-xs text-white/80">
                         <strong>선택된 컨퍼런스:</strong> {selectedConference.title.ko}
                         {selectedConference.title.en && ` / ${selectedConference.title.en}`}
                     </p>

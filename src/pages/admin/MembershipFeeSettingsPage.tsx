@@ -330,7 +330,7 @@ export default function MembershipFeeSettingsPage() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b pb-6">
                 <div>
                     <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="outline" className="text-indigo-600 border-indigo-200 bg-indigo-50">Admin Console</Badge>
+                        <Badge variant="outline" className="text-[#003366] border-[#c3daee] bg-[#f0f5fa]">Admin Console</Badge>
                         <span className="text-slate-300">|</span>
                         <span className="text-sm font-medium text-slate-500 uppercase tracking-wide">Society Settings</span>
                     </div>
@@ -341,14 +341,14 @@ export default function MembershipFeeSettingsPage() {
 
             {/* Add New Tier */}
             <Card className="border-none shadow-lg shadow-slate-200/50 overflow-hidden bg-white rounded-2xl max-w-4xl mx-auto">
-                <CardHeader className="bg-indigo-50/50 border-b border-indigo-100 pb-4">
+                <CardHeader className="bg-[#f0f5fa]/50 border-b border-[#c3daee] pb-4">
                     <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-indigo-100 rounded-xl text-indigo-600">
+                        <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
                             <Plus className="w-5 h-5" />
                         </div>
                         <div>
                             <CardTitle className="text-lg font-bold text-slate-800">새 회비 등급 추가</CardTitle>
-                            <CardDescription className="text-indigo-600/80 font-medium mt-0.5">등급별 금액과 유효기간 설정</CardDescription>
+                            <CardDescription className="text-[#24669e] font-medium mt-0.5">등급별 금액과 유효기간 설정</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -435,7 +435,7 @@ export default function MembershipFeeSettingsPage() {
                         onClick={handleAddTier}
                         disabled={saving || !newTier.gradeCode || !newTier.amount}
                         size="lg"
-                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200/50 mt-4 rounded-xl"
+                        className="w-full bg-[#003366] hover:bg-[#002244] text-white shadow-md mt-4 rounded-xl"
                     >
                         <Plus className="w-5 h-5 mr-2" />
                         {saving ? '저장 중...' : '회비 등급 추가'}
@@ -501,7 +501,7 @@ export default function MembershipFeeSettingsPage() {
                                         <TableCell>
                                             <Badge
                                                 variant={tier.isActive ? 'default' : 'secondary'}
-                                                className={tier.isActive ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200" : "bg-slate-100 text-slate-500 border-slate-200"}
+                                                className={tier.isActive ? "bg-green-100 text-green-700 hover:bg-green-200 border-green-200" : "bg-slate-100 text-slate-500 border-slate-200"}
                                                 onClick={() => handleToggleActive(tier.id)}
                                                 style={{ cursor: 'pointer' }}
                                             >
@@ -514,7 +514,7 @@ export default function MembershipFeeSettingsPage() {
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={() => handleEditClick(tier)}
-                                                    className="h-8 w-8 p-0 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                                                    className="h-8 w-8 p-0 text-slate-400 hover:text-[#003366] hover:bg-[#f0f5fa]"
                                                     title="수정"
                                                 >
                                                     <Pencil className="w-3.5 h-3.5" />
@@ -602,7 +602,7 @@ export default function MembershipFeeSettingsPage() {
                         <Button variant="outline" onClick={() => setEditingTier(null)}>
                             취소
                         </Button>
-                        <Button onClick={handleEditSave} className="bg-indigo-600 hover:bg-indigo-700">
+                        <Button onClick={handleEditSave} className="bg-[#003366] hover:bg-[#002244]">
                             <Save className="w-4 h-4 mr-2" />
                             저장
                         </Button>

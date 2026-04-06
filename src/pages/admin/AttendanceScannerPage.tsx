@@ -54,7 +54,7 @@ const AttendanceScannerPage: React.FC = () => {
                 const rulesSnap = await getDoc(rulesRef);
                 if (rulesSnap.exists()) {
                     const allRules = rulesSnap.data().rules || {};
-                    let allZones: any[] = [];
+                    const allZones: any[] = [];
                     Object.entries(allRules).forEach(([dateStr, rule]: [string, any]) => {
                         if (rule?.zones) {
                             rule.zones.forEach((z: any) => {
@@ -108,7 +108,7 @@ const AttendanceScannerPage: React.FC = () => {
                 return s.split('').map(c => map[c] || c).join('').replace(/[^a-zA-Z0-9-]/g, '');
             };
 
-            let raw = decodeTypos(code).trim();
+            const raw = decodeTypos(code).trim();
             let id = raw;
             if (raw.toUpperCase().startsWith('BADGE-')) id = raw.substring(6);
 
@@ -178,7 +178,7 @@ const AttendanceScannerPage: React.FC = () => {
                     bE = new Date(Math.min(now.getTime(), new Date(`${ds}T${rule.end}:00+09:00`).getTime()));
                 }
                 if (bE > bS) {
-                    let diff = Math.floor((bE.getTime() - bS.getTime()) / 60000);
+                    const diff = Math.floor((bE.getTime() - bS.getTime()) / 60000);
                     let ded = 0;
                     if (rule?.breaks) {
                         rule.breaks.forEach((b: any) => {
@@ -245,14 +245,14 @@ const AttendanceScannerPage: React.FC = () => {
                     <div className="mt-4 inline-flex items-center gap-2 bg-slate-100 px-4 py-1 rounded-full text-slate-600 font-bold border border-slate-200"><MapPin className="w-4 h-4" /> {zones.find(z => z.id === selectedZoneId)?.name}</div>
                 </div>
 
-                <div className={cn("mb-10 px-8 py-3 rounded-full text-white font-black tracking-widest shadow-2xl animate-pulse", mode === 'ENTER_ONLY' ? 'bg-blue-600' : mode === 'EXIT_ONLY' ? 'bg-red-600' : 'bg-purple-600')}>
+                <div className={cn("mb-10 px-8 py-3 rounded-full text-white font-black tracking-widest shadow-2xl animate-pulse", mode === 'ENTER_ONLY' ? 'bg-[#003366]' : mode === 'EXIT_ONLY' ? 'bg-red-600' : 'bg-[#24669e]')}>
                     {mode} MODE
                 </div>
 
                 <div className="w-full max-w-2xl bg-white rounded-[50px] shadow-[0_40px_80px_rgba(0,0,0,0.1)] border border-slate-50 p-16 flex flex-col items-center">
                     <div className="mb-10 p-10 rounded-full bg-slate-50 shadow-inner">
                         {scannerState.status === 'IDLE' && <LogIn className="w-16 h-16 text-slate-200" />}
-                        {scannerState.status === 'PROCESSING' && <Loader2 className="w-16 h-16 animate-spin text-blue-500" />}
+                        {scannerState.status === 'PROCESSING' && <Loader2 className="w-16 h-16 animate-spin text-[#003366]" />}
                         {scannerState.status === 'SUCCESS' && <CheckCircle className="w-16 h-16 text-green-500 animate-in zoom-in duration-300" />}
                         {scannerState.status === 'ERROR' && <AlertCircle className="w-16 h-16 text-red-500 animate-in shake-in duration-300" />}
                     </div>

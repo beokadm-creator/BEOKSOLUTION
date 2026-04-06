@@ -465,7 +465,7 @@ const AttendanceLivePage: React.FC = () => {
             <div className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center z-10">
                 <div className="space-y-1">
                     <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                        <RefreshCw className={cn("w-5 h-5 text-blue-600", loading && "animate-spin")} />
+                        <RefreshCw className={cn("w-5 h-5 text-[#003366]", loading && "animate-spin")} />
                         실시간 출결 현황
                     </h1>
                     <p className="text-xs text-slate-500">
@@ -491,7 +491,7 @@ const AttendanceLivePage: React.FC = () => {
                         <select
                             value={selectedDate}
                             onChange={(e) => setSelectedDate(e.target.value)}
-                            className="pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none hover:bg-slate-50 transition-colors cursor-pointer"
+                            className="pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-[#003366] focus:border-[#003366] outline-none hover:bg-slate-50 transition-colors cursor-pointer"
                         >
                             {availableDates.map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
@@ -517,7 +517,7 @@ const AttendanceLivePage: React.FC = () => {
                                     {rules?.globalGoalMinutes || 0} <span className="text-sm font-normal text-slate-400">분</span>
                                 </div>
                             </div>
-                            <div className="h-10 w-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <div className="h-10 w-10 rounded-full bg-[#f0f5fa] text-[#003366] flex items-center justify-center">
                                 <CheckCircle className="w-5 h-5" />
                             </div>
                         </CardContent>
@@ -632,7 +632,7 @@ const AttendanceLivePage: React.FC = () => {
                                     return (
                                         <div key={r.id} className={cn(
                                             "grid grid-cols-12 gap-4 px-6 py-4 items-center transition-colors hover:bg-slate-50/50",
-                                            r.attendanceStatus === 'INSIDE' && "bg-blue-50/30"
+                                            r.attendanceStatus === 'INSIDE' && "bg-[#f0f5fa]/30"
                                         )}>
                                             {/* User Info */}
                                             <div className="col-span-3 min-w-0">
@@ -663,7 +663,7 @@ const AttendanceLivePage: React.FC = () => {
                                             {/* Current Zone */}
                                             <div className="col-span-2">
                                                 {r.currentZone ? (
-                                                    <div className="text-sm font-medium text-blue-700 flex items-center gap-1.5">
+                                                    <div className="text-sm font-medium text-[#003366] flex items-center gap-1.5">
                                                         <MapPin className="w-3.5 h-3.5" />
                                                         {zones.find(z => z.id === r.currentZone)?.name || 'Unknown'}
                                                     </div>
@@ -678,8 +678,8 @@ const AttendanceLivePage: React.FC = () => {
                                                     variant="ghost"
                                                     size="sm"
                                                     className={cn(
-                                                        "h-auto p-1 font-mono text-lg font-bold leading-none hover:bg-blue-50 transition-colors",
-                                                        isLive ? "text-purple-600" : "text-slate-800"
+                                                        "h-auto p-1 font-mono text-lg font-bold leading-none hover:bg-[#f0f5fa] transition-colors",
+                                                        isLive ? "text-[#24669e]" : "text-slate-800"
                                                     )}
                                                     onClick={async () => {
                                                         const newVal = prompt(`${r.userName}님의 누적 시간을 수정하시겠습니까? (단위: 분)`, String(r.totalMinutes));
@@ -699,7 +699,7 @@ const AttendanceLivePage: React.FC = () => {
                                                 </Button>
                                                 <div className={cn(
                                                     "text-[10px] mt-0.5 font-bold px-1 rounded",
-                                                    isLive ? "text-purple-400 bg-purple-50 animate-pulse" : "text-slate-400"
+                                                    isLive ? "text-[#24669e] bg-[#f0f5fa] animate-pulse" : "text-slate-400"
                                                 )}>
                                                     {isLive ? 'LIVE (MINS)' : 'FINAL MINS'}
                                                 </div>
@@ -724,7 +724,7 @@ const AttendanceLivePage: React.FC = () => {
                                                                 size="sm"
                                                                 variant="outline"
                                                                 onClick={() => handleCheckIn(r.id, z.id)}
-                                                                className="h-8 text-xs border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800 hover:border-blue-300 flex-shrink-0"
+                                                                className="h-8 text-xs border-[#c3daee] text-[#003366] hover:bg-[#f0f5fa] hover:text-[#002244] hover:border-[#c3daee] flex-shrink-0"
                                                             >
                                                                 {z.name}
                                                             </Button>
@@ -779,7 +779,7 @@ const AttendanceLivePage: React.FC = () => {
                                             {/* Timeline Dot */}
                                             <div className={cn(
                                                 "relative z-10 w-2.5 h-2.5 rounded-full mt-1.5 ring-4 ring-white flex-shrink-0",
-                                                log.type === 'ENTER' ? "bg-blue-500" : "bg-slate-400"
+                                                log.type === 'ENTER' ? "bg-[#003366]" : "bg-slate-400"
                                             )} />
 
                                             <div className="flex-1">
@@ -787,7 +787,7 @@ const AttendanceLivePage: React.FC = () => {
                                                     <div>
                                                         <span className={cn(
                                                             "text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border mb-1 inline-block",
-                                                            log.type === 'ENTER' ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-slate-50 text-slate-500 border-slate-100"
+                                                            log.type === 'ENTER' ? "bg-[#f0f5fa] text-[#003366] border-[#c3daee]" : "bg-slate-50 text-slate-500 border-slate-100"
                                                         )}>
                                                             {log.type}
                                                         </span>
@@ -810,7 +810,7 @@ const AttendanceLivePage: React.FC = () => {
                                                             <span className="flex items-center gap-1"><AlertCircle className="w-3 h-3" /> 휴게 차감</span>
                                                             <span className="font-mono">-{log.deduction}분</span>
                                                         </div>
-                                                        <div className="flex justify-between items-center pt-2 border-t border-slate-200 font-bold text-blue-600 text-sm">
+                                                        <div className="flex justify-between items-center pt-2 border-t border-slate-200 font-bold text-[#003366] text-sm">
                                                             <span>최종 인정</span>
                                                             <span className="font-mono text-base">{log.recognizedMinutes}m</span>
                                                         </div>

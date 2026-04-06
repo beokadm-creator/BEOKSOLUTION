@@ -95,7 +95,7 @@ export function OptionForm({ option, onSubmit, onCancel, loading = false }: Opti
           placeholder="옵션에 대한 상세 설명"
           rows={3}
           maxLength={500}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366]"
         />
       </div>
 
@@ -109,7 +109,7 @@ export function OptionForm({ option, onSubmit, onCancel, loading = false }: Opti
           placeholder="Detailed description of the option"
           rows={3}
           maxLength={500}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366]"
         />
       </div>
 

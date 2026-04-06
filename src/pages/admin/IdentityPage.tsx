@@ -153,7 +153,7 @@ const IdentityPage: React.FC = () => {
     if (!society) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[50vh]">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4" />
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#003366] mb-4" />
                 <p className="text-slate-500 font-medium">Loading society profile...</p>
             </div>
         );
@@ -166,7 +166,7 @@ const IdentityPage: React.FC = () => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b pb-6">
                 <div>
                     <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">Admin Console</Badge>
+                        <Badge variant="outline" className="text-[#003366] border-[#c3daee] bg-[#f0f5fa]">Admin Console</Badge>
                         <span className="text-slate-300">|</span>
                         <span className="text-sm font-medium text-slate-500 uppercase tracking-wide">{society.id}</span>
                     </div>
@@ -185,14 +185,14 @@ const IdentityPage: React.FC = () => {
 
                 {/* 1. Branding Section */}
                 <Card className="border-none shadow-lg shadow-slate-200/50 overflow-hidden bg-white rounded-2xl">
-                    <CardHeader className="bg-blue-50/50 border-b border-blue-100 pb-4">
+                    <CardHeader className="bg-[#f0f5fa]/50 border-b border-[#c3daee] pb-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2.5 bg-blue-100 rounded-xl text-blue-600">
+                            <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
                                 <Building2 className="w-5 h-5" />
                             </div>
                             <div>
                                 <CardTitle className="text-lg font-bold text-slate-800">Branding & Identity</CardTitle>
-                                <CardDescription className="text-blue-600/80 font-medium mt-0.5">Society Logo and Naming</CardDescription>
+                                <CardDescription className="text-[#003366]/80 font-medium mt-0.5">Society Logo and Naming</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
@@ -204,7 +204,7 @@ const IdentityPage: React.FC = () => {
                                     Society Logo
                                     <Badge variant="secondary" className="text-[10px] h-5">PNG / SVG</Badge>
                                 </Label>
-                                <div className="bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 p-6 flex flex-col items-center justify-center min-h-[240px] hover:border-blue-300 transition-colors group">
+                                <div className="bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 p-6 flex flex-col items-center justify-center min-h-[240px] hover:border-[#c3daee] transition-colors group">
                                     <div className="relative w-full flex-1 flex items-center justify-center">
                                         <ImageUpload
                                             path={`societies/${society?.id}/logo`}
@@ -338,8 +338,8 @@ const IdentityPage: React.FC = () => {
                         <Tabs defaultValue="ko" className="w-full">
                             <div className="px-6 py-4 bg-slate-50/50 border-b border-slate-100">
                                 <TabsList className="grid w-full grid-cols-2 max-w-md h-12 p-1.5 bg-slate-200/50 rounded-xl">
-                                    <TabsTrigger value="ko" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm">한국어 (Korean)</TabsTrigger>
-                                    <TabsTrigger value="en" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm">English (Global)</TabsTrigger>
+                                    <TabsTrigger value="ko" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">한국어 (Korean)</TabsTrigger>
+                                    <TabsTrigger value="en" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">English (Global)</TabsTrigger>
                                 </TabsList>
                             </div>
 
@@ -348,7 +348,7 @@ const IdentityPage: React.FC = () => {
                                 {/* Core Policies */}
                                 <div className="space-y-6">
                                     <div className="flex items-center gap-2 mb-4">
-                                        <BadgeCheck className="w-5 h-5 text-blue-600" />
+                                        <BadgeCheck className="w-5 h-5 text-[#003366]" />
                                         <h3 className="text-md font-bold text-slate-800">기본 정책 (Core Policies)</h3>
                                     </div>
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -387,7 +387,7 @@ const IdentityPage: React.FC = () => {
                                 {/* Consents */}
                                 <div className="space-y-6">
                                     <div className="flex items-center gap-2 mb-4">
-                                        <FileText className="w-5 h-5 text-emerald-600" />
+                                        <FileText className="w-5 h-5 text-[#003366]" />
                                         <h3 className="text-md font-bold text-slate-800">사용자 동의 항목 (User Consents)</h3>
                                     </div>
                                     <div className="grid grid-cols-1 gap-6">
@@ -429,7 +429,7 @@ const IdentityPage: React.FC = () => {
                                 {/* Core Policies */}
                                 <div className="space-y-6">
                                     <div className="flex items-center gap-2 mb-4">
-                                        <BadgeCheck className="w-5 h-5 text-indigo-600" />
+                                        <BadgeCheck className="w-5 h-5 text-[#003366]" />
                                         <h3 className="text-md font-bold text-slate-800">Core Policies (English)</h3>
                                     </div>
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -468,7 +468,7 @@ const IdentityPage: React.FC = () => {
                                 {/* Consents */}
                                 <div className="space-y-6">
                                     <div className="flex items-center gap-2 mb-4">
-                                        <FileText className="w-5 h-5 text-purple-600" />
+                                        <FileText className="w-5 h-5 text-[#003366]" />
                                         <h3 className="text-md font-bold text-slate-800">User Consents (English)</h3>
                                     </div>
                                     <div className="grid grid-cols-1 gap-6">

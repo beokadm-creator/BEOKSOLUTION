@@ -215,7 +215,7 @@ const AttendanceSettingsPage: React.FC = () => {
                     수강 설정을 진행하려면 먼저 행사 기본 설정에서 시작일과 종료일을 입력해야 합니다.
                 </p>
             </div>
-            <Button asChild className="bg-blue-600 hover:bg-blue-700">
+            <Button asChild className="bg-[#003366] hover:bg-[#002244]">
                 <a href={`/admin/conf/${cid}/settings`}>
                     행사 기본 설정으로 이동
                 </a>
@@ -251,7 +251,7 @@ const AttendanceSettingsPage: React.FC = () => {
                             <TabsTrigger
                                 key={date}
                                 value={date}
-                                className="px-5 py-2.5 rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm data-[state=active]:font-semibold text-slate-500 hover:text-slate-900 transition-all"
+                                className="px-5 py-2.5 rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm data-[state=active]:font-semibold text-slate-500 hover:text-slate-900 transition-all"
                             >
                                 {date}
                             </TabsTrigger>
@@ -264,7 +264,7 @@ const AttendanceSettingsPage: React.FC = () => {
                         <section className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                             <div className="lg:col-span-4 space-y-2">
                                 <div className="flex items-center gap-2 text-slate-800 font-bold text-lg">
-                                    <Clock className="w-5 h-5 text-blue-600" />
+                                    <Clock className="w-5 h-5 text-[#003366]" />
                                     일일 표준 이수 기준
                                 </div>
                                 <p className="text-sm text-slate-500 leading-relaxed">
@@ -282,11 +282,11 @@ const AttendanceSettingsPage: React.FC = () => {
                                                     type="number"
                                                     value={currentRule.globalGoalMinutes}
                                                     onChange={(e) => updateRule({ ...currentRule, globalGoalMinutes: Number(e.target.value) })}
-                                                    className="pl-4 pr-16 h-12 text-lg font-medium border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                                                    className="pl-4 pr-16 h-12 text-lg font-medium border-slate-200 focus:border-[#003366] focus:ring-[#003366]"
                                                 />
                                                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">Minutes</span>
                                             </div>
-                                            <p className="text-xs text-blue-600 mt-2 font-medium">
+                                            <p className="text-xs text-[#003366] mt-2 font-medium">
                                                 💡 {Math.floor(currentRule.globalGoalMinutes / 60)}시간 {currentRule.globalGoalMinutes % 60}분
                                                 {currentRule.globalGoalMinutes === 240 && " (평점 4점 기준)"}
                                             </p>
@@ -309,7 +309,7 @@ const AttendanceSettingsPage: React.FC = () => {
                         <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-6">
                             <div className="lg:col-span-4 space-y-2">
                                 <div className="flex items-center gap-2 text-slate-800 font-bold text-lg">
-                                    <Clock className="w-5 h-5 text-purple-600" />
+                                    <Clock className="w-5 h-5 text-[#003366]" />
                                     이수 계산 방식
                                 </div>
                                 <p className="text-sm text-slate-500 leading-relaxed">
@@ -329,7 +329,7 @@ const AttendanceSettingsPage: React.FC = () => {
                                                         className={cn(
                                                             "flex-1 px-4 py-3 rounded-lg border-2 font-medium text-sm transition-all",
                                                             currentRule.completionMode === 'DAILY_SEPARATE'
-                                                                ? "bg-blue-50 border-blue-500 text-blue-700"
+                                                                ? "bg-[#f0f5fa] border-[#003366] text-[#003366]"
                                                                 : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
                                                         )}
                                                     >
@@ -347,7 +347,7 @@ const AttendanceSettingsPage: React.FC = () => {
                                                         className={cn(
                                                             "flex-1 px-4 py-3 rounded-lg border-2 font-medium text-sm transition-all",
                                                             currentRule.completionMode === 'CUMULATIVE'
-                                                                ? "bg-purple-50 border-purple-500 text-purple-700"
+                                                                ? "bg-[#f0f5fa] border-[#003366] text-[#003366]"
                                                                 : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
                                                         )}
                                                     >
@@ -371,12 +371,12 @@ const AttendanceSettingsPage: React.FC = () => {
                                                             type="number"
                                                             value={currentRule.cumulativeGoalMinutes || 0}
                                                             onChange={(e) => updateRule({ ...currentRule, cumulativeGoalMinutes: Number(e.target.value) })}
-                                                            className="pl-4 pr-16 h-12 text-lg font-medium border-slate-200 focus:border-purple-500 focus:ring-purple-500"
+                                                            className="pl-4 pr-16 h-12 text-lg font-medium border-slate-200 focus:border-[#003366] focus:ring-[#003366]"
                                                             placeholder="예: 720 (3일 × 240분)"
                                                         />
                                                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">Minutes</span>
                                                     </div>
-                                                    <p className="text-xs text-purple-600 mt-2 font-medium">
+                                                    <p className="text-xs text-[#003366] mt-2 font-medium">
                                                         💡 전체 회기 기간 동안 충족해야 할 총 시간입니다.
                                                     </p>
                                                 </div>
@@ -419,9 +419,9 @@ const AttendanceSettingsPage: React.FC = () => {
                             ) : (
                                 <div className="grid grid-cols-1 gap-6">
                                     {currentRule.zones.map(zone => (
-                                        <Card key={zone.id} className="border shadow-sm overflow-hidden group hover:border-blue-300 transition-all duration-200">
+                                        <Card key={zone.id} className="border shadow-sm overflow-hidden group hover:border-[#c3daee] transition-all duration-200">
                                             <div className="h-1.5 w-full bg-slate-100">
-                                                <div className={cn("h-full w-full", zone.goalMinutes > 0 ? "bg-blue-500" : "bg-slate-300")} />
+                                                <div className={cn("h-full w-full", zone.goalMinutes > 0 ? "bg-[#24669e]" : "bg-slate-300")} />
                                             </div>
                                             <CardContent className="p-0">
                                                 {/* Top Row: Basic Info */}
@@ -476,7 +476,7 @@ const AttendanceSettingsPage: React.FC = () => {
                                                                 type="number"
                                                                 value={zone.points || 0}
                                                                 onChange={(e) => updateZone(zone.id, 'points', Number(e.target.value))}
-                                                                className="bg-blue-50 border-blue-100 text-blue-700 font-bold"
+                                                                className="bg-[#f0f5fa] border-[#c3daee] text-[#003366] font-bold"
                                                             />
                                                         </div>
                                                     </div>
@@ -538,7 +538,7 @@ const AttendanceSettingsPage: React.FC = () => {
                                                                         id={`auto-checkout-${zone.id}`}
                                                                         checked={!!zone.autoCheckout}
                                                                         onChange={(e) => updateZone(zone.id, 'autoCheckout', e.target.checked)}
-                                                                        className="h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                                                                        className="h-4 w-4 text-[#003366] border-slate-300 rounded focus:ring-[#003366]"
                                                                     />
                                                                     <label htmlFor={`auto-checkout-${zone.id}`} className="text-sm font-medium text-slate-700 cursor-pointer select-none">
                                                                         자동 퇴장 처리
@@ -553,7 +553,7 @@ const AttendanceSettingsPage: React.FC = () => {
                                                                     </div>
                                                                 </div>
                                                                 {zone.autoCheckout && (
-                                                                    <p className="text-xs text-blue-600 pl-6">
+                                                                    <p className="text-xs text-[#003366] pl-6">
                                                                         ⏰ {zone.end} 이후 자동 퇴장 예정
                                                                     </p>
                                                                 )}

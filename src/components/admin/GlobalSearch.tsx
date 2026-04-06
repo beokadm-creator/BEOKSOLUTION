@@ -108,7 +108,7 @@ export default function GlobalSearch() {
                         <Input
                             autoFocus
                             placeholder="Type to search users..."
-                            className="h-12 text-lg bg-white shadow-sm border-blue-100 focus:border-blue-500"
+                            className="h-12 text-lg bg-white shadow-sm border-[#c3daee] focus:border-[#003366]"
                             onChange={(e) => handleSearch(e.target.value)}
                             value={keyword}
                         />
@@ -124,7 +124,7 @@ export default function GlobalSearch() {
 
                             <div className="grid gap-3">
                                 {results.map(user => (
-                                    <div key={user.uid} className="bg-white p-4 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all flex items-start justify-between group">
+                                    <div key={user.uid} className="bg-white p-4 rounded-xl border border-gray-200 hover:border-[#c3daee] hover:shadow-md transition-all flex items-start justify-between group">
                                         <div className="flex items-start gap-4">
                                             <div className="w-12 h-12 rounded-full overflow-hidden border border-gray-100 bg-slate-100 flex items-center justify-center text-slate-500 font-bold shrink-0">
                                                 {user.photoURL ? (
@@ -151,7 +151,7 @@ export default function GlobalSearch() {
                                                 if (!aff || !aff.verified) return null;
                                                 return (
                                                     <div key={socId} className="flex flex-col items-center">
-                                                        <Badge variant="outline" className="bg-blue-50 text-[#003366] border-blue-200 font-mono gap-1">
+                                                        <Badge variant="outline" className="bg-[#f0f5fa] text-[#003366] border-[#c3daee] font-mono gap-1">
                                                             <Building className="w-3 h-3" />
                                                             {socId.toUpperCase()}
                                                         </Badge>

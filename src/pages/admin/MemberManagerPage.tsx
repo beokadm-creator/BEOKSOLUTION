@@ -537,7 +537,7 @@ const MemberManagerPage: React.FC = () => {
 
     if (!targetId) return (
         <div className="flex flex-col items-center justify-center min-h-[50vh]">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-4" />
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#003366] mb-4" />
             <p className="text-slate-500 font-medium">Resolving Society Context...</p>
         </div>
     );
@@ -550,7 +550,7 @@ const MemberManagerPage: React.FC = () => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b pb-6">
                 <div>
                     <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="outline" className="text-indigo-600 border-indigo-200 bg-indigo-50">Admin Console</Badge>
+                        <Badge variant="outline" className="text-[#003366] border-[#c3daee] bg-[#f0f5fa]">Admin Console</Badge>
                         <span className="text-slate-300">|</span>
                         <span className="text-sm font-medium text-slate-500 uppercase tracking-wide">Member Management</span>
                     </div>
@@ -572,20 +572,20 @@ const MemberManagerPage: React.FC = () => {
 
             <Tabs defaultValue="list" className="w-full space-y-8">
                 <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-14 p-1.5 bg-slate-100/80 rounded-xl">
-                    <TabsTrigger value="list" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm">
+                    <TabsTrigger value="list" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">
                         Member List
-                        <Badge variant="secondary" className="ml-2 bg-indigo-100 text-indigo-700 hover:bg-indigo-200">{members.length}</Badge>
+                        <Badge variant="secondary" className="ml-2 bg-[#f0f5fa] text-[#003366] hover:bg-[#f0f5fa]">{members.length}</Badge>
                     </TabsTrigger>
-                    <TabsTrigger value="add" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm">
+                    <TabsTrigger value="add" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">
                         Add Single
                     </TabsTrigger>
-                    <TabsTrigger value="bulk" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm">
+                    <TabsTrigger value="bulk" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">
                         Bulk Upload
                     </TabsTrigger>
-                    <TabsTrigger value="bulk-expiry" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm">
+                    <TabsTrigger value="bulk-expiry" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">
                         Bulk Expiry Update
                     </TabsTrigger>
-                    <TabsTrigger value="settings" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm">
+                    <TabsTrigger value="settings" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">
                         Grade Settings
                     </TabsTrigger>
                 </TabsList>
@@ -603,7 +603,7 @@ const MemberManagerPage: React.FC = () => {
                                         <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
                                         <Input
                                             placeholder="Search by name or code..."
-                                            className="pl-9 pr-8 bg-white border-slate-200 focus:border-indigo-300 transition-colors"
+                                            className="pl-9 pr-8 bg-white border-slate-200 focus:border-[#c3daee] transition-colors"
                                             value={searchTerm}
                                             onChange={e => setSearchTerm(e.target.value)}
                                         />
@@ -617,7 +617,7 @@ const MemberManagerPage: React.FC = () => {
                                         )}
                                     </div>
                                 </div>
-                                <Button variant="outline" size="sm" onClick={fetchMembers} disabled={loading} className="w-full md:w-auto border-dashed hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50">
+                                <Button variant="outline" size="sm" onClick={fetchMembers} disabled={loading} className="w-full md:w-auto border-dashed hover:border-[#c3daee] hover:text-[#003366] hover:bg-[#f0f5fa]">
                                     <RefreshCw className={`w-3.5 h-3.5 mr-2 ${loading ? 'animate-spin' : ''}`} />
                                     Refresh List
                                 </Button>
@@ -677,7 +677,7 @@ const MemberManagerPage: React.FC = () => {
                                                         ) : isExpired(member.expiryDate) ? (
                                                             <Badge variant="outline" className="bg-orange-50 text-orange-600 border-orange-200 font-bold">Expired</Badge>
                                                         ) : (
-                                                            <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 font-bold">Available</Badge>
+                                                            <Badge variant="outline" className="bg-[#f0f5fa] text-[#003366] border-[#c3daee] font-bold">Available</Badge>
                                                         )}
                                                     </TableCell>
                                                     <TableCell className="text-xs text-slate-500 font-mono">
@@ -734,14 +734,14 @@ const MemberManagerPage: React.FC = () => {
                 {/* Tab 2: Manual Add */}
                 <TabsContent value="add" className="animate-in fade-in slide-in-from-bottom-2">
                     <Card className="border-none shadow-lg shadow-slate-200/50 bg-white rounded-2xl max-w-2xl mx-auto">
-                        <CardHeader className="bg-indigo-50/50 border-b border-indigo-100">
+                        <CardHeader className="bg-[#f0f5fa]/50 border-b border-[#c3daee]">
                             <div className="flex items-center gap-3">
-                                <div className="p-2.5 bg-indigo-100 rounded-xl text-indigo-600">
+                                <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
                                     <UserPlus className="w-5 h-5" />
                                 </div>
                                 <div>
                                     <CardTitle className="text-lg font-bold text-slate-800">Add New Member</CardTitle>
-                                    <CardDescription className="text-indigo-600/80 font-medium mt-0.5">Manually register a single member to whitelist.</CardDescription>
+                                    <CardDescription className="text-[#003366]/80 font-medium mt-0.5">Manually register a single member to whitelist.</CardDescription>
                                 </div>
                             </div>
                         </CardHeader>
@@ -794,7 +794,7 @@ const MemberManagerPage: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
-                            <Button onClick={handleSingleAdd} size="lg" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200 mt-4 rounded-xl">
+                            <Button onClick={handleSingleAdd} size="lg" className="w-full bg-[#003366] hover:bg-[#002244] text-white shadow-md shadow-[#003366]/20 mt-4 rounded-xl">
                                 <Plus className="w-5 h-5 mr-2" />
                                 Register Member
                             </Button>
@@ -805,14 +805,14 @@ const MemberManagerPage: React.FC = () => {
                 {/* Tab 3: Bulk Upload (NEW) */}
                 <TabsContent value="bulk" className="animate-in fade-in slide-in-from-bottom-2">
                     <Card className="border-none shadow-lg shadow-slate-200/50 bg-white rounded-2xl">
-                        <CardHeader className="bg-emerald-50/50 border-b border-emerald-100">
+                        <CardHeader className="bg-[#f0f5fa]/50 border-b border-[#c3daee]">
                             <div className="flex items-center gap-3">
-                                <div className="p-2.5 bg-emerald-100 rounded-xl text-emerald-600">
+                                <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
                                     <FileSpreadsheet className="w-5 h-5" />
                                 </div>
                                 <div>
                                     <CardTitle className="text-lg font-bold text-slate-800">CSV 대량 업로드</CardTitle>
-                                    <CardDescription className="text-emerald-600/80 font-medium mt-0.5">회원 정보를 CSV 형식으로 대량 업로드합니다.</CardDescription>
+                                    <CardDescription className="text-[#24669e] font-medium mt-0.5">회원 정보를 CSV 형식으로 대량 업로드합니다.</CardDescription>
                                 </div>
                             </div>
                         </CardHeader>
@@ -825,10 +825,10 @@ const MemberManagerPage: React.FC = () => {
                                         rows={12}
                                         value={bulkData}
                                         onChange={e => setBulkData(e.target.value)}
-                                        className="font-mono text-sm leading-relaxed bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500 transition-colors rounded-xl resize-none p-4"
+                                        className="font-mono text-sm leading-relaxed bg-slate-50 border-slate-200 focus:bg-white focus:border-[#003366] transition-colors rounded-xl resize-none p-4"
                                     />
                                 </div>
-                                <Button onClick={handleBulkUpload} size="lg" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-200 rounded-xl h-12">
+                                <Button onClick={handleBulkUpload} size="lg" className="w-full bg-[#003366] hover:bg-[#002244] text-white shadow-md rounded-xl h-12">
                                     <Upload className="w-5 h-5 mr-2" />
                                     CSV 업로드 처리
                                 </Button>
@@ -863,14 +863,14 @@ const MemberManagerPage: React.FC = () => {
                 {/* Tab 4: Bulk Expiry Update (NEW) */}
                 <TabsContent value="bulk-expiry" className="animate-in fade-in slide-in-from-bottom-2">
                     <Card className="border-none shadow-lg shadow-slate-200/50 bg-white rounded-2xl max-w-3xl mx-auto">
-                        <CardHeader className="bg-blue-50/50 border-b border-blue-100">
+                        <CardHeader className="bg-[#f0f5fa]/50 border-b border-[#c3daee]">
                             <div className="flex items-center gap-3">
-                                <div className="p-2.5 bg-blue-100 rounded-xl text-blue-600">
+                                <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
                                     <Calendar className="w-5 h-5" />
                                 </div>
                                 <div>
                                     <CardTitle className="text-lg font-bold text-slate-800">대량 유효기간 수정</CardTitle>
-                                    <CardDescription className="text-blue-600/80 font-medium mt-0.5">선택된 회원들의 유효기간을 일괄로 수정합니다.</CardDescription>
+                                    <CardDescription className="text-[#003366]/80 font-medium mt-0.5">선택된 회원들의 유효기간을 일괄로 수정합니다.</CardDescription>
                                 </div>
                             </div>
                         </CardHeader>
@@ -891,7 +891,7 @@ const MemberManagerPage: React.FC = () => {
                                     <Button
                                         onClick={handleBulkExpiryUpdate}
                                         disabled={selectedMemberIds.size === 0 || !bulkNewExpiry}
-                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 h-12"
+                                        className="w-full bg-[#003366] hover:bg-[#002244] text-white shadow-md shadow-[#003366]/20 h-12"
                                     >
                                         선택된 회원들 ({selectedMemberIds.size}명) 유효기간 수정
                                     </Button>

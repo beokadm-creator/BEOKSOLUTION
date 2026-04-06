@@ -110,12 +110,12 @@ const ExternalAttendeeMigration: React.FC<ExternalAttendeeMigrationProps> = ({ c
                     </Button>
 
                     {dryRunResult && (
-                        <Alert className="bg-blue-50 border-blue-200">
-                            <CheckCircle className="h-4 w-4 text-blue-600" />
+                        <Alert className="bg-[#f0f5fa] border-[#c3daee]">
+                            <CheckCircle className="h-4 w-4 text-[#003366]" />
                             <AlertDescription>
                                 <div className="space-y-1">
-                                    <p className="font-semibold text-blue-900">시뮬레이션 결과:</p>
-                                    <ul className="text-sm text-blue-800 space-y-1">
+                                    <p className="font-semibold text-[#003366]">시뮬레이션 결과:</p>
+                                    <ul className="text-sm text-[#24669e] space-y-1">
                                         <li>• 전체 외부 참석자: {dryRunResult.results.total}명</li>
                                         <li>• 업데이트 대상: {dryRunResult.results.updated}명</li>
                                         <li>• 스킵 (계정 미생성): {dryRunResult.results.skipped}명</li>

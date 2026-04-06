@@ -231,7 +231,7 @@ const SponsorManager: React.FC = () => {
               {sponsors.map((sponsor, index) => (
                 <Card
                   key={sponsor.id}
-                  className={`cursor-pointer transition-all hover:shadow-md ${selectedSponsorId === sponsor.id ? 'ring-2 ring-blue-500' : ''
+                  className={`cursor-pointer transition-all hover:shadow-md ${selectedSponsorId === sponsor.id ? 'ring-2 ring-[#003366]' : ''
                     }`}
                   onClick={() => selectSponsor(sponsor)}
                 >
@@ -352,7 +352,7 @@ const SponsorManager: React.FC = () => {
                       id="vendorId"
                       value={form.vendorId || ''}
                       onChange={(e) => setForm({ ...form, vendorId: e.target.value === '' ? undefined : e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366] bg-white"
                     >
                       <option value="">연결 안 함 (단순 스폰서 로고 노출용)</option>
                       {globalVendors.map(v => (
@@ -371,9 +371,9 @@ const SponsorManager: React.FC = () => {
                         id="isStampTourParticipant"
                         checked={form.isStampTourParticipant ?? false}
                         onChange={(e) => setForm({ ...form, isStampTourParticipant: e.target.checked })}
-                        className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                        className="w-4 h-4 text-[#003366] border-slate-300 rounded focus:ring-[#003366]"
                       />
-                      <Label htmlFor="isStampTourParticipant" className="cursor-pointer text-indigo-900 font-semibold">
+                      <Label htmlFor="isStampTourParticipant" className="cursor-pointer text-[#003366] font-semibold">
                         ⭐ 스탬프 투어(게이미피케이션) 참여 부스
                       </Label>
                     </div>
@@ -410,7 +410,7 @@ const SponsorManager: React.FC = () => {
                       id="tier"
                       value={form.tier || ''}
                       onChange={(e) => setForm({ ...form, tier: e.target.value === '' ? undefined : e.target.value as SponsorTier })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366]"
                     >
                       <option value="">등급 미지정</option>
                       <option value="PLATINUM">플래티넘</option>
@@ -440,7 +440,7 @@ const SponsorManager: React.FC = () => {
                     id="isActive"
                     checked={form.isActive ?? true}
                     onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                    className="w-4 h-4 text-[#003366] border-slate-300 rounded focus:ring-[#003366]"
                   />
                   <Label htmlFor="isActive" className="cursor-pointer">
                     활성화 (체크 해제 시 숨김)

@@ -106,13 +106,13 @@ export default function ContextSwitcher() {
           size="lg"
           className={cn(
             "w-full justify-between px-3 hover:bg-slate-100 transition-colors h-14",
-            isConferenceMode ? "text-blue-700 bg-blue-50 hover:bg-blue-100" : "text-slate-700"
+            isConferenceMode ? "text-[#003366] bg-[#f0f5fa] hover:bg-[#e1ecf6]" : "text-slate-700"
           )}
         >
           <div className="flex items-center gap-3 text-left overflow-hidden">
             <div className={cn(
                 "p-1.5 rounded-md shrink-0",
-                isConferenceMode ? "bg-blue-200 text-blue-700" : "bg-slate-200 text-slate-700"
+                isConferenceMode ? "bg-[#c3daee] text-[#003366]" : "bg-slate-200 text-slate-700"
             )}>
                 {isConferenceMode ? <Calendar className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
             </div>
@@ -153,8 +153,8 @@ export default function ContextSwitcher() {
                     onClick={() => handleSelectConference(conf)}
                     className="gap-2 cursor-pointer p-2"
                 >
-                    <div className="p-1 rounded bg-blue-50">
-                        <Calendar className="w-4 h-4 text-blue-600" />
+                    <div className="p-1 rounded bg-[#f0f5fa]">
+                        <Calendar className="w-4 h-4 text-[#003366]" />
                     </div>
                     <span className="truncate flex-1">{safeText(conf.title)}</span>
                     {selectedConferenceId === conf.id && <span className="ml-auto text-xs text-green-600 font-bold">●</span>}

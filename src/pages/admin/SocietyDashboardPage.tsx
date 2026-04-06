@@ -426,7 +426,7 @@ export default function SocietyDashboardPage() {
     const getStatusBadge = (status: string) => {
         switch (status.toUpperCase()) {
             case 'OPEN': return <Badge className="bg-emerald-500 hover:bg-emerald-600 shadow text-white border-0">OPEN</Badge>;
-            case 'PLANNING': return <Badge className="bg-blue-500 hover:bg-blue-600 shadow text-white border-0">PLANNING</Badge>;
+            case 'PLANNING': return <Badge className="bg-[#24669e] hover:bg-[#003366] shadow text-white border-0">PLANNING</Badge>;
             case 'CLOSED': return <Badge variant="secondary" className="bg-slate-200 text-slate-500 hover:bg-slate-300">CLOSED</Badge>;
             case 'SETUP': return <Badge className="bg-amber-400 hover:bg-amber-500 shadow text-white border-0">SETUP</Badge>;
             default: return <Badge variant="outline">{status}</Badge>;
@@ -446,7 +446,7 @@ export default function SocietyDashboardPage() {
                         </div>
                         <div>
                             <h1 className="text-lg font-bold text-slate-900 leading-tight">Society Dashboard</h1>
-                            <p className="text-[11px] text-slate-500 font-medium">Overview for <span className="text-blue-600 uppercase">{effectiveDomainCode}</span></p>
+                            <p className="text-[11px] text-slate-500 font-medium">Overview for <span className="text-[#003366] uppercase">{effectiveDomainCode}</span></p>
                         </div>
                     </div>
                 </div>
@@ -455,9 +455,9 @@ export default function SocietyDashboardPage() {
             <div className="max-w-7xl mx-auto p-6 space-y-8">
                 {/* Stats Row */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <StatCard label="Total Members" value={stats.totalMembers} icon={<Users className="text-blue-600" />} subtext="Registered Users" />
+                    <StatCard label="Total Members" value={stats.totalMembers} icon={<Users className="text-[#003366]" />} subtext="Registered Users" />
                     <StatCard label="Active Events" value={stats.activeConfs} icon={<Activity className="text-emerald-600" />} subtext="Currently Live" />
-                    <StatCard label="Total Events" value={stats.totalConfs} icon={<BarChart3 className="text-purple-600" />} subtext="Historical Data" />
+                    <StatCard label="Total Events" value={stats.totalConfs} icon={<BarChart3 className="text-[#003366]" />} subtext="Historical Data" />
                 </div>
 
                 {/* Sponsor Requests */}
@@ -520,7 +520,7 @@ export default function SocietyDashboardPage() {
                             <DialogContent className="sm:max-w-[600px] rounded-2xl p-0 overflow-hidden gap-0">
                                 <DialogHeader className="p-6 bg-slate-50 border-b">
                                     <DialogTitle className="text-xl font-bold flex items-center gap-2">
-                                        <Calendar className="w-5 h-5 text-blue-600" />
+                                        <Calendar className="w-5 h-5 text-[#003366]" />
                                         Launch New Conference
                                     </DialogTitle>
                                     <DialogDescription>
@@ -561,7 +561,7 @@ export default function SocietyDashboardPage() {
                                                 placeholder="2026spring"
                                                 value={newSlug}
                                                 onChange={e => setNewSlug(e.target.value)}
-                                                className="pl-24 font-mono text-blue-600 font-bold bg-blue-50/30 border-blue-200 focus:border-blue-500"
+                                                className="pl-24 font-mono text-[#003366] font-bold bg-[#f0f5fa]/30 border-[#c3daee] focus:border-[#003366]"
                                             />
                                         </div>
                                         <p className="text-[11px] text-slate-400">
@@ -593,7 +593,7 @@ export default function SocietyDashboardPage() {
                                 </div>
                                 <DialogFooter className="p-4 bg-slate-50 border-t gap-2 md:gap-0">
                                     <Button variant="ghost" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-                                    <Button onClick={handleCreate} disabled={isCreating} className="bg-blue-600 hover:bg-blue-700 min-w-[120px]">
+                                    <Button onClick={handleCreate} disabled={isCreating} className="bg-[#003366] hover:bg-[#002244] min-w-[120px]">
                                         {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Event'}
                                     </Button>
                                 </DialogFooter>
@@ -603,7 +603,7 @@ export default function SocietyDashboardPage() {
 
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20">
-                            <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-4" />
+                            <Loader2 className="w-8 h-8 animate-spin text-[#003366] mb-4" />
                             <p className="text-slate-500 font-medium">Loading events...</p>
                         </div>
                     ) : conferences.length === 0 ? (
@@ -632,7 +632,7 @@ export default function SocietyDashboardPage() {
                                                 /{conf.slug}
                                             </Badge>
                                         </div>
-                                        <CardTitle className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-2 h-14">
+                                        <CardTitle className="text-lg font-bold text-slate-900 group-hover:text-[#003366] transition-colors line-clamp-2 h-14">
                                             {safeText(conf.title)}
                                         </CardTitle>
                                     </CardHeader>
@@ -652,7 +652,7 @@ export default function SocietyDashboardPage() {
                                             <Label className="text-[10px] uppercase font-bold text-slate-400 mb-1.5 block">Current Status</Label>
                                             <div className="relative">
                                                 <select
-                                                    className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-700 text-sm font-medium py-2 pl-3 pr-8 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer hover:bg-white"
+                                                    className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-700 text-sm font-medium py-2 pl-3 pr-8 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#003366]/20 focus:border-[#003366] transition-all cursor-pointer hover:bg-white"
                                                     value={conf.status}
                                                     onChange={(e) => handleStatusChange(conf.id, e.target.value)}
                                                     onClick={(e) => e.stopPropagation()}
@@ -669,7 +669,7 @@ export default function SocietyDashboardPage() {
                                     <CardFooter className="p-4 bg-slate-50 border-t grid grid-cols-2 gap-3">
                                         <Button
                                             variant="ghost"
-                                                    className="w-full text-slate-500 hover:text-blue-600 hover:bg-blue-50 h-10 text-xs font-semibold"
+                                                    className="w-full text-slate-500 hover:text-[#003366] hover:bg-[#f0f5fa] h-10 text-xs font-semibold"
                                             onClick={() => {
                                                 const url = window.location.origin.includes('localhost')
                                                     ? `/${conf.slug}`
@@ -681,7 +681,7 @@ export default function SocietyDashboardPage() {
                                             Visit Live
                                         </Button>
                                         <Button
-                                            className="w-full bg-white border border-slate-200 text-slate-900 hover:bg-blue-600 hover:text-white hover:border-blue-600 hover:shadow-md transition-all h-10 text-xs font-bold shadow-sm"
+                                            className="w-full bg-white border border-slate-200 text-slate-900 hover:bg-[#003366] hover:text-white hover:border-[#003366] hover:shadow-md transition-all h-10 text-xs font-bold shadow-sm"
                                             onClick={() => handleManage(conf)}
                                         >
                                             Manage

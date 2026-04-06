@@ -453,7 +453,7 @@ const StatisticsPage: React.FC = () => {
         }
     };
 
-    if (loading) return <div className="flex h-screen justify-center items-center"><Loader2 className="animate-spin w-10 h-10 text-blue-500" /></div>;
+    if (loading) return <div className="flex h-screen justify-center items-center"><Loader2 className="animate-spin w-10 h-10 text-[#24669e]" /></div>;
 
     if (!selectedDate || !rules[selectedDate]) return (
         <div className="p-8 text-center">
@@ -594,9 +594,9 @@ const StatisticsPage: React.FC = () => {
                                 </CardHeader>
                                 <CardContent className="space-y-4 pt-4">
                                     {[
-                                        { label: '결제 완료 (등록)', value: stats.totalRegistered, color: 'bg-blue-500' },
-                                        { label: '명찰 발급', value: stats.totalBadgeIssued, color: 'bg-indigo-500' },
-                                        { label: '수강 입장', value: stats.activeUsers, color: 'bg-purple-500' },
+                                        { label: '결제 완료 (등록)', value: stats.totalRegistered, color: 'bg-[#003366]' },
+                                        { label: '명찰 발급', value: stats.totalBadgeIssued, color: 'bg-[#24669e]' },
+                                        { label: '수강 입장', value: stats.activeUsers, color: 'bg-[#003366]' },
                                         { label: '수강 완료', value: stats.compliantUsers, color: 'bg-green-500' },
                                     ].map(item => (
                                         <div key={item.label} className="space-y-1">
@@ -700,7 +700,7 @@ const StatisticsPage: React.FC = () => {
                                                     <TableCell className="font-medium">{user.userName}</TableCell>
                                                     <TableCell className="text-sm text-gray-500">{user.affiliation || '—'}</TableCell>
                                                     <TableCell>
-                                                        <Badge variant="outline" className={user.isExternal ? 'text-purple-600 border-purple-200' : 'text-blue-600 border-blue-200'}>
+                                                        <Badge variant="outline" className={user.isExternal ? 'text-[#003366] border-[#c3daee]' : 'text-[#003366] border-[#c3daee]'}>
                                                             {user.isExternal ? '외부' : '등록'}
                                                         </Badge>
                                                     </TableCell>

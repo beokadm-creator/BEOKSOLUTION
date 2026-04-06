@@ -800,10 +800,10 @@ const SuperAdminPage: React.FC = () => {
                         </Card>
 
                         {editingSoc && (
-                            <Card className="shadow-lg border-t-4 border-t-blue-600">
+                            <Card className="shadow-lg border-t-4 border-t-[#003366]">
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2">
-                                        <Edit className="w-5 h-5 text-blue-600" /> Edit Society
+                                        <Edit className="w-5 h-5 text-[#003366]" /> Edit Society
                                     </CardTitle>
                                     <CardDescription>Update society details</CardDescription>
                                 </CardHeader>
@@ -826,7 +826,7 @@ const SuperAdminPage: React.FC = () => {
                                             <Input value={editAliases} onChange={e => setEditAliases(e.target.value)} className="bg-white" placeholder="예: kaid, k-a-i-d" />
                                         </div>
                                         <div className="flex gap-2">
-                                            <Button onClick={() => handleUpdateSociety(editingSoc.id)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold flex-1">
+                                            <Button onClick={() => handleUpdateSociety(editingSoc.id)} className="bg-[#003366] hover:bg-[#002244] text-white font-bold flex-1">
                                                 <Save className="w-4 h-4 mr-2" /> Save Changes
                                             </Button>
                                             <Button onClick={() => { setEditingSoc(null); setEditDomainCode(''); setEditAliases(''); }} variant="outline">
@@ -903,12 +903,12 @@ const SuperAdminPage: React.FC = () => {
 
                 {activeTab === 'MEMBERS' && (
                     <div className="max-w-7xl mx-auto space-y-6">
-                        <Card className="shadow-lg border-t-4 border-t-blue-600">
+                        <Card className="shadow-lg border-t-4 border-t-[#003366]">
                             <CardHeader className="pb-4">
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <CardTitle className="text-xl flex items-center gap-2">
-                                            <Users className="w-5 h-5 text-blue-600" /> Member Management
+                                            <Users className="w-5 h-5 text-[#003366]" /> Member Management
                                         </CardTitle>
                                         <CardDescription>View and manage registered members</CardDescription>
                                     </div>
@@ -916,7 +916,7 @@ const SuperAdminPage: React.FC = () => {
                                         <div className="relative">
                                             <Filter className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                                             <select
-                                                className="pl-9 pr-4 py-2 border rounded-lg text-sm bg-white hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all w-full md:w-48 appearance-none"
+                                                className="pl-9 pr-4 py-2 border rounded-lg text-sm bg-white hover:border-[#c3daee] focus:outline-none focus:ring-2 focus:ring-[#003366] transition-all w-full md:w-48 appearance-none"
                                                 value={currentSocietyId}
                                                 onChange={e => setCurrentSocietyId(e.target.value)}
                                             >
@@ -948,7 +948,7 @@ const SuperAdminPage: React.FC = () => {
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
                                                 {members.map(m => (
-                                                    <tr key={m.id} className="hover:bg-blue-50/30 transition-colors group">
+                                                    <tr key={m.id} className="hover:bg-[#f0f5fa]/30 transition-colors group">
                                                         <td className="p-4 pl-6">
                                                             <div className="flex items-center gap-3">
                                                                 <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold border border-slate-200">
@@ -969,7 +969,7 @@ const SuperAdminPage: React.FC = () => {
                                                             {m.organization || m.affiliation || <span className="text-slate-300">-</span>}
                                                         </td>
                                                         <td className="p-4">
-                                                            <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-0 px-1.5 py-0 h-5 text-[10px]">VERIFIED</Badge>
+                                                            <Badge className="bg-[#f0f5fa] text-[#003366] hover:bg-[#e1ecf6] border-0 px-1.5 py-0 h-5 text-[10px]">VERIFIED</Badge>
                                                         </td>
                                                         <td className="p-4">
                                                             <div className="flex justify-center gap-2">
@@ -1012,10 +1012,10 @@ const SuperAdminPage: React.FC = () => {
 
                 {activeTab === 'CODES' && (
                     <div className="max-w-5xl mx-auto space-y-6">
-                        <Card className="shadow-lg border-t-4 border-t-indigo-500">
+                        <Card className="shadow-lg border-t-4 border-t-[#003366]">
                             <CardHeader className="pb-4">
                                 <CardTitle className="flex items-center gap-2 text-xl">
-                                    <Key className="w-5 h-5 text-indigo-600" /> Verification Code Management
+                                    <Key className="w-5 h-5 text-[#003366]" /> Verification Code Management
                                 </CardTitle>
                                 <CardDescription>Issue and monitor 1-time verification codes for society member registration</CardDescription>
                             </CardHeader>
@@ -1025,7 +1025,7 @@ const SuperAdminPage: React.FC = () => {
                                         <div className="space-y-1.5">
                                             <Label className="text-xs font-semibold text-slate-500 uppercase">Target Society</Label>
                                             <select
-                                                className="w-full h-10 px-3 bg-white border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                                className="w-full h-10 px-3 bg-white border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-[#003366] focus:border-[#003366]"
                                                 value={newCodeSocId}
                                                 onChange={e => setNewCodeSocId(e.target.value)}
                                             >
@@ -1064,7 +1064,7 @@ const SuperAdminPage: React.FC = () => {
                                             />
                                         </div>
                                     </div>
-                                    <Button onClick={handleCreateCode} className="h-10 bg-indigo-600 hover:bg-indigo-700 min-w-[120px]">
+                                    <Button onClick={handleCreateCode} className="h-10 bg-[#003366] hover:bg-[#002244] min-w-[120px]">
                                         <Plus className="w-4 h-4 mr-2" /> Add Code
                                     </Button>
                                     <div className="ml-auto">
@@ -1180,14 +1180,14 @@ const SuperAdminPage: React.FC = () => {
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div className="space-y-3">
                                                 <Label className="flex items-center gap-2 text-base">
-                                                    <ShieldCheck className="w-4 h-4 text-blue-600" /> Terms of Service
+                                                    <ShieldCheck className="w-4 h-4 text-[#003366]" /> Terms of Service
                                                 </Label>
                                                 <div className="relative">
                                                     <div className="absolute top-3 right-3 text-xs font-bold text-slate-300">{settingsLang}</div>
                                                     <Textarea
                                                         value={settingsLang === 'KO' ? termsService : termsServiceEn}
                                                         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => settingsLang === 'KO' ? setTermsService(e.target.value) : setTermsServiceEn(e.target.value)}
-                                                        className="min-h-[250px] font-mono text-sm leading-relaxed resize-none focus:ring-2 focus:ring-blue-500"
+                                                        className="min-h-[250px] font-mono text-sm leading-relaxed resize-none focus:ring-2 focus:ring-[#003366]"
                                                         placeholder={settingsLang === 'KO' ? "서비스 이용약관 내용을 입력하세요..." : "Enter Terms of Service content..."}
                                                     />
                                                 </div>
@@ -1223,19 +1223,19 @@ const SuperAdminPage: React.FC = () => {
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <Label className="text-xs font-semibold text-blue-600">Marketing Consent (Opt)</Label>
+                                                    <Label className="text-xs font-semibold text-[#003366]">Marketing Consent (Opt)</Label>
                                                     <Textarea
                                                         value={settingsLang === 'KO' ? termsMarketing : termsMarketingEn}
                                                         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => settingsLang === 'KO' ? setTermsMarketing(e.target.value) : setTermsMarketingEn(e.target.value)}
-                                                        className="min-h-[120px] text-xs font-mono bg-blue-50/30 border-blue-100 focus:border-blue-300"
+                                                        className="min-h-[120px] text-xs font-mono bg-[#f0f5fa]/30 border-[#c3daee] focus:border-[#003366]"
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <Label className="text-xs font-semibold text-blue-600">Ad Info Transmission (Opt)</Label>
+                                                    <Label className="text-xs font-semibold text-[#003366]">Ad Info Transmission (Opt)</Label>
                                                     <Textarea
                                                         value={settingsLang === 'KO' ? termsAdInfo : termsAdInfoEn}
                                                         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => settingsLang === 'KO' ? setTermsAdInfo(e.target.value) : setTermsAdInfoEn(e.target.value)}
-                                                        className="min-h-[120px] text-xs font-mono bg-blue-50/30 border-blue-100 focus:border-blue-300"
+                                                        className="min-h-[120px] text-xs font-mono bg-[#f0f5fa]/30 border-[#c3daee] focus:border-[#003366]"
                                                     />
                                                 </div>
                                             </div>
@@ -1348,9 +1348,9 @@ const SuperAdminPage: React.FC = () => {
                                     </Card>
 
                                     {/* AlimTalk Config Check Card */}
-                                    <Card className="shadow-lg border-t-4 border-t-purple-500 bg-[#1e1e1e] border-[#333]">
+                                    <Card className="shadow-lg border-t-4 border-t-[#24669e] bg-[#1e1e1e] border-[#333]">
                                         <CardHeader className="pb-4">
-                                            <CardTitle className="text-xl flex items-center gap-2 text-purple-400">
+                                            <CardTitle className="text-xl flex items-center gap-2 text-[#c3daee]">
                                                 💬 알림톡 설정 확인
                                             </CardTitle>
                                             <CardDescription className="text-gray-400">
@@ -1360,7 +1360,7 @@ const SuperAdminPage: React.FC = () => {
                                         <CardContent className="space-y-4">
                                             <div className="flex gap-2">
                                                 <select
-                                                    className="flex-1 p-3 bg-[#2a2a2a] border border-[#333] rounded-lg text-gray-200 focus:border-purple-600"
+                                                    className="flex-1 p-3 bg-[#2a2a2a] border border-[#333] rounded-lg text-gray-200 focus:border-[#24669e]"
                                                     value={selectedSocietyForAlimTalk}
                                                     onChange={(e) => setSelectedSocietyForAlimTalk(e.target.value)}
                                                 >
@@ -1370,7 +1370,7 @@ const SuperAdminPage: React.FC = () => {
                                                 <Button
                                                     onClick={() => fetchAlimTalkConfig(selectedSocietyForAlimTalk)}
                                                     disabled={alimTalkConfigLoading || !selectedSocietyForAlimTalk}
-                                                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold"
+                                                    className="bg-[#003366] hover:bg-[#002244] text-white font-bold"
                                                 >
                                                     {alimTalkConfigLoading ? '확인 중...' : '확인'}
                                                 </Button>
@@ -1403,7 +1403,7 @@ const SuperAdminPage: React.FC = () => {
                                                             </div>
                                                             <div className="p-3 bg-[#2a2a2a] rounded-lg">
                                                                 <div className="text-xs text-gray-400">승인된 템플릿</div>
-                                                                <div className="text-2xl font-bold text-blue-400">{alimTalkConfigData.summary.approvedTemplates}</div>
+                                                                <div className="text-2xl font-bold text-[#c3daee]">{alimTalkConfigData.summary.approvedTemplates}</div>
                                                             </div>
                                                             <div className="p-3 bg-[#2a2a2a] rounded-lg">
                                                                 <div className="text-xs text-gray-400">Aligo 설정</div>
@@ -1497,9 +1497,9 @@ const SuperAdminPage: React.FC = () => {
                                 </Card>
 
                                 {/* Performance Metrics Section */}
-                                <Card className="shadow-lg border-t-4 border-t-blue-500 bg-[#1e1e1e] border-[#333]">
+                                <Card className="shadow-lg border-t-4 border-t-[#24669e] bg-[#1e1e1e] border-[#333]">
                                     <CardHeader className="pb-4">
-                                        <CardTitle className="text-xl flex items-center gap-2 text-blue-400">
+                                        <CardTitle className="text-xl flex items-center gap-2 text-[#c3daee]">
                                             📊 성능 지표 ({performanceMetrics.length})
                                         </CardTitle>
                                         <CardDescription className="text-gray-400">
@@ -1643,10 +1643,10 @@ const SuperAdminPage: React.FC = () => {
 
                 {activeTab === 'VENDORS' && (
                     <div className="space-y-6">
-                        <Card className="shadow-lg border-t-4 border-t-indigo-500">
+                        <Card className="shadow-lg border-t-4 border-t-[#003366]">
                             <CardHeader className="pb-4">
                                 <CardTitle className="text-xl flex items-center gap-2">
-                                    <Store className="w-5 h-5 text-indigo-500" /> Register Global Vendor
+                                    <Store className="w-5 h-5 text-[#003366]" /> Register Global Vendor
                                 </CardTitle>
                                 <CardDescription>Add new independent vendors to the platform</CardDescription>
                             </CardHeader>
@@ -1655,22 +1655,22 @@ const SuperAdminPage: React.FC = () => {
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                         <div className="space-y-1.5">
                                             <Label className="text-xs font-semibold text-gray-400 uppercase">Vendor Name</Label>
-                                            <Input required value={newVendorName} onChange={e => setNewVendorName(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-indigo-500 text-gray-200" placeholder="e.g. ABC IT Solutions" />
+                                            <Input required value={newVendorName} onChange={e => setNewVendorName(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-[#003366] text-gray-200" placeholder="e.g. ABC IT Solutions" />
                                         </div>
                                         <div className="space-y-1.5">
                                             <Label className="text-xs font-semibold text-gray-400 uppercase">Slug (Optional)</Label>
-                                            <Input value={newVendorSlug} onChange={e => setNewVendorSlug(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-indigo-500 text-gray-200" placeholder="e.g. shinhung" />
+                                            <Input value={newVendorSlug} onChange={e => setNewVendorSlug(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-[#003366] text-gray-200" placeholder="e.g. shinhung" />
                                         </div>
                                         <div className="space-y-1.5">
                                             <Label className="text-xs font-semibold text-gray-400 uppercase">Admin Email (Optional)</Label>
-                                            <Input type="email" value={newVendorEmail} onChange={e => setNewVendorEmail(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-indigo-500 text-gray-200" placeholder="admin@vendor.com" />
+                                            <Input type="email" value={newVendorEmail} onChange={e => setNewVendorEmail(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-[#003366] text-gray-200" placeholder="admin@vendor.com" />
                                         </div>
                                         <div className="space-y-1.5">
                                             <Label className="text-xs font-semibold text-gray-400 uppercase">Description (Optional)</Label>
-                                            <Input value={newVendorDesc} onChange={e => setNewVendorDesc(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-indigo-500 text-gray-200" placeholder="Brief description..." />
+                                            <Input value={newVendorDesc} onChange={e => setNewVendorDesc(e.target.value)} className="bg-[#2a2a2a] border-[#333] focus:border-[#003366] text-gray-200" placeholder="Brief description..." />
                                         </div>
                                     </div>
-                                    <Button type="submit" disabled={!newVendorName.trim()} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold">
+                                    <Button type="submit" disabled={!newVendorName.trim()} className="w-full bg-[#003366] hover:bg-[#002244] text-white font-bold">
                                         <Plus className="w-4 h-4 mr-2" /> Register Vendor
                                     </Button>
                                 </form>
@@ -1726,10 +1726,10 @@ const SuperAdminPage: React.FC = () => {
                         </Card>
 
                         {editingVendor && (
-                            <Card className="shadow-lg border-t-4 border-t-blue-600">
+                            <Card className="shadow-lg border-t-4 border-t-[#003366]">
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2">
-                                        <Edit className="w-5 h-5 text-blue-600" /> Edit Vendor Info
+                                        <Edit className="w-5 h-5 text-[#003366]" /> Edit Vendor Info
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
@@ -1751,7 +1751,7 @@ const SuperAdminPage: React.FC = () => {
                                             <Input value={editVendorDesc} onChange={e => setEditVendorDesc(e.target.value)} className="bg-white" placeholder="Description" />
                                         </div>
                                         <div className="flex gap-2">
-                                            <Button onClick={() => handleUpdateVendor(editingVendor.id)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold flex-1">
+                                            <Button onClick={() => handleUpdateVendor(editingVendor.id)} className="bg-[#003366] hover:bg-[#002244] text-white font-bold flex-1">
                                                 <Save className="w-4 h-4 mr-2" /> Save Changes
                                             </Button>
                                             <Button onClick={() => setEditingVendor(null)} variant="outline">
