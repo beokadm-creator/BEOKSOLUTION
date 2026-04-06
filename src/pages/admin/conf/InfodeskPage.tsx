@@ -345,157 +345,149 @@ const InfodeskPage: React.FC = () => {
         }
     };
 
-    if (loading) return <div>Loading Kiosk...</div>;
+    if (loading) return (
+        <div className="fixed inset-0 bg-[#001f3f] flex items-center justify-center">
+            <div className="text-center">
+                <Loader2 className="w-16 h-16 animate-spin text-white/30 mx-auto mb-4" />
+                <p className="text-white/50 font-bold text-xl tracking-widest uppercase">Loading Info Desk</p>
+            </div>
+        </div>
+    );
 
     return (
         <div
-            className="fixed inset-0 z-[99999] flex flex-col font-sans transition-colors duration-500 bg-white"
+            className="fixed inset-0 z-[99999] flex flex-col font-sans overflow-hidden select-none"
             style={{
                 backgroundImage: design.bgImage ? `url(${design.bgImage})` : 'none',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
-                color: design.textColor
+                backgroundColor: design.bgImage ? undefined : '#001f3f',
             }}
         >
-            {/* Top Admin Console */}
-            <div className="fixed top-0 left-0 right-0 bg-black/80 text-white p-3 z-[10000] flex justify-between items-center backdrop-blur-md shadow-lg">
-                <div className="flex items-center gap-4">
-                    <span className="font-bold text-yellow-400 flex items-center gap-2">
+            {/* 배경 오버레이 (이미지 있을 때 가독성 확보) */}
+            {design.bgImage && <div className="absolute inset-0 bg-black/50 z-0" />}
+
+            {/* ── 관리자 컨트롤 바 ─────────────────────────────────────── */}
+            <div className="shrink-0 bg-black/60 backdrop-blur-md border-b border-white/10 px-5 py-2.5 flex items-center justify-between z-[10000] relative">
+                <div className="flex items-center gap-3">
+                    <span className="text-[#c3daee] font-black text-sm flex items-center gap-2 px-3">
                         <Printer className="w-4 h-4" /> INFO DESK
                     </span>
-
-                    <div className="flex bg-gray-700 rounded p-1">
+                    <div className="w-px h-5 bg-white/15" />
+                    <div className="flex gap-1 bg-white/10 p-1 rounded-lg">
                         {[
-                            { l: '디지털만', v: 'DIGITAL_ONLY' },
+                            { l: '디지털', v: 'DIGITAL_ONLY' },
                             { l: '디지털+인쇄', v: 'DIGITAL_PRINT' },
                             { l: '인쇄만', v: 'PRINT_ONLY' }
                         ].map(opt => (
                             <button
                                 key={opt.v}
                                 onClick={() => setIssueOption(opt.v as IssueOption['value'])}
-                                className={`px-3 py-1 rounded text-xs font-bold transition-colors ${issueOption === opt.v ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'
-                                    }`}
+                                className={`px-3 py-1.5 rounded-md text-xs font-black transition-all ${issueOption === opt.v ? 'bg-[#003366] text-white shadow-lg' : 'text-white/40 hover:text-white/70'}`}
                             >
                                 {opt.l}
                             </button>
                         ))}
                     </div>
                 </div>
-
                 <div className="flex gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => setShowSettings(!showSettings)} className="text-gray-300 hover:text-white hover:bg-white/10">
-                        <Palette className="w-4 h-4 mr-2" /> Style
-                    </Button>
-                    <Button variant="destructive" size="sm" onClick={() => navigate(-1)} className="text-xs">
-                        <X className="w-4 h-4 mr-1" /> Exit
-                    </Button>
+                    <button
+                        onClick={() => setShowSettings(!showSettings)}
+                        className="text-white/40 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/10"
+                    >
+                        <Palette className="w-5 h-5" />
+                    </button>
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="flex items-center gap-1.5 text-white/50 hover:text-white transition-colors text-sm font-bold px-3 py-2 rounded-lg hover:bg-white/10"
+                    >
+                        <X className="w-4 h-4" /> 나가기
+                    </button>
                 </div>
             </div>
 
-            {/* Design Settings Modal */}
-            {showSettings && (
-                <div className="fixed top-16 right-4 bg-white text-black p-4 rounded-lg shadow-xl z-[10001] w-80 border border-gray-200 animate-in fade-in slide-in-from-top-2">
-                    <h3 className="font-bold mb-4 flex items-center gap-2">
-                        <Settings className="w-4 h-4" /> Kiosk Design
-                    </h3>
+            {/* ── 메인 스테이지 ────────────────────────────────────────── */}
+            <div className="flex-1 flex flex-col items-center justify-center relative z-10 overflow-hidden">
 
-                    <div className="space-y-4">
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 block mb-1">Background Image</label>
-                            <input type="file" accept="image/*" onChange={handleBgUpload} className="text-sm w-full" />
-                            {design.bgImage && (
-                                <Button variant="outline" size="sm" className="mt-2 w-full text-xs" onClick={() => setDesign(prev => ({ ...prev, bgImage: null }))}>
-                                    Clear Image
-                                </Button>
+                {/* 배경 글로우 (이미지 없을 때) */}
+                {!design.bgImage && (
+                    <div className="absolute inset-0 pointer-events-none">
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-[#003366]/20 blur-[120px]" />
+                    </div>
+                )}
+
+                {/* 대기 상태 */}
+                {scannerState.status === 'IDLE' && (
+                    <div className="flex flex-col items-center z-10 px-8 w-full max-w-3xl">
+                        <div className="text-center mb-10" style={{ color: design.bgImage ? design.textColor : undefined }}>
+                            <h1 className={`text-5xl md:text-6xl font-black mb-3 leading-tight ${design.bgImage ? '' : 'text-white'}`}>
+                                {conferenceTitle}
+                            </h1>
+                            {conferenceSubtitle && (
+                                <p className={`text-2xl font-medium ${design.bgImage ? 'opacity-80' : 'text-white/50'}`}>
+                                    {conferenceSubtitle}
+                                </p>
                             )}
                         </div>
 
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 block mb-1">Text Color</label>
-                            <div className="flex gap-2">
-                                <input
-                                    type="color"
-                                    value={design.textColor}
-                                    onChange={(e) => setDesign(prev => ({ ...prev, textColor: e.target.value }))}
-                                    className="h-8 w-16 p-0 border-0"
-                                />
-                                <div className="flex-1 flex gap-1">
-                                    <button onClick={() => setDesign(prev => ({ ...prev, textColor: '#000000' }))} className="w-8 h-8 bg-black rounded-full border border-gray-200" />
-                                    <button onClick={() => setDesign(prev => ({ ...prev, textColor: '#ffffff' }))} className="w-8 h-8 bg-white rounded-full border border-gray-200" />
+                        <div className="w-full bg-white/5 border border-white/10 rounded-[40px] p-14 md:p-16 flex flex-col items-center shadow-[0_0_80px_rgba(0,51,102,0.4)] backdrop-blur-sm">
+                            <div className="w-44 h-44 rounded-full bg-white/5 border-2 border-dashed border-white/20 flex items-center justify-center mb-10">
+                                <Printer className="w-20 h-20 text-white/20" />
+                            </div>
+                            <h2 className="text-5xl md:text-6xl font-black text-white mb-5">등록 확인 및 명찰 발급</h2>
+                            <p className="text-white/40 text-xl md:text-2xl font-medium text-center leading-relaxed">
+                                등록 교환권(QR)을 스캐너에 인식시켜 주세요
+                                <br />
+                                <span className="text-white/25 text-lg">Please scan your Registration Voucher</span>
+                            </p>
+                            <div className="mt-10 flex items-center gap-3 text-white/25 font-black uppercase tracking-[0.5em] text-xs animate-pulse">
+                                <div className="w-2 h-2 rounded-full bg-white/30 animate-ping" />
+                                SCAN QR CODE
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 처리 중 전체화면 */}
+                {scannerState.status === 'PROCESSING' && (
+                    <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center z-[50000] backdrop-blur-md">
+                        <Loader2 className="w-28 h-28 animate-spin text-[#c3daee] mb-8" />
+                        <p className="text-4xl font-black text-white">발급 처리 중...</p>
+                    </div>
+                )}
+
+                {/* 성공 전체화면 */}
+                {scannerState.status === 'SUCCESS' && (
+                    <div className="absolute inset-0 bg-green-600 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200 z-[60000]">
+                        <CheckCircle className="w-52 h-52 text-white drop-shadow-2xl mb-8" />
+                        <h2 className="text-7xl md:text-8xl font-black text-white mb-6 drop-shadow-lg">
+                            {scannerState.message}
+                        </h2>
+                        {scannerState.userData && (
+                            <div className="text-center bg-white/15 border border-white/20 rounded-3xl px-16 py-10 backdrop-blur-sm mt-4 w-full max-w-4xl">
+                                <div className="text-6xl md:text-7xl font-black text-white mb-4 tracking-tight">
+                                    {scannerState.userData.name}
+                                </div>
+                                <div className="text-3xl md:text-4xl text-white/70 font-medium">
+                                    {scannerState.userData.affiliation}
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Main Content Area */}
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative mt-16">
-
-                {/* Header */}
-                <div className="mb-12 drop-shadow-lg">
-                    <h1 className="text-5xl md:text-7xl font-bold mb-4 tracking-tight" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
-                        {conferenceTitle}
-                    </h1>
-                    <p className="text-2xl md:text-3xl opacity-90 font-light">{conferenceSubtitle}</p>
-                </div>
-
-                {/* Main Instruction Card */}
-                <div className={`p-10 rounded-3xl w-full max-w-3xl shadow-2xl backdrop-blur-sm border transition-all duration-500 ${design.bgImage ? 'bg-black/40 border-white/20 text-white' :
-                    'bg-green-50 border-green-200 text-green-900'
-                    }`}>
-                    <h2 className="text-5xl font-black mb-6">
-                        등록 확인 및 명찰 발급
-                    </h2>
-
-                    <p className="opacity-80 mb-8 text-2xl font-medium">
-                        등록 교환권(QR)을 스캐너에 인식시켜주세요.
-                        <br />(Please scan your Registration Voucher)
-                    </p>
-
-                    <div className="animate-pulse mt-8">
-                        <Printer className="w-16 h-16 mx-auto opacity-50" />
-                    </div>
-                </div>
-
-                {/* Processing Indicator */}
-                {scannerState.status === 'PROCESSING' && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-[50000] backdrop-blur-sm">
-                        <div className="bg-white p-8 rounded-2xl flex flex-col items-center">
-                            <Loader2 className="w-16 h-16 animate-spin text-blue-600 mb-4" />
-                            <p className="text-xl font-bold text-gray-800">발급 처리중...</p>
-                        </div>
-                    </div>
-                )}
-
-                {/* Result Overlay (Success/Error) */}
-                {(scannerState.status === 'SUCCESS' || scannerState.status === 'ERROR') && (
-                    <div className={`absolute inset-0 z-[60000] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200 ${scannerState.status === 'SUCCESS' ? 'bg-green-600' : 'bg-red-600'
-                        } text-white`}>
-                        {scannerState.status === 'SUCCESS' ? (
-                            <CheckCircle className="w-40 h-40 mb-8 drop-shadow-lg" />
-                        ) : (
-                            <AlertCircle className="w-40 h-40 mb-8 drop-shadow-lg" />
-                        )}
-
-                        <h2 className="text-6xl font-black mb-4 drop-shadow-md">{scannerState.message}</h2>
-
-                        {scannerState.userData && (
-                            <div className="mt-12 text-center bg-white/10 p-12 rounded-3xl backdrop-blur-md border border-white/20 w-full max-w-4xl shadow-2xl">
-                                <div className="text-7xl font-black mb-6 tracking-tight">{scannerState.userData.name}</div>
-                                <div className="text-4xl opacity-90 font-light">{scannerState.userData.affiliation}</div>
-                            </div>
-                        )}
-
-                        {scannerState.status === 'ERROR' && (
-                            <div className="mt-6 text-3xl opacity-90 font-medium bg-black/20 px-8 py-4 rounded-xl">
-                                {scannerState.message}
-                            </div>
                         )}
                     </div>
                 )}
 
-                {/* Hidden Input */}
+                {/* 실패 전체화면 */}
+                {scannerState.status === 'ERROR' && (
+                    <div className="absolute inset-0 bg-red-600 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200 z-[60000]">
+                        <AlertCircle className="w-52 h-52 text-white drop-shadow-2xl mb-8" />
+                        <h2 className="text-7xl md:text-8xl font-black text-white mb-6 drop-shadow-lg">발급 실패</h2>
+                        <p className="text-3xl md:text-4xl text-white/80 font-medium bg-black/20 px-10 py-5 rounded-2xl">
+                            {scannerState.message}
+                        </p>
+                    </div>
+                )}
+
+                {/* 숨겨진 QR 입력 */}
                 <input
                     ref={inputRef}
                     value={inputValue}
@@ -506,6 +498,50 @@ const InfodeskPage: React.FC = () => {
                     autoFocus
                 />
             </div>
+
+            {/* ── 설정 패널 ────────────────────────────────────────────── */}
+            {showSettings && (
+                <div className="fixed inset-0 z-[10001] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+                    <div className="bg-[#001f3f] border border-white/20 rounded-3xl shadow-2xl w-full max-w-sm p-8">
+                        <h3 className="font-black text-xl text-white mb-6 flex items-center gap-2">
+                            <Settings className="w-5 h-5 text-white/50" /> 키오스크 설정
+                        </h3>
+                        <div className="space-y-5">
+                            <div>
+                                <label className="text-xs font-bold text-white/40 uppercase mb-2 block tracking-wider">배경 이미지</label>
+                                <input type="file" accept="image/*" onChange={handleBgUpload} className="text-sm w-full text-white/60" />
+                                {design.bgImage && (
+                                    <button
+                                        onClick={() => setDesign(prev => ({ ...prev, bgImage: null }))}
+                                        className="mt-2 w-full py-2 text-xs font-bold text-white/60 border border-white/20 rounded-xl hover:bg-white/10 transition-colors"
+                                    >
+                                        이미지 제거
+                                    </button>
+                                )}
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-white/40 uppercase mb-2 block tracking-wider">텍스트 색상</label>
+                                <div className="flex gap-3 items-center">
+                                    <input
+                                        type="color"
+                                        value={design.textColor}
+                                        onChange={(e) => setDesign(prev => ({ ...prev, textColor: e.target.value }))}
+                                        className="h-10 w-16 p-1 rounded-xl border border-white/20 bg-white/10 cursor-pointer"
+                                    />
+                                    <button onClick={() => setDesign(prev => ({ ...prev, textColor: '#ffffff' }))} className="w-10 h-10 bg-white rounded-full border border-white/30 shadow" />
+                                    <button onClick={() => setDesign(prev => ({ ...prev, textColor: '#000000' }))} className="w-10 h-10 bg-black rounded-full border border-white/20 shadow" />
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowSettings(false)}
+                                className="w-full py-3 bg-[#003366] hover:bg-[#002244] text-white font-black rounded-xl transition-colors mt-2"
+                            >
+                                닫기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

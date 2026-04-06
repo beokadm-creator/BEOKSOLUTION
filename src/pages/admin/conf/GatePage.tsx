@@ -257,71 +257,173 @@ const GatePage: React.FC = () => {
 
     const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter' && inputValue.trim()) processScan(inputValue.trim()); };
 
-    if (loading) return <div className="p-10 text-center font-bold">Loading...</div>;
+    if (loading) return (
+        <div className="fixed inset-0 bg-[#001f3f] flex items-center justify-center">
+            <div className="text-center">
+                <Loader2 className="w-16 h-16 animate-spin text-white/30 mx-auto mb-4" />
+                <p className="text-white/50 font-bold text-xl tracking-widest uppercase">Loading Gate</p>
+            </div>
+        </div>
+    );
 
     const activeZone = zones.find(z => z.id === selectedZoneId);
+    const modeLabel = { ENTER_ONLY: '입장', EXIT_ONLY: '퇴장', AUTO: '자동' };
+    const modeBg = { ENTER_ONLY: 'bg-[#003366]', EXIT_ONLY: 'bg-red-600', AUTO: 'bg-[#24669e]' };
 
     return (
-        <div className="fixed inset-0 z-[9999] bg-white flex flex-col font-sans overflow-hidden">
-            <div className="bg-slate-900 text-white px-6 py-3 flex justify-between items-center z-[100]">
-                <div className="flex items-center gap-6">
-                    <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="text-slate-400">
-                        <ArrowLeft className="w-4 h-4 mr-2" /> Exit
-                    </Button>
-                    <div className="flex items-center gap-2">
-                        <select value={selectedZoneId} onChange={e => setSelectedZoneId(e.target.value)} className="bg-slate-800 border-none rounded px-2 py-1 text-sm font-bold">
-                            {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
-                        </select>
-                    </div>
-                    <div className="flex gap-1 bg-slate-800 p-1 rounded">
+        <div className="fixed inset-0 z-[9999] bg-[#001f3f] flex flex-col font-sans overflow-hidden select-none">
+
+            {/* ── 관리자 컨트롤 바 ─────────────────────────────────────── */}
+            <div className="shrink-0 bg-black/50 backdrop-blur-md border-b border-white/10 px-5 py-2.5 flex items-center justify-between z-[100]">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="flex items-center gap-1.5 text-white/50 hover:text-white transition-colors text-sm font-bold px-3 py-2 rounded-lg hover:bg-white/10"
+                    >
+                        <ArrowLeft className="w-4 h-4" /> 나가기
+                    </button>
+                    <div className="w-px h-5 bg-white/15" />
+                    <select
+                        value={selectedZoneId}
+                        onChange={e => setSelectedZoneId(e.target.value)}
+                        className="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm font-bold text-white appearance-none cursor-pointer"
+                    >
+                        {zones.map(z => <option key={z.id} value={z.id} className="text-slate-900">{z.name}</option>)}
+                    </select>
+                    <div className="flex gap-1 bg-white/10 p-1 rounded-lg">
                         {(['ENTER_ONLY', 'EXIT_ONLY', 'AUTO'] as const).map(m => (
-                            <button key={m} onClick={() => setMode(m)} className={`px-3 py-1 rounded text-[10px] font-bold ${mode === m ? 'bg-blue-600' : 'text-slate-500'}`}>{m}</button>
+                            <button
+                                key={m}
+                                onClick={() => setMode(m)}
+                                className={`px-4 py-1.5 rounded-md text-xs font-black transition-all ${mode === m ? `${modeBg[m]} text-white shadow-lg` : 'text-white/40 hover:text-white/70'}`}
+                            >
+                                {modeLabel[m]}
+                            </button>
                         ))}
                     </div>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => setShowSettings(!showSettings)} className="text-slate-400"><Palette className="w-4 h-4" /></Button>
+                <button
+                    onClick={() => setShowSettings(!showSettings)}
+                    className="text-white/40 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/10"
+                >
+                    <Palette className="w-5 h-5" />
+                </button>
             </div>
 
-            <div className="flex-1 flex flex-col items-center justify-center p-8 relative">
-                <div className="text-center mb-10 z-10">
-                    <h1 className="text-4xl font-black text-slate-900 mb-2">{conferenceTitle}</h1>
-                    <p className="text-slate-500 text-xl">{conferenceSubtitle}</p>
-                    <div className="mt-4 inline-flex items-center gap-2 bg-slate-100 px-4 py-1 rounded-full text-slate-600 font-bold"><MapPin className="w-4 h-4" /> {activeZone?.name}</div>
+            {/* ── 메인 스테이지 ────────────────────────────────────────── */}
+            <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden">
+
+                {/* 배경 글로우 */}
+                <div className="absolute inset-0 pointer-events-none">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-[#003366]/20 blur-[120px]" />
                 </div>
 
-                <div className="w-full max-w-2xl bg-white rounded-[40px] shadow-2xl border border-slate-100 overflow-hidden z-10">
-                    <div className="p-16 flex flex-col items-center">
-                        <div className="mb-10 p-8 rounded-full bg-slate-50">
-                            {scannerState.status === 'IDLE' && <LogIn className="w-16 h-16 text-slate-200" />}
-                            {scannerState.status === 'PROCESSING' && <Loader2 className="w-16 h-16 animate-spin text-blue-500" />}
-                            {scannerState.status === 'SUCCESS' && <CheckCircle className="w-16 h-16 text-green-500" />}
-                            {scannerState.status === 'ERROR' && <AlertCircle className="w-16 h-16 text-red-500" />}
+                {/* 대기 / 처리 중 상태 */}
+                {(scannerState.status === 'IDLE' || scannerState.status === 'PROCESSING') && (
+                    <div className="flex flex-col items-center z-10 px-8 w-full max-w-3xl">
+                        {/* 학회명 */}
+                        <div className="text-center mb-10">
+                            <h1 className="text-5xl md:text-6xl font-black text-white mb-3 leading-tight">{conferenceTitle}</h1>
+                            {conferenceSubtitle && <p className="text-white/50 text-2xl font-medium">{conferenceSubtitle}</p>}
+                            {activeZone && (
+                                <div className="mt-5 inline-flex items-center gap-2 bg-white/10 border border-white/20 px-5 py-2 rounded-full text-white/70 font-bold text-lg">
+                                    <MapPin className="w-5 h-5" /> {activeZone.name}
+                                </div>
+                            )}
                         </div>
-                        <h2 className={cn("text-5xl font-black mb-4", scannerState.status === 'ERROR' ? "text-red-600" : scannerState.status === 'SUCCESS' ? "text-green-600" : "text-slate-900")}>
+
+                        {/* QR 스캔 카드 */}
+                        <div className="w-full bg-white/5 border border-white/10 rounded-[40px] p-14 md:p-16 flex flex-col items-center shadow-[0_0_80px_rgba(0,51,102,0.4)]">
+                            {scannerState.status === 'IDLE' ? (
+                                <>
+                                    <div className="w-44 h-44 rounded-full bg-white/5 border-2 border-dashed border-white/20 flex items-center justify-center mb-10">
+                                        <LogIn className="w-20 h-20 text-white/20" />
+                                    </div>
+                                    <h2 className="text-5xl md:text-6xl font-black text-white mb-5">QR 스캔 대기</h2>
+                                    <p className="text-white/40 text-xl md:text-2xl font-medium text-center leading-relaxed">
+                                        등록 QR코드를 스캐너에 인식시켜 주세요
+                                    </p>
+                                    <div className="mt-10 flex items-center gap-3 text-white/25 font-black uppercase tracking-[0.5em] text-xs animate-pulse">
+                                        <div className="w-2 h-2 rounded-full bg-white/30 animate-ping" />
+                                        SCAN QR CODE
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <Loader2 className="w-28 h-28 animate-spin text-[#c3daee] mb-8" />
+                                    <h2 className="text-5xl font-black text-white">확인 중...</h2>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* ── 성공 전체화면 ──────────────────────────────────────── */}
+                {scannerState.status === 'SUCCESS' && (
+                    <div className="absolute inset-0 bg-green-600 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200 z-50">
+                        <CheckCircle className="w-52 h-52 text-white drop-shadow-2xl mb-8" />
+                        <h2 className="text-7xl md:text-8xl font-black text-white mb-6 drop-shadow-lg">
                             {scannerState.message}
                         </h2>
-                        {scannerState.subMessage && <p className="text-3xl font-bold text-slate-700">{scannerState.subMessage}</p>}
-                        {scannerState.userData && <p className="text-xl text-slate-400 font-medium mt-2">{scannerState.userData.affiliation}</p>}
+                        {scannerState.userData && (
+                            <div className="text-center bg-white/15 border border-white/20 rounded-3xl px-16 py-10 backdrop-blur-sm mt-4">
+                                <div className="text-5xl md:text-6xl font-black text-white mb-3">
+                                    {scannerState.userData.name}
+                                </div>
+                                <div className="text-2xl md:text-3xl text-white/70 font-medium">
+                                    {scannerState.userData.affiliation}
+                                </div>
+                            </div>
+                        )}
                     </div>
-                </div>
+                )}
 
-                <div className="mt-12 flex items-center gap-2 text-slate-300 font-bold uppercase tracking-widest animate-pulse">
-                    Scan QR
-                </div>
+                {/* ── 실패 전체화면 ──────────────────────────────────────── */}
+                {scannerState.status === 'ERROR' && (
+                    <div className="absolute inset-0 bg-red-600 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200 z-50">
+                        <X className="w-52 h-52 text-white drop-shadow-2xl mb-8" />
+                        <h2 className="text-7xl md:text-8xl font-black text-white mb-6 drop-shadow-lg">인식 실패</h2>
+                        <p className="text-3xl md:text-4xl text-white/80 font-medium bg-black/20 px-10 py-5 rounded-2xl">
+                            {scannerState.message}
+                        </p>
+                    </div>
+                )}
 
-                <input ref={inputRef} value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={handleKeyDown} onBlur={handleBlur} className="absolute opacity-0 pointer-events-none" autoFocus />
+                {/* 숨겨진 QR 입력 */}
+                <input
+                    ref={inputRef}
+                    value={inputValue}
+                    onChange={e => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    onBlur={handleBlur}
+                    className="absolute opacity-0 pointer-events-none"
+                    autoFocus
+                />
             </div>
 
+            {/* ── 설정 모달 ────────────────────────────────────────────── */}
             {showSettings && (
-                <div className="fixed inset-0 z-[200] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-6">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8">
-                        <h3 className="font-black text-xl mb-6">Settings</h3>
+                <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+                    <div className="bg-[#001f3f] border border-white/20 rounded-3xl shadow-2xl w-full max-w-sm p-8">
+                        <h3 className="font-black text-xl text-white mb-6 flex items-center gap-2">
+                            <Palette className="w-5 h-5 text-white/50" /> 키오스크 설정
+                        </h3>
                         <div className="space-y-6">
                             <div>
-                                <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Text Color</label>
-                                <input type="color" value={design.textColor} onChange={e => setDesign(p => ({ ...p, textColor: e.target.value }))} className="w-full h-10 p-1 rounded border-none" />
+                                <label className="text-xs font-bold text-white/40 uppercase mb-2 block tracking-wider">텍스트 색상</label>
+                                <input
+                                    type="color"
+                                    value={design.textColor}
+                                    onChange={e => setDesign(p => ({ ...p, textColor: e.target.value }))}
+                                    className="w-full h-12 p-1 rounded-xl border border-white/20 bg-white/10 cursor-pointer"
+                                />
                             </div>
-                            <Button className="w-full font-bold" onClick={() => setShowSettings(false)}>Close</Button>
+                            <button
+                                onClick={() => setShowSettings(false)}
+                                className="w-full py-3 bg-[#003366] hover:bg-[#002244] text-white font-black rounded-xl transition-colors"
+                            >
+                                닫기
+                            </button>
                         </div>
                     </div>
                 </div>
