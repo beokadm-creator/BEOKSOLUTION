@@ -86,7 +86,7 @@ export const WideFooterPreview: React.FC<WideFooterPreviewProps> = ({ society, l
             {(footerInfo?.representativeName || footerInfo?.bizRegNumber) && (
               <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50">
                 <div className="flex items-center gap-3 mb-5">
-                  <Building2 className="w-5 h-5 text-blue-400" />
+                  <Building2 className="w-5 h-5 text-[#93bfde]" />
                   <h4 className="text-base font-bold text-white">
                     {language === 'ko' ? '사업자 정보' : 'Business Information'}
                   </h4>
@@ -126,7 +126,7 @@ export const WideFooterPreview: React.FC<WideFooterPreviewProps> = ({ society, l
             {(footerInfo?.contactEmail || footerInfo?.contactPhone) && (
               <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50">
                 <div className="flex items-center gap-3 mb-5">
-                  <Mail className="w-5 h-5 text-blue-400" />
+                  <Mail className="w-5 h-5 text-[#93bfde]" />
                   <h4 className="text-base font-bold text-white">
                     {language === 'ko' ? '연락처' : 'Contact'}
                   </h4>
@@ -141,7 +141,7 @@ export const WideFooterPreview: React.FC<WideFooterPreviewProps> = ({ society, l
                         </p>
                         <a
                           href={`mailto:${footerInfo.contactEmail}`}
-                          className="text-sm text-blue-400 hover:text-blue-300 font-medium transition-colors"
+                          className="text-sm text-[#93bfde] hover:text-white font-medium transition-colors"
                         >
                           {footerInfo.contactEmail}
                         </a>
@@ -157,7 +157,7 @@ export const WideFooterPreview: React.FC<WideFooterPreviewProps> = ({ society, l
                         </p>
                         <a
                           href={`tel:${footerInfo.contactPhone}`}
-                          className="text-sm text-blue-400 hover:text-blue-300 font-medium transition-colors"
+                          className="text-sm text-[#93bfde] hover:text-white font-medium transition-colors"
                         >
                           {footerInfo.contactPhone}
                         </a>
@@ -174,7 +174,7 @@ export const WideFooterPreview: React.FC<WideFooterPreviewProps> = ({ society, l
             {/* Address */}
             <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50">
               <div className="flex items-center gap-3 mb-5">
-                <MapPin className="w-5 h-5 text-blue-400" />
+                <MapPin className="w-5 h-5 text-[#93bfde]" />
                 <h4 className="text-base font-bold text-white">
                   {language === 'ko' ? '주소' : 'Address'}
                 </h4>
@@ -195,7 +195,7 @@ export const WideFooterPreview: React.FC<WideFooterPreviewProps> = ({ society, l
 
             {/* Operating Hours */}
             {footerInfo?.operatingHours && (
-              <div className="bg-gradient-to-br from-blue-600/20 to-slate-700/20 rounded-2xl p-6 border border-blue-500/30">
+              <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50">
                 <h4 className="text-sm font-bold text-white mb-3">
                   {language === 'ko' ? '⏰ 운영 시간' : '⏰ Operating Hours'}
                 </h4>

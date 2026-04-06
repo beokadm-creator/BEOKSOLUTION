@@ -41,7 +41,7 @@ export const WideProgramPreview = ({ agendas, speakers = [], lang = 'ko' }: { ag
                 else if (agenda.startTime.toDate) date = agenda.startTime.toDate();
                 // @ts-expect-error - Check for seconds (Firestore serialized)
                 else if (agenda.startTime.seconds) date = new Date(agenda.startTime.seconds * 1000);
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                 
                 else date = new Date(agenda.startTime as any);
             }
 
@@ -143,7 +143,7 @@ export const WideProgramPreview = ({ agendas, speakers = [], lang = 'ko' }: { ag
                                 return (
                                     <div
                                         key={agenda.id}
-                                        className="group bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg hover:border-blue-200 transition-all duration-300 overflow-hidden"
+                                        className="group bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg hover:border-[#c3daee] transition-all duration-300 overflow-hidden"
                                     >
                                         <div className="flex flex-col md:flex-row">
                                             {/* Time Section - Desktop Left Sidebar style */}
@@ -159,7 +159,7 @@ export const WideProgramPreview = ({ agendas, speakers = [], lang = 'ko' }: { ag
 
                                                 {agenda.location && (
                                                     <div className="flex items-center gap-1.5 text-xs md:text-sm font-medium text-slate-500 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm">
-                                                        <MapPin className="w-3.5 h-3.5 text-blue-500" />
+                                                        <MapPin className="w-3.5 h-3.5 text-[#24669e]" />
                                                         {t(agenda.location)}
                                                     </div>
                                                 )}
@@ -170,7 +170,7 @@ export const WideProgramPreview = ({ agendas, speakers = [], lang = 'ko' }: { ag
                                                 {/* Session Header */}
                                                 <div className="flex flex-wrap items-start gap-3 mb-4">
                                                     {agenda.sessionType && (
-                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs md:text-sm font-bold bg-indigo-50 text-indigo-600 border border-indigo-100 uppercase tracking-wider">
+                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs md:text-sm font-bold bg-[#f0f5fa] text-[#003366] border border-[#c3daee] uppercase tracking-wider">
                                                             {agenda.sessionType}
                                                         </span>
                                                     )}
@@ -193,7 +193,7 @@ export const WideProgramPreview = ({ agendas, speakers = [], lang = 'ko' }: { ag
                                                             <button
                                                                 type="button"
                                                                 key={speaker.id}
-                                                                className="relative flex flex-col sm:flex-row gap-4 md:gap-5 p-4 md:p-5 bg-slate-50/80 rounded-xl border border-slate-100 hover:bg-blue-50/50 hover:border-blue-100 transition-colors cursor-pointer group/speaker text-left"
+                                                                className="relative flex flex-col sm:flex-row gap-4 md:gap-5 p-4 md:p-5 bg-slate-50/80 rounded-xl border border-slate-100 hover:bg-[#f0f5fa]/50 hover:border-[#c3daee] transition-colors cursor-pointer group/speaker text-left"
                                                                 onClick={() => setSelectedSpeaker(speaker)}
                                                                 aria-label={`View ${t(speaker.name)} details`}
                                                             >
@@ -222,7 +222,7 @@ export const WideProgramPreview = ({ agendas, speakers = [], lang = 'ko' }: { ag
                                                                     {/* Presentation Title (TOPIC) - Highlighted */}
                                                                     <div className="mb-2">
                                                                         {speaker.presentationTitle ? (
-                                                                            <h4 className="text-sm md:text-lg font-bold text-slate-900 leading-tight group-hover/speaker:text-blue-700 transition-colors">
+                                                                            <h4 className="text-sm md:text-lg font-bold text-slate-900 leading-tight group-hover/speaker:text-[#003366] transition-colors">
                                                                                 {t(speaker.presentationTitle)}
                                                                             </h4>
                                                                         ) : (
@@ -270,7 +270,7 @@ export const WideProgramPreview = ({ agendas, speakers = [], lang = 'ko' }: { ag
                     {selectedSpeaker && (
                         <>
                             {/* Header with Gradient & Close Button */}
-                            <div className="relative h-36 md:h-48 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 overflow-hidden shrink-0">
+                            <div className="relative h-36 md:h-48 bg-[#003366] overflow-hidden shrink-0">
                                 {/* Decorative Pattern Overlay */}
                                 <div className="absolute inset-0 opacity-10">
                                     <div className="absolute top-0 left-0 w-40 h-40 bg-white rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2" />
@@ -314,7 +314,7 @@ export const WideProgramPreview = ({ agendas, speakers = [], lang = 'ko' }: { ag
                                         {t(selectedSpeaker.name)}
                                     </h2>
                                     {selectedSpeaker.organization && (
-                                        <p className="text-sm md:text-base lg:text-lg font-semibold text-blue-600 mb-5 md:mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-2 rounded-full border border-blue-100 shadow-sm inline-block">
+                                        <p className="text-sm md:text-base lg:text-lg font-semibold text-[#003366] mb-5 md:mb-6 bg-[#f0f5fa] px-4 py-2 rounded-full border border-[#c3daee] shadow-sm inline-block">
                                             {t(selectedSpeaker.organization)}
                                         </p>
                                     )}
@@ -323,7 +323,7 @@ export const WideProgramPreview = ({ agendas, speakers = [], lang = 'ko' }: { ag
                                     {selectedSpeaker.presentationTitle && (
                                         <div className="w-full bg-gradient-to-br from-slate-50 to-slate-100 p-5 md:p-6 rounded-2xl mb-5 md:mb-6 border border-slate-200 shadow-lg text-left">
                                             <h3 className="text-sm md:text-base font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                                <span className="bg-blue-100 text-blue-600 p-1.5 md:p-2 rounded-lg">
+                                                <span className="bg-[#f0f5fa] text-[#003366] p-1.5 md:p-2 rounded-lg">
                                                     <Mic2 className="w-4 h-4 md:w-5 md:h-5" />
                                                 </span>
                                                 {lang === 'ko' ? '발표 주제' : 'Presentation Topic'}
@@ -338,7 +338,7 @@ export const WideProgramPreview = ({ agendas, speakers = [], lang = 'ko' }: { ag
                                     {selectedSpeaker.bio && (
                                         <div className="w-full text-left bg-white rounded-2xl p-5 md:p-6 border border-slate-200 shadow-sm">
                                             <h3 className="text-sm md:text-base font-bold text-slate-900 mb-3 pb-3 border-b-2 border-slate-100 flex items-center gap-2">
-                                                <span className="w-2 h-2 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500" />
+                                                <span className="w-2 h-2 rounded-full bg-[#003366]" />
                                                 {lang === 'ko' ? '약력' : 'Biography'}
                                             </h3>
                                             {/* Bio content without separate scroll - part of overall modal scroll */}

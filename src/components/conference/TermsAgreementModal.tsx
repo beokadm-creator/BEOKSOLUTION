@@ -130,13 +130,13 @@ export default function TermsAgreementModal({
 
           <div className="flex-1 overflow-y-auto py-4 space-y-3">
             {/* Select All */}
-            <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-3 p-4 bg-[#f0f5fa] border border-[#c3daee] rounded-lg">
               <Checkbox
                 id="selectAll"
                 checked={allSelected}
                 onCheckedChange={handleSelectAll}
               />
-              <Label htmlFor="selectAll" className="font-bold text-blue-900 cursor-pointer">
+              <Label htmlFor="selectAll" className="font-bold text-[#003366] cursor-pointer">
                 {lang === 'ko' ? '전체 동의' : 'Select All'}
               </Label>
             </div>
@@ -174,7 +174,7 @@ export default function TermsAgreementModal({
                         title: lang === 'ko' ? term.labelKo : term.labelEn,
                         content
                       })}
-                      className="mt-2 text-blue-600 text-sm flex items-center gap-1 hover:underline"
+                      className="mt-2 text-[#003366] text-sm flex items-center gap-1 hover:underline"
                     >
                       <FileText className="w-4 h-4" />
                       {lang === 'ko' ? '내용 보기' : 'View Content'}
@@ -213,7 +213,7 @@ export default function TermsAgreementModal({
               <Button
                 onClick={handleAgree}
                 disabled={!canProceed}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-[#003366] hover:bg-[#002244] text-white"
               >
                 <CheckCircle2 className="w-4 h-4 mr-2" />
                 {lang === 'ko' ? '약관동의' : 'Agree'}

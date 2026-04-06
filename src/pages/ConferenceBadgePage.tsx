@@ -524,19 +524,19 @@ const ConferenceBadgePage: React.FC = () => {
                 <button
                     type="button"
                     onClick={() => setBadgeLang("ko")}
-                    className={`rounded-full px-3 py-1 text-xs font-bold ${badgeLang === "ko" ? "bg-blue-600 text-white" : "border border-blue-200 bg-white text-blue-700"}`}
+                    className={`rounded-full px-3 py-1 text-xs font-bold ${badgeLang === "ko" ? "bg-[#003366] text-white" : "border border-[#c3daee] bg-white text-[#003366]"}`}
                 >
                     KO
                 </button>
                 <button
                     type="button"
                     onClick={() => setBadgeLang("en")}
-                    className={`rounded-full px-3 py-1 text-xs font-bold ${badgeLang === "en" ? "bg-blue-600 text-white" : "border border-blue-200 bg-white text-blue-700"}`}
+                    className={`rounded-full px-3 py-1 text-xs font-bold ${badgeLang === "en" ? "bg-[#003366] text-white" : "border border-[#c3daee] bg-white text-[#003366]"}`}
                 >
                     EN
                 </button>
             </div>
-            <div className={`w-full max-w-sm rounded-3xl border-4 p-8 text-center shadow-2xl transition-all ${uiData.issued ? "border-blue-600" : "border-gray-300"}`}>
+            <div className={`w-full max-w-sm rounded-3xl border-4 p-8 text-center shadow-2xl transition-all ${uiData.issued ? "border-[#003366]" : "border-gray-300"}`}>
                 <h1 className="mb-6 text-xl font-bold uppercase tracking-wide text-gray-800">
                     {uiData.issued ? t("디지털 명찰", "Digital Badge") : t("등록 확인 바우처", "Registration Voucher")}
                 </h1>
@@ -569,33 +569,33 @@ const ConferenceBadgePage: React.FC = () => {
 
             {uiData.issued && stampConfig?.enabled && (
                 <div className="mt-6 w-full max-w-sm space-y-4">
-                    <div className="rounded-3xl border-2 border-dashed border-indigo-400 bg-indigo-50 p-6 text-center shadow-md">
-                        <h3 className="mb-2 text-xl font-bold text-indigo-900">{t("스탬프 투어", "Stamp Tour")}</h3>
-                        <p className="mb-4 text-sm text-indigo-700">{t("참여 부스를 방문하고 스탬프를 모아보세요.", "Visit participating booths and collect stamps.")}</p>
+                    <div className="rounded-3xl border-2 border-dashed border-[#c3daee] bg-[#f0f5fa] p-6 text-center shadow-md">
+                        <h3 className="mb-2 text-xl font-bold text-[#003366]">{t("스탬프 투어", "Stamp Tour")}</h3>
+                        <p className="mb-4 text-sm text-[#24669e]">{t("참여 부스를 방문하고 스탬프를 모아보세요.", "Visit participating booths and collect stamps.")}</p>
 
-                        <div className="mb-2 flex items-center justify-between text-sm font-bold text-indigo-800">
+                        <div className="mb-2 flex items-center justify-between text-sm font-bold text-[#003366]">
                             <span>{t("현재 진행 현황", "Current progress")}</span>
-                            <span className="rounded-full bg-white px-3 py-1 text-indigo-600 shadow-sm">
+                            <span className="rounded-full bg-white px-3 py-1 text-[#003366] shadow-sm">
                                 {myStamps.length} / {requiredCount || totalVendors}
                             </span>
                         </div>
 
-                        <div className="mb-4 h-3 w-full overflow-hidden rounded-full bg-indigo-200">
+                        <div className="mb-4 h-3 w-full overflow-hidden rounded-full bg-[#c3daee]">
                             <div
-                                className="h-3 rounded-full bg-indigo-600 transition-all duration-1000 ease-out"
+                                className="h-3 rounded-full bg-[#003366] transition-all duration-1000 ease-out"
                                 style={{ width: `${Math.min(100, requiredCount > 0 ? (myStamps.length / requiredCount) * 100 : 0)}%` }}
                             />
                         </div>
 
                         {isCompleted && (
                             <div className="mt-4 space-y-2">
-                                <div className="text-sm font-semibold text-indigo-900">
+                                <div className="text-sm font-semibold text-[#003366]">
                                     {stampConfig.completionMessage || t("스탬프 투어를 완료했습니다.", "Stamp tour completed.")}
                                 </div>
                                 {rewardStatus === "NONE" && canParticipantDraw && (
                                     <button
                                         type="button"
-                                        className="w-full rounded-xl bg-indigo-600 py-2 text-sm font-bold text-white disabled:opacity-50"
+                                        className="w-full rounded-xl bg-[#003366] py-2 text-sm font-bold text-white disabled:opacity-50"
                                         onClick={handleRewardRequest}
                                         disabled={rewardRequesting}
                                     >
@@ -613,7 +613,7 @@ const ConferenceBadgePage: React.FC = () => {
                                     </div>
                                 )}
                                 {!isInstantReward && lotteryStatus === "PENDING" && stampConfig.lotteryScheduledAt && (
-                                    <div className="text-xs text-indigo-700">
+                                    <div className="text-xs text-[#24669e]">
                                         {t("추첨 예정", "Scheduled draw")}: {stampConfig.lotteryScheduledAt.toDate().toLocaleString(badgeLang === "ko" ? "ko-KR" : "en-US")}
                                     </div>
                                 )}
@@ -628,7 +628,7 @@ const ConferenceBadgePage: React.FC = () => {
                                     </div>
                                 )}
                                 {rewardStatus === "REDEEMED" && (
-                                    <div className="rounded-xl bg-emerald-100 py-2 text-sm font-semibold text-emerald-700">
+                                    <div className="rounded-xl bg-green-50 py-2 text-sm font-semibold text-green-700">
                                         {t("상품 수령 완료", "Reward redeemed")}
                                     </div>
                                 )}
@@ -638,7 +638,7 @@ const ConferenceBadgePage: React.FC = () => {
                                     </div>
                                 )}
                                 {rewardMessage && (
-                                    <div className="text-xs text-indigo-700">{rewardMessage}</div>
+                                    <div className="text-xs text-[#24669e]">{rewardMessage}</div>
                                 )}
                             </div>
                         )}
@@ -653,7 +653,7 @@ const ConferenceBadgePage: React.FC = () => {
                                 {stampBooths.map((booth) => (
                                     <div key={booth.id} className="flex items-center justify-between text-sm">
                                         <span className="font-medium text-slate-700">{booth.name}</span>
-                                        <span className={`rounded-full px-2 py-1 text-xs ${booth.isStamped ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500"}`}>
+                                        <span className={`rounded-full px-2 py-1 text-xs ${booth.isStamped ? "bg-[#f0f5fa] text-[#003366]" : "bg-slate-100 text-slate-500"}`}>
                                             {booth.isStamped ? t("스탬프 완료", "Stamped") : t("미완료", "Pending")}
                                         </span>
                                     </div>

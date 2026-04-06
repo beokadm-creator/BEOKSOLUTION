@@ -56,7 +56,7 @@ const SocietySidebar: React.FC<SocietySidebarProps> = ({
         <div className="h-20 flex items-center justify-between px-6 border-b border-[#003366] gap-3">
           <div className="flex-1 min-w-0">
             <h1 className="text-lg font-black leading-none truncate">{societyName || 'SOCIETY'}</h1>
-            <p className="text-[10px] font-bold text-blue-300 uppercase tracking-widest mt-1">Portal</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Portal</p>
           </div>
           <button
             onClick={onClose}
@@ -83,15 +83,15 @@ const SocietySidebar: React.FC<SocietySidebarProps> = ({
                 className={`
                   w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all relative
                   ${isActive
-                    ? 'bg-[#003366] text-white border border-blue-400 shadow-lg shadow-blue-900/20'
-                    : 'text-blue-200 hover:bg-[#003366]/50 hover:text-white'
+                    ? 'bg-[#003366] text-white border border-white/20 shadow-lg shadow-black/20'
+                    : 'text-white/60 hover:bg-[#003366]/50 hover:text-white'
                   }
                 `}
               >
                 <Icon size={18} strokeWidth={2.5} />
                 <span className="flex-1 text-left">{item.label[language] || item.label.ko}</span>
                 {isActive && (
-                  <div className="absolute right-2 w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
+                  <div className="absolute right-2 w-1.5 h-1.5 bg-white/50 rounded-full animate-pulse" />
                 )}
               </button>
             );
@@ -105,13 +105,13 @@ const SocietySidebar: React.FC<SocietySidebarProps> = ({
             <button
               type="button"
               onClick={onToggleLanguage}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#003366]/50 hover:bg-[#003366] text-blue-200 hover:text-white transition-all text-xs font-bold"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#003366]/50 hover:bg-[#003366] text-white/60 hover:text-white transition-all text-xs font-bold"
             >
               <Languages size={14} />
               {language === 'ko' ? 'English' : '한국어'}
             </button>
           )}
-          <div className="text-[10px] text-blue-400 text-center font-bold uppercase tracking-widest">
+          <div className="text-[10px] text-white/30 text-center font-bold uppercase tracking-widest">
             Society Hub
           </div>
         </div>

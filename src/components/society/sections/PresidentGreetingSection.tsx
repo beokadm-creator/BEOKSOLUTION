@@ -57,14 +57,14 @@ const PresidentGreetingSection: React.FC<PresidentGreetingSectionProps> = ({ soc
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
       <div className="bg-white rounded-3xl border border-slate-100 p-6 md:p-12 shadow-sm">
         <h2 className="text-2xl md:text-3xl font-black text-slate-900 mb-6 md:mb-8 flex items-center gap-3 md:gap-4">
-          <div className="w-10 h-10 md:w-12 md:h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 font-black text-lg md:text-xl">
+          <div className="w-10 h-10 md:w-12 md:h-12 bg-[#f0f5fa] rounded-2xl flex items-center justify-center text-[#003366] font-black text-lg md:text-xl">
             {language === 'ko' ? '인사' : 'MSG'}
           </div>
           {language === 'ko' ? '학회장 인사말' : 'President\'s Greeting'}
         </h2>
 
         <div className="space-y-6">
-          <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-2xl p-5 md:p-8 border border-slate-100">
+          <div className="bg-[#f0f5fa] rounded-2xl p-5 md:p-8 border border-[#c3daee]">
             {/* Images */}
             {greetingImages.length > 0 && (
               <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">

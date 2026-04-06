@@ -89,8 +89,8 @@ const RegistrationFailPage: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="bg-blue-50/80 p-6 rounded-2xl border border-blue-200">
-                        <p className="text-sm text-blue-900 text-center leading-relaxed">
+                    <div className="bg-[#f0f5fa] p-6 rounded-2xl border border-[#c3daee]">
+                        <p className="text-sm text-[#003366] text-center leading-relaxed">
                             {language === 'ko'
                                 ? '다시 시도하시거나, 문제가 지속되면 관리자에게 문의해주세요.'
                                 : 'Please try again or contact support if the problem persists.'
@@ -101,7 +101,7 @@ const RegistrationFailPage: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Button
                             onClick={handleRetry}
-                            className="bg-[#003366] hover:bg-[#002244] h-14 text-lg font-bold rounded-2xl shadow-lg shadow-blue-900/20 hover:shadow-xl hover:-translate-y-0.5 transition-all text-white"
+                            className="bg-[#003366] hover:bg-[#002244] h-14 text-lg font-bold rounded-2xl shadow-lg shadow-[#003366]/20 hover:shadow-xl hover:-translate-y-0.5 transition-all text-white"
                         >
                             <RotateCcw className="w-5 h-5 mr-2" />
                             {language === 'ko' ? '다시 시도하기' : 'Try Again'}

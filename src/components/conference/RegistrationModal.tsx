@@ -337,11 +337,11 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 <DialogContent className="sm:max-w-md md:max-w-lg max-w-[calc(100vw-2rem)] w-full mx-4 md:mx-0">
                     {conferenceLoading ? (
                         <div className="flex items-center justify-center py-12">
-                            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                            <div className="w-8 h-8 border-4 border-[#003366] border-t-transparent rounded-full animate-spin" />
                         </div>
                     ) : isOutsideAllPeriods ? (
                         /* 등록 기간 외 안내 */
-                        <div className="py-6 px-2">
+                        <div className="py-4 px-2">
                             <DialogHeader className="mb-4">
                                 <DialogTitle className="text-xl sm:text-2xl font-bold text-slate-900 pr-8">
                                     {lang === 'ko' ? '학술대회 등록' : 'Conference Registration'}
@@ -406,8 +406,8 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                                 <DialogDescription className="text-sm sm:text-base">
                                     {activePeriod && (
                                         <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${periodType === 'ONSITE'
-                                                ? 'bg-orange-100 text-orange-700'
-                                                : 'bg-blue-100 text-blue-700'
+                                                ? 'bg-amber-50 text-amber-700'
+                                                : 'bg-[#f0f5fa] text-[#003366]'
                                             }`}>
                                             <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
                                             {typeof activePeriod.name === 'object'
@@ -431,7 +431,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                                         setVerifiedMemberData(null);
                                     }}
                                     className={`flex-1 flex-shrink-0 px-2 py-2.5 sm:py-3 text-[11px] sm:text-sm font-medium transition-all duration-200 rounded-lg flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 ${mode === 'member-auth'
-                                        ? 'bg-white text-blue-600 shadow-sm ring-1 ring-black/5'
+                                        ? 'bg-white text-[#003366] shadow-sm ring-1 ring-black/5'
                                         : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
                                         }`}
                                 >
@@ -446,7 +446,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                                         setVerifiedMemberData(null);
                                     }}
                                     className={`flex-1 flex-shrink-0 px-2 py-2.5 sm:py-3 text-[11px] sm:text-sm font-medium transition-all duration-200 rounded-lg flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 ${mode === 'non-member'
-                                        ? 'bg-white text-blue-600 shadow-sm ring-1 ring-black/5'
+                                        ? 'bg-white text-[#003366] shadow-sm ring-1 ring-black/5'
                                         : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
                                         }`}
                                 >
@@ -457,7 +457,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                                     type="button"
                                     onClick={() => setMode('registration-check')}
                                     className={`flex-1 flex-shrink-0 px-2 py-2.5 sm:py-3 text-[11px] sm:text-sm font-medium transition-all duration-200 rounded-lg flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 ${mode === 'registration-check'
-                                        ? 'bg-white text-blue-600 shadow-sm ring-1 ring-black/5'
+                                        ? 'bg-white text-[#003366] shadow-sm ring-1 ring-black/5'
                                         : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
                                         }`}
                                 >
@@ -469,14 +469,14 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                             {/* Member Authentication Form */}
                             {mode === 'member-auth' && !isVerified && (
                                 <div className="space-y-3 sm:space-y-4">
-                                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 sm:p-4">
+                                    <div className="bg-[#f0f5fa] border border-[#c3daee] rounded-xl p-3 sm:p-4">
                                         <div className="flex items-start gap-2 sm:gap-3">
-                                            <AlertCircle className="w-4 h-4 sm:w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                                            <div className="text-xs sm:text-sm text-blue-800">
+                                            <AlertCircle className="w-4 h-4 sm:w-5 text-[#003366] flex-shrink-0 mt-0.5" />
+                                            <div className="text-xs sm:text-sm text-[#003366]">
                                                 <p className="font-medium mb-0.5">
                                                     {lang === 'ko' ? '회원 인증 안내' : 'Verification Guide'}
                                                 </p>
-                                                <p className="text-blue-600 text-xs sm:text-sm leading-relaxed">
+                                                <p className="text-[#24669e] text-xs sm:text-sm leading-relaxed">
                                                     {lang === 'ko' ? (
                                                         <>
                                                             학회 회원명과 면허번호를 입력하여 인증받으세요.
@@ -543,7 +543,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                                     <Button
                                         onClick={handleMemberVerification}
                                         disabled={verifyLoading || !consent || !memberName || !memberCode}
-                                        className="w-full bg-blue-600 hover:bg-blue-700 min-h-[44px] flex items-center justify-center"
+                                        className="w-full bg-[#003366] hover:bg-[#002244] text-white min-h-[44px] flex items-center justify-center"
                                     >
                                         {verifyLoading ? (
                                             <span className="flex items-center gap-2">
@@ -586,7 +586,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                                                 <span className="text-xs text-slate-600">
                                                     {lang === 'ko' ? '등록금액' : 'Fee'}
                                                 </span>
-                                                <span className="font-bold text-xl sm:text-2xl text-blue-600">
+                                                <span className="font-bold text-xl sm:text-2xl text-[#003366]">
                                                     {formatPrice(getGradePrice(verifiedMemberData.grade))}
                                                 </span>
                                             </div>
@@ -606,8 +606,8 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                                     <Button
                                         onClick={handleRegisterClick}
                                         className={`w-full text-white font-bold min-h-[44px] flex items-center justify-center ${periodType === 'ONSITE'
-                                                ? 'bg-orange-600 hover:bg-orange-700'
-                                                : 'bg-green-600 hover:bg-green-700'
+                                                ? 'bg-amber-500 hover:bg-amber-600'
+                                                : 'bg-[#003366] hover:bg-[#002244]'
                                             }`}
                                     >
                                         {registrationLabel} {lang === 'ko' ? '진행하기' : '- Register Now'}
@@ -620,14 +620,14 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                             {/* Registration Check (Login) Check Flow */}
                             {mode === 'registration-check' && (
                                 <form onSubmit={handleLogin} className="space-y-3 sm:space-y-4">
-                                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 sm:p-4">
+                                    <div className="bg-[#f0f5fa] border border-[#c3daee] rounded-xl p-3 sm:p-4">
                                         <div className="flex items-start gap-2 sm:gap-3">
-                                            <LogIn className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                                            <div className="text-xs sm:text-sm text-blue-800">
+                                            <LogIn className="w-4 h-4 text-[#003366] flex-shrink-0 mt-0.5" />
+                                            <div className="text-xs sm:text-sm text-[#003366]">
                                                 <p className="font-medium mb-0.5">
                                                     {lang === 'ko' ? '등록 내역 확인' : 'Check Registration'}
                                                 </p>
-                                                <p className="text-blue-600 text-xs sm:text-sm">
+                                                <p className="text-[#24669e] text-xs sm:text-sm">
                                                     {lang === 'ko'
                                                         ? '등록 시 사용한 계정으로 로그인하여 내역을 확인합니다.'
                                                         : 'Log in with your account to check registration status.'}
@@ -669,7 +669,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                                     <Button
                                         type="submit"
                                         disabled={isLoggingIn || !checkEmail || !checkPassword}
-                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold min-h-[44px] flex items-center justify-center"
+                                        className="w-full bg-[#003366] hover:bg-[#002244] text-white font-bold min-h-[44px] flex items-center justify-center"
                                     >
                                         {isLoggingIn ? (
                                             <span className="flex items-center gap-2">
@@ -745,7 +745,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                                                             role="button"
                                                             tabIndex={0}
                                                             aria-pressed={selectedNonMemberType === gradeCode}
-                                                            className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-2.5 sm:p-3 rounded-lg border cursor-pointer transition-all h-full min-h-[56px] sm:min-h-[48px] ${selectedNonMemberType === gradeCode ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-slate-200 hover:border-slate-300'}`}
+                                                            className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-2.5 sm:p-3 rounded-lg border cursor-pointer transition-all h-full min-h-[56px] sm:min-h-[48px] ${selectedNonMemberType === gradeCode ? 'border-[#003366] bg-[#f0f5fa] ring-1 ring-[#003366]' : 'border-slate-200 hover:border-slate-300'}`}
                                                         >
                                                             <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-0">
                                                                 <RadioGroupItem value={gradeCode} id={`nm-${gradeCode}`} />
@@ -776,8 +776,8 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                                     <Button
                                         onClick={handleRegisterClick}
                                         className={`w-full text-white font-bold min-h-[44px] flex items-center justify-center ${periodType === 'ONSITE'
-                                                ? 'bg-orange-600 hover:bg-orange-700'
-                                                : 'bg-blue-600 hover:bg-blue-700'
+                                                ? 'bg-amber-500 hover:bg-amber-600'
+                                                : 'bg-[#003366] hover:bg-[#002244]'
                                             }`}
                                     >
                                         {registrationLabel} {lang === 'ko' ? '진행하기' : '- Register Now'}

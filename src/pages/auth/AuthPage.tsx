@@ -244,7 +244,7 @@ const AuthPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+        <div className="min-h-screen bg-[#f0f5fa]">
             <EregiNavigation />
 
             <div className="max-w-md mx-auto px-4 py-16">
@@ -414,7 +414,7 @@ const AuthPage: React.FC = () => {
                                     <button
                                         type="button"
                                         onClick={() => setShowTermsDetails(!showTermsDetails)}
-                                        className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                                        className="text-xs text-[#003366] hover:text-[#002244] flex items-center gap-1"
                                     >
                                         {showTermsDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                         {showTermsDetails ? '접기' : '펼쳐보기'}
@@ -429,7 +429,7 @@ const AuthPage: React.FC = () => {
                                             checked={termsAgreed}
                                             onChange={(e) => setTermsAgreed(e.target.checked)}
                                             disabled={!isAllowedDomain}
-                                            className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                            className="mt-1 w-4 h-4 text-[#003366] border-gray-300 rounded focus:ring-[#003366]"
                                         />
                                         <div className="flex-1">
                                             <span className="text-sm text-gray-700">
@@ -449,7 +449,7 @@ const AuthPage: React.FC = () => {
                                             checked={privacyAgreed}
                                             onChange={(e) => setPrivacyAgreed(e.target.checked)}
                                             disabled={!isAllowedDomain}
-                                            className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                            className="mt-1 w-4 h-4 text-[#003366] border-gray-300 rounded focus:ring-[#003366]"
                                         />
                                         <div className="flex-1">
                                             <span className="text-sm text-gray-700">
@@ -469,7 +469,7 @@ const AuthPage: React.FC = () => {
                                             checked={thirdPartyAgreed}
                                             onChange={(e) => setThirdPartyAgreed(e.target.checked)}
                                             disabled={!isAllowedDomain}
-                                            className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                            className="mt-1 w-4 h-4 text-[#003366] border-gray-300 rounded focus:ring-[#003366]"
                                         />
                                         <div className="flex-1">
                                             <span className="text-sm text-gray-700">
@@ -492,11 +492,11 @@ const AuthPage: React.FC = () => {
                                             checked={marketingAgreed}
                                             onChange={(e) => setMarketingAgreed(e.target.checked)}
                                             disabled={!isAllowedDomain}
-                                            className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                            className="mt-1 w-4 h-4 text-[#003366] border-gray-300 rounded focus:ring-[#003366]"
                                         />
                                         <div className="flex-1">
                                             <span className="text-sm text-gray-700">
-                                                <span className="text-blue-500 font-medium">[선택]</span> 마케팅 정보 수신 동의
+                                                <span className="text-[#24669e] font-medium">[선택]</span> 마케팅 정보 수신 동의
                                             </span>
                                             {showTermsDetails && systemSettings?.termsMarketing && (
                                                 <div className="mt-2 p-3 bg-gray-50 rounded-lg text-xs text-gray-600 max-h-32 overflow-y-auto">
@@ -512,11 +512,11 @@ const AuthPage: React.FC = () => {
                                             checked={adInfoAgreed}
                                             onChange={(e) => setAdInfoAgreed(e.target.checked)}
                                             disabled={!isAllowedDomain}
-                                            className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                            className="mt-1 w-4 h-4 text-[#003366] border-gray-300 rounded focus:ring-[#003366]"
                                         />
                                         <div className="flex-1">
                                             <span className="text-sm text-gray-700">
-                                                <span className="text-blue-500 font-medium">[선택]</span> 광고성 정보 수신 동의
+                                                <span className="text-[#24669e] font-medium">[선택]</span> 광고성 정보 수신 동의
                                             </span>
                                             {showTermsDetails && systemSettings?.termsAdInfo && (
                                                 <div className="mt-2 p-3 bg-gray-50 rounded-lg text-xs text-gray-600 max-h-32 overflow-y-auto">
@@ -536,7 +536,7 @@ const AuthPage: React.FC = () => {
                                         setPrivacyAgreed(allRequired);
                                         setThirdPartyAgreed(allRequired);
                                     }}
-                                    className="text-xs text-blue-600 hover:text-blue-700 font-medium mt-2"
+                                    className="text-xs text-[#003366] hover:text-[#002244] font-medium mt-2"
                                     disabled={!isAllowedDomain}
                                 >
                                     {termsAgreed && privacyAgreed && thirdPartyAgreed ? '필수 약관 모두 해제' : '필수 약관 모두 동의'}

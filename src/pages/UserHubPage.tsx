@@ -1236,15 +1236,15 @@ const UserHubPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,_#dbeafe_0%,_#f8fafc_45%,_#f1f5f9_100%)] pb-20 pt-20">
+        <div className="min-h-screen bg-[#f0f5fa] pb-20 pt-20">
             <EregiNavigation />
 
             <div className="max-w-5xl mx-auto px-3 sm:px-6">
                 {/* TITLE & SYNC STATUS */}
-                <div className="mb-8 mt-8 rounded-2xl border border-slate-200/70 bg-white/80 backdrop-blur-sm px-5 py-5 shadow-sm">
+                <div className="mb-8 mt-8 rounded-2xl border border-[#c3daee] bg-white px-5 py-5 shadow-sm">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                            <p className="text-xs font-semibold tracking-wide text-blue-700 uppercase mb-1">My eRegi</p>
+                            <p className="text-xs font-semibold tracking-wide text-[#003366] uppercase mb-1">My eRegi</p>
                             <h1 className="text-2xl font-heading-2 text-slate-900">{pageTitle}</h1>
                             <p className="text-sm text-slate-500 mt-1">등록, 초록, 인증, 개인정보 제공 이력을 한 화면에서 확인할 수 있습니다.</p>
                         </div>
@@ -1252,8 +1252,8 @@ const UserHubPage: React.FC = () => {
                         {/* [Step 512-Des] Sync Status Indicator */}
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-full border border-gray-100 shadow-sm">
                             <div className={`w-2 h-2 rounded-full transition-colors duration-500 ${syncStatus === 'connected' ? 'bg-green-500' :
-                                syncStatus === 'syncing' ? 'bg-blue-500 animate-pulse' :
-                                    'bg-orange-500'
+                                syncStatus === 'syncing' ? 'bg-[#003366] animate-pulse' :
+                                    'bg-amber-500'
                                 }`} />
                             <span className="text-[10px] font-mono font-medium text-gray-400 uppercase tracking-wider">
                                 {syncStatus === 'connected' ? 'Data Live' :
@@ -1299,11 +1299,11 @@ const UserHubPage: React.FC = () => {
                 {/* TABS */}
                 <div className="mb-6 overflow-x-auto no-scrollbar min-w-0">
                     <div className="inline-flex w-full min-w-max gap-2 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
-                    <button onClick={() => setActiveTab('EVENTS')} className={`px-4 py-2 rounded-xl whitespace-nowrap text-sm font-semibold transition-all ${activeTab === 'EVENTS' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-slate-100'}`}>등록학회</button>
-                    <button onClick={() => setActiveTab('ABSTRACTS')} className={`px-4 py-2 rounded-xl whitespace-nowrap text-sm font-semibold transition-all ${activeTab === 'ABSTRACTS' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-slate-100'}`}>초록 내역</button>
+                    <button onClick={() => setActiveTab('EVENTS')} className={`px-4 py-2 rounded-xl whitespace-nowrap text-sm font-semibold transition-all ${activeTab === 'EVENTS' ? 'bg-[#003366] text-white shadow-sm' : 'text-gray-600 hover:bg-slate-100'}`}>등록학회</button>
+                    <button onClick={() => setActiveTab('ABSTRACTS')} className={`px-4 py-2 rounded-xl whitespace-nowrap text-sm font-semibold transition-all ${activeTab === 'ABSTRACTS' ? 'bg-[#003366] text-white shadow-sm' : 'text-gray-600 hover:bg-slate-100'}`}>초록 내역</button>
                     {/* [SIMPLIFIED] Anonymous check removed - all users have full accounts */}
-                    <button onClick={() => setActiveTab('CERTS')} className={`px-4 py-2 rounded-xl whitespace-nowrap text-sm font-semibold transition-all ${activeTab === 'CERTS' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-slate-100'}`}>학회 인증</button>
-                    <button onClick={() => setActiveTab('PROFILE')} className={`px-4 py-2 rounded-xl whitespace-nowrap text-sm font-semibold transition-all ${activeTab === 'PROFILE' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-slate-100'}`}>내 정보</button>
+                    <button onClick={() => setActiveTab('CERTS')} className={`px-4 py-2 rounded-xl whitespace-nowrap text-sm font-semibold transition-all ${activeTab === 'CERTS' ? 'bg-[#003366] text-white shadow-sm' : 'text-gray-600 hover:bg-slate-100'}`}>학회 인증</button>
+                    <button onClick={() => setActiveTab('PROFILE')} className={`px-4 py-2 rounded-xl whitespace-nowrap text-sm font-semibold transition-all ${activeTab === 'PROFILE' ? 'bg-[#003366] text-white shadow-sm' : 'text-gray-600 hover:bg-slate-100'}`}>내 정보</button>
                     </div>
                 </div>
 
@@ -1326,8 +1326,8 @@ const UserHubPage: React.FC = () => {
                         )}
                         {!loading && visibleRegs.length === 0 && (
                             <div className="flex flex-col items-center justify-center py-16 px-4 bg-white rounded-xl border-2 border-dashed border-gray-200 text-center">
-                                <div className="w-20 h-20 bg-blue-50 text-blue-200 rounded-full flex items-center justify-center mb-6">
-                                    <Calendar className="w-10 h-10 text-blue-400" />
+                                <div className="w-20 h-20 bg-[#f0f5fa] rounded-full flex items-center justify-center mb-6">
+                                    <Calendar className="w-10 h-10 text-[#c3daee]" />
                                 </div>
                                 <h3 className="text-xl font-bold text-gray-900 mb-2">등록된 학회가 없습니다</h3>
                                 <p className="text-gray-500 max-w-sm mb-8">
@@ -1345,8 +1345,8 @@ const UserHubPage: React.FC = () => {
                         {visibleRegs.map(r => (
                             <div key={r.id} onClick={() => handleEventClick(r)} className="eregi-card cursor-pointer flex flex-col group animate-in fade-in slide-in-from-bottom-2 duration-500 border border-slate-200 bg-white/95 hover:shadow-lg hover:-translate-y-0.5 transition-all">
                                 <div className="flex flex-col mb-4">
-                                    <div className="flex items-center text-sm text-[#24669e] font-bold mb-2">
-                                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 border border-blue-100">[{r.societyName}]</span>
+                                    <div className="flex items-center text-sm text-[#003366] font-bold mb-2">
+                                        <span className="inline-flex items-center rounded-full bg-[#f0f5fa] px-2 py-0.5 border border-[#c3daee]">[{r.societyName}]</span>
                                     </div>
                                     <h3 className="font-heading-3 text-slate-900 mb-2 group-hover:text-[#1b4d77] transition-colors">{r.conferenceName}</h3>
                                     <div className="text-body-sm text-slate-500 flex flex-col gap-1">
@@ -1476,7 +1476,7 @@ const UserHubPage: React.FC = () => {
                             const soc = societies.find(s => s.id === socId);
 
                             return (
-                                <div key={socId} className="eregi-card flex justify-between items-center bg-blue-50/30 border-blue-100">
+                                <div key={socId} className="eregi-card flex justify-between items-center bg-[#f0f5fa]/50 border-[#c3daee]">
                                     <div className="flex items-center gap-4">
                                         <div className="w-12 h-12 bg-[#e1ecf6] text-[#24669e] rounded-full flex items-center justify-center font-bold text-xl">✓</div>
                                         <div>
@@ -1490,17 +1490,17 @@ const UserHubPage: React.FC = () => {
                                         <span className="bg-white border border-blue-100 text-eregi-700 px-3 py-1 rounded text-xs font-bold block mb-1 shadow-sm">
                                             {forceString(aff.grade || '정회원')}
                                         </span>
-                                        <p className="text-xs text-blue-600 mt-1">
+                                        <p className="text-xs text-[#24669e] mt-1">
                                             {aff.expiry || aff.expiryDate ? `유효기간: ${formatDate(aff.expiry || aff.expiryDate)}` : '무기한'}
                                         </p>
                                     </div>
                                 </div>
                             );
                         })}
-                        <button onClick={handleOpenModal} className="w-full py-4 bg-white border-2 border-dashed border-blue-300 text-blue-600 rounded-xl font-bold hover:bg-blue-50">
+                        <button onClick={handleOpenModal} className="w-full py-4 bg-white border-2 border-dashed border-[#c3daee] text-[#003366] rounded-xl font-bold hover:bg-[#f0f5fa]">
                             + 학회 정회원 인증 추가하기
                         </button>
-                        <button onClick={() => navigate('/mypage/membership')} className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-bold hover:from-blue-700 hover:to-blue-800 shadow-md flex items-center justify-center gap-2">
+                        <button onClick={() => navigate('/mypage/membership')} className="w-full py-4 bg-[#003366] hover:bg-[#002244] text-white rounded-xl font-bold shadow-md flex items-center justify-center gap-2 transition-colors">
                             <CreditCard className="w-5 h-5" />
                             학회 회비 납부
                         </button>
@@ -1526,8 +1526,8 @@ const UserHubPage: React.FC = () => {
                         )}
                         {!loading && abstracts.length === 0 && (
                             <div className="flex flex-col items-center justify-center py-16 px-4 bg-white rounded-xl border-2 border-dashed border-gray-200 text-center">
-                                <div className="w-20 h-20 bg-blue-50 text-blue-200 rounded-full flex items-center justify-center mb-6">
-                                    <FileText className="w-10 h-10 text-blue-400" />
+                                <div className="w-20 h-20 bg-[#f0f5fa] rounded-full flex items-center justify-center mb-6">
+                                    <FileText className="w-10 h-10 text-[#c3daee]" />
                                 </div>
                                 <h3 className="text-xl font-bold text-gray-900 mb-2">제출된 초록이 없습니다</h3>
                                 <p className="text-gray-500 max-w-sm mb-8">
@@ -1537,7 +1537,7 @@ const UserHubPage: React.FC = () => {
                                 <Button
                                     onClick={() => setActiveTab('EVENTS')}
                                     variant="outline"
-                                    className="px-8 py-6 text-base font-bold border-2 border-blue-100 text-blue-600 hover:bg-blue-50 hover:border-blue-200"
+                                    className="px-8 py-6 text-base font-bold border-2 border-[#c3daee] text-[#003366] hover:bg-[#f0f5fa] hover:border-[#003366]"
                                 >
                                     등록된 학회 보기
                                 </Button>
@@ -1557,7 +1557,7 @@ const UserHubPage: React.FC = () => {
                                     <span className={`px-3 py-1 rounded-md text-xs font-bold shadow-sm border ${abs.reviewStatus === ABSTRACT_STATUS.ACCEPTED_ORAL
                                         ? 'bg-green-100 text-green-800 border-green-200'
                                         : abs.reviewStatus === ABSTRACT_STATUS.ACCEPTED_POSTER
-                                            ? 'bg-blue-100 text-blue-800 border-blue-200'
+                                            ? 'bg-[#f0f5fa] text-[#003366] border-[#c3daee]'
                                             : abs.reviewStatus === ABSTRACT_STATUS.REJECTED
                                                 ? 'bg-red-50 text-red-600 border-red-200'
                                                 : 'bg-gray-100 text-gray-600 border-gray-200'
@@ -1614,7 +1614,7 @@ const UserHubPage: React.FC = () => {
                                                     window.location.href = authUrl;
                                                 }
                                             }}
-                                            className="w-full sm:w-auto text-xs bg-blue-50 text-blue-600 px-3 py-2 sm:py-1.5 rounded hover:bg-blue-100 font-bold border border-blue-200"
+                                            className="w-full sm:w-auto text-xs bg-[#f0f5fa] text-[#003366] px-3 py-2 sm:py-1.5 rounded hover:bg-[#e1ecf6] font-bold border border-[#c3daee]"
                                         >
                                             수정하기
                                         </button>
@@ -1686,7 +1686,7 @@ const UserHubPage: React.FC = () => {
                                     <button
                                         onClick={handleSaveProfile}
                                         disabled={profileSaving}
-                                        className="w-full sm:w-auto px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+                                        className="w-full sm:w-auto px-4 py-2 rounded-lg bg-[#003366] text-white hover:bg-[#002244] disabled:opacity-60 transition-colors"
                                     >
                                         {profileSaving ? '저장 중...' : '기본 정보 저장'}
                                     </button>
@@ -1732,7 +1732,7 @@ const UserHubPage: React.FC = () => {
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
                     <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full relative">
                         <h3 className="text-xl font-bold mb-2 text-gray-900">학회 정회원 인증</h3>
-                        <p className="text-xs text-center text-blue-500 mb-6 font-bold bg-blue-50 p-1 rounded">{isSocLocked ? `[${verifyForm.societyId}] 학회 전용 모드` : '통합 모드 (학회 선택 가능)'}</p>
+                        <p className="text-xs text-center text-[#003366] mb-6 font-bold bg-[#f0f5fa] p-1 rounded">{isSocLocked ? `[${verifyForm.societyId}] 학회 전용 모드` : '통합 모드 (학회 선택 가능)'}</p>
                         {/* Form Fields */}
                         <div className="space-y-4">
                             <div>
@@ -1749,7 +1749,7 @@ const UserHubPage: React.FC = () => {
                             <button onClick={() => setShowCertModal(false)} className="px-5 py-3 text-gray-500 hover:bg-gray-100 rounded-lg font-bold">취소</button>
                             <button
                                 onClick={handleVerify}
-                                className="px-5 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 flex items-center justify-center min-w-[100px]"
+                                className="px-5 py-3 bg-[#003366] text-white rounded-lg font-bold hover:bg-[#002244] flex items-center justify-center min-w-[100px] transition-colors"
                                 disabled={verifyLoading}
                             >
                                 {verifyLoading ? <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" /> : '인증 받기'}
@@ -1791,7 +1791,7 @@ const UserHubPage: React.FC = () => {
                         <PrintHandler
                             contentRef={receiptRef}
                             triggerButton={
-                                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                                <Button className="bg-[#003366] hover:bg-[#002244] text-white">
                                     <Printer className="w-4 h-4 mr-2" />
                                     인쇄하기
                                 </Button>

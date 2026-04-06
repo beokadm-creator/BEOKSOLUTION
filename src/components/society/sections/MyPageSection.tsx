@@ -12,16 +12,16 @@ const MyPageSection: React.FC<MyPageSectionProps> = ({ onNavigateToMypage, onLog
     <div className="max-w-4xl mx-auto px-3 sm:px-0">
       <div className="bg-white/95 rounded-3xl border border-slate-200 p-6 sm:p-10 shadow-sm">
         <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mb-6 sm:mb-8 flex items-center gap-3 sm:gap-4">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#f0f5fa] rounded-2xl flex items-center justify-center text-[#003366]">
             <User size={24} />
           </div>
           마이페이지
         </h2>
 
         <div className="space-y-5 sm:space-y-6">
-          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-5 sm:p-8 border border-blue-100">
+          <div className="bg-[#f0f5fa] rounded-2xl p-5 sm:p-8 border border-[#c3daee]">
             <div className="text-center">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white text-[#003366] rounded-full flex items-center justify-center mx-auto mb-4 border border-[#c3daee]">
                 <User size={36} />
               </div>
               <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-2">
@@ -34,17 +34,17 @@ const MyPageSection: React.FC<MyPageSectionProps> = ({ onNavigateToMypage, onLog
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             <button
               onClick={onNavigateToMypage}
-              className="p-5 sm:p-6 bg-blue-50 hover:bg-blue-100 rounded-2xl border border-blue-200 transition-all text-left"
+              className="p-5 sm:p-6 bg-[#f0f5fa] hover:bg-[#e1ecf6] rounded-2xl border border-[#c3daee] transition-all text-left"
             >
               <div className="flex items-center gap-3 sm:gap-4">
-                <div className="w-11 h-11 sm:w-12 sm:h-12 bg-blue-600 text-white rounded-xl flex items-center justify-center">
+                <div className="w-11 h-11 sm:w-12 sm:h-12 bg-[#003366] text-white rounded-xl flex items-center justify-center">
                   <User size={20} />
                 </div>
                 <div className="flex-1">
                   <h4 className="text-base sm:text-lg font-black text-slate-900">회원정보</h4>
                   <p className="text-sm text-slate-600">내 정보 관리</p>
                 </div>
-                <ChevronRight className="w-4 h-4 text-blue-500" />
+                <ChevronRight className="w-4 h-4 text-[#003366]" />
               </div>
             </button>
 

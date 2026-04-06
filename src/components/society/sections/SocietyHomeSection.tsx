@@ -28,7 +28,7 @@ const SocietyHomeSection: React.FC<SocietyHomeSectionProps> = ({ society, langua
 
       <div className="relative max-w-7xl mx-auto px-6 w-full animate-in fade-in slide-in-from-bottom-8 duration-1000">
         <div className="max-w-3xl space-y-6">
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-600/20 text-blue-400 border border-blue-500/30 text-[10px] font-black uppercase tracking-widest">
+          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-white/80 border border-white/30 text-[10px] font-black uppercase tracking-widest">
             <Globe size={12} /> {language === "ko" ? "공식 학회 포털" : "Official Society Portal"}
           </span>
           <h2 className="text-5xl md:text-7xl font-black text-white leading-[1.1] tracking-tight">

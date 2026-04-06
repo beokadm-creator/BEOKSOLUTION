@@ -39,7 +39,7 @@ const ConferenceListSection: React.FC<ConferenceListSectionProps> = ({
       {(activeConferences.length > 0 || (activeConferences.length === 0 && upcomingConferences.length === 0 && pastConferences.length === 0)) && (
         <section>
           <div className="flex items-center gap-4 mb-8">
-            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-600/30">
+            <div className="w-12 h-12 bg-[#003366] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-[#003366]/30">
               <Calendar size={24} strokeWidth={2.5} />
             </div>
             <div>
@@ -63,12 +63,12 @@ const ConferenceListSection: React.FC<ConferenceListSectionProps> = ({
               {activeConferences.map((conf) => (
                 <div
                   key={conf.id}
-                  className="group relative bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-blue-600/10 transition-all duration-300 overflow-hidden flex flex-col lg:flex-row"
+                  className="group relative bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-[#003366]/10 transition-all duration-300 overflow-hidden flex flex-col lg:flex-row"
                 >
                   {/* Image Section */}
                   <div className="lg:w-2/5 aspect-video lg:aspect-auto bg-slate-900 relative overflow-hidden flex items-center justify-center p-10">
                     {/* Background Pattern */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900"></div>
+                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-[#001f3f] to-slate-900"></div>
                     <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
 
                     {/* Visual Content */}
@@ -83,7 +83,7 @@ const ConferenceListSection: React.FC<ConferenceListSectionProps> = ({
 
                     {/* Status Badge */}
                     <div className="absolute top-6 left-6">
-                      <div className="bg-blue-500 text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-lg">
+                      <div className="bg-[#003366] text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-lg">
                         <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
                         {language === 'ko' ? '접수중' : 'Open'}
                       </div>
@@ -97,14 +97,14 @@ const ConferenceListSection: React.FC<ConferenceListSectionProps> = ({
                         <h4 className="text-2xl md:text-3xl font-black text-slate-900 mb-2 leading-tight">
                           {getLocalizedText(conf.title)}
                         </h4>
-                        <div className="h-1 w-12 bg-blue-600 rounded-full"></div>
+                        <div className="h-1 w-12 bg-[#003366] rounded-full"></div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-1">
                           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Date</p>
                           <p className="text-slate-700 font-bold text-lg flex items-center gap-2">
-                            <span className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <span className="w-8 h-8 rounded-lg bg-[#f0f5fa] text-[#003366] flex items-center justify-center">
                               <Calendar size={16} />
                             </span>
                             {formatDate(conf.dates?.start, language)}
@@ -113,7 +113,7 @@ const ConferenceListSection: React.FC<ConferenceListSectionProps> = ({
                         <div className="space-y-1">
                           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Location</p>
                           <p className="text-slate-700 font-bold text-lg flex items-center gap-2">
-                            <span className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <span className="w-8 h-8 rounded-lg bg-[#f0f5fa] text-[#003366] flex items-center justify-center">
                               <MapPin size={16} />
                             </span>
                             {getLocalizedText(conf.venue?.name) || conf.location || (language === 'ko' ? '추후 공지' : 'TBD')}
@@ -125,7 +125,7 @@ const ConferenceListSection: React.FC<ConferenceListSectionProps> = ({
                     <div className="mt-10">
                       <button
                         onClick={() => (window.location.href = getConferenceUrl(conf))}
-                        className="w-full bg-slate-900 text-white py-5 px-6 rounded-2xl font-bold text-base hover:bg-black transition-all shadow-xl shadow-slate-900/10 active:scale-[0.98] flex items-center justify-center gap-2 group-hover:bg-blue-600 group-hover:shadow-blue-600/20"
+                        className="w-full bg-slate-900 text-white py-5 px-6 rounded-2xl font-bold text-base hover:bg-black transition-all shadow-xl shadow-slate-900/10 active:scale-[0.98] flex items-center justify-center gap-2 group-hover:bg-[#003366] group-hover:shadow-[#003366]/20"
                       >
                         <span>{language === 'ko' ? '학술대회 등록하기' : 'Register Now'}</span>
                         <ArrowRight size={18} />
@@ -143,7 +143,7 @@ const ConferenceListSection: React.FC<ConferenceListSectionProps> = ({
       {upcomingConferences.length > 0 && (
         <section>
           <div className="flex items-center gap-4 mb-8">
-            <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600">
+            <div className="w-12 h-12 bg-[#f0f5fa] rounded-2xl flex items-center justify-center text-[#003366]">
               <Clock size={24} strokeWidth={2.5} />
             </div>
             <div>
@@ -160,15 +160,15 @@ const ConferenceListSection: React.FC<ConferenceListSectionProps> = ({
             {upcomingConferences.map((conf) => (
               <div
                 key={conf.id}
-                className="group relative bg-white p-8 rounded-[2rem] border border-slate-100 hover:border-indigo-100 hover:shadow-xl hover:shadow-indigo-900/5 transition-all duration-300"
+                className="group relative bg-white p-8 rounded-[2rem] border border-slate-100 hover:border-[#c3daee] hover:shadow-xl hover:shadow-[#003366]/5 transition-all duration-300"
               >
-                <div className="absolute top-8 right-8 w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+                <div className="absolute top-8 right-8 w-2 h-2 rounded-full bg-[#003366] animate-pulse"></div>
 
-                <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mb-6 font-black text-xs shadow-sm">
+                <div className="w-12 h-12 bg-[#f0f5fa] text-[#003366] rounded-2xl flex items-center justify-center mb-6 font-black text-xs shadow-sm">
                   TBD
                 </div>
 
-                <h4 className="text-xl font-black text-slate-900 mb-3 line-clamp-2 leading-tight group-hover:text-indigo-600 transition-colors">
+                <h4 className="text-xl font-black text-slate-900 mb-3 line-clamp-2 leading-tight group-hover:text-[#003366] transition-colors">
                   {getLocalizedText(conf.title)}
                 </h4>
 

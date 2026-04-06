@@ -178,7 +178,7 @@ export const WidePricingPreview: React.FC<WidePricingPreviewProps> = ({
                                                     key={item.id}
                                                     className={`p-6 text-center min-w-[200px] border-b-2 ${
                                                         isActive
-                                                            ? 'bg-blue-600 border-blue-700'
+                                                            ? 'bg-[#003366] border-[#002244]'
                                                             : 'bg-slate-50 border-slate-200'
                                                     }`}
                                                 >
@@ -186,7 +186,7 @@ export const WidePricingPreview: React.FC<WidePricingPreviewProps> = ({
                                                         {t(item.name)}
                                                     </div>
                                                     {dateStr && (
-                                                        <div className={`text-xs mt-1 font-medium ${isActive ? 'text-blue-100' : 'text-slate-500'}`}>
+                                                        <div className={`text-xs mt-1 font-medium ${isActive ? 'text-slate-200' : 'text-slate-500'}`}>
                                                             {dateStr}
                                                         </div>
                                                     )}
@@ -217,7 +217,7 @@ export const WidePricingPreview: React.FC<WidePricingPreviewProps> = ({
                                                     <td
                                                         key={`${item.id}-${grade}`}
                                                         className={`p-5 text-center font-mono font-bold text-lg ${
-                                                            isActive ? 'bg-blue-50/50 text-blue-600' : 'bg-white text-slate-700'
+                                                            isActive ? 'bg-[#f0f5fa]/50 text-[#003366]' : 'bg-white text-slate-700'
                                                         }`}
                                                     >
                                                         {priceData ? getCurrencyDisplay(priceData.amount) : '-'}
@@ -243,7 +243,7 @@ export const WidePricingPreview: React.FC<WidePricingPreviewProps> = ({
                                 <div
                                     key={item.id}
                                     className={`bg-white rounded-2xl shadow-lg border-2 overflow-hidden ${
-                                        isActive ? 'border-blue-500' : 'border-slate-200'
+                                        isActive ? 'border-[#003366]' : 'border-slate-200'
                                     }`}
                                 >
                                     {/* Period Header */}
@@ -254,7 +254,7 @@ export const WidePricingPreview: React.FC<WidePricingPreviewProps> = ({
                                                     {t(item.name)}
                                                 </div>
                                                 {dateStr && (
-                                                    <div className={`text-xs mt-1 font-medium ${isActive ? 'text-blue-100' : 'text-slate-500'}`}>
+                                                    <div className={`text-xs mt-1 font-medium ${isActive ? 'text-slate-200' : 'text-slate-500'}`}>
                                                         {dateStr}
                                                     </div>
                                                 )}
@@ -277,7 +277,7 @@ export const WidePricingPreview: React.FC<WidePricingPreviewProps> = ({
                                                 <span className="text-sm font-medium text-slate-700">
                                                     {priceData.name}
                                                 </span>
-                                                <span className="text-lg font-bold font-mono text-blue-600">
+                                                <span className="text-lg font-bold font-mono text-[#003366]">
                                                     {getCurrencyDisplay(priceData.amount)}
                                                 </span>
                                             </div>

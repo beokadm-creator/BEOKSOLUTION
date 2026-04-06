@@ -146,7 +146,7 @@ const RegistrationSuccessPage: React.FC = () => {
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-gray-500">{language === 'ko' ? '계좌번호' : 'Account Number'}</span>
-                                            <span className="font-bold text-lg text-blue-600">{regData.virtualAccount.accountNumber}</span>
+                                            <span className="font-bold text-lg text-[#003366]">{regData.virtualAccount.accountNumber}</span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-gray-500">{language === 'ko' ? '예금주' : 'Account Holder'}</span>
@@ -177,7 +177,7 @@ const RegistrationSuccessPage: React.FC = () => {
                         {!isPending && (
                             <Button
                                 onClick={handlePrint}
-                                className="bg-[#003366] hover:bg-[#002244] h-14 text-lg font-bold rounded-2xl shadow-lg shadow-blue-900/20 hover:shadow-xl hover:-translate-y-0.5 transition-all text-white"
+                                className="bg-[#003366] hover:bg-[#002244] h-14 text-lg font-bold rounded-2xl shadow-lg shadow-[#003366]/20 hover:shadow-xl hover:-translate-y-0.5 transition-all text-white"
                             >
                                 <Download className="w-5 h-5 mr-2" />
                                 {language === 'ko' ? '접수증 출력' : 'Print Receipt'}
@@ -198,7 +198,7 @@ const RegistrationSuccessPage: React.FC = () => {
                         <Button
                             variant="outline"
                             onClick={() => navigate(`/${finalSlug}/abstracts`)}
-                            className="h-14 border-2 border-gray-200 hover:border-[#003366]/20 text-[#003366] hover:bg-blue-50 font-bold rounded-2xl text-lg transition-all"
+                            className="h-14 border-2 border-gray-200 hover:border-[#003366]/20 text-[#003366] hover:bg-[#f0f5fa] font-bold rounded-2xl text-lg transition-all"
                         >
                             <FileText className="w-5 h-5 mr-2" />
                             {language === 'ko' ? '초록 제출' : 'Submit Abstract'}

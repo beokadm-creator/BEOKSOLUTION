@@ -33,7 +33,7 @@ const NoticesSection: React.FC<NoticesSectionProps> = ({ society, language = 'ko
             notices.map((notice) => (
               <div
                 key={notice.id}
-                className="bg-gradient-to-r from-slate-50 to-blue-50 rounded-2xl p-6 border border-slate-100 hover:shadow-md transition-all"
+                className="bg-white rounded-2xl p-6 border border-slate-100 hover:border-[#c3daee] hover:shadow-md transition-all"
               >
                 <div className="flex items-start gap-4">
                   <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center flex-shrink-0">

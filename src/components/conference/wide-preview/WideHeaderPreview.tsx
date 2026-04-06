@@ -120,8 +120,8 @@ export const WideHeaderPreview: React.FC<WideHeaderPreviewProps> = ({
                 onClick={() => handleNavigation(`/auth`)}
                 className="rounded-full px-5 font-bold shadow-lg transition-transform hover:scale-105 active:scale-95"
                 style={{
-                  backgroundColor: isScrolled ? '#2563eb' : '#ffffff',
-                  color: isScrolled ? '#ffffff' : '#1e3a8a',
+                  backgroundColor: isScrolled ? '#003366' : '#ffffff',
+                  color: isScrolled ? '#ffffff' : '#003366',
                   border: 'none'
                 }}
               >
@@ -178,8 +178,8 @@ export const WideHeaderPreview: React.FC<WideHeaderPreviewProps> = ({
                 onClick={() => handleNavigation(`/auth`)}
                 className="rounded-full px-4 font-bold shadow-sm transition-transform active:scale-95 text-xs h-8"
                 style={{
-                  backgroundColor: isScrolled ? '#2563eb' : '#ffffff',
-                  color: isScrolled ? '#ffffff' : '#1e3a8a',
+                  backgroundColor: isScrolled ? '#003366' : '#ffffff',
+                  color: isScrolled ? '#ffffff' : '#003366',
                   border: 'none'
                 }}
               >

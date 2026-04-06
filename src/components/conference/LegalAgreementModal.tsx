@@ -103,7 +103,7 @@ export default function LegalAgreementModal({
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col md:p-0">
                     <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b">
                         <div className="flex items-center gap-2 sm:gap-3">
-                            <ShieldCheck className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 flex-shrink-0" />
+                            <ShieldCheck className="w-6 h-6 sm:w-8 sm:h-8 text-[#003366] flex-shrink-0" />
                             <div>
                                 <DialogTitle className="text-xl sm:text-2xl font-bold text-slate-900">
                                     {lang === 'ko' ? '이용약관 동의' : 'Terms Agreement'}
@@ -137,7 +137,7 @@ export default function LegalAgreementModal({
                         {terms && (
                             <>
                                 {/* All Agree Checkbox - Mobile Optimized */}
-                                <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 bg-blue-50 rounded-xl border border-blue-200">
+                                <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 bg-[#f0f5fa] rounded-xl border border-[#c3daee]">
                                     <Checkbox
                                         id="allAgree"
                                         checked={Object.values(agreements).every(Boolean)}
@@ -145,10 +145,10 @@ export default function LegalAgreementModal({
                                         className="mt-0.5 sm:mt-1 w-5 h-5 sm:w-4 sm:h-4"
                                     />
                                     <div className="flex-1">
-                                        <Label htmlFor="allAgree" className="text-base sm:text-lg font-bold cursor-pointer text-blue-900 block">
+                                        <Label htmlFor="allAgree" className="text-base sm:text-lg font-bold cursor-pointer text-[#003366] block">
                                             {lang === 'ko' ? '모든 약관에 동의합니다' : 'I agree to all terms'}
                                         </Label>
-                                        <p className="text-xs sm:text-sm text-blue-700 mt-0.5 sm:mt-1">
+                                        <p className="text-xs sm:text-sm text-[#24669e] mt-0.5 sm:mt-1">
                                             {lang === 'ko'
                                                 ? '필수 및 선택 정보 수집에 대해 일괄 동의합니다.'
                                                 : 'Agree to all required and optional terms.'}
@@ -176,7 +176,7 @@ export default function LegalAgreementModal({
                                         <button
                                             type="button"
                                             onClick={() => setViewingTerm({ title: lang === 'ko' ? '개인정보 수집 및 이용 동의' : 'Consent to Collection and Use', content: termsContent.termsOfService })}
-                                            className="text-blue-600 text-xs sm:text-sm underline hover:text-blue-700 flex items-center gap-1 flex-shrink-0"
+                                            className="text-[#003366] text-xs sm:text-sm underline hover:text-[#002244] flex items-center gap-1 flex-shrink-0"
                                         >
                                             <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                             <span>{lang === 'ko' ? '보기' : 'View'}</span>
@@ -204,7 +204,7 @@ export default function LegalAgreementModal({
                                         <button
                                             type="button"
                                             onClick={() => setViewingTerm({ title: lang === 'ko' ? '개인정보 제3자 제공 (시스템)' : 'Third Party Provision (System Use)', content: termsContent.thirdPartySystem })}
-                                            className="text-blue-600 text-xs sm:text-sm underline hover:text-blue-700 flex items-center gap-1 flex-shrink-0"
+                                            className="text-[#003366] text-xs sm:text-sm underline hover:text-[#002244] flex items-center gap-1 flex-shrink-0"
                                         >
                                             <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                             <span>{lang === 'ko' ? '보기' : 'View'}</span>
@@ -232,7 +232,7 @@ export default function LegalAgreementModal({
                                         <button
                                             type="button"
                                             onClick={() => setViewingTerm({ title: lang === 'ko' ? '개인정보 제3자 제공 (결제)' : 'Third Party Provision (Payment)', content: termsContent.thirdPartyPG })}
-                                            className="text-blue-600 text-xs sm:text-sm underline hover:text-blue-700 flex items-center gap-1 flex-shrink-0"
+                                            className="text-[#003366] text-xs sm:text-sm underline hover:text-[#002244] flex items-center gap-1 flex-shrink-0"
                                         >
                                             <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                             <span>{lang === 'ko' ? '보기' : 'View'}</span>
@@ -261,7 +261,7 @@ export default function LegalAgreementModal({
                                             <button
                                                 type="button"
                                                 onClick={() => setViewingTerm({ title: lang === 'ko' ? '정보성 정보 수신 안내' : 'Informational Notifications', content: termsContent.infoConsent })}
-                                                className="text-blue-600 text-xs sm:text-sm underline hover:text-blue-700 flex items-center gap-1 flex-shrink-0"
+                                                className="text-[#003366] text-xs sm:text-sm underline hover:text-[#002244] flex items-center gap-1 flex-shrink-0"
                                             >
                                                 <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                                 <span>{lang === 'ko' ? '보기' : 'View'}</span>
@@ -291,7 +291,7 @@ export default function LegalAgreementModal({
                                             <button
                                                 type="button"
                                                 onClick={() => setViewingTerm({ title: lang === 'ko' ? '환불 규정' : 'Refund Policy', content: termsContent.refundPolicy })}
-                                                className="text-blue-600 text-xs sm:text-sm underline hover:text-blue-700 flex items-center gap-1 flex-shrink-0"
+                                                className="text-[#003366] text-xs sm:text-sm underline hover:text-[#002244] flex items-center gap-1 flex-shrink-0"
                                             >
                                                 <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                                 <span>{lang === 'ko' ? '보기' : 'View'}</span>
@@ -321,7 +321,7 @@ export default function LegalAgreementModal({
                                             <button
                                                 type="button"
                                                 onClick={() => setViewingTerm({ title: lang === 'ko' ? '마케팅 활용' : 'Marketing Consent', content: termsContent.marketingConsent })}
-                                                className="text-blue-600 text-xs sm:text-sm underline hover:text-blue-700 flex items-center gap-1 flex-shrink-0"
+                                                className="text-[#003366] text-xs sm:text-sm underline hover:text-[#002244] flex items-center gap-1 flex-shrink-0"
                                             >
                                                 <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                                 <span>{lang === 'ko' ? '보기' : 'View'}</span>
@@ -372,7 +372,7 @@ export default function LegalAgreementModal({
                                     type="button"
                                     onClick={handleAgree}
                                     disabled={!canProceed}
-                                    className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-8 py-3 sm:py-2 text-xs sm:text-sm min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed font-bold"
+                                    className="flex-1 sm:flex-none bg-[#003366] hover:bg-[#002244] text-white px-4 sm:px-8 py-3 sm:py-2 text-xs sm:text-sm min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed font-bold"
                                 >
                                     {lang === 'ko' ? '약관동의' : 'Agree'}
                                 </Button>
@@ -397,7 +397,7 @@ export default function LegalAgreementModal({
                         <Button
                             type="button"
                             onClick={() => setViewingTerm(null)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white min-h-[44px] px-6 sm:px-8"
+                            className="bg-[#003366] hover:bg-[#002244] text-white min-h-[44px] px-6 sm:px-8"
                         >
                             {lang === 'ko' ? '닫기' : 'Close'}
                         </Button>
@@ -474,7 +474,7 @@ export default function LegalAgreementModal({
                         <Button
                             type="button"
                             onClick={() => setViewAllTerms(false)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white min-h-[44px] px-6 sm:px-8"
+                            className="bg-[#003366] hover:bg-[#002244] text-white min-h-[44px] px-6 sm:px-8"
                         >
                             {lang === 'ko' ? '닫기' : 'Close'}
                         </Button>

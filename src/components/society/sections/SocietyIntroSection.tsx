@@ -32,7 +32,7 @@ const SocietyIntroSection: React.FC<SocietyIntroSectionProps> = ({ society, lang
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
       <div className="bg-white rounded-3xl border border-slate-100 p-12 shadow-sm">
         <h2 className="text-3xl font-black text-slate-900 mb-8 flex items-center gap-4">
-          <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 font-black text-xl">
+          <div className="w-12 h-12 bg-[#f0f5fa] rounded-2xl flex items-center justify-center text-[#003366] font-black text-xl">
             {language === 'ko' ? '학회' : 'SOC'}
           </div>
           {language === 'ko' ? '학회소개' : 'Society Introduction'}

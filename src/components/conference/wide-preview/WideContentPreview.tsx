@@ -66,7 +66,7 @@ export const WideContentPreview: React.FC<WideContentPreviewProps> = ({
         if (config.subCollectionsLoading) {
           return (
             <div id="section-program" className="animate-fade-in pt-8 pb-4 flex justify-center items-center min-h-[300px]">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#003366]"></div>
             </div>
           );
         }
@@ -86,7 +86,7 @@ export const WideContentPreview: React.FC<WideContentPreviewProps> = ({
         if (config.subCollectionsLoading) {
           return (
             <div id="section-speakers" className="animate-fade-in pt-8 pb-4 flex justify-center items-center min-h-[300px]">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#003366]"></div>
             </div>
           );
         }
@@ -138,7 +138,7 @@ export const WideContentPreview: React.FC<WideContentPreviewProps> = ({
         if (config.subCollectionsLoading) {
           return (
             <div id="section-sponsors" className="animate-fade-in pt-8 pb-4 flex justify-center items-center min-h-[300px]">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#003366]"></div>
             </div>
           );
         }
@@ -162,7 +162,7 @@ export const WideContentPreview: React.FC<WideContentPreviewProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 min-h-[50vh] md:min-h-[600px]">
+    <div className="bg-white rounded-xl shadow-sm border border-[#e1ecf6] min-h-[50vh] md:min-h-[600px]">
       {renderContent()}
     </div>
   );

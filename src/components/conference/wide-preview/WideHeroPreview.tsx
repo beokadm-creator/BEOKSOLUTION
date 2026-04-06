@@ -107,7 +107,7 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
         } else {
           // URL에서 societyId 추출
           const hostname = window.location.hostname;
-          let societyIdToUse = extractSocietyFromHost(hostname) || DOMAIN_CONFIG.DEFAULT_SOCIETY;
+          const societyIdToUse = extractSocietyFromHost(hostname) || DOMAIN_CONFIG.DEFAULT_SOCIETY;
 
           confIdToUse = `${societyIdToUse}_${targetSlug}`;
         }
@@ -169,37 +169,36 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
           </p>
         )}
 
-        {/* Buttons - Enhanced Mobile Stack with Better Touch Targets */}
-        <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full max-w-md sm:max-w-none items-center justify-center mt-6 md:mt-8">
+        {/* Buttons */}
+        <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm sm:max-w-none items-center justify-center mt-8 md:mt-10">
           {auth.user ? (
-            // 로그인한 회원
             <>
               {isRegistered ? (
-                // 이미 등록한 회원: 등록확인 버튼 -> QR 페이지로 랜딩
+                // 이미 등록한 회원: 등록확인 (green — semantic success)
                 <button
                   type="button"
                   onClick={() => navigate(`/${targetSlug}/badge?lang=${lang}`)}
-                  className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-emerald-900/30 hover:shadow-emerald-900/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98]"
+                  className="w-full sm:w-auto min-h-[56px] px-8 py-3.5 bg-green-600 hover:bg-green-700 text-white text-base md:text-lg font-bold rounded-xl shadow-lg transition-all duration-200 active:scale-[0.98]"
                 >
-                  {lang === 'ko' ? '등록확인' : 'Registration Check'}
+                  {lang === 'ko' ? '등록 확인하기' : 'Check Registration'}
                 </button>
               ) : (
-                // 아직 등록하지 않은 회원: 등록(조회)하기 버튼 -> 모달 표시
+                // 미등록 회원: 메인 CTA — white on dark hero
                 <button
                   type="button"
                   onClick={() => setShowModal(true)}
-                  className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-blue-900/30 hover:shadow-blue-900/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98]"
+                  className="w-full sm:w-auto min-h-[56px] px-8 py-3.5 bg-white hover:bg-[#f0f5fa] text-[#003366] text-base md:text-lg font-bold rounded-xl shadow-lg transition-all duration-200 active:scale-[0.98]"
                 >
                   {lang === 'ko' ? '등록(조회)하기' : 'Register / Check'}
                 </button>
               )}
             </>
           ) : (
-            // 비로그인: 등록(조회)하기 버튼 (클릭 시 모달 표시)
+            // 비로그인: 메인 CTA
             <button
               type="button"
               onClick={() => setShowModal(true)}
-              className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-blue-900/30 hover:shadow-blue-900/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98]"
+              className="w-full sm:w-auto min-h-[56px] px-8 py-3.5 bg-white hover:bg-[#f0f5fa] text-[#003366] text-base md:text-lg font-bold rounded-xl shadow-lg transition-all duration-200 active:scale-[0.98]"
             >
               {lang === 'ko' ? '등록(조회)하기' : 'Register / Check'}
             </button>
@@ -216,7 +215,7 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
                 setShowModal(true);
               }
             }}
-            className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-teal-900/30 hover:shadow-teal-900/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98] text-center"
+            className="w-full sm:w-auto min-h-[56px] px-8 py-3.5 bg-white/10 hover:bg-white/20 border border-white/50 text-white text-base md:text-lg font-semibold rounded-xl transition-all duration-200 active:scale-[0.98] text-center"
           >
             {lang === 'ko' ? '초록 접수' : 'Abstract Submission'}
           </button>

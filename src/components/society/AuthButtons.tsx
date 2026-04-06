@@ -38,7 +38,7 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({
         <button
           type="button"
           onClick={onToggleLanguage}
-          className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-slate-600 hover:text-blue-600 hover:bg-slate-50 transition-colors border border-slate-200 hover:border-blue-200"
+          className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-slate-600 hover:text-[#003366] hover:bg-slate-50 transition-colors border border-slate-200 hover:border-[#c3daee]"
         >
           <Globe size={16} />
           {language === 'ko' ? 'EN' : 'KO'}
@@ -49,7 +49,7 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({
       <button
         type="button"
         onClick={onLoginClick}
-        className="text-sm font-bold text-slate-600 hover:text-blue-600 transition-colors flex items-center gap-1.5 px-4 py-2.5 rounded-xl hover:bg-slate-50"
+        className="text-sm font-bold text-slate-600 hover:text-[#003366] transition-colors flex items-center gap-1.5 px-4 py-2.5 rounded-xl hover:bg-slate-50"
       >
         <LogIn size={16} />
         <span className="hidden sm:inline">{language === 'ko' ? '로그인' : 'LOGIN'}</span>

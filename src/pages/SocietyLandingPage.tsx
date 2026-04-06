@@ -240,7 +240,7 @@ const SocietyLandingPage: React.FC = () => {
                         {society.logoUrl ? (
                             <img src={society.logoUrl} alt="Logo" className={`h-9 object-contain max-w-full transition-all duration-300 ${logoContainerClass}`} />
                         ) : (
-                            <div className="h-9 w-9 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black uppercase text-sm font-black shadow-lg shadow-blue-600/20">
+                            <div className="h-9 w-9 bg-[#003366] rounded-xl flex items-center justify-center text-white font-black uppercase text-sm shadow-lg shadow-[#003366]/20">
                                 {society.id.substring(0, 2)}
                             </div>
                         )}
@@ -289,7 +289,7 @@ const SocietyLandingPage: React.FC = () => {
                     <button
                         type="button"
                         onClick={toggleLanguage}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-sm text-slate-500 hover:text-blue-600 hover:bg-slate-50 transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-sm text-slate-500 hover:text-[#003366] hover:bg-slate-50 transition-colors"
                     >
                         <Globe size={16} />
                         {language === 'ko' ? 'KO' : 'EN'}

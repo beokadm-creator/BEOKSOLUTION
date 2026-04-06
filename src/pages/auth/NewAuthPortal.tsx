@@ -31,10 +31,10 @@ const NewAuthPortal: React.FC = () => {
     }, [returnUrl, slug, navigate]);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-[#f0f5fa] flex items-center justify-center p-4">
             <div className="text-center">
                 <div className="flex items-center justify-center mb-6">
-                    <ShieldCheck className="w-16 h-16 text-blue-600 animate-pulse" />
+                    <ShieldCheck className="w-16 h-16 text-[#003366] animate-pulse" />
                 </div>
                 <h1 className="text-2xl font-bold text-slate-900 mb-2">
                     시스템 이전 중입니다...
@@ -44,7 +44,7 @@ const NewAuthPortal: React.FC = () => {
                 </p>
                 <Button
                     onClick={() => window.location.reload()}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-lg"
+                    className="bg-[#003366] hover:bg-[#002244] text-white font-bold px-8 py-3 rounded-lg"
                 >
                     바로 이동하기
                     <ArrowRight className="ml-2 w-5 h-5" />

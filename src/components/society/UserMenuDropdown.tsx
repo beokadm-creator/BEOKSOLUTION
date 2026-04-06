@@ -41,14 +41,14 @@ const UserMenuDropdown: React.FC<UserMenuDropdownProps> = ({
       label: language === 'ko' ? '마이페이지' : 'My Page',
       description: language === 'ko' ? '내 정보 관리' : 'Manage my profile',
       onClick: onNavigateToMypage,
-      color: 'text-blue-600',
+      color: 'text-[#003366]',
     },
     {
       icon: Calendar,
       label: language === 'ko' ? '참여 현황' : 'My Conferences',
       description: language === 'ko' ? '학술대회 참여 내역' : 'Conference history',
       onClick: onNavigateToMypage,
-      color: 'text-indigo-600',
+      color: 'text-[#24669e]',
     },
     ...(onToggleLanguage
       ? [

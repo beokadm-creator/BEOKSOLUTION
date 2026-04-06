@@ -78,7 +78,7 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#003366]"></div>
       </div>
     );
   }
@@ -129,11 +129,11 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
       </div>
 
       {/* 4. Mobile-Optimized Bottom Tab Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-lg z-50 safe-area-inset-bottom">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#c3daee] shadow-lg z-50 safe-area-inset-bottom">
         <div className="max-w-7xl mx-auto px-2 sm:px-4">
-          <div className="flex items-center justify-between gap-2 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-2 py-2 sm:py-3">
             {/* Tab Buttons */}
-            <div className="flex justify-around sm:justify-center sm:gap-8 flex-1 overflow-x-auto scrollbar-hide">
+            <div className="flex justify-around sm:justify-center sm:gap-6 flex-1 overflow-x-auto scrollbar-hide">
               {tabItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeSection === item.id;
@@ -143,13 +143,13 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
                     key={item.id}
                     type="button"
                     onClick={() => handleTabClick(item.id)}
-                    className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 sm:px-6 py-2 rounded-xl font-medium transition-all duration-200 min-w-[60px] sm:min-w-[100px] ${isActive
-                      ? 'text-blue-600 bg-blue-50'
-                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 sm:px-5 py-2 rounded-xl font-medium transition-all duration-200 min-w-[52px] sm:min-w-[90px] ${isActive
+                      ? 'text-[#003366] bg-[#f0f5fa]'
+                      : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
                       }`}
                   >
-                    <Icon className={`w-6 h-6 sm:w-5 sm:h-5 md:w-6 md:h-6 ${isActive ? 'text-blue-600' : ''}`} />
-                    <span className="text-[10px] sm:text-sm md:text-base font-medium">
+                    <Icon className={`w-5 h-5 sm:w-5 sm:h-5 ${isActive ? 'text-[#003366]' : ''}`} />
+                    <span className={`text-[10px] sm:text-xs font-semibold ${isActive ? 'text-[#003366]' : ''}`}>
                       {getLabel(item.label)}
                     </span>
                   </button>

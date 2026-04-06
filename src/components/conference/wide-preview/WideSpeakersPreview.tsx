@@ -47,7 +47,7 @@ export const WideSpeakersPreview: React.FC<WideSpeakersPreviewProps> = ({ speake
                                 className="flex flex-col items-center text-center group cursor-pointer p-4"
                                 onClick={() => setSelectedSpeaker(speaker)}
                             >
-                                <div className="relative w-36 md:w-40 h-36 md:h-40 mb-5 md:mb-6 rounded-full overflow-hidden shadow-2xl border-4 border-white ring-2 ring-slate-200 group-hover:ring-blue-300 transition-all duration-300 group-hover:scale-105 bg-slate-100">
+                                <div className="relative w-36 md:w-40 h-36 md:h-40 mb-5 md:mb-6 rounded-full overflow-hidden shadow-2xl border-4 border-white ring-2 ring-slate-200 group-hover:ring-[#c3daee] transition-all duration-300 group-hover:scale-105 bg-slate-100">
                                     {speaker.photoUrl ? (
                                         <img
                                             src={speaker.photoUrl}
@@ -61,11 +61,11 @@ export const WideSpeakersPreview: React.FC<WideSpeakersPreviewProps> = ({ speake
                                     )}
                                 </div>
 
-                                <h4 className="text-lg md:text-xl font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">
+                                <h4 className="text-lg md:text-xl font-bold text-slate-900 mb-2 group-hover:text-[#003366] transition-colors">
                                     {t(speaker.name)}
                                 </h4>
 
-                                <p className="text-sm md:text-base font-semibold text-blue-600 mb-2 line-clamp-2 min-h-[2.25rem]">
+                                <p className="text-sm md:text-base font-semibold text-[#003366] mb-2 line-clamp-2 min-h-[2.25rem]">
                                     {t(speaker.organization)}
                                 </p>
                             </div>
@@ -96,26 +96,26 @@ export const WideSpeakersPreview: React.FC<WideSpeakersPreviewProps> = ({ speake
                                 </div>
                                 <div className="mt-6 text-center">
                                     <h4 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">{t(selectedSpeaker.name)}</h4>
-                                    <p className="text-lg md:text-xl font-semibold text-blue-600">{t(selectedSpeaker.organization)}</p>
+                                    <p className="text-lg md:text-xl font-semibold text-[#003366]">{t(selectedSpeaker.organization)}</p>
                                 </div>
                             </div>
 
                             {/* Info Section */}
                             <div className="md:w-3/5 p-6 md:p-12 space-y-8">
                                 {/* Lecture Title Section - Enhanced Design */}
-                                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 md:p-8 border border-blue-100 shadow-lg">
+                                <div className="bg-[#f0f5fa] rounded-2xl p-6 md:p-8 border border-[#c3daee] shadow-lg">
                                     <div className="flex items-center gap-3 mb-4">
-                                        <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/30">
+                                        <div className="w-10 h-10 bg-[#003366] rounded-xl flex items-center justify-center shadow-lg shadow-[#003366]/30">
                                             <span className="text-white text-xl">🎤</span>
                                         </div>
-                                        <h5 className="text-lg md:text-xl font-bold text-blue-900 uppercase tracking-wide">
+                                        <h5 className="text-lg md:text-xl font-bold text-[#003366] uppercase tracking-wide">
                                             {lang === 'ko' ? '강연 주제' : 'Lecture Topic'}
                                         </h5>
                                     </div>
                                     <p className="text-xl md:text-2xl font-bold text-slate-800 leading-relaxed">
-                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                        { }
                                         {(selectedSpeaker.presentationTitle as any)?.[lang] ||
-                                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                          
                                          (selectedSpeaker.presentationTitle as any)?.ko ||
                                          t(selectedSpeaker.presentationTitle) ||
                                          (lang === 'ko' ? '주제 미정' : 'TBD')}
@@ -126,10 +126,10 @@ export const WideSpeakersPreview: React.FC<WideSpeakersPreviewProps> = ({ speake
                                 {selectedSpeaker.bio && (
                                     <div>
                                         <div className="flex items-center gap-3 mb-4">
-                                            <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-600/30">
+                                            <div className="w-10 h-10 bg-[#24669e] rounded-xl flex items-center justify-center shadow-lg shadow-[#24669e]/30">
                                                 <span className="text-white text-xl">👤</span>
                                             </div>
-                                            <h5 className="text-lg md:text-xl font-bold text-emerald-900 uppercase tracking-wide">
+                                            <h5 className="text-lg md:text-xl font-bold text-[#003366] uppercase tracking-wide">
                                                 {lang === 'ko' ? '소개' : 'Biography'}
                                             </h5>
                                         </div>

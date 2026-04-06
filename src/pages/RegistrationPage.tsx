@@ -778,11 +778,11 @@ export default function RegistrationPage() {
         <div className="min-h-screen flex flex-col bg-gray-50">
             {/* HEADER */}
             <header className="bg-white shadow-sm py-4 px-6 flex justify-between items-center sticky top-0 z-10">
-                <div className="font-bold text-xl text-blue-900">{info?.societyId?.toUpperCase() || 'Academic Society'}</div>
+                <div className="font-bold text-xl text-[#003366]">{info?.societyId?.toUpperCase() || 'Academic Society'}</div>
                 <button
                     type="button"
                     onClick={() => setLanguage(language === 'ko' ? 'en' : 'ko')}
-                    className="px-3 py-1 rounded text-sm font-bold bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+                    className="px-3 py-1 rounded text-sm font-bold bg-[#f0f5fa] text-[#003366] hover:bg-[#e1ecf6] transition-colors"
                 >
                     {language === 'ko' ? 'EN' : 'KO'}
                 </button>
@@ -812,10 +812,10 @@ export default function RegistrationPage() {
                     </div>
 
                     {/* Step 1: Basic Info */}
-                    <Card className={`transition-all duration-300 ${isInfoSaved ? 'opacity-70 grayscale' : 'shadow-lg border-blue-200'}`}>
+                    <Card className={`transition-all duration-300 ${isInfoSaved ? 'opacity-70 grayscale' : 'shadow-lg border-[#c3daee]'}`}>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isInfoSaved ? 'bg-green-100 text-green-600' : 'bg-blue-600 text-white'}`}>
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isInfoSaved ? 'bg-green-100 text-green-600' : 'bg-[#003366] text-white'}`}>
                                     {isInfoSaved ? <CheckCircle2 className="w-5 h-5" /> : '1'}
                                 </div>
                                 {language === 'ko' ? '기본 정보' : 'Basic Information'}
@@ -850,7 +850,7 @@ export default function RegistrationPage() {
                                             <button
                                                 type="button"
                                                 onClick={handleLoginAndLoad}
-                                                className="text-xs text-blue-600 hover:underline font-medium"
+                                                className="text-xs text-[#003366] hover:underline font-medium"
                                                 disabled={isProcessing}
                                             >
                                                 {language === 'ko' ? '기존 정보 불러오기' : 'Load Existing Info'}
@@ -916,7 +916,7 @@ export default function RegistrationPage() {
                             </div>
                         </CardContent>
                         <CardFooter className={`${isInfoSaved ? 'hidden' : 'block'}`}>
-                            <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={handleSaveBasicInfo} disabled={isProcessing}>
+                            <Button className="w-full bg-[#003366] hover:bg-[#002244]" onClick={handleSaveBasicInfo} disabled={isProcessing}>
                                 <Save className="w-4 h-4 mr-2" />
                                 {language === 'ko' ? '기본 정보 저장' : 'Save Basic Info'}
                             </Button>
@@ -942,10 +942,10 @@ export default function RegistrationPage() {
 
                     {/* Step 2: Payment */}
                     {isInfoSaved && (
-                        <Card id="payment-section" className="shadow-lg border-blue-200 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <Card id="payment-section" className="shadow-lg border-[#c3daee] animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center">
+                                    <div className="w-8 h-8 rounded-full bg-[#003366] text-white flex items-center justify-center">
                                         2
                                     </div>
                                     {language === 'ko' ? '결제' : 'Payment'}
@@ -989,10 +989,10 @@ export default function RegistrationPage() {
                                                 </div>
                                             ))}
                                             <div className="flex justify-between items-center pt-2 mt-1 border-t border-dashed border-slate-200">
-                                                <span className="text-xs font-bold text-blue-600">
+                                                <span className="text-xs font-bold text-[#003366]">
                                                     {language === 'ko' ? '옵션 합계' : 'Options Subtotal'}
                                                 </span>
-                                                <span className="text-sm font-bold text-blue-600">
+                                                <span className="text-sm font-bold text-[#003366]">
                                                     + {optionsTotal.toLocaleString()}원
                                                 </span>
                                             </div>
@@ -1005,7 +1005,7 @@ export default function RegistrationPage() {
                                             <p className="text-sm font-medium text-slate-700">{language === 'ko' ? '총 결제 금액' : 'Total Amount'}</p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-2xl font-bold text-blue-600">{totalPrice.toLocaleString()}원</p>
+                                            <p className="text-2xl font-bold text-[#003366]">{totalPrice.toLocaleString()}원</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1016,7 +1016,7 @@ export default function RegistrationPage() {
                             </CardContent>
                             <CardFooter>
                                 <Button
-                                    className="w-full h-12 text-lg font-bold bg-blue-600 hover:bg-blue-700 shadow-md"
+                                    className="w-full h-12 text-lg font-bold bg-[#003366] hover:bg-[#002244] shadow-md"
                                     onClick={handlePayment}
                                     disabled={isProcessing || !paymentWidget}
                                 >
@@ -1051,7 +1051,7 @@ export default function RegistrationPage() {
             <button
                 type="button"
                 onClick={() => setShowRefundModal(true)}
-                className="fixed bottom-4 right-4 z-40 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-bold transition-colors"
+                className="fixed bottom-4 right-4 z-40 bg-[#003366] hover:bg-[#002244] text-white px-4 py-2 rounded-lg shadow-lg text-sm font-bold transition-colors"
             >
                 {language === 'ko' ? '환불 규정' : 'Refund Policy'}
             </button>

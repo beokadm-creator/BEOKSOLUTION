@@ -170,7 +170,7 @@ const AbstractSubmissionPage: React.FC = () => {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
                 <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
-                    <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <div className="w-16 h-16 bg-[#f0f5fa] text-[#003366] rounded-full flex items-center justify-center mx-auto mb-6">
                         <Lock size={32} />
                     </div>
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
@@ -287,7 +287,7 @@ const AbstractSubmissionPage: React.FC = () => {
                                     setStep(0);
                                     window.scrollTo(0, 0);
                                 }}
-                                className="h-14 bg-[#003366] hover:bg-[#002244] text-white font-bold shadow-lg shadow-blue-900/10 rounded-xl justify-center text-lg"
+                                className="h-14 bg-[#003366] hover:bg-[#002244] text-white font-bold shadow-lg shadow-[#003366]/10 rounded-xl justify-center text-lg"
                             >
                                 {lang === 'ko' ? '제출 내역 확인하기' : 'View Submissions'}
                             </EregiButton>
@@ -342,16 +342,16 @@ const AbstractSubmissionPage: React.FC = () => {
                         {/* Deadline Status Banner */}
                         <div className={cn(
                             "mb-8 p-5 rounded-2xl flex items-start sm:items-center gap-4 border",
-                            !isSubmissionOpen ? "bg-gray-50 border-gray-200" : "bg-blue-50 border-blue-100"
+                            !isSubmissionOpen ? "bg-gray-50 border-gray-200" : "bg-[#f0f5fa] border-[#c3daee]"
                         )}>
                             <div className={cn(
                                 "p-2 rounded-full flex-shrink-0",
-                                !isSubmissionOpen ? "bg-gray-200 text-gray-500" : "bg-blue-100 text-blue-600"
+                                !isSubmissionOpen ? "bg-gray-200 text-gray-500" : "bg-[#f0f5fa] text-[#003366]"
                             )}>
                                 {!isSubmissionOpen ? <Lock className="w-5 h-5" /> : <Calendar className="w-5 h-5" />}
                             </div>
                             <div>
-                                <h3 className={cn("font-bold text-sm mb-0.5", !isSubmissionOpen ? "text-gray-900" : "text-blue-900")}>
+                                <h3 className={cn("font-bold text-sm mb-0.5", !isSubmissionOpen ? "text-gray-900" : "text-[#003366]")}>
                                     {!isSubmissionOpen
                                         ? (lang === 'ko' ? '신규 접수가 마감되었습니다.' : 'New submissions are closed.')
                                         : (lang === 'ko' ? '현재 초록 접수 기간입니다.' : 'Abstract submission is currently OPEN.')
@@ -394,13 +394,13 @@ const AbstractSubmissionPage: React.FC = () => {
                             ) : (
                                 <div className="grid gap-4">
                                     {mySubmissions.map(sub => (
-                                        <div key={sub.id} className="bg-white border border-gray-200 rounded-2xl p-6 hover:border-blue-300 transition-all shadow-sm hover:shadow-md group relative">
+                                        <div key={sub.id} className="bg-white border border-gray-200 rounded-2xl p-6 hover:border-[#c3daee] transition-all shadow-sm hover:shadow-md group relative">
                                             {/* Status Badge (Top Right) */}
                                             <div className="absolute top-6 right-6">
                                                 <Badge className={cn(
                                                     "px-3 py-1 rounded-full text-xs font-bold border-0",
                                                     sub.reviewStatus === 'accepted_oral' ? 'bg-green-100 text-green-800' :
-                                                        sub.reviewStatus === 'accepted_poster' ? 'bg-blue-100 text-blue-800' :
+                                                        sub.reviewStatus === 'accepted_poster' ? 'bg-[#f0f5fa] text-[#003366]' :
                                                             sub.reviewStatus === 'rejected' ? 'bg-red-100 text-red-800' :
                                                                 'bg-gray-100 text-gray-600'
                                                 )}>
@@ -413,7 +413,7 @@ const AbstractSubmissionPage: React.FC = () => {
 
                                             <div className="pr-24">
                                                 <div className="flex items-center gap-2 mb-2">
-                                                    <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                                                    <span className="text-xs font-bold text-[#003366] bg-[#f0f5fa] px-2 py-0.5 rounded border border-[#c3daee]">
                                                         {sub.field}
                                                     </span>
                                                     <span className="text-xs font-bold text-gray-500 bg-gray-50 px-2 py-0.5 rounded border border-gray-100">
@@ -522,7 +522,7 @@ const AbstractSubmissionPage: React.FC = () => {
                                 <div key={s} className="relative z-10 flex flex-col items-center bg-white px-2 sm:px-4">
                                     <div className={cn(
                                         "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 border-2",
-                                        step === s ? "border-[#003366] bg-white text-[#003366] ring-4 ring-blue-50 shadow-md transform scale-110" :
+                                        step === s ? "border-[#003366] bg-white text-[#003366] ring-4 ring-[#f0f5fa] shadow-md transform scale-110" :
                                             step > s ? "border-[#003366] bg-[#003366] text-white" : "border-gray-100 bg-gray-100 text-gray-400"
                                     )}>
                                         {step > s ? <CheckCircle2 className="w-5 h-5" /> : s}
@@ -549,7 +549,7 @@ const AbstractSubmissionPage: React.FC = () => {
                                                 <select
                                                     value={type}
                                                     onChange={e => setType(e.target.value)}
-                                                    className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all font-medium"
+                                                    className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:border-[#003366] focus:ring-4 focus:ring-[#003366]/10 transition-all font-medium"
                                                 >
                                                     <option value="Oral">Oral Presentation</option>
                                                     <option value="Poster">Poster Presentation</option>
@@ -560,7 +560,7 @@ const AbstractSubmissionPage: React.FC = () => {
                                                 <select
                                                     value={field}
                                                     onChange={e => setField(e.target.value)}
-                                                    className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all font-medium"
+                                                    className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:border-[#003366] focus:ring-4 focus:ring-[#003366]/10 transition-all font-medium"
                                                 >
                                                     <option value="General">General</option>
                                                     <option value="AI">Artificial Intelligence</option>
@@ -587,7 +587,7 @@ const AbstractSubmissionPage: React.FC = () => {
                                         </div>
 
                                         <div className="flex justify-end pt-6 border-t border-gray-100">
-                                            <EregiButton onClick={() => setStep(2)} className="h-12 px-8 text-base font-bold bg-[#003366] hover:bg-[#002244] rounded-xl shadow-lg shadow-blue-900/10">
+                                            <EregiButton onClick={() => setStep(2)} className="h-12 px-8 text-base font-bold bg-[#003366] hover:bg-[#002244] rounded-xl shadow-lg shadow-[#003366]/10">
                                                 Next Step <ArrowRight className="w-5 h-5 ml-2" />
                                             </EregiButton>
                                         </div>
@@ -601,7 +601,7 @@ const AbstractSubmissionPage: React.FC = () => {
                                             <h3 className="text-lg font-bold text-gray-900">Authors Information</h3>
                                             <button
                                                 onClick={handleAddAuthor}
-                                                className="flex items-center gap-2 text-sm font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg transition-colors"
+                                                className="flex items-center gap-2 text-sm font-bold text-[#003366] bg-[#f0f5fa] hover:bg-[#e1ecf6] px-4 py-2 rounded-lg transition-colors"
                                             >
                                                 <Plus className="w-4 h-4" /> Add Co-Author
                                             </button>
@@ -609,7 +609,7 @@ const AbstractSubmissionPage: React.FC = () => {
 
                                         <div className="space-y-6">
                                             {authors.map((author, idx) => (
-                                                <div key={idx} className="relative group bg-white border border-gray-200 rounded-2xl p-6 hover:border-blue-300 transition-all shadow-sm pl-10 sm:pl-8">
+                                                <div key={idx} className="relative group bg-white border border-gray-200 rounded-2xl p-6 hover:border-[#c3daee] transition-all shadow-sm pl-10 sm:pl-8">
                                                     <div className="absolute left-0 top-0 bottom-0 w-2 bg-gray-100 group-hover:bg-[#003366] rounded-l-2xl transition-colors"></div>
 
                                                     {/* Author Number Badge */}
@@ -684,7 +684,7 @@ const AbstractSubmissionPage: React.FC = () => {
                                             <button onClick={() => setStep(1)} className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors">
                                                 Back
                                             </button>
-                                            <EregiButton onClick={() => setStep(3)} className="h-12 px-8 text-base font-bold bg-[#003366] hover:bg-[#002244] rounded-xl shadow-lg shadow-blue-900/10">
+                                            <EregiButton onClick={() => setStep(3)} className="h-12 px-8 text-base font-bold bg-[#003366] hover:bg-[#002244] rounded-xl shadow-lg shadow-[#003366]/10">
                                                 Next Step <ArrowRight className="w-5 h-5 ml-2" />
                                             </EregiButton>
                                         </div>
@@ -709,7 +709,7 @@ const AbstractSubmissionPage: React.FC = () => {
                                                 />
                                                 <div className={cn(
                                                     "border-2 border-dashed rounded-2xl p-12 transition-all text-center flex flex-col items-center justify-center gap-6",
-                                                    file ? "border-[#003366] bg-blue-50/30" : "border-gray-300 hover:border-[#003366]/50 hover:bg-gray-50/50"
+                                                    file ? "border-[#003366] bg-[#f0f5fa]/30" : "border-gray-300 hover:border-[#003366]/50 hover:bg-gray-50/50"
                                                 )}>
                                                     <div className={cn(
                                                         "w-20 h-20 rounded-full flex items-center justify-center transition-all shadow-sm",
@@ -722,7 +722,7 @@ const AbstractSubmissionPage: React.FC = () => {
                                                             <>
                                                                 <p className="text-xl font-bold text-[#003366] mb-1">{file.name}</p>
                                                                 <p className="text-sm text-gray-500 mb-3">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                                                                <span className="text-xs text-blue-500 font-bold bg-blue-50 px-3 py-1 rounded-full">
+                                                                <span className="text-xs text-[#003366] font-bold bg-[#f0f5fa] px-3 py-1 rounded-full">
                                                                     Click to replace
                                                                 </span>
                                                             </>
