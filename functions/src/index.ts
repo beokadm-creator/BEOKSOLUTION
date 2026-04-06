@@ -1186,10 +1186,13 @@ export const mintCrossDomainToken = functions
 // --------------------------------------------------------------------------
 import * as crypto from 'crypto';
 
-const LINK_SECRET = process.env.LINK_SECRET;
-if (!LINK_SECRET) {
-    throw new Error('LINK_SECRET environment variable is required but not set');
-}
+const getLinkSecret = (): string => {
+    const secret = process.env.LINK_SECRET;
+    if (!secret) {
+        throw new Error('LINK_SECRET environment variable is required but not set');
+    }
+    return secret;
+};
 
 export const verifyAccessLink = functions
     .runWith({ enforceAppCheck: false, ingressSettings: 'ALLOW_ALL' })
@@ -1205,7 +1208,7 @@ export const verifyAccessLink = functions
             const [payloadB64, signature] = parts;
 
             // 1. Verify Signature
-            const expectedSig = crypto.createHmac('sha256', LINK_SECRET).update(payloadB64).digest('hex');
+            const expectedSig = crypto.createHmac('sha256', getLinkSecret()).update(payloadB64).digest('hex');
 
             // Constant time comparison to prevent timing attacks (optional but good)
             if (expectedSig !== signature) {
@@ -1248,7 +1251,7 @@ export const generateAccessLink = functions
         };
 
         const payloadB64 = Buffer.from(JSON.stringify(payload)).toString('base64');
-        const signature = crypto.createHmac('sha256', LINK_SECRET).update(payloadB64).digest('hex');
+        const signature = crypto.createHmac('sha256', getLinkSecret()).update(payloadB64).digest('hex');
         const token = `${payloadB64}.${signature}`;
 
         return { token };
