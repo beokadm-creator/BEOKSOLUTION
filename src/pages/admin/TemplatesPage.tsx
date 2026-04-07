@@ -408,17 +408,15 @@ export default function TemplatesPage() {
     const currentVariables = eventPresets[selectedEventType]?.variables || [];
 
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-8 pb-24">
+        <div className="p-6 space-y-6 pb-24">
             {/* Header Area */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b pb-6">
+            <div className="flex items-start justify-between">
                 <div>
-                    <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="outline" className="text-[#003366] border-[#c3daee] bg-[#f0f5fa]">Admin Console</Badge>
-                        <span className="text-slate-300">|</span>
-                        <span className="text-sm font-medium text-slate-500 uppercase tracking-wide">Notification Center</span>
-                    </div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">알림 템플릿 관리</h1>
-                    <p className="text-slate-500 mt-2 font-medium">이벤트별 알림톡 및 이메일 템플릿을 관리합니다.</p>
+                    <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                        <Mail className="w-5 h-5 text-[#003366]" />
+                        알림 템플릿 관리
+                    </h1>
+                    <p className="text-sm text-gray-500 mt-1">이벤트별 알림톡 및 이메일 템플릿을 관리합니다.</p>
                 </div>
                 <Button onClick={fetchTemplates} variant="outline" disabled={loading} className="border-dashed hover:border-[#c3daee] hover:text-[#003366] hover:bg-[#f0f5fa]">
                     <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -427,8 +425,8 @@ export default function TemplatesPage() {
             </div>
 
             {/* Event Type Tabs */}
-            <Tabs value={selectedEventType} onValueChange={(v) => setSelectedEventType(v as NotificationEventType)} className="space-y-8">
-                <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 w-full h-auto p-1.5 bg-slate-100/80 rounded-xl gap-1">
+            <Tabs value={selectedEventType} onValueChange={(v) => setSelectedEventType(v as NotificationEventType)} className="space-y-6">
+                <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 w-full h-auto p-1 bg-[#f0f5fa] rounded-xl gap-1">
                     {(Object.keys(eventPresets) as NotificationEventType[]).map(eventType => (
                         <TabsTrigger
                             key={eventType}
@@ -443,17 +441,17 @@ export default function TemplatesPage() {
                 {(Object.keys(eventPresets) as NotificationEventType[]).map(eventType => (
                     <TabsContent key={eventType} value={eventType} className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
                         {/* Event Context Card */}
-                        <Card className="border-none shadow-lg shadow-slate-200/50 bg-white rounded-2xl overflow-hidden">
-                            <CardHeader className="bg-[#f0f5fa]/50 border-b border-[#c3daee] pb-4">
+                        <Card className="rounded-2xl border border-[#c3daee] shadow-sm bg-white overflow-hidden">
+                            <CardHeader className="bg-[#f0f5fa] border-b border-[#c3daee] px-6 py-4">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-[#f0f5fa] rounded-lg text-[#003366]">
-                                        <Info className="w-5 h-5" />
+                                        <Info className="w-4 h-4 text-[#003366]" />
                                     </div>
                                     <div>
-                                        <CardTitle className="text-lg font-bold text-slate-800">
+                                        <CardTitle className="text-base font-semibold text-gray-800">
                                             {eventPresets[eventType].label.ko} 가용 변수
                                         </CardTitle>
-                                        <CardDescription className="text-[#003366]/80 font-medium">
+                                        <CardDescription className="text-sm text-gray-500">
                                             템플릿 작성 시 사용할 수 있는 동적 데이터 변수 목록입니다.
                                         </CardDescription>
                                     </div>
@@ -492,7 +490,7 @@ export default function TemplatesPage() {
                         {loading ? (
                             <div className="flex flex-col items-center justify-center py-20">
                                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#003366] mb-4" />
-                                <p className="text-slate-500">Loading templates...</p>
+                                <p className="text-slate-500">설정 로딩 중...</p>
                             </div>
                         ) : currentTemplates.length === 0 ? (
                             <Card className="border-dashed border-2 border-slate-200 bg-slate-50/50">
@@ -510,8 +508,8 @@ export default function TemplatesPage() {
                         ) : (
                             <div className="grid grid-cols-1 gap-6">
                                 {currentTemplates.map(template => (
-                                    <Card key={template.id} className={`border-none shadow-lg shadow-slate-200/50 bg-white rounded-2xl overflow-hidden transition-all hover:shadow-xl ${!template.isActive ? 'opacity-80 grayscale-[0.3]' : ''}`}>
-                                        <CardHeader className="border-b border-slate-100 pb-4 bg-slate-50/50">
+                                    <Card key={template.id} className={`rounded-2xl border border-[#c3daee] shadow-sm bg-white overflow-hidden transition-all hover:shadow-md ${!template.isActive ? 'opacity-80 grayscale-[0.3]' : ''}`}>
+                                        <CardHeader className="border-b border-[#c3daee] pb-4 bg-[#f0f5fa]">
                                             <div className="flex justify-between items-start">
                                                 <div className="space-y-1">
                                                     <div className="flex items-center gap-3">
@@ -540,10 +538,10 @@ export default function TemplatesPage() {
                                                         variant="outline"
                                                         size="sm"
                                                         onClick={() => handleEdit(template)}
-                                                        className="hover:bg-[#f0f5fa] hover:text-[#003366] border-slate-200"
+                                                        className="hover:bg-[#f0f5fa] hover:text-[#003366] border-[#c3daee]"
                                                     >
                                                         <Save className="w-3.5 h-3.5 mr-2" />
-                                                        Edit
+                                                        편집
                                                     </Button>
                                                     <Button
                                                         variant="ghost"
@@ -678,7 +676,7 @@ export default function TemplatesPage() {
                             </DialogTitle>
                         </div>
                         <DialogDescription className="text-slate-500 ml-11">
-                            Configuring for <span className="font-bold text-[#003366]">{eventPresets[selectedEventType].label.ko}</span> event.
+                            <span className="font-bold text-[#003366]">{eventPresets[selectedEventType].label.ko}</span> 이벤트 템플릿 설정
                         </DialogDescription>
                     </DialogHeader>
 

@@ -538,72 +538,70 @@ const MemberManagerPage: React.FC = () => {
     if (!targetId) return (
         <div className="flex flex-col items-center justify-center min-h-[50vh]">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#003366] mb-4" />
-            <p className="text-slate-500 font-medium">Resolving Society Context...</p>
+            <p className="text-slate-500 font-medium">학회 정보 로딩 중...</p>
         </div>
     );
 
     const availableCount = members.filter(m => !m.used && !isExpired(m.expiryDate)).length;
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8 pb-24 p-6">
+        <div className="p-6 space-y-6 pb-24">
             {/* Header Area */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b pb-6">
+            <div className="flex items-start justify-between">
                 <div>
-                    <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="outline" className="text-[#003366] border-[#c3daee] bg-[#f0f5fa]">Admin Console</Badge>
-                        <span className="text-slate-300">|</span>
-                        <span className="text-sm font-medium text-slate-500 uppercase tracking-wide">Member Management</span>
-                    </div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Society Members</h1>
-                    <p className="text-slate-500 mt-2 font-medium">Manage member verification codes (Whitelist) and grades.</p>
+                    <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                        <ShieldCheck className="w-5 h-5 text-[#003366]" />
+                        회원 명단
+                    </h1>
+                    <p className="text-sm text-gray-500 mt-1">회원 인증 코드(화이트리스트) 및 등급을 관리합니다.</p>
                 </div>
                 <div className="flex gap-4">
                     <div className="text-right hidden md:block">
-                        <p className="text-sm text-slate-400 font-medium uppercase">Total Members</p>
+                        <p className="text-sm text-slate-400 font-medium">전체 회원</p>
                         <p className="text-2xl font-bold text-slate-800">{members.length}</p>
                     </div>
                     <div className="w-px bg-slate-200 hidden md:block" />
                     <div className="text-right hidden md:block">
-                        <p className="text-sm text-emerald-600 font-medium uppercase">Available</p>
+                        <p className="text-sm text-emerald-600 font-medium">사용 가능</p>
                         <p className="text-2xl font-bold text-emerald-600">{availableCount}</p>
                     </div>
                 </div>
             </div>
 
-            <Tabs defaultValue="list" className="w-full space-y-8">
-                <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-14 p-1.5 bg-slate-100/80 rounded-xl">
-                    <TabsTrigger value="list" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">
-                        Member List
+            <Tabs defaultValue="list" className="w-full space-y-6">
+                <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto p-1 bg-[#f0f5fa] rounded-xl">
+                    <TabsTrigger value="list" className="rounded-lg font-medium data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">
+                        회원 목록
                         <Badge variant="secondary" className="ml-2 bg-[#f0f5fa] text-[#003366] hover:bg-[#f0f5fa]">{members.length}</Badge>
                     </TabsTrigger>
-                    <TabsTrigger value="add" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">
-                        Add Single
+                    <TabsTrigger value="add" className="rounded-lg font-medium data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">
+                        단건 추가
                     </TabsTrigger>
-                    <TabsTrigger value="bulk" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">
-                        Bulk Upload
+                    <TabsTrigger value="bulk" className="rounded-lg font-medium data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">
+                        대량 업로드
                     </TabsTrigger>
-                    <TabsTrigger value="bulk-expiry" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">
-                        Bulk Expiry Update
+                    <TabsTrigger value="bulk-expiry" className="rounded-lg font-medium data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">
+                        만료일 일괄 변경
                     </TabsTrigger>
-                    <TabsTrigger value="settings" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">
-                        Grade Settings
+                    <TabsTrigger value="settings" className="rounded-lg font-medium data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">
+                        등급 설정
                     </TabsTrigger>
                 </TabsList>
 
                 {/* Tab 1: List */}
                 <TabsContent value="list" className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                    <Card className="border-none shadow-lg shadow-slate-200/50 overflow-hidden bg-white rounded-2xl">
-                        <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+                    <Card className="rounded-2xl border border-[#c3daee] shadow-sm overflow-hidden bg-white">
+                        <CardHeader className="bg-[#f0f5fa] border-b border-[#c3daee] px-6 py-4">
                             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                                 <div className="flex items-center gap-3 w-full md:w-auto">
-                                    <div className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm">
-                                        <Filter className="w-4 h-4 text-slate-500" />
+                                    <div className="p-2 bg-white border border-[#c3daee] rounded-lg shadow-sm">
+                                        <Filter className="w-4 h-4 text-[#003366]" />
                                     </div>
                                     <div className="relative w-full md:w-80">
                                         <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
                                         <Input
-                                            placeholder="Search by name or code..."
-                                            className="pl-9 pr-8 bg-white border-slate-200 focus:border-[#c3daee] transition-colors"
+                                            placeholder="이름 또는 코드로 검색..."
+                                            className="pl-9 pr-8 bg-white border-[#c3daee] focus:border-[#003366] transition-colors"
                                             value={searchTerm}
                                             onChange={e => setSearchTerm(e.target.value)}
                                         />
@@ -619,26 +617,26 @@ const MemberManagerPage: React.FC = () => {
                                 </div>
                                 <Button variant="outline" size="sm" onClick={fetchMembers} disabled={loading} className="w-full md:w-auto border-dashed hover:border-[#c3daee] hover:text-[#003366] hover:bg-[#f0f5fa]">
                                     <RefreshCw className={`w-3.5 h-3.5 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                                    Refresh List
+                                    새로고침
                                 </Button>
                             </div>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <div className="border-t border-slate-100">
+                            <div className="border-t border-[#c3daee]">
                                 <Table>
-                                    <TableHeader className="bg-slate-50/50">
+                                    <TableHeader className="bg-[#f0f5fa]">
                                         <TableRow className="hover:bg-transparent">
                                             <TableHead className="w-[60px] font-bold text-slate-600 pl-6">
                                                 {selectAll ? <CheckSquare className="w-5 h-5 cursor-pointer" onClick={() => handleSelectAll(false)} /> : <Square className="w-5 h-5 cursor-pointer" onClick={() => handleSelectAll(true)} />}
                                             </TableHead>
-                                            <TableHead className="w-[180px] font-bold text-slate-600 pl-6">Name</TableHead>
-                                            <TableHead className="font-bold text-slate-600">Verification Code</TableHead>
-                                            <TableHead className="font-bold text-slate-600">Grade</TableHead>
-                                            <TableHead className="font-bold text-slate-600">Expiry</TableHead>
-                                            <TableHead className="font-bold text-slate-600">Status</TableHead>
-                                            <TableHead className="font-bold text-slate-600">Used By</TableHead>
-                                            <TableHead className="font-bold text-slate-600">Used At</TableHead>
-                                            <TableHead className="text-right font-bold text-slate-600 pr-6">Actions</TableHead>
+                                            <TableHead className="w-[180px] font-bold text-slate-600 pl-6">이름</TableHead>
+                                            <TableHead className="font-bold text-slate-600">인증 코드</TableHead>
+                                            <TableHead className="font-bold text-slate-600">등급</TableHead>
+                                            <TableHead className="font-bold text-slate-600">만료일</TableHead>
+                                            <TableHead className="font-bold text-slate-600">상태</TableHead>
+                                            <TableHead className="font-bold text-slate-600">사용자</TableHead>
+                                            <TableHead className="font-bold text-slate-600">사용일</TableHead>
+                                            <TableHead className="text-right font-bold text-slate-600 pr-6">작업</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -647,7 +645,7 @@ const MemberManagerPage: React.FC = () => {
                                                 <TableCell colSpan={8} className="text-center h-64 text-slate-400">
                                                     <div className="flex flex-col items-center justify-center gap-2">
                                                         <Search className="w-8 h-8 opacity-20" />
-                                                        <p>No members found matching your criteria.</p>
+                                                        <p>조건에 맞는 회원이 없습니다.</p>
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
@@ -673,11 +671,11 @@ const MemberManagerPage: React.FC = () => {
                                                     <TableCell className="text-sm text-slate-600 font-medium tabular-nums">{member.expiryDate}</TableCell>
                                                     <TableCell>
                                                         {member.used ? (
-                                                            <Badge variant="destructive" className="bg-red-100 text-red-600 hover:bg-red-200 border-red-200 shadow-none font-bold">Used</Badge>
+                                                            <Badge variant="destructive" className="bg-red-100 text-red-600 hover:bg-red-200 border-red-200 shadow-none font-bold">사용됨</Badge>
                                                         ) : isExpired(member.expiryDate) ? (
-                                                            <Badge variant="outline" className="bg-orange-50 text-orange-600 border-orange-200 font-bold">Expired</Badge>
+                                                            <Badge variant="outline" className="bg-orange-50 text-orange-600 border-orange-200 font-bold">만료됨</Badge>
                                                         ) : (
-                                                            <Badge variant="outline" className="bg-[#f0f5fa] text-[#003366] border-[#c3daee] font-bold">Available</Badge>
+                                                            <Badge variant="outline" className="bg-[#f0f5fa] text-[#003366] border-[#c3daee] font-bold">사용 가능</Badge>
                                                         )}
                                                     </TableCell>
                                                     <TableCell className="text-xs text-slate-500 font-mono">
@@ -733,19 +731,19 @@ const MemberManagerPage: React.FC = () => {
 
                 {/* Tab 2: Manual Add */}
                 <TabsContent value="add" className="animate-in fade-in slide-in-from-bottom-2">
-                    <Card className="border-none shadow-lg shadow-slate-200/50 bg-white rounded-2xl max-w-2xl mx-auto">
-                        <CardHeader className="bg-[#f0f5fa]/50 border-b border-[#c3daee]">
+                    <Card className="rounded-2xl border border-[#c3daee] shadow-sm bg-white max-w-2xl mx-auto">
+                        <CardHeader className="bg-[#f0f5fa] border-b border-[#c3daee] px-6 py-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
-                                    <UserPlus className="w-5 h-5" />
+                                    <UserPlus className="w-4 h-4 text-[#003366]" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-lg font-bold text-slate-800">Add New Member</CardTitle>
-                                    <CardDescription className="text-[#003366]/80 font-medium mt-0.5">Manually register a single member to whitelist.</CardDescription>
+                                    <CardTitle className="text-base font-semibold text-gray-800">새 회원 추가</CardTitle>
+                                    <CardDescription className="text-sm text-gray-500 mt-0.5">화이트리스트에 단건으로 회원을 등록합니다.</CardDescription>
                                 </div>
                             </div>
                         </CardHeader>
-                        <CardContent className="p-8 space-y-6">
+                        <CardContent className="p-6 space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <Label className="text-xs font-bold text-slate-500 uppercase">Member Name</Label>
@@ -804,19 +802,19 @@ const MemberManagerPage: React.FC = () => {
 
                 {/* Tab 3: Bulk Upload (NEW) */}
                 <TabsContent value="bulk" className="animate-in fade-in slide-in-from-bottom-2">
-                    <Card className="border-none shadow-lg shadow-slate-200/50 bg-white rounded-2xl">
-                        <CardHeader className="bg-[#f0f5fa]/50 border-b border-[#c3daee]">
+                    <Card className="rounded-2xl border border-[#c3daee] shadow-sm bg-white">
+                        <CardHeader className="bg-[#f0f5fa] border-b border-[#c3daee] px-6 py-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
-                                    <FileSpreadsheet className="w-5 h-5" />
+                                    <FileSpreadsheet className="w-4 h-4 text-[#003366]" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-lg font-bold text-slate-800">CSV 대량 업로드</CardTitle>
-                                    <CardDescription className="text-[#24669e] font-medium mt-0.5">회원 정보를 CSV 형식으로 대량 업로드합니다.</CardDescription>
+                                    <CardTitle className="text-base font-semibold text-gray-800">CSV 대량 업로드</CardTitle>
+                                    <CardDescription className="text-sm text-gray-500 mt-0.5">회원 정보를 CSV 형식으로 대량 업로드합니다.</CardDescription>
                                 </div>
                             </div>
                         </CardHeader>
-                        <CardContent className="p-8 space-y-6">
+                        <CardContent className="p-6 space-y-6">
                             <div className="space-y-4">
                                 <div className="space-y-2">
                                     <Label className="text-sm font-bold text-slate-700">CSV 파일 입력</Label>
@@ -862,19 +860,19 @@ const MemberManagerPage: React.FC = () => {
 
                 {/* Tab 4: Bulk Expiry Update (NEW) */}
                 <TabsContent value="bulk-expiry" className="animate-in fade-in slide-in-from-bottom-2">
-                    <Card className="border-none shadow-lg shadow-slate-200/50 bg-white rounded-2xl max-w-3xl mx-auto">
-                        <CardHeader className="bg-[#f0f5fa]/50 border-b border-[#c3daee]">
+                    <Card className="rounded-2xl border border-[#c3daee] shadow-sm bg-white max-w-3xl mx-auto">
+                        <CardHeader className="bg-[#f0f5fa] border-b border-[#c3daee] px-6 py-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
-                                    <Calendar className="w-5 h-5" />
+                                    <Calendar className="w-4 h-4 text-[#003366]" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-lg font-bold text-slate-800">대량 유효기간 수정</CardTitle>
-                                    <CardDescription className="text-[#003366]/80 font-medium mt-0.5">선택된 회원들의 유효기간을 일괄로 수정합니다.</CardDescription>
+                                    <CardTitle className="text-base font-semibold text-gray-800">대량 유효기간 수정</CardTitle>
+                                    <CardDescription className="text-sm text-gray-500 mt-0.5">선택된 회원들의 유효기간을 일괄로 수정합니다.</CardDescription>
                                 </div>
                             </div>
                         </CardHeader>
-                        <CardContent className="p-8 space-y-6">
+                        <CardContent className="p-6 space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
                                 <div className="space-y-4 flex-1">
                                     <Label className="text-sm font-bold text-slate-700">새로운 유효기간</Label>
@@ -913,19 +911,19 @@ const MemberManagerPage: React.FC = () => {
 
                 {/* Tab 4: Grade Settings */}
                 <TabsContent value="settings" className="animate-in fade-in slide-in-from-bottom-2">
-                    <Card className="border-none shadow-lg shadow-slate-200/50 bg-white rounded-2xl max-w-3xl mx-auto">
-                        <CardHeader className="bg-slate-50/50 border-b border-slate-100">
+                    <Card className="rounded-2xl border border-[#c3daee] shadow-sm bg-white max-w-3xl mx-auto">
+                        <CardHeader className="bg-[#f0f5fa] border-b border-[#c3daee] px-6 py-4">
                             <div className="flex items-center gap-3">
-                                <div className="p-2.5 bg-slate-100 rounded-xl text-slate-600">
-                                    <Settings className="w-5 h-5" />
+                                <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
+                                    <Settings className="w-4 h-4 text-[#003366]" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-lg font-bold text-slate-800">Grade Configuration</CardTitle>
-                                    <CardDescription className="text-slate-500 font-medium mt-0.5">Define member grades and codes (e.g., Regular, Associate). (v_fix_id)</CardDescription>
+                                    <CardTitle className="text-base font-semibold text-gray-800">등급 설정</CardTitle>
+                                    <CardDescription className="text-sm text-gray-500 mt-0.5">회원 등급 및 코드를 정의합니다. (예: 정회원, 준회원)</CardDescription>
                                 </div>
                             </div>
                         </CardHeader>
-                        <CardContent className="p-8 space-y-8">
+                        <CardContent className="p-6 space-y-8">
                             <div className="bg-slate-50 p-6 rounded-2xl border border-dashed border-slate-200">
                                 <Label className="text-sm font-bold text-slate-700 mb-4 block">Add New Grade</Label>
                                 <div className="flex flex-col md:flex-row gap-4 items-end">
@@ -954,9 +952,9 @@ const MemberManagerPage: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="border border-slate-200 rounded-xl overflow-hidden">
+                            <div className="border border-[#c3daee] rounded-xl overflow-hidden">
                                 <Table>
-                                    <TableHeader className="bg-slate-50">
+                                    <TableHeader className="bg-[#f0f5fa]">
                                         <TableRow>
                                             <TableHead className="font-bold text-slate-600 pl-6">Display Name</TableHead>
                                             <TableHead className="font-bold text-slate-600">System Code</TableHead>

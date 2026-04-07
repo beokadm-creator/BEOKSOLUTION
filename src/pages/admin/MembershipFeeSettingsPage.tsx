@@ -325,34 +325,32 @@ export default function MembershipFeeSettingsPage() {
     );
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8 pb-24 p-6">
+        <div className="p-6 space-y-6 pb-24">
             {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b pb-6">
+            <div className="flex items-start justify-between">
                 <div>
-                    <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="outline" className="text-[#003366] border-[#c3daee] bg-[#f0f5fa]">Admin Console</Badge>
-                        <span className="text-slate-300">|</span>
-                        <span className="text-sm font-medium text-slate-500 uppercase tracking-wide">Society Settings</span>
-                    </div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">학회 회비 설정</h1>
-                    <p className="text-slate-500 mt-2 font-medium">회원 등급별 납부 금액과 유효기간을 설정합니다.</p>
+                    <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                        <CreditCard className="w-5 h-5 text-[#003366]" />
+                        학회 회비 설정
+                    </h1>
+                    <p className="text-sm text-gray-500 mt-1">회원 등급별 납부 금액과 유효기간을 설정합니다.</p>
                 </div>
             </div>
 
             {/* Add New Tier */}
-            <Card className="border-none shadow-lg shadow-slate-200/50 overflow-hidden bg-white rounded-2xl max-w-4xl mx-auto">
-                <CardHeader className="bg-[#f0f5fa]/50 border-b border-[#c3daee] pb-4">
+            <Card className="rounded-2xl border border-[#c3daee] shadow-sm overflow-hidden bg-white">
+                <CardHeader className="bg-[#f0f5fa] border-b border-[#c3daee] px-6 py-4">
                     <div className="flex items-center gap-3">
                         <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
-                            <Plus className="w-5 h-5" />
+                            <Plus className="w-4 h-4 text-[#003366]" />
                         </div>
                         <div>
-                            <CardTitle className="text-lg font-bold text-slate-800">새 회비 등급 추가</CardTitle>
-                            <CardDescription className="text-[#24669e] font-medium mt-0.5">등급별 금액과 유효기간 설정</CardDescription>
+                            <CardTitle className="text-base font-semibold text-gray-800">새 회비 등급 추가</CardTitle>
+                            <CardDescription className="text-sm text-gray-500 mt-0.5">등급별 금액과 유효기간 설정</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent className="p-8 space-y-6">
+                <CardContent className="p-6 space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="space-y-2">
                             <Label className="text-xs font-bold text-slate-400 uppercase">회원 등급</Label>
@@ -444,15 +442,15 @@ export default function MembershipFeeSettingsPage() {
             </Card>
 
             {/* Fee Tiers List */}
-            <Card className="border-none shadow-lg shadow-slate-200/50 bg-white rounded-2xl max-w-5xl mx-auto">
-                <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+            <Card className="rounded-2xl border border-[#c3daee] shadow-sm bg-white">
+                <CardHeader className="bg-[#f0f5fa] border-b border-[#c3daee] px-6 py-4">
                     <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-slate-100 rounded-xl text-slate-600">
-                            <CreditCard className="w-5 h-5" />
+                        <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
+                            <CreditCard className="w-4 h-4 text-[#003366]" />
                         </div>
                         <div>
-                            <CardTitle className="text-lg font-bold text-slate-800">설정된 회비 등급</CardTitle>
-                            <CardDescription className="text-slate-500 font-medium mt-0.5">
+                            <CardTitle className="text-base font-semibold text-gray-800">설정된 회비 등급</CardTitle>
+                            <CardDescription className="text-sm text-gray-500 mt-0.5">
                                 총 {feeTiers.length}개 등급 설정됨
                             </CardDescription>
                         </div>
@@ -467,7 +465,7 @@ export default function MembershipFeeSettingsPage() {
                         </div>
                     ) : (
                         <Table>
-                            <TableHeader className="bg-slate-50">
+                            <TableHeader className="bg-[#f0f5fa]">
                                 <TableRow>
                                     <TableHead className="font-bold text-slate-600 pl-6">회원 등급</TableHead>
                                     <TableHead className="font-bold text-slate-600">회비 금액</TableHead>

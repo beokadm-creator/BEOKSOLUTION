@@ -154,54 +154,52 @@ const IdentityPage: React.FC = () => {
         return (
             <div className="flex flex-col items-center justify-center min-h-[50vh]">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#003366] mb-4" />
-                <p className="text-slate-500 font-medium">Loading society profile...</p>
+                <p className="text-slate-500 font-medium">학회 정보 로딩 중...</p>
             </div>
         );
     }
 
     return (
-        <div className="max-w-5xl mx-auto space-y-8 pb-24 p-6">
+        <div className="p-6 space-y-6 pb-24">
 
             {/* Header Area */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b pb-6">
+            <div className="flex items-start justify-between">
                 <div>
-                    <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="outline" className="text-[#003366] border-[#c3daee] bg-[#f0f5fa]">Admin Console</Badge>
-                        <span className="text-slate-300">|</span>
-                        <span className="text-sm font-medium text-slate-500 uppercase tracking-wide">{society.id}</span>
-                    </div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Society Identity</h1>
-                    <p className="text-slate-500 mt-2 font-medium">Manage branding, footer information, and legal documents.</p>
+                    <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                        <Building2 className="w-5 h-5 text-[#003366]" />
+                        아이덴티티
+                    </h1>
+                    <p className="text-sm text-gray-500 mt-1">학회 로고, 푸터 정보, 법률 문서를 관리합니다.</p>
                 </div>
                 <div className="hidden md:block">
-                    <Button onClick={handleSaveSociety} disabled={loading} size="lg" className="bg-slate-900 hover:bg-slate-800 text-white shadow-lg shadow-slate-900/20 px-8 rounded-xl font-bold transition-all active:scale-95">
-                        <Save className="w-4 h-4 mr-2" />
-                        {loading ? 'Saving...' : 'Save Changes'}
+                    <Button onClick={handleSaveSociety} disabled={loading} className="bg-[#003366] hover:bg-[#002244] text-white rounded-xl gap-2 transition-colors">
+                        <Save className="w-4 h-4" />
+                        {loading ? '저장 중...' : '설정 저장'}
                     </Button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="grid grid-cols-1 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
                 {/* 1. Branding Section */}
-                <Card className="border-none shadow-lg shadow-slate-200/50 overflow-hidden bg-white rounded-2xl">
-                    <CardHeader className="bg-[#f0f5fa]/50 border-b border-[#c3daee] pb-4">
+                <Card className="rounded-2xl border border-[#c3daee] shadow-sm overflow-hidden bg-white">
+                    <CardHeader className="bg-[#f0f5fa] border-b border-[#c3daee] px-6 py-4">
                         <div className="flex items-center gap-3">
                             <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
-                                <Building2 className="w-5 h-5" />
+                                <Building2 className="w-4 h-4 text-[#003366]" />
                             </div>
                             <div>
-                                <CardTitle className="text-lg font-bold text-slate-800">Branding & Identity</CardTitle>
-                                <CardDescription className="text-[#003366]/80 font-medium mt-0.5">Society Logo and Naming</CardDescription>
+                                <CardTitle className="text-base font-semibold text-gray-800">브랜딩 & 아이덴티티</CardTitle>
+                                <CardDescription className="text-sm text-gray-500 mt-0.5">학회 로고 및 명칭</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="p-8">
+                    <CardContent className="p-6">
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
                             {/* Logo Column */}
                             <div className="lg:col-span-4 space-y-3">
-                                <Label className="text-base font-bold text-slate-700 flex justify-between items-center">
-                                    Society Logo
+                                <Label className="text-sm font-medium text-gray-700 flex justify-between items-center">
+                                    학회 로고
                                     <Badge variant="secondary" className="text-[10px] h-5">PNG / SVG</Badge>
                                 </Label>
                                 <div className="bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 p-6 flex flex-col items-center justify-center min-h-[240px] hover:border-[#c3daee] transition-colors group">
@@ -222,32 +220,32 @@ const IdentityPage: React.FC = () => {
                             <div className="lg:col-span-8 space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase">Society Name (Korean)</Label>
+                                        <Label className="text-sm font-medium text-gray-700">학회명 (한국어)</Label>
                                         <Input
                                             value={socNameKo}
                                             onChange={e => setSocNameKo(e.target.value)}
                                             placeholder="대한OO학회"
-                                            className="h-11 bg-slate-50/50 border-slate-200 rounded-xl focus:bg-white transition-all text-base"
+                                            className="h-11 border-[#c3daee] rounded-xl focus:bg-white transition-all text-base"
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase">Society Name (English)</Label>
+                                        <Label className="text-sm font-medium text-gray-700">학회명 (영문)</Label>
                                         <Input
                                             value={socNameEn}
                                             onChange={e => setSocNameEn(e.target.value)}
                                             placeholder="Korean Society of OO"
-                                            className="h-11 bg-slate-50/50 border-slate-200 rounded-xl focus:bg-white transition-all text-base"
+                                            className="h-11 border-[#c3daee] rounded-xl focus:bg-white transition-all text-base"
                                         />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold text-slate-500 uppercase">Description</Label>
+                                    <Label className="text-sm font-medium text-gray-700">학회 소개</Label>
                                     <Textarea
                                         value={socDesc}
                                         onChange={e => setSocDesc(e.target.value)}
-                                        placeholder="Brief introduction of the society..."
+                                        placeholder="학회 소개 내용을 입력하세요..."
                                         rows={4}
-                                        className="resize-none bg-slate-50/50 border-slate-200 rounded-xl focus:bg-white transition-all leading-relaxed"
+                                        className="resize-none border-[#c3daee] rounded-xl focus:bg-white transition-all leading-relaxed"
                                     />
                                 </div>
                             </div>
@@ -256,63 +254,63 @@ const IdentityPage: React.FC = () => {
                 </Card>
 
                 {/* 2. Footer Info Section */}
-                <Card className="border-none shadow-lg shadow-slate-200/50 overflow-hidden bg-white rounded-2xl">
-                    <CardHeader className="bg-slate-50/80 border-b border-slate-100 pb-4">
+                <Card className="rounded-2xl border border-[#c3daee] shadow-sm overflow-hidden bg-white">
+                    <CardHeader className="bg-[#f0f5fa] border-b border-[#c3daee] px-6 py-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 shadow-sm">
-                                <LayoutTemplate className="w-5 h-5" />
+                            <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
+                                <LayoutTemplate className="w-4 h-4 text-[#003366]" />
                             </div>
                             <div>
-                                <CardTitle className="text-lg font-bold text-slate-800">Footer Information</CardTitle>
-                                <CardDescription className="text-slate-500 font-medium mt-0.5">Official Business Information displayed in footer</CardDescription>
+                                <CardTitle className="text-base font-semibold text-gray-800">푸터 정보</CardTitle>
+                                <CardDescription className="text-sm text-gray-500 mt-0.5">하단 푸터에 표시되는 법인 정보</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="p-8">
+                    <CardContent className="p-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 uppercase">Business Registration No.</Label>
+                                <Label className="text-sm font-medium text-gray-700">사업자 등록번호</Label>
                                 <Input
                                     value={bizReg}
                                     onChange={e => setBizReg(e.target.value)}
                                     placeholder="000-00-00000"
-                                    className="h-11 border-slate-200 rounded-xl"
+                                    className="h-11 border-[#c3daee] rounded-xl"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 uppercase">Representative Name</Label>
+                                <Label className="text-sm font-medium text-gray-700">대표자명</Label>
                                 <Input
                                     value={repName}
                                     onChange={e => setRepName(e.target.value)}
-                                    placeholder="President Name"
-                                    className="h-11 border-slate-200 rounded-xl"
+                                    placeholder="대표자 이름"
+                                    className="h-11 border-[#c3daee] rounded-xl"
                                 />
                             </div>
                             <div className="md:col-span-2 space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 uppercase">Office Address</Label>
+                                <Label className="text-sm font-medium text-gray-700">주소</Label>
                                 <Input
                                     value={address}
                                     onChange={e => setAddress(e.target.value)}
-                                    placeholder="Full street address..."
-                                    className="h-11 border-slate-200 rounded-xl"
+                                    placeholder="전체 주소..."
+                                    className="h-11 border-[#c3daee] rounded-xl"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 uppercase">Contact Email</Label>
+                                <Label className="text-sm font-medium text-gray-700">연락처 이메일</Label>
                                 <Input
                                     value={contactEmail}
                                     onChange={e => setContactEmail(e.target.value)}
                                     placeholder="office@example.org"
-                                    className="h-11 border-slate-200 rounded-xl"
+                                    className="h-11 border-[#c3daee] rounded-xl"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 uppercase">Contact Phone</Label>
+                                <Label className="text-sm font-medium text-gray-700">연락처 전화번호</Label>
                                 <Input
                                     value={contactPhone}
                                     onChange={e => setContactPhone(e.target.value)}
                                     placeholder="02-0000-0000"
-                                    className="h-11 border-slate-200 rounded-xl"
+                                    className="h-11 border-[#c3daee] rounded-xl"
                                 />
                             </div>
                         </div>
@@ -320,31 +318,31 @@ const IdentityPage: React.FC = () => {
                 </Card>
 
                 {/* 3. Legal Documents Section */}
-                <Card className="border-none shadow-lg shadow-slate-200/50 overflow-hidden bg-white rounded-2xl">
-                    <CardHeader className="bg-slate-50/80 border-b border-slate-100 pb-0">
-                        <div className="flex items-center justify-between pb-4">
+                <Card className="rounded-2xl border border-[#c3daee] shadow-sm overflow-hidden bg-white">
+                    <CardHeader className="bg-[#f0f5fa] border-b border-[#c3daee] pb-0">
+                        <div className="flex items-center justify-between pb-4 px-0">
                             <div className="flex items-center gap-3">
-                                <div className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 shadow-sm">
-                                    <Scale className="w-5 h-5" />
+                                <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
+                                    <Scale className="w-4 h-4 text-[#003366]" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-lg font-bold text-slate-800">Legal Documents</CardTitle>
-                                    <CardDescription className="text-slate-500 font-medium mt-0.5">Terms, Privacy Policy, and Consent Forms</CardDescription>
+                                    <CardTitle className="text-base font-semibold text-gray-800">법적 문서</CardTitle>
+                                    <CardDescription className="text-sm text-gray-500 mt-0.5">이용약관, 개인정보처리방침, 동의 항목</CardDescription>
                                 </div>
                             </div>
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
                         <Tabs defaultValue="ko" className="w-full">
-                            <div className="px-6 py-4 bg-slate-50/50 border-b border-slate-100">
-                                <TabsList className="grid w-full grid-cols-2 max-w-md h-12 p-1.5 bg-slate-200/50 rounded-xl">
-                                    <TabsTrigger value="ko" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">한국어 (Korean)</TabsTrigger>
-                                    <TabsTrigger value="en" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">English (Global)</TabsTrigger>
+                            <div className="px-6 py-4 bg-[#f0f5fa] border-b border-[#c3daee]">
+                                <TabsList className="grid w-full grid-cols-2 max-w-md h-12 p-1 bg-[#f0f5fa] rounded-xl">
+                                    <TabsTrigger value="ko" className="rounded-lg font-medium data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">한국어 (Korean)</TabsTrigger>
+                                    <TabsTrigger value="en" className="rounded-lg font-medium data-[state=active]:bg-white data-[state=active]:text-[#003366] data-[state=active]:shadow-sm">English (Global)</TabsTrigger>
                                 </TabsList>
                             </div>
 
                             {/* Korean Content */}
-                            <TabsContent value="ko" className="p-8 space-y-10 mt-0">
+                            <TabsContent value="ko" className="p-6 space-y-8 mt-0">
                                 {/* Core Policies */}
                                 <div className="space-y-6">
                                     <div className="flex items-center gap-2 mb-4">
@@ -425,7 +423,7 @@ const IdentityPage: React.FC = () => {
                             </TabsContent>
 
                             {/* English Content */}
-                            <TabsContent value="en" className="p-8 space-y-10 mt-0 bg-slate-50/30">
+                            <TabsContent value="en" className="p-6 space-y-8 mt-0">
                                 {/* Core Policies */}
                                 <div className="space-y-6">
                                     <div className="flex items-center gap-2 mb-4">
@@ -512,7 +510,7 @@ const IdentityPage: React.FC = () => {
 
             {/* Bottom Floating Action Bar for mobile/ease */}
             <div className="md:hidden fixed bottom-6 right-6 z-50">
-                <Button onClick={handleSaveSociety} disabled={loading} size="lg" className="rounded-full shadow-2xl h-14 w-14 bg-slate-900 text-white flex items-center justify-center p-0 hover:scale-105 transition-transform">
+                <Button onClick={handleSaveSociety} disabled={loading} size="lg" className="rounded-full shadow-2xl h-14 w-14 bg-[#003366] hover:bg-[#002244] text-white flex items-center justify-center p-0 transition-colors">
                     <Save className="w-6 h-6" />
                 </Button>
             </div>

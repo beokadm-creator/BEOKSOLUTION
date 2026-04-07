@@ -174,49 +174,52 @@ export default function InfraPage() {
     if (loading) return (
         <div className="flex flex-col items-center justify-center min-h-[50vh]">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#003366] mb-4" />
-            <p className="text-slate-500 font-medium">Loading infrastructure settings...</p>
+            <p className="text-slate-500 font-medium">설정 로딩 중...</p>
         </div>
     );
 
     return (
-        <div className="max-w-5xl mx-auto space-y-8 pb-20 p-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b pb-6">
+        <div className="p-6 space-y-6">
+            <div className="flex items-start justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Infrastructure Settings</h1>
-                    <p className="text-slate-500 mt-2 font-medium">Manage payment gateways, notification channels, and email services.</p>
+                    <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                        <CreditCard className="w-5 h-5 text-[#003366]" />
+                        인프라 설정
+                    </h1>
+                    <p className="text-sm text-gray-500 mt-1">결제 게이트웨이, 알림 채널, 이메일 서비스를 관리합니다.</p>
                 </div>
-                <Button onClick={handleSave} disabled={saving} size="lg" className="bg-slate-900 hover:bg-slate-800 text-white shadow-lg shadow-slate-900/20 px-8 rounded-xl font-bold transition-all active:scale-95">
-                    <Save className="w-4 h-4 mr-2" />
-                    {saving ? 'Saving Changes...' : 'Save Configuration'}
+                <Button onClick={handleSave} disabled={saving} className="bg-[#003366] hover:bg-[#002244] text-white rounded-xl gap-2 transition-colors">
+                    <Save className="w-4 h-4" />
+                    {saving ? '저장 중...' : '설정 저장'}
                 </Button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* 1. Domestic Payment Gateway */}
-                <Card className="border-none shadow-lg shadow-slate-200/50 overflow-hidden bg-white rounded-2xl">
-                    <CardHeader className="bg-[#f0f5fa]/50 border-b border-[#c3daee] pb-4">
+                <Card className="rounded-2xl border border-[#c3daee] shadow-sm overflow-hidden bg-white">
+                    <CardHeader className="bg-[#f0f5fa] border-b border-[#c3daee] px-6 py-4">
                         <div className="flex items-start justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
-                                    <CreditCard className="w-5 h-5" />
+                                    <CreditCard className="w-4 h-4 text-[#003366]" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-lg font-bold text-slate-800">Domestic Payment (PG)</CardTitle>
-                                    <CardDescription className="text-[#003366]/80 font-medium mt-0.5">Korean Issued Cards (KRW)</CardDescription>
+                                    <CardTitle className="text-base font-semibold text-gray-800">국내 결제 (PG)</CardTitle>
+                                    <CardDescription className="text-sm text-gray-500 mt-0.5">국내 발급 카드 (원화)</CardDescription>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-[#c3daee] shadow-sm">
                                 <span className={`w-2 h-2 rounded-full ${settings.payment.domestic.isTestMode ? 'bg-amber-400' : 'bg-green-500 animate-pulse'}`} />
-                                <span className="text-xs font-bold text-slate-600 uppercase">
-                                    {settings.payment.domestic.isTestMode ? 'Test Mode' : 'Live Mode'}
+                                <span className="text-xs font-bold text-slate-600">
+                                    {settings.payment.domestic.isTestMode ? '테스트 모드' : '라이브 모드'}
                                 </span>
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="p-6 space-y-6">
+                    <CardContent className="p-6 space-y-4">
                         <div className="grid grid-cols-1 gap-5">
                             <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 uppercase">PG Provider</Label>
+                                <Label className="text-sm font-medium text-gray-700">PG사</Label>
                                 <Select
                                     value={settings.payment.domestic.provider}
                                     onValueChange={(val) => setSettings(prev => ({
@@ -227,21 +230,21 @@ export default function InfraPage() {
                                         }
                                     }))}
                                 >
-                                    <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-slate-200 focus:ring-[#003366]/20 font-medium">
-                                        <SelectValue placeholder="Select a Provider" />
+                                    <SelectTrigger className="h-11 rounded-xl border-[#c3daee] focus:ring-[#003366]/20 font-medium">
+                                        <SelectValue placeholder="PG사 선택" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="TOSS">Toss Payments (Recommended)</SelectItem>
+                                        <SelectItem value="TOSS">Toss Payments (권장)</SelectItem>
                                         <SelectItem value="KCP">NHN KCP</SelectItem>
                                         <SelectItem value="KICC">EasyPay (KICC)</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
 
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between group hover:border-[#c3daee] transition-colors">
+                            <div className="bg-[#f0f5fa] p-4 rounded-xl border border-[#c3daee] flex items-center justify-between group transition-colors">
                                 <div className="space-y-0.5">
-                                    <Label className="text-sm font-bold text-slate-700">Sandbox Environment</Label>
-                                    <p className="text-xs text-slate-500">Enable for testing transactions without real charges.</p>
+                                    <Label className="text-sm font-medium text-gray-700">샌드박스 환경 (테스트)</Label>
+                                    <p className="text-xs text-slate-500">실제 결제 없이 테스트 거래를 활성화합니다.</p>
                                 </div>
                                 <Switch
                                     checked={settings.payment.domestic.isTestMode}
@@ -255,32 +258,32 @@ export default function InfraPage() {
 
                             <div className="space-y-4 pt-2">
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold text-slate-500 uppercase">Merchant ID (MID)</Label>
+                                    <Label className="text-sm font-medium text-gray-700">가맹점 ID (MID)</Label>
                                     <Input
                                         value={settings.payment.domestic.merchantId}
                                         onChange={(e) => setSettings(prev => ({ ...prev, payment: { ...prev.payment, domestic: { ...prev.payment.domestic, merchantId: e.target.value } } }))}
-                                        className="h-11 font-mono text-sm bg-slate-50 border-slate-200 focus:bg-white transition-colors rounded-xl"
+                                        className="h-11 font-mono text-sm border-[#c3daee] focus:bg-white transition-colors rounded-xl"
                                         placeholder="e.g. tosspayments"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold text-slate-500 uppercase">Client API Key</Label>
+                                    <Label className="text-sm font-medium text-gray-700">API 키</Label>
                                     <Input
                                         value={settings.payment.domestic.apiKey}
                                         onChange={(e) => setSettings(prev => ({ ...prev, payment: { ...prev.payment, domestic: { ...prev.payment.domestic, apiKey: e.target.value } } }))}
                                         type="password"
-                                        className="h-11 font-mono text-sm bg-slate-50 border-slate-200 focus:bg-white transition-colors rounded-xl tracking-widest"
-                                        placeholder="Starting with test_ck_..."
+                                        className="h-11 font-mono text-sm border-[#c3daee] focus:bg-white transition-colors rounded-xl tracking-widest"
+                                        placeholder="test_ck_..."
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold text-slate-500 uppercase">Secret Key</Label>
+                                    <Label className="text-sm font-medium text-gray-700">시크릿 키</Label>
                                     <Input
                                         value={settings.payment.domestic.secretKey}
                                         onChange={(e) => setSettings(prev => ({ ...prev, payment: { ...prev.payment, domestic: { ...prev.payment.domestic, secretKey: e.target.value } } }))}
                                         type="password"
-                                        className="h-11 font-mono text-sm bg-slate-50 border-slate-200 focus:bg-white transition-colors rounded-xl tracking-widest"
-                                        placeholder="Starting with test_sk_..."
+                                        className="h-11 font-mono text-sm border-[#c3daee] focus:bg-white transition-colors rounded-xl tracking-widest"
+                                        placeholder="test_sk_..."
                                     />
                                 </div>
                             </div>
@@ -289,24 +292,24 @@ export default function InfraPage() {
                 </Card>
 
                 {/* 2. Global Payment Gateway */}
-                <Card className="border-none shadow-lg shadow-slate-200/50 overflow-hidden bg-white rounded-2xl h-fit">
-                    <CardHeader className="bg-[#f0f5fa]/50 border-b border-[#c3daee] pb-4">
+                <Card className="rounded-2xl border border-[#c3daee] shadow-sm overflow-hidden bg-white h-fit">
+                    <CardHeader className="bg-[#f0f5fa] border-b border-[#c3daee] px-6 py-4">
                         <div className="flex items-start justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
-                                    <Globe className="w-5 h-5" />
+                                    <Globe className="w-4 h-4 text-[#003366]" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-lg font-bold text-slate-800">Global Payment (PG)</CardTitle>
-                                    <CardDescription className="text-[#003366]/80 font-medium mt-0.5">International Cards (KRW Settlement)</CardDescription>
+                                    <CardTitle className="text-base font-semibold text-gray-800">해외 결제 (PG)</CardTitle>
+                                    <CardDescription className="text-sm text-gray-500 mt-0.5">해외 카드 (원화 정산)</CardDescription>
                                 </div>
                             </div>
                             <Badge variant={settings.payment.global.enabled ? 'default' : 'secondary'} className={settings.payment.global.enabled ? "bg-[#003366] hover:bg-[#002244] h-7" : "bg-slate-200 text-slate-500 h-7"}>
-                                {settings.payment.global.enabled ? 'Enabled' : 'Disabled'}
+                                {settings.payment.global.enabled ? '활성' : '비활성'}
                             </Badge>
                         </div>
                     </CardHeader>
-                    <CardContent className="p-6 space-y-6">
+                    <CardContent className="p-6 space-y-4">
                         <div className="bg-amber-50 border border-amber-200/60 p-4 rounded-xl flex gap-3">
                             <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                             <div className="text-xs text-amber-900 leading-relaxed">
@@ -315,10 +318,10 @@ export default function InfraPage() {
                             </div>
                         </div>
 
-                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between group hover:border-[#c3daee] transition-colors">
+                        <div className="bg-[#f0f5fa] p-4 rounded-xl border border-[#c3daee] flex items-center justify-between group transition-colors">
                             <div className="space-y-0.5">
-                                <Label className="text-sm font-bold text-slate-700">Accept Global Payments</Label>
-                                <p className="text-xs text-slate-500">Allow payments via Visa, Mastercard, JCB from overseas.</p>
+                                <Label className="text-sm font-medium text-gray-700">해외 결제 허용</Label>
+                                <p className="text-xs text-slate-500">Visa, Mastercard, JCB 해외 결제를 허용합니다.</p>
                             </div>
                             <Switch
                                 checked={settings.payment.global.enabled}
@@ -333,7 +336,7 @@ export default function InfraPage() {
                         {settings.payment.global.enabled && (
                             <div className="space-y-4 pt-2 animate-in fade-in slide-in-from-top-4 duration-300">
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold text-slate-500 uppercase">Provider</Label>
+                                    <Label className="text-sm font-medium text-gray-700">PG사</Label>
                                     <Select
                                         value={settings.payment.global.provider}
                                         onValueChange={(val) => setSettings(prev => ({
@@ -341,39 +344,39 @@ export default function InfraPage() {
                                             payment: { ...prev.payment, global: { ...prev.payment.global, provider: val as 'EXIMBAY' | 'STRIPE' | 'PAYPAL' } }
                                         }))}
                                     >
-                                        <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-slate-200 font-medium">
-                                            <SelectValue placeholder="Select Global Provider" />
+                                        <SelectTrigger className="h-11 rounded-xl border-[#c3daee] font-medium">
+                                            <SelectValue placeholder="해외 PG사 선택" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="EXIMBAY">Eximbay (Recommended)</SelectItem>
+                                            <SelectItem value="EXIMBAY">Eximbay (권장)</SelectItem>
                                             <SelectItem value="PAYPAL">PayPal</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold text-slate-500 uppercase">Merchant ID (MID)</Label>
+                                    <Label className="text-sm font-medium text-gray-700">가맹점 ID (MID)</Label>
                                     <Input
                                         value={settings.payment.global.merchantId}
                                         onChange={(e) => setSettings(prev => ({ ...prev, payment: { ...prev.payment, global: { ...prev.payment.global, merchantId: e.target.value } } }))}
-                                        className="h-11 font-mono text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                        className="h-11 font-mono text-sm border-[#c3daee] rounded-xl"
                                         placeholder="e.g., eximbay_mid"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold text-slate-500 uppercase">Secret Key</Label>
+                                    <Label className="text-sm font-medium text-gray-700">시크릿 키</Label>
                                     <Input
                                         value={settings.payment.global.secretKey}
                                         onChange={(e) => setSettings(prev => ({ ...prev, payment: { ...prev.payment, global: { ...prev.payment.global, secretKey: e.target.value } } }))}
                                         type="password"
-                                        className="h-11 font-mono text-sm bg-slate-50 border-slate-200 rounded-xl tracking-widest"
-                                        placeholder="Global secret key..."
+                                        className="h-11 font-mono text-sm border-[#c3daee] rounded-xl tracking-widest"
+                                        placeholder="해외 결제 시크릿 키..."
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold text-slate-500 uppercase">Settlement Currency</Label>
+                                    <Label className="text-sm font-medium text-gray-700">정산 통화</Label>
                                     <div className="flex items-center bg-gray-100 rounded-xl h-11 px-4 border border-gray-200 text-gray-500 font-bold text-sm">
-                                        KRW (Fixed)
+                                        KRW (고정)
                                     </div>
                                 </div>
                             </div>
@@ -382,38 +385,38 @@ export default function InfraPage() {
                 </Card>
 
                 {/* 3. Notification Service */}
-                <Card className="border-none shadow-lg shadow-slate-200/50 overflow-hidden bg-white rounded-2xl h-fit">
-                    <CardHeader className="bg-amber-50/50 border-b border-amber-100 pb-4">
+                <Card className="rounded-2xl border border-[#c3daee] shadow-sm overflow-hidden bg-white h-fit">
+                    <CardHeader className="bg-[#f0f5fa] border-b border-[#c3daee] px-6 py-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2.5 bg-amber-100 rounded-xl text-amber-600">
-                                <Bell className="w-5 h-5" />
+                            <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
+                                <Bell className="w-4 h-4 text-[#003366]" />
                             </div>
                             <div>
-                                <CardTitle className="text-lg font-bold text-slate-800">Notification Service</CardTitle>
-                                <CardDescription className="text-amber-600/80 font-medium mt-0.5">KakaoTalk AlimTalk Integration</CardDescription>
+                                <CardTitle className="text-base font-semibold text-gray-800">알림 서비스</CardTitle>
+                                <CardDescription className="text-sm text-gray-500 mt-0.5">카카오 알림톡 연동</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="p-6 space-y-6">
+                    <CardContent className="p-6 space-y-4">
 
 
                         {/* NHN AlimTalk Section */}
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h3 className="text-sm font-bold text-slate-700">NHN Cloud AlimTalk</h3>
-                                    <p className="text-xs text-slate-500 mt-0.5">Society-specific sender profile</p>
+                                    <h3 className="text-sm font-medium text-gray-700">NHN 클라우드 알림톡</h3>
+                                    <p className="text-xs text-slate-500 mt-0.5">학회별 발신 프로필</p>
                                 </div>
                                 <Badge variant={settings.notification.nhnAlimTalk?.enabled ? 'default' : 'secondary'}
                                     className={settings.notification.nhnAlimTalk?.enabled ? "bg-emerald-600 hover:bg-emerald-700 h-7" : "bg-slate-200 text-slate-500 h-7"}>
-                                    {settings.notification.nhnAlimTalk?.enabled ? 'Enabled' : 'Disabled'}
+                                    {settings.notification.nhnAlimTalk?.enabled ? '활성' : '비활성'}
                                 </Badge>
                             </div>
 
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between group hover:border-[#c3daee] transition-colors">
+                            <div className="bg-[#f0f5fa] p-4 rounded-xl border border-[#c3daee] flex items-center justify-between group transition-colors">
                                 <div className="space-y-0.5">
-                                    <Label className="text-sm font-bold text-slate-700">Enable NHN AlimTalk</Label>
-                                    <p className="text-xs text-slate-500">Use NHN Cloud for this society's notifications</p>
+                                    <Label className="text-sm font-medium text-gray-700">NHN 알림톡 활성화</Label>
+                                    <p className="text-xs text-slate-500">이 학회의 알림에 NHN Cloud를 사용합니다.</p>
                                 </div>
                                 <Switch
                                     checked={settings.notification.nhnAlimTalk?.enabled || false}
@@ -436,15 +439,15 @@ export default function InfraPage() {
                                     <div className="bg-[#f0f5fa] border border-[#c3daee] p-4 rounded-xl flex gap-3">
                                         <Info className="w-5 h-5 text-[#003366] shrink-0 mt-0.5" />
                                         <div className="text-xs text-slate-900 leading-relaxed">
-                                            <p className="font-bold mb-1">Society-Specific Configuration</p>
-                                            Only <span className="font-bold">senderKey</span> is society-specific. The appKey and secretKey are system-wide common settings managed by the administrator. Obtain senderKey from your KakaoTalk channel registration in NHN Cloud Console.
+                                            <p className="font-bold mb-1">학회별 설정</p>
+                                            <span className="font-bold">senderKey</span>만 학회별로 다릅니다. appKey와 secretKey는 관리자가 관리하는 시스템 공통 설정입니다. NHN Cloud 콘솔의 카카오톡 채널 등록에서 senderKey를 확인하세요.
                                         </div>
                                     </div>
 
                                     <div className="space-y-2">
                                         <div className="flex items-center gap-2">
-                                            <Label className="text-xs font-bold text-slate-500 uppercase">Sender Profile Key</Label>
-                                            <Badge className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5">Required</Badge>
+                                            <Label className="text-sm font-medium text-gray-700">발신 프로필 키</Label>
+                                            <Badge className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5">필수</Badge>
                                         </div>
                                         <Input
                                             value={settings.notification.nhnAlimTalk?.senderKey || ''}
@@ -466,8 +469,8 @@ export default function InfraPage() {
 
                                     <div className="space-y-2">
                                         <div className="flex items-center gap-2">
-                                            <Label className="text-xs font-bold text-slate-500 uppercase">Resend Phone Number</Label>
-                                            <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Optional</Badge>
+                                            <Label className="text-sm font-medium text-gray-700">대체 발신번호 (SMS)</Label>
+                                            <Badge variant="secondary" className="text-[10px] px-2 py-0.5">선택</Badge>
                                         </div>
                                         <Input
                                             value={settings.notification.nhnAlimTalk?.resendSendNo || ''}
@@ -504,78 +507,78 @@ export default function InfraPage() {
                 </Card>
 
                 {/* 4. Email Service */}
-                <Card className="border-none shadow-lg shadow-slate-200/50 overflow-hidden bg-white rounded-2xl h-fit">
-                    <CardHeader className="bg-[#f0f5fa]/50 border-b border-[#c3daee] pb-4">
+                <Card className="rounded-2xl border border-[#c3daee] shadow-sm overflow-hidden bg-white h-fit">
+                    <CardHeader className="bg-[#f0f5fa] border-b border-[#c3daee] px-6 py-4">
                         <div className="flex items-center gap-3">
                             <div className="p-2.5 bg-[#f0f5fa] rounded-xl text-[#003366]">
-                                <Mail className="w-5 h-5" />
+                                <Mail className="w-4 h-4 text-[#003366]" />
                             </div>
                             <div>
-                                <CardTitle className="text-lg font-bold text-slate-800">Email Service (SMTP)</CardTitle>
-                                <CardDescription className="text-[#003366]/80 font-medium mt-0.5">Receipts & System Emails</CardDescription>
+                                <CardTitle className="text-base font-semibold text-gray-800">이메일 서비스 (SMTP)</CardTitle>
+                                <CardDescription className="text-sm text-gray-500 mt-0.5">영수증 및 시스템 이메일</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="p-6 space-y-6">
+                    <CardContent className="p-6 space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 uppercase">SMTP Host</Label>
+                                <Label className="text-sm font-medium text-gray-700">SMTP 호스트</Label>
                                 <Input
                                     value={settings.email.host}
                                     onChange={(e) => setSettings(prev => ({ ...prev, email: { ...prev.email, host: e.target.value } }))}
                                     placeholder="smtp.gmail.com"
-                                    className="h-11 text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                    className="h-11 text-sm border-[#c3daee] rounded-xl"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 uppercase">Port</Label>
+                                <Label className="text-sm font-medium text-gray-700">포트</Label>
                                 <Input
                                     value={settings.email.port}
                                     onChange={(e) => setSettings(prev => ({ ...prev, email: { ...prev.email, port: e.target.value } }))}
                                     placeholder="587"
-                                    className="h-11 text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                    className="h-11 text-sm border-[#c3daee] rounded-xl"
                                 />
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-500 uppercase">Username / Email</Label>
+                            <Label className="text-sm font-medium text-gray-700">계정 / 이메일</Label>
                             <Input
                                 value={settings.email.user}
                                 onChange={(e) => setSettings(prev => ({ ...prev, email: { ...prev.email, user: e.target.value } }))}
                                 placeholder="notifications@eregi.co.kr"
-                                className="h-11 text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                className="h-11 text-sm border-[#c3daee] rounded-xl"
                             />
                         </div>
 
                         <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-500 uppercase">SMTP Password</Label>
+                            <Label className="text-sm font-medium text-gray-700">SMTP 비밀번호</Label>
                             <Input
                                 value={settings.email.pass}
                                 onChange={(e) => setSettings(prev => ({ ...prev, email: { ...prev.email, pass: e.target.value } }))}
                                 type="password"
                                 placeholder="••••••••••••"
-                                className="h-11 text-sm bg-slate-50 border-slate-200 rounded-xl tracking-widest"
+                                className="h-11 text-sm border-[#c3daee] rounded-xl tracking-widest"
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+                        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-[#c3daee]">
                             <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 uppercase">Sender Email</Label>
+                                <Label className="text-sm font-medium text-gray-700">발신 이메일</Label>
                                 <Input
                                     value={settings.email.fromEmail}
                                     onChange={(e) => setSettings(prev => ({ ...prev, email: { ...prev.email, fromEmail: e.target.value } }))}
                                     placeholder="noreply@..."
-                                    className="h-11 text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                    className="h-11 text-sm border-[#c3daee] rounded-xl"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 uppercase">Sender Name</Label>
+                                <Label className="text-sm font-medium text-gray-700">발신자 이름</Label>
                                 <Input
                                     value={settings.email.fromName}
                                     onChange={(e) => setSettings(prev => ({ ...prev, email: { ...prev.email, fromName: e.target.value } }))}
                                     placeholder="eRegi System"
-                                    className="h-11 text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                    className="h-11 text-sm border-[#c3daee] rounded-xl"
                                 />
                             </div>
                         </div>

@@ -192,69 +192,70 @@ const SocietyContentManagementPage: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-slate-400">로딩 중 / Loading...</div>
+        <div className="text-slate-400">설정 로딩 중...</div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-8">
+    <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-black text-slate-900">
-            학회 콘텐츠 관리 / Society Content Management
+          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <Languages size={20} className="text-[#003366]" />
+            콘텐츠 관리
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            학회장 인사말, 공지사항 등을 관리합니다 / Manage president greeting and notices
+          <p className="text-sm text-gray-500 mt-1">
+            학회장 인사말, 공지사항 등을 관리합니다.
           </p>
         </div>
         <button
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-2 px-6 py-3 bg-[#003366] text-white rounded-xl font-bold hover:bg-[#002244] transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-4 py-2 bg-[#003366] text-white rounded-xl font-medium hover:bg-[#002244] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Save size={20} />
-          {saving ? '저장 중 / Saving...' : '저장 / Save'}
+          <Save size={16} />
+          {saving ? '저장 중...' : '설정 저장'}
         </button>
       </div>
 
       {/* Preview Language Toggle */}
-      <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl">
-        <Languages size={20} className="text-slate-400" />
-        <span className="text-sm font-bold text-slate-600">미리보기 언어 / Preview Language:</span>
+      <div className="flex items-center gap-4 p-4 bg-[#f0f5fa] rounded-xl border border-[#c3daee]">
+        <Languages size={20} className="text-[#003366]" />
+        <span className="text-sm font-medium text-gray-700">미리보기 언어:</span>
         <button
           type="button"
           onClick={() => setPreviewLang('ko')}
-          className={`px-4 py-2 rounded-lg font-bold text-sm transition ${previewLang === 'ko'
+          className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${previewLang === 'ko'
             ? 'bg-[#003366] text-white'
             : 'bg-white text-slate-600 hover:bg-slate-100'
             }`}
         >
-          한국어 / KO
+          한국어
         </button>
         <button
           type="button"
           onClick={() => setPreviewLang('en')}
-          className={`px-4 py-2 rounded-lg font-bold text-sm transition ${previewLang === 'en'
+          className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${previewLang === 'en'
             ? 'bg-[#003366] text-white'
             : 'bg-white text-slate-600 hover:bg-slate-100'
             }`}
         >
-          English / EN
+          English
         </button>
       </div>
 
       {/* President Greeting Section */}
-      <section className="bg-white rounded-2xl border border-slate-200 p-8">
-        <h2 className="text-2xl font-black text-slate-900 mb-6">학회장 인사말 / President's Greeting</h2>
+      <section className="bg-white rounded-2xl border border-[#c3daee] p-6">
+        <h2 className="text-lg font-semibold text-gray-800 mb-6">학회장 인사말</h2>
 
         <div className="space-y-8">
           {/* Korean */}
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">
-              🇰🇷 한국어 / Korean
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              한국어
             </label>
             <div>
               <RichTextEditor
@@ -266,14 +267,14 @@ const SocietyContentManagementPage: React.FC = () => {
 
             {/* Image Upload for Korean */}
             <div className="mt-4">
-              <label className="block text-sm font-bold text-slate-700 mb-2">
-                이미지 추가 / Add Images
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                이미지 추가
               </label>
               <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer transition">
+                <label className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer transition-colors">
                   <ImageIcon size={18} />
-                  <span className="text-sm font-bold text-slate-700">
-                    {uploadingImage ? '업로드 중 / Uploading...' : '이미지 선택 / Choose Image'}
+                  <span className="text-sm font-medium text-slate-700">
+                    {uploadingImage ? '업로드 중...' : '이미지 선택'}
                   </span>
                   <input
                     type="file"
@@ -314,8 +315,8 @@ const SocietyContentManagementPage: React.FC = () => {
 
           {/* English */}
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">
-              🇺🇸 English
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              English
             </label>
             <div>
               <RichTextEditor
@@ -327,14 +328,14 @@ const SocietyContentManagementPage: React.FC = () => {
 
             {/* Image Upload for English */}
             <div className="mt-4">
-              <label className="block text-sm font-bold text-slate-700 mb-2">
-                Images for English / 영어용 이미지
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                영어용 이미지
               </label>
               <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer transition">
+                <label className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer transition-colors">
                   <ImageIcon size={18} />
-                  <span className="text-sm font-bold text-slate-700">
-                    {uploadingImage ? 'Uploading...' : 'Choose Image'}
+                  <span className="text-sm font-medium text-slate-700">
+                    {uploadingImage ? '업로드 중...' : '이미지 선택'}
                   </span>
                   <input
                     type="file"
@@ -409,14 +410,14 @@ const SocietyContentManagementPage: React.FC = () => {
       </section>
 
       {/* Society Introduction Section */}
-      <section className="bg-white rounded-2xl border border-slate-200 p-8">
-        <h2 className="text-2xl font-black text-slate-900 mb-6">학회 소개 / Society Introduction</h2>
+      <section className="bg-white rounded-2xl border border-[#c3daee] p-6">
+        <h2 className="text-lg font-semibold text-gray-800 mb-6">학회 소개</h2>
 
-        <div className="space-y-8">
+        <div className="space-y-6">
           {/* Korean */}
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">
-              🇰🇷 한국어 / Korean
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              한국어
             </label>
             <RichTextEditor
               value={introKO}
@@ -427,8 +428,8 @@ const SocietyContentManagementPage: React.FC = () => {
 
           {/* English */}
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">
-              🇺🇸 English
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              English
             </label>
             <RichTextEditor
               value={introEN}
@@ -456,20 +457,20 @@ const SocietyContentManagementPage: React.FC = () => {
       </section>
 
       {/* Notices Section */}
-      <section className="bg-white rounded-2xl border border-slate-200 p-8">
-        <h2 className="text-2xl font-black text-slate-900 mb-6">공지사항 관리 / Notice Management</h2>
+      <section className="bg-white rounded-2xl border border-[#c3daee] p-6">
+        <h2 className="text-lg font-semibold text-gray-800 mb-6">공지사항 관리</h2>
 
         {/* Add New Notice Form */}
-        <div className="bg-slate-50 rounded-xl p-6 mb-8">
-          <h3 className="text-lg font-bold text-slate-900 mb-4">새 공지사항 추가 / Add New Notice</h3>
+        <div className="bg-[#f0f5fa] rounded-xl p-6 mb-6 border border-[#c3daee]">
+          <h3 className="text-base font-semibold text-gray-800 mb-4">새 공지사항 추가</h3>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">카테고리 / Category</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">카테고리</label>
               <select
                 value={newNotice.category}
                 onChange={(e) => setNewNotice({ ...newNotice, category: e.target.value as '공지' | '뉴스' | '안내' })}
-                className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#003366]"
+                className="w-full p-3 border border-[#c3daee] rounded-xl focus:ring-2 focus:ring-[#003366]"
               >
                 <option value="공지">공지 / Notice</option>
                 <option value="뉴스">뉴스 / News</option>
@@ -479,26 +480,26 @@ const SocietyContentManagementPage: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">
-                  제목 (한국어) / Title (KO)
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  제목 (한국어)
                 </label>
                 <input
                   type="text"
                   value={newNotice.titleKO}
                   onChange={(e) => setNewNotice({ ...newNotice, titleKO: e.target.value })}
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#003366]"
+                  className="w-full p-3 border border-[#c3daee] rounded-xl focus:ring-2 focus:ring-[#003366]"
                   placeholder="공지 제목"
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Title (English)
                 </label>
                 <input
                   type="text"
                   value={newNotice.titleEN}
                   onChange={(e) => setNewNotice({ ...newNotice, titleEN: e.target.value })}
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#003366]"
+                  className="w-full p-3 border border-[#c3daee] rounded-xl focus:ring-2 focus:ring-[#003366]"
                   placeholder="Notice title"
                 />
               </div>
@@ -506,26 +507,26 @@ const SocietyContentManagementPage: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">
-                  내용 (한국어) / Content (KO)
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  내용 (한국어)
                 </label>
                 <textarea
                   value={newNotice.contentKO}
                   onChange={(e) => setNewNotice({ ...newNotice, contentKO: e.target.value })}
                   rows={4}
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#003366] resize-none"
+                  className="w-full p-3 border border-[#c3daee] rounded-xl focus:ring-2 focus:ring-[#003366] resize-none"
                   placeholder="공지 내용"
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Content (English)
                 </label>
                 <textarea
                   value={newNotice.contentEN}
                   onChange={(e) => setNewNotice({ ...newNotice, contentEN: e.target.value })}
                   rows={4}
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#003366] resize-none"
+                  className="w-full p-3 border border-[#c3daee] rounded-xl focus:ring-2 focus:ring-[#003366] resize-none"
                   placeholder="Notice content"
                 />
               </div>
@@ -534,23 +535,23 @@ const SocietyContentManagementPage: React.FC = () => {
             <button
               type="button"
               onClick={handleAddNotice}
-              className="flex items-center justify-center gap-2 w-full md:w-auto px-6 py-3 bg-[#003366] text-white rounded-xl font-bold hover:bg-[#002244] transition"
+              className="flex items-center justify-center gap-2 w-full md:w-auto px-6 py-2 bg-[#003366] text-white rounded-xl font-medium hover:bg-[#002244] transition-colors"
             >
-              <Plus size={20} />
-              추가 / Add Notice
+              <Plus size={16} />
+              추가
             </button>
           </div>
         </div>
 
         {/* Existing Notices List */}
         <div className="space-y-4">
-          <h3 className="text-lg font-bold text-slate-900">
-            등록된 공지사항 / Existing Notices ({notices.length})
+          <h3 className="text-base font-semibold text-gray-800">
+            등록된 공지사항 ({notices.length})
           </h3>
 
           {notices.length === 0 ? (
-            <div className="text-center py-12 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
-              <p className="text-slate-400 font-bold">
+            <div className="text-center py-12 bg-[#f0f5fa] rounded-xl border-2 border-dashed border-[#c3daee]">
+              <p className="text-slate-400 font-medium">
                 {previewLang === 'ko' ? '등록된 공지사항이 없습니다' : 'No notices yet'}
               </p>
             </div>
@@ -558,7 +559,7 @@ const SocietyContentManagementPage: React.FC = () => {
             notices.map((notice) => (
               <div
                 key={notice.id}
-                className="bg-white border border-slate-200 rounded-xl p-6 hover:shadow-md transition-all"
+                className="bg-white border border-[#c3daee] rounded-xl p-6 hover:shadow-md transition-all"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
