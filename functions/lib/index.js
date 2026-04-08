@@ -36,12 +36,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.healthCheck = exports.onTossWebhook = exports.logPerformance = exports.logError = exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.confirmTossPaymentHttp = exports.confirmTossPayment = exports.confirmNicePayment = exports.prepareNicePayment = exports.runStampRewardLottery = exports.adminDrawStampReward = exports.requestStampReward = exports.manualDataCleanup = exports.scheduledDataCleanup = exports.withdrawConsent = exports.logAuditEvent = exports.processVendorVisit = exports.resolveVendorBadgeScan = exports.sendVendorAlimTalk = exports.manualAutoCheckout = exports.scheduledAutoCheckout = exports.resolveDataIntegrityAlert = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.bulkSendNotifications = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.corsHandler = void 0;
+exports.healthCheck = exports.onTossWebhook = exports.logPerformance = exports.logError = exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.confirmTossPaymentHttp = exports.confirmTossPayment = exports.runStampRewardLottery = exports.adminDrawStampReward = exports.requestStampReward = exports.manualDataCleanup = exports.scheduledDataCleanup = exports.withdrawConsent = exports.logAuditEvent = exports.processVendorVisit = exports.resolveVendorBadgeScan = exports.sendVendorAlimTalk = exports.manualAutoCheckout = exports.scheduledAutoCheckout = exports.resolveDataIntegrityAlert = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.bulkSendNotifications = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.corsHandler = void 0;
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const cors_1 = __importDefault(require("cors"));
-const nice_1 = require("./payment/nice");
 const toss_1 = require("./payment/toss");
 const paymentVerifier_1 = require("./utils/paymentVerifier"); // New import
 const index_1 = require("./badge/index");
@@ -92,216 +91,9 @@ admin.initializeApp();
 const external_1 = require("./auth/external");
 Object.defineProperty(exports, "generateFirebaseAuthUserForExternalAttendee", { enumerable: true, get: function () { return external_1.generateFirebaseAuthUserForExternalAttendee; } });
 // --------------------------------------------------------------------------
-// PAYMENT: NICEPAY UTILITIES
+// PAYMENT: TOSS PAYMENTS
 // --------------------------------------------------------------------------
-// 1. Prepare NicePayment (Get SignData & EdiDate)
-exports.prepareNicePayment = functions
-    .runWith({
-    enforceAppCheck: false, // Keep false as it's for public payment initiation
-    ingressSettings: 'ALLOW_ALL'
-})
-    .https.onCall(async (data, _context) => {
-    // Add authentication check for callable functions as per instruction
-    if (!_context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
-    }
-    const { amt, mid, key } = data;
-    if (!amt || !mid || !key) {
-        throw new functions.https.HttpsError('invalid-argument', 'Missing amt, mid, or key');
-    }
-    try {
-        const result = (0, nice_1.getNiceAuthParams)(amt, mid, key);
-        return result;
-    }
-    catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-        functions.logger.error("Error in prepareNicePayment:", errorMessage);
-        throw new functions.https.HttpsError('internal', errorMessage);
-    }
-});
-// 2. Confirm NicePayment (Approve Transaction)
-exports.confirmNicePayment = functions
-    .runWith({
-    // enforceAppCheck: false, // Removed: Enable App Check for authenticated calls
-    ingressSettings: 'ALLOW_ALL'
-})
-    .https.onCall(async (data, _context) => {
-    var _a;
-    // [Security] Require Authentication
-    if (!_context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'User must be logged in to confirm payment.');
-    }
-    const { tid, amt, mid, key, regId, confId, userData, baseAmount, optionsTotal, selectedOptions } = data;
-    if (!tid || !amt || !mid || !key) {
-        throw new functions.https.HttpsError('invalid-argument', 'Missing payment details');
-    }
-    // [Security] Verify Payment Amount against Database
-    const verification = await (0, paymentVerifier_1.verifyPaymentAmount)(confId, userData.tier, selectedOptions || [], parseInt(amt, 10));
-    if (!verification.isValid) {
-        functions.logger.error(`[Security] Payment verification failed for ${regId}: ${verification.error} `);
-        throw new functions.https.HttpsError('aborted', verification.error || 'Payment amount verification failed');
-    }
-    if (!userData) {
-        throw new functions.https.HttpsError('invalid-argument', 'Missing user data for registration creation');
-    }
-    // [Security] 중복 등록 방지: 동일 userId + 동일 학술대회에 PAID 등록이 있으면 차단
-    if (userData.userId && userData.userId !== 'GUEST' && confId) {
-        const existingRegsSnap = await admin.firestore()
-            .collection(`conferences/${confId}/registrations`)
-            .where('userId', '==', userData.userId)
-            .where('status', '==', 'PAID')
-            .limit(1)
-            .get();
-        if (!existingRegsSnap.empty) {
-            functions.logger.warn(`[DuplicateBlock] userId=${userData.userId} already has PAID registration in ${confId}`);
-            throw new functions.https.HttpsError('already-exists', '이미 해당 학술대회에 등록이 완료된 계정입니다. 동일 계정으로 중복 등록은 불가합니다.');
-        }
-    }
-    try {
-        // 1. Call NicePay API
-        const approvalResult = await (0, nice_1.approveNicePayment)(tid, amt, mid, key);
-        const result = approvalResult;
-        // 2. Check Result
-        if (result.ResultCode === '3001' || result.ResultCode === '4100' || result.ResultCode === '4000') {
-            if (regId && confId) {
-                const regRef = admin.firestore().collection(`conferences/${confId}/registrations`).doc(regId);
-                // Generate receipt number (simplified for now)
-                const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-                const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
-                // Get conference to resolve society ID
-                const confSnap = await admin.firestore().collection('conferences').doc(confId).get();
-                const societyId = (_a = confSnap.data()) === null || _a === void 0 ? void 0 : _a.societyId;
-                // Create Registration document with PAID status
-                await regRef.set({
-                    id: regId,
-                    userId: userData.userId || 'GUEST',
-                    userInfo: {
-                        name: userData.name,
-                        email: userData.email,
-                        phone: userData.phone,
-                        affiliation: userData.affiliation,
-                        licenseNumber: userData.licenseNumber || ''
-                    },
-                    email: userData.email,
-                    phone: userData.phone,
-                    name: userData.name,
-                    conferenceId: confId,
-                    status: 'PAID',
-                    paymentStatus: 'PAID',
-                    paymentMethod: 'CARD',
-                    paymentKey: tid,
-                    orderId: (result === null || result === void 0 ? void 0 : result.Moid) || (result === null || result === void 0 ? void 0 : result.moid) || regId,
-                    amount: parseInt(amt, 10), // Total amount including base + options
-                    baseAmount: baseAmount || parseInt(amt, 10), // Base registration fee
-                    optionsTotal: optionsTotal || 0, // Sum of selected option prices
-                    options: selectedOptions || [], // Selected options details
-                    tier: userData.tier || null,
-                    categoryName: userData.categoryName || null,
-                    memberVerificationData: null, // Will be populated if member verified
-                    isAnonymous: userData.isAnonymous || false,
-                    agreements: {}, // Will be populated from session data if needed
-                    paymentDetails: result,
-                    receiptNumber: `${dateStr}-${rand}`,
-                    confirmationQr: `CONF-${regId}`,
-                    badgeQr: null,
-                    isCheckedIn: false,
-                    checkInTime: null,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                    paidAt: admin.firestore.FieldValue.serverTimestamp()
-                }, { merge: false });
-                // [Security] Lock the Member Code
-                try {
-                    if (societyId && userData.memberVerificationData && userData.memberVerificationData.id) {
-                        const memberId = userData.memberVerificationData.id;
-                        const memberRef = admin.firestore().collection('societies').doc(societyId).collection('members').doc(memberId);
-                        await memberRef.update({
-                            used: true,
-                            usedBy: userData.userId || 'unknown',
-                            usedAt: admin.firestore.FieldValue.serverTimestamp()
-                        });
-                        functions.logger.info(`[Member Locked] Member ${memberId} locked for registration ${regId}`);
-                    }
-                }
-                catch (lockError) {
-                    functions.logger.error("Failed to lock member code (Payment Successful):", lockError);
-                    // Do not fail the request, as payment is already processed.
-                }
-                // Log participation history (for authenticated users)
-                if (userData.userId && userData.userId !== 'GUEST') {
-                    try {
-                        // Create/Update User Document first
-                        const userRef = admin.firestore().collection('users').doc(userData.userId);
-                        const userSnap = await userRef.get();
-                        if (!userSnap.exists) {
-                            // Create new user document (match signup field structure)
-                            await userRef.set({
-                                uid: userData.userId,
-                                email: userData.email,
-                                name: userData.name,
-                                phone: userData.phone,
-                                affiliation: userData.affiliation,
-                                organization: userData.affiliation, // Standard field
-                                licenseNumber: userData.licenseNumber || '',
-                                tier: userData.tier || 'NON_MEMBER',
-                                isAnonymous: false,
-                                isForeigner: false,
-                                country: 'KR',
-                                authStatus: {
-                                    emailVerified: false,
-                                    phoneVerified: false
-                                },
-                                simplePassword: null,
-                                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                                updatedAt: admin.firestore.FieldValue.serverTimestamp()
-                            });
-                            functions.logger.info(`[User Created] User document created for ${userData.userId}`);
-                        }
-                        else {
-                            // Update existing user document
-                            await userRef.update({
-                                email: userData.email,
-                                name: userData.name,
-                                phone: userData.phone,
-                                affiliation: userData.affiliation,
-                                organization: userData.affiliation,
-                                updatedAt: admin.firestore.FieldValue.serverTimestamp()
-                            });
-                            functions.logger.info(`[User Updated] User document updated for ${userData.userId}`);
-                        }
-                        // Then log participation history
-                        await admin.firestore().collection('users').doc(userData.userId).collection('participations').doc(regId).set({
-                            conferenceId: confId,
-                            conferenceName: '', // Will be populated later if needed
-                            registrationId: regId,
-                            societyId: societyId || 'unknown',
-                            role: 'ATTENDEE',
-                            registeredAt: admin.firestore.FieldValue.serverTimestamp(),
-                            paidAt: admin.firestore.FieldValue.serverTimestamp(),
-                            amount: parseInt(amt, 10),
-                            status: 'PAID'
-                        }, { merge: true });
-                        functions.logger.info(`[History Logged] Participation saved for user ${userData.userId}`);
-                    }
-                    catch (historyError) {
-                        functions.logger.error("Failed to log participation history:", historyError);
-                    }
-                }
-            }
-            return { success: true, data: result };
-        }
-        else {
-            // Failed
-            return { success: false, message: result.ResultMsg, code: result.ResultCode };
-        }
-    }
-    catch (error) {
-        functions.logger.error("Error in confirmNicePayment:", error);
-        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-        throw new functions.https.HttpsError('internal', errorMessage);
-    }
-});
-// 3. Confirm TossPayment (Approve Transaction)
+// 1. Confirm TossPayment (Approve Transaction)
 exports.confirmTossPayment = functions
     .runWith({
     // enforceAppCheck: false, // Removed: Enable App Check for authenticated calls
@@ -318,7 +110,7 @@ exports.confirmTossPayment = functions
         throw new functions.https.HttpsError('invalid-argument', 'Missing payment details (paymentKey, orderId, amount)');
     }
     // [Security] Verify Payment Amount against Database
-    const verification = await (0, paymentVerifier_1.verifyPaymentAmount)(confId, userData.tier, selectedOptions || [], Number(amount));
+    const verification = await (0, paymentVerifier_1.verifyPaymentAmount)(confId, userData.tier, selectedOptions || [], parseInt(amount, 10));
     if (!verification.isValid) {
         functions.logger.error(`[Security] Payment verification failed for ${regId}: ${verification.error}`);
         throw new functions.https.HttpsError('aborted', verification.error || 'Payment amount verification failed');
@@ -326,7 +118,7 @@ exports.confirmTossPayment = functions
     if (!userData) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing user data for registration creation');
     }
-    // [Security] 중복 등록 방지: 동일 userId + 동일 학술대회에 PAID 등록이 있으면 차단
+    // [Security] Duplicate registration guard
     if (userData.userId && userData.userId !== 'GUEST' && confId) {
         const existingRegsSnap = await admin.firestore()
             .collection(`conferences/${confId}/registrations`)
@@ -546,7 +338,7 @@ exports.confirmTossPaymentHttp = functions
             res.status(400).json({ error: 'Missing user data for registration creation' });
             return;
         }
-        // [Security] 중복 등록 방지: 동일 userId + 동일 학술대회에 PAID 등록이 있으면 차단
+        // [Security] 繞벿살탮???繹먮굞夷??꾩렮維?: ???됰뎄 userId + ???됰뎄 ???덈뻿???????PAID ?繹먮굞夷?????깅さ嶺?嶺뚢뼰維??
         if (userData.userId && userData.userId !== 'GUEST' && confId) {
             const existingRegsSnap = await admin.firestore()
                 .collection(`conferences/${confId}/registrations`)
@@ -829,10 +621,10 @@ exports.getNhnAlimTalkTemplates = functions
         throw new functions.https.HttpsError('invalid-argument', 'senderKey and societyId are required');
     }
     try {
-        // NHN Cloud 공통 설정 (모든 학회 동일)
+        // NHN Cloud ??ㅻ쾹?????깆젧 (嶺뚮ㅄ維獄????깅뤂 ???됰뎄)
         const appKey = 'Ik6GEBC22p5Qliqk';
         const secretKey = 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme';
-        // senderKey는 Firestore에서 조회 (학회별 상이)
+        // senderKey??Firestore??????브퀗???(???깅뤂????⑤챷逾?
         const db = admin.firestore();
         const infraSnap = await db
             .collection('societies')
@@ -846,7 +638,7 @@ exports.getNhnAlimTalkTemplates = functions
         const infraData = infraSnap.data();
         const nhnConfig = (_a = infraData === null || infraData === void 0 ? void 0 : infraData.notification) === null || _a === void 0 ? void 0 : _a.nhnAlimTalk;
         const firestoreSenderKey = nhnConfig === null || nhnConfig === void 0 ? void 0 : nhnConfig.senderKey;
-        // senderKey는 함수 파라미터 또는 Firestore 설정 사용
+        // senderKey????貫?????逾ф쾬?롮구?????裕?Firestore ???깆젧 ????
         const finalSenderKey = senderKey || firestoreSenderKey;
         if (!finalSenderKey) {
             throw new functions.https.HttpsError('failed-precondition', 'NHN Cloud senderKey not configured. Please configure in Admin > Infrastructure settings.');
@@ -1022,7 +814,7 @@ exports.sendAuthCode = functions
     }
     // In a real implementation, this would call an SMS/AlimTalk provider API (e.g., Twilio, Solapi)
     // For now, we just log it as requested.
-    functions.logger.info(`[SMS MOCK] Sending AlimTalk to ${phone}: [e-Regi] 가입인증번호 입니다. #${code}`);
+    functions.logger.info(`[SMS MOCK] Sending AlimTalk to ${phone}: [e-Regi] ?띠럾????곷데嶺뚯빘鍮뽬떋?????낅퉵?? #${code}`);
     return { success: true, message: "Code sent successfully (MOCK)" };
 });
 // --------------------------------------------------------------------------
@@ -1044,7 +836,7 @@ exports.verifyMemberIdentity = functions
         // Path: societies/{societyId}/members/{memberId}
         const membersRef = admin.firestore().collection('societies').doc(societyId).collection('members');
         // Strategy: Check Name + (LicenseNumber OR Code)
-        // [FIX] Handle 2-character names with space (e.g., "김 결" vs "김결")
+        // [FIX] Handle 2-character names with space (e.g., "濚밸쮦? ?? vs "濚밸쮦???)
         const checkMember = async (queryName, queryCode) => {
             // 1. Try License Number
             let q = membersRef.where('name', '==', queryName).where('licenseNumber', '==', queryCode);
@@ -1061,14 +853,14 @@ exports.verifyMemberIdentity = functions
         // 2. Try variations for 2-character names (common in legacy DBs)
         if (snap.empty) {
             const trimmedName = name.replace(/\s+/g, '');
-            // Case A: User entered "김결", DB has "김 결"
+            // Case A: User entered "濚밸쮦???, DB has "濚밸쮦? ??
             if (trimmedName.length === 2) {
                 const spacedName = `${trimmedName[0]} ${trimmedName[1]}`;
                 if (spacedName !== name) {
                     snap = await checkMember(spacedName, code);
                 }
             }
-            // Case B: User entered "김 결", DB has "김결"
+            // Case B: User entered "濚밸쮦? ??, DB has "濚밸쮦???
             if (snap.empty && name !== trimmedName) {
                 snap = await checkMember(trimmedName, code);
             }
@@ -1112,16 +904,16 @@ exports.verifyMemberIdentity = functions
             return {
                 success: true,
                 grade: serverGrade,
-                isExpired: isExpired, // ✅ [FIX] 만료 여부 플래그 추가
+                isExpired: isExpired, // ??[FIX] 嶺뚮씭??쭩???? ????뗥윜??怨뺣뼺?
                 memberData: {
                     id: memberDoc.id, // [Critical] Return Doc ID for Locking
                     name: member.name,
-                    grade: serverGrade, // ✅ [FIX] 등급 정보 추가
-                    priceKey: priceKey, // ✅ [FIX] 정규화된 가격 키 추가
+                    grade: serverGrade, // ??[FIX] ?繹먭퍗???筌먲퐢沅??怨뺣뼺?
+                    priceKey: priceKey, // ??[FIX] ?筌????븐뼔彛??띠럾??????怨뺣뼺?
                     licenseNumber: member.licenseNumber || member.code,
                     societyId: societyId, // Pass back for context
                     expiryDate: finalExpiry,
-                    expiry: finalExpiry // 프론트가 찾는 필드 강제 주입
+                    expiry: finalExpiry // ?熬곣뫁夷?筌? 嶺뚢돦堉???熬곣뫀援??띠룆踰???낅슣???
                 }
             };
         }
@@ -1262,7 +1054,7 @@ exports.mintCrossDomainToken = functions
             functions.logger.warn(`[CORS Block] Origin ${origin} not in allowed list.`);
             throw new functions.https.HttpsError('permission-denied', 'CORS Policy: Origin not allowed');
         }
-        // 1. 유효성 검사 강화 (Hybrid: Context Auth OR ID Token Payload)
+        // 1. ??ル쪇????롪틵????띠룆踰??(Hybrid: Context Auth OR ID Token Payload)
         let uid;
         if (context.auth) {
             // Case A: SDK already authenticated (e.g. refresh)
@@ -1282,7 +1074,7 @@ exports.mintCrossDomainToken = functions
             }
         }
         else {
-            throw new functions.https.HttpsError('unauthenticated', '인증 정보가 없습니다.');
+            throw new functions.https.HttpsError('unauthenticated', '?筌뤾쑴理??筌먲퐢沅뽪뤆?쎛 ??怨룸????덈펲.');
         }
         const customToken = await admin.auth().createCustomToken(uid, {
             crossDomain: true,
@@ -1705,7 +1497,7 @@ exports.onTossWebhook = functions
                         // Expiry Logic
                         let expiresAt;
                         if ((_b = conference === null || conference === void 0 ? void 0 : conference.dates) === null || _b === void 0 ? void 0 : _b.end) {
-                            expiresAt = admin.firestore.Timestamp.fromMillis(conference.dates.end.toMillis() + (24 * 60 * 60 * 1000));
+                            expiresAt = admin.firestore.Timestamp.fromMillis(conference.dates.end.toMillis() + (48 * 60 * 60 * 1000));
                         }
                         else {
                             expiresAt = admin.firestore.Timestamp.fromMillis(now.toMillis() + (7 * 24 * 60 * 60 * 1000));

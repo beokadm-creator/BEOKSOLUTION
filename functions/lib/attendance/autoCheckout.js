@@ -176,7 +176,17 @@ async function processConferenceAutoCheckout(confId, config) {
         for (const zone of endedZones) {
             try {
                 logger.info(`[AutoCheckout] Processing zone ${zone.name} (${zone.id}) - ended at ${zone.end}`);
-                const batchResult = await (0, exitLogger_1.batchCreateExitLogs)(confId, zone.id, currentTime, config.dryRun);
+                const zoneConfig = {
+                    start: zone.start,
+                    end: zone.end,
+                    breaks: zone.breaks,
+                    ruleDate: today,
+                    goalMinutes: zone.goalMinutes || 0,
+                    globalGoalMinutes: rules.globalGoalMinutes || 0,
+                    completionMode: rules.completionMode || 'DAILY_SEPARATE',
+                    cumulativeGoalMinutes: rules.cumulativeGoalMinutes || 0,
+                };
+                const batchResult = await (0, exitLogger_1.batchCreateExitLogs)(confId, zone.id, currentTime, config.dryRun, zoneConfig);
                 result.zonesProcessed++;
                 result.participantsCheckedOut += batchResult.successful;
                 logger.info(`[AutoCheckout] Zone ${zone.name}: ${batchResult.successful}/${batchResult.processed} checked out`);
