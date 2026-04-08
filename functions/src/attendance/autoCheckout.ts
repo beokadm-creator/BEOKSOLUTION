@@ -16,7 +16,7 @@
 
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import { batchCreateExitLogs } from './exitLogger';
+import { batchCreateExitLogs, type ZoneConfig } from './exitLogger';
 
 // Custom logger with context
 const logger = functions.logger;
@@ -79,6 +79,8 @@ async function getAttendanceRules(
   date: string
 ): Promise<{
   globalGoalMinutes: number;
+  completionMode: 'DAILY_SEPARATE' | 'CUMULATIVE';
+  cumulativeGoalMinutes: number;
   zones: Array<{
     id: string;
     name: string;
@@ -87,6 +89,7 @@ async function getAttendanceRules(
     autoCheckout: boolean;
     breaks: Array<{ label: string; start: string; end: string }>;
     points: number;
+    goalMinutes?: number;
   }>;
 } | null> {
   try {
@@ -195,11 +198,23 @@ async function processConferenceAutoCheckout(
           `[AutoCheckout] Processing zone ${zone.name} (${zone.id}) - ended at ${zone.end}`
         );
 
+        const zoneConfig: ZoneConfig = {
+          start: zone.start,
+          end: zone.end,
+          breaks: zone.breaks,
+          ruleDate: today,
+          goalMinutes: zone.goalMinutes || 0,
+          globalGoalMinutes: rules.globalGoalMinutes || 0,
+          completionMode: rules.completionMode || 'DAILY_SEPARATE',
+          cumulativeGoalMinutes: rules.cumulativeGoalMinutes || 0,
+        };
+
         const batchResult = await batchCreateExitLogs(
           confId,
           zone.id,
           currentTime,
-          config.dryRun
+          config.dryRun,
+          zoneConfig
         );
 
         result.zonesProcessed++;
