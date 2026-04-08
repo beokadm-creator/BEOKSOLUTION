@@ -18,7 +18,6 @@ import { createAuditLogEntry } from '../audit/logAuditEvent';
  * - error?: string
  */
 export const withdrawConsent = functions.https.onCall(async (data, context) => {
-    const db = admin.firestore();
     // Authentication check
     if (!context.auth) {
         throw new functions.https.HttpsError(

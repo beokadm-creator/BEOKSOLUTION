@@ -54,7 +54,6 @@ const logAuditEvent_1 = require("../audit/logAuditEvent");
  */
 exports.withdrawConsent = functions.https.onCall(async (data, context) => {
     var _a, _b;
-    const db = admin.firestore();
     // Authentication check
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated to withdraw consent');

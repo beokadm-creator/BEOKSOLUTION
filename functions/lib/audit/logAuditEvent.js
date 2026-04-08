@@ -67,7 +67,6 @@ exports.logAuditEvent = functions.https.onCall(async (data, context) => {
     }
     try {
         const timestamp = admin.firestore.Timestamp.now();
-        const db = admin.firestore();
         // Determine actor type
         let actorType = 'PARTICIPANT';
         const actorEmail = (_a = context.auth.token) === null || _a === void 0 ? void 0 : _a.email;
@@ -172,7 +171,6 @@ async function createAuditLogEntry(params) {
     const db = admin.firestore();
     const { action, entityType, entityId, vendorId, conferenceId, details, result, errorMessage, actorId = 'system', actorEmail, actorType = 'SYSTEM', } = params;
     const timestamp = admin.firestore.Timestamp.now();
-    const db = admin.firestore();
     const logEntry = {
         actorId,
         actorEmail,
