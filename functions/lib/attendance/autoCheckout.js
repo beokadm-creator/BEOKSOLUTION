@@ -72,23 +72,23 @@ async function getAutoCheckoutConfig() {
             .get();
         if (!configDoc.exists) {
             return {
-                enabled: false,
-                dryRun: true,
+                enabled: true,
+                dryRun: false,
                 whitelist: [],
             };
         }
         const data = configDoc.data() || {};
         return {
-            enabled: (_a = data.enabled) !== null && _a !== void 0 ? _a : false,
-            dryRun: (_b = data.dry_run) !== null && _b !== void 0 ? _b : true,
+            enabled: (_a = data.enabled) !== null && _a !== void 0 ? _a : true,
+            dryRun: (_b = data.dry_run) !== null && _b !== void 0 ? _b : false,
             whitelist: Array.isArray(data.whitelist) ? data.whitelist : [],
         };
     }
     catch (error) {
         logger.error('[AutoCheckout] Failed to get config:', error);
         return {
-            enabled: false,
-            dryRun: true,
+            enabled: true,
+            dryRun: false,
             whitelist: [],
         };
     }

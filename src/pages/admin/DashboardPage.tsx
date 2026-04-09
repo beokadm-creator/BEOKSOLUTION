@@ -103,9 +103,22 @@ export default function DashboardPage() {
             let globalGoal = 0;
             let completionMode = 'DAILY_SEPARATE';
             let cumulativeGoalMinutes = 0;
+            const allZones: { id: string; name: string }[] = [];
             if (rulesSnap.exists()) {
                 const rulesData = rulesSnap.data().rules || {};
                 const dates = Object.keys(rulesData).sort();
+                const seenZoneIds = new Set<string>();
+                dates.forEach(dateStr => {
+                    const rule = rulesData[dateStr];
+                    if (rule.zones && Array.isArray(rule.zones)) {
+                        rule.zones.forEach((z: { id: string; name: string }) => {
+                            if (!seenZoneIds.has(z.id)) {
+                                seenZoneIds.add(z.id);
+                                allZones.push({ id: z.id, name: z.name });
+                            }
+                        });
+                    }
+                });
                 if (dates.length > 0) {
                     const firstRule = rulesData[dates[0]];
                     globalGoal = firstRule.globalGoalMinutes || 0;
@@ -145,6 +158,8 @@ export default function DashboardPage() {
                 const data = d.data();
                 const times = userTimes[d.id] || (data.badgeQr && userTimes[data.badgeQr]) || {};
                 const totalMinutes = typeof data.totalMinutes === 'number' ? data.totalMinutes : 0;
+                const zoneMinutes: Record<string, number> = data.zoneMinutes || {};
+                const zoneCompleted: Record<string, boolean> = data.zoneCompleted || {};
                 let isCompliant = !!data.isCompleted;
                 if (completionMode !== 'CUMULATIVE' && goal > 0) {
                     isCompliant = totalMinutes >= goal;
@@ -162,7 +177,12 @@ export default function DashboardPage() {
                     '마지막 퇴장시간': times.lastExitTime,
                     '현재 상태': data.attendanceStatus === 'INSIDE' ? '입장 중' : '퇴장',
                     '수강인정시간(분)': totalMinutes,
-                    '수강완료표기': isCompliant ? 'Y' : 'N'
+                    '수강완료표기': isCompliant ? 'Y' : 'N',
+                    ...(allZones.length >= 2 ? allZones.reduce((acc, zone) => {
+                        acc[`${zone.name} 수강인정(분)`] = zoneMinutes[zone.id] || 0;
+                        acc[`${zone.name} 수강완료`] = zoneCompleted[zone.id] === true ? 'Y' : 'N';
+                        return acc;
+                    }, {} as Record<string, unknown>) : {}),
                 };
             });
 
@@ -174,6 +194,8 @@ export default function DashboardPage() {
                 const data = d.data();
                 const times = userTimes[d.id] || (data.badgeQr && userTimes[data.badgeQr]) || {};
                 const totalMinutes = typeof data.totalMinutes === 'number' ? data.totalMinutes : 0;
+                const zoneMinutes: Record<string, number> = data.zoneMinutes || {};
+                const zoneCompleted: Record<string, boolean> = data.zoneCompleted || {};
                 let isCompliant = !!data.isCompleted;
                 if (completionMode !== 'CUMULATIVE' && goal > 0) {
                     isCompliant = totalMinutes >= goal;
@@ -191,7 +213,12 @@ export default function DashboardPage() {
                     '마지막 퇴장시간': times.lastExitTime,
                     '현재 상태': data.attendanceStatus === 'INSIDE' ? '입장 중' : '퇴장',
                     '수강인정시간(분)': totalMinutes,
-                    '수강완료표기': isCompliant ? 'Y' : 'N'
+                    '수강완료표기': isCompliant ? 'Y' : 'N',
+                    ...(allZones.length >= 2 ? allZones.reduce((acc, zone) => {
+                        acc[`${zone.name} 수강인정(분)`] = zoneMinutes[zone.id] || 0;
+                        acc[`${zone.name} 수강완료`] = zoneCompleted[zone.id] === true ? 'Y' : 'N';
+                        return acc;
+                    }, {} as Record<string, unknown>) : {}),
                 };
             });
 
