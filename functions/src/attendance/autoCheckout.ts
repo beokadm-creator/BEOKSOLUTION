@@ -1,7 +1,7 @@
 /**
  * Auto Checkout Scheduler - Scheduled Cloud Function for automatic participant checkout
  * 
- * This function runs every 5 minutes and:
+ * This function runs every 60 minutes and:
  * 1. Checks all active conferences
  * 2. For each conference with autoCheckout enabled zones
  * 3. Finds participants still checked in after zone end time
@@ -111,9 +111,9 @@ async function getAttendanceRules(
 }
 
 /**
- * Gets all active conferences
+ * Gets all active conferences with their data (for end date checking)
  */
-async function getActiveConferences(): Promise<string[]> {
+async function getActiveConferences(): Promise<admin.firestore.QueryDocumentSnapshot[]> {
   try {
     const db = getDb();
     const snapshot = await db
@@ -121,11 +121,39 @@ async function getActiveConferences(): Promise<string[]> {
       .where('status', '==', 'active')
       .get();
 
-    return snapshot.docs.map(doc => doc.id);
+    return snapshot.docs;
   } catch (error) {
     logger.error('[AutoCheckout] Failed to get active conferences:', error);
     return [];
   }
+}
+
+/**
+ * Extracts end date string (YYYY-MM-DD) from a conference document snapshot.
+ * Returns null if no valid end date found.
+ */
+function getConferenceEndDateStr(
+  confData: admin.firestore.DocumentData
+): string | null {
+  const endDate = confData.endDate;
+  if (!endDate) return null;
+
+  if (endDate && typeof endDate === 'object' && 'toDate' in endDate) {
+    return (endDate as admin.firestore.Timestamp).toDate().toISOString().split('T')[0];
+  }
+  if (typeof endDate === 'string') {
+    return endDate;
+  }
+  return null;
+}
+
+/**
+ * Returns today's date in KST as YYYY-MM-DD string.
+ */
+function getKstToday(now: Date = new Date()): string {
+  const kstOffset = 9 * 60 * 60 * 1000;
+  const kstTime = new Date(now.getTime() + kstOffset);
+  return kstTime.toISOString().split('T')[0];
 }
 
 /**
@@ -250,17 +278,19 @@ async function processConferenceAutoCheckout(
  * Checks for zones that have ended and auto-checks out participants
  */
 export const scheduledAutoCheckout = functions.pubsub
-  .schedule('every 5 minutes')
+  .schedule('every 60 minutes')
   .timeZone('Asia/Seoul')
   .onRun(async (context) => {
     const startTime = Date.now();
+    const now = new Date();
+    const kstToday = getKstToday(now);
     logger.info('[AutoCheckout] Scheduler started', { 
-      timestamp: new Date().toISOString(),
-      eventId: context.eventId 
+      timestamp: now.toISOString(),
+      eventId: context.eventId,
+      kstToday,
     });
 
     try {
-      // Get configuration
       const config = await getAutoCheckoutConfig();
 
       if (!config.enabled) {
@@ -274,27 +304,34 @@ export const scheduledAutoCheckout = functions.pubsub
         whitelistCount: config.whitelist.length,
       });
 
-      // Get active conferences
-      let conferences = await getActiveConferences();
+      const activeConferences = await getActiveConferences();
 
-      // Apply whitelist filter if specified
-      if (config.whitelist.length > 0) {
-        conferences = conferences.filter(confId => config.whitelist.includes(confId));
-        logger.info(`[AutoCheckout] Whitelist applied: ${conferences.length} conferences`);
+      const conferencesToProcess: string[] = [];
+      for (const conf of activeConferences) {
+        if (config.whitelist.length > 0 && !config.whitelist.includes(conf.id)) {
+          continue;
+        }
+        const endDateStr = getConferenceEndDateStr(conf.data());
+        if (!endDateStr) continue;
+        if (kstToday >= endDateStr) {
+          conferencesToProcess.push(conf.id);
+          logger.info(`[AutoCheckout] ${conf.id}: ending on ${endDateStr}, will process.`);
+        } else {
+          logger.info(`[AutoCheckout] ${conf.id}: ends on ${endDateStr}, skipping (today: ${kstToday}).`);
+        }
       }
 
-      if (conferences.length === 0) {
-        logger.info('[AutoCheckout] No conferences to process');
+      if (conferencesToProcess.length === 0) {
+        logger.info('[AutoCheckout] No conferences ending today. Skipping.');
         return null;
       }
 
-      logger.info(`[AutoCheckout] Processing ${conferences.length} conferences`);
+      logger.info(`[AutoCheckout] Processing ${conferencesToProcess.length} conferences`);
 
-      // Process each conference
       const results: Array<{ conferenceId: string; zonesProcessed: number; participantsCheckedOut: number; errors: string[] }> = [];
       const errors: string[] = [];
 
-      for (const confId of conferences) {
+      for (const confId of conferencesToProcess) {
         try {
           const result = await processConferenceAutoCheckout(confId, config);
           results.push(result);
@@ -315,7 +352,7 @@ export const scheduledAutoCheckout = functions.pubsub
       const duration = Date.now() - startTime;
 
       logger.info('[AutoCheckout] Completed', {
-        conferencesProcessed: conferences.length,
+        conferencesProcessed: conferencesToProcess.length,
         zonesProcessed: totalZonesProcessed,
         participantsCheckedOut: totalParticipantsCheckedOut,
         errors: errors.length,
@@ -323,10 +360,9 @@ export const scheduledAutoCheckout = functions.pubsub
         dryRun: config.dryRun,
       });
 
-      // Return summary for monitoring
       return {
         success: true,
-        conferencesProcessed: conferences.length,
+        conferencesProcessed: conferencesToProcess.length,
         zonesProcessed: totalZonesProcessed,
         participantsCheckedOut: totalParticipantsCheckedOut,
         errors: errors.length,
@@ -374,6 +410,28 @@ export const manualAutoCheckout = functions.https.onCall(
       dryRun,
       caller: context.auth.uid,
     });
+
+    const db = getDb();
+    const confSnap = await db.doc(`conferences/${confId}`).get();
+    if (!confSnap.exists) {
+      throw new functions.https.HttpsError('not-found', `Conference ${confId} not found.`);
+    }
+
+    const endDateStr = getConferenceEndDateStr(confSnap.data()!);
+    if (!endDateStr) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        `Conference ${confId} has no end date configured.`
+      );
+    }
+
+    const kstToday = getKstToday();
+    if (kstToday < endDateStr) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        `Auto checkout is only available on the conference last day (${endDateStr}). Today is ${kstToday}.`
+      );
+    }
 
     try {
       const config: AutoCheckoutConfig = {
