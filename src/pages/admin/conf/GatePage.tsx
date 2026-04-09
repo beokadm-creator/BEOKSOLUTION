@@ -210,7 +210,7 @@ const GatePage: React.FC = () => {
                 const rule = zones.find(z => z.id === curZoneId);
                 let bS = lastIn || now, bE = now;
                 if (rule && rule.start && rule.end) {
-                    const ds = rule.ruleDate || bS.toISOString().split('T')[0];
+                    const ds = bS.toISOString().split('T')[0];
                     bS = new Date(Math.max(bS.getTime(), new Date(`${ds}T${rule.start}:00+09:00`).getTime()));
                     bE = new Date(Math.min(now.getTime(), new Date(`${ds}T${rule.end}:00+09:00`).getTime()));
                 }
@@ -219,7 +219,7 @@ const GatePage: React.FC = () => {
                     let ded = 0;
                     if (rule?.breaks) {
                         rule.breaks.forEach((b: any) => {
-                            const ds = rule.ruleDate || bS.toISOString().split('T')[0];
+                            const ds = bS.toISOString().split('T')[0];
                             const bsS = new Date(`${ds}T${b.start}:00+09:00`), bsE = new Date(`${ds}T${b.end}:00+09:00`);
                             const oS = Math.max(bS.getTime(), bsS.getTime()), oE = Math.min(bE.getTime(), bsE.getTime());
                             if (oE > oS) ded += Math.floor((oE - oS) / 60000);
@@ -230,26 +230,57 @@ const GatePage: React.FC = () => {
             }
 
             const newTotal = totalMins + minsToAdd;
-            const ruleForGoal = zones.find(z => z.id === (action === 'ENTER' ? targetZoneId : curZoneId));
-            let isComp = data.isCompleted || false;
-            if (ruleForGoal) {
-                const goal = ruleForGoal.completionMode === 'CUMULATIVE' ? ruleForGoal.cumulativeGoalMinutes : (ruleForGoal.goalMinutes || ruleForGoal.globalGoalMinutes || 0);
-                if (goal > 0 && newTotal >= goal) isComp = true;
+
+            const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+            const dailyMinutes = { ...(data.dailyMinutes || {}) };
+            dailyMinutes[todayStr] = (dailyMinutes[todayStr] || 0) + minsToAdd;
+
+            // Initialize zone-level tracking maps
+            const zoneMinutes: Record<string, number> = { ...(data.zoneMinutes || {}) };
+            const zoneCompleted: Record<string, boolean> = { ...(data.zoneCompleted || {}) };
+
+            // Add minutes to the zone being LEFT (curZoneId)
+            if (curZoneId && minsToAdd > 0) {
+                zoneMinutes[curZoneId] = (zoneMinutes[curZoneId] || 0) + minsToAdd;
             }
+
+            // Per-zone completion check — only in DAILY_SEPARATE mode
+            // In CUMULATIVE mode, completion is determined solely by cumulativeGoalMinutes
+            if (curZoneId && minsToAdd > 0) {
+                const ruleForZone = zones.find(z => z.id === curZoneId);
+                if (ruleForZone && ruleForZone.completionMode !== 'CUMULATIVE') {
+                    const zoneGoal = ruleForZone.goalMinutes || ruleForZone.globalGoalMinutes || 0;
+                    if (zoneGoal > 0 && (zoneMinutes[curZoneId] || 0) >= zoneGoal) {
+                        zoneCompleted[curZoneId] = true;
+                    }
+                }
+            }
+
+            // Backward-compatible isCompleted
+            let isComp = data.isCompleted || false;
+            const anyZoneCompleted = Object.values(zoneCompleted).some(v => v === true);
+            const ruleForCumulative = zones.length > 0 ? zones[0] : null;
+            const cumulativeCompleted = ruleForCumulative?.completionMode === 'CUMULATIVE'
+                && ruleForCumulative.cumulativeGoalMinutes
+                && newTotal >= ruleForCumulative.cumulativeGoalMinutes;
+            isComp = anyZoneCompleted || !!cumulativeCompleted || isComp;
 
             tx.update(regRef, {
                 attendanceStatus: action === 'ENTER' ? 'INSIDE' : 'OUTSIDE',
                 currentZone: action === 'ENTER' ? targetZoneId : null,
                 totalMinutes: newTotal,
+                dailyMinutes: dailyMinutes,
+                zoneMinutes: zoneMinutes,
+                zoneCompleted: zoneCompleted,
                 isCompleted: isComp,
                 [action === 'ENTER' ? 'lastCheckIn' : 'lastCheckOut']: tsNow
             });
 
             const logRef = doc(collection(db, `conferences/${confId}/${col}/${id}/logs`));
-            tx.set(logRef, { type: action, zoneId: action === 'ENTER' ? targetZoneId : curZoneId, timestamp: tsNow, method: 'KIOSK', recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
+            tx.set(logRef, { type: action, zoneId: action === 'ENTER' ? targetZoneId : curZoneId, timestamp: tsNow, date: todayStr, method: 'KIOSK', recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
 
             const accRef = doc(collection(db, `conferences/${confId}/access_logs`));
-            tx.set(accRef, { action: action === 'ENTER' ? 'ENTRY' : 'EXIT', scannedQr: data.badgeQr || id, locationId: action === 'ENTER' ? targetZoneId : curZoneId, timestamp: tsNow, method: 'KIOSK_GATE', registrationId: id, isExternal: isExt, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
+            tx.set(accRef, { action: action === 'ENTER' ? 'ENTRY' : 'EXIT', scannedQr: data.badgeQr || id, locationId: action === 'ENTER' ? targetZoneId : curZoneId, timestamp: tsNow, date: todayStr, method: 'KIOSK_GATE', registrationId: id, isExternal: isExt, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
 
             return { actionText: text, actionType: action, userName: name, affiliation: aff };
         });

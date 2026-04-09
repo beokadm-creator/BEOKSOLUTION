@@ -41,6 +41,9 @@ interface Registration {
     currentZone: string | null;
     lastCheckIn?: Timestamp;
     totalMinutes: number;
+    dailyMinutes?: Record<string, number>;
+    zoneMinutes?: Record<string, number>;
+    zoneCompleted?: Record<string, boolean>;
     isCompleted: boolean;
     slug: string;
     affiliation?: string;
@@ -170,6 +173,9 @@ const AttendanceLivePage: React.FC = () => {
                         id: d.id,
                         ...docData,
                         totalMinutes: docData.totalMinutes || 0,
+                        dailyMinutes: docData.dailyMinutes || {},
+                        zoneMinutes: docData.zoneMinutes || {},
+                        zoneCompleted: docData.zoneCompleted || {},
                         attendanceStatus: docData.attendanceStatus || 'OUTSIDE',
                         isExternal: false
                     } as Registration;
@@ -204,6 +210,9 @@ const AttendanceLivePage: React.FC = () => {
                         currentZone: docData.currentZone || null,
                         lastCheckIn: docData.lastCheckIn,
                         totalMinutes: docData.totalMinutes || 0,
+                        dailyMinutes: docData.dailyMinutes || {},
+                        zoneMinutes: docData.zoneMinutes || {},
+                        zoneCompleted: docData.zoneCompleted || {},
                         isCompleted: !!docData.isCompleted,
                         slug: docData.slug || '',
                         affiliation: docData.userOrg || docData.organization || docData.affiliation || '',
@@ -241,6 +250,7 @@ const AttendanceLivePage: React.FC = () => {
             const collectionName = reg?.isExternal ? 'external_attendees' : 'registrations';
             const regRef = doc(db, 'conferences', cid!, collectionName, regId);
             const now = Timestamp.now();
+            const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
 
             await updateDoc(regRef, {
                 attendanceStatus: 'INSIDE',
@@ -253,6 +263,7 @@ const AttendanceLivePage: React.FC = () => {
                 type: 'ENTER',
                 zoneId,
                 timestamp: now,
+                date: todayStr,
                 method: 'MANUAL_ADMIN'
             });
 
@@ -265,6 +276,7 @@ const AttendanceLivePage: React.FC = () => {
                     scannedQr: badgeQr,
                     locationId: zoneId,
                     timestamp: now,
+                    date: todayStr,
                     method: 'MANUAL_ADMIN',
                     registrationId: regId,
                     isExternal: reg?.isExternal || false,
@@ -327,25 +339,48 @@ const AttendanceLivePage: React.FC = () => {
             const collectionName = reg?.isExternal ? 'external_attendees' : 'registrations';
             const regRef = doc(db, 'conferences', cid!, collectionName, regId);
 
-            // 목표 설정: CUMULATIVE 모드면 전체 누적 목표, 아니면 날짜별 목표
-            const goal = rules.completionMode === 'CUMULATIVE' && rules.cumulativeGoalMinutes
-                ? rules.cumulativeGoalMinutes
-                : (zoneRule?.goalMinutes && zoneRule.goalMinutes > 0)
-                    ? zoneRule.goalMinutes
-                    : rules.globalGoalMinutes;
-
-            const currentTotal = registrations.find(r => r.id === regId)?.totalMinutes || 0;
+            const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+            const currentTotal = reg?.totalMinutes || 0;
             const newTotal = currentTotal + finalMinutes;
 
-            // 완료 여부 판정: 누적 시간이 목표 이상인지
-            const isCompleted = newTotal >= goal;
+            const dailyMinutes = { ...(reg?.dailyMinutes || {}) };
+            dailyMinutes[todayStr] = (dailyMinutes[todayStr] || 0) + finalMinutes;
+
+            // Per-zone tracking
+            const zoneMinutes = { ...(reg?.zoneMinutes || {}) };
+            const zoneCompleted = { ...(reg?.zoneCompleted || {}) };
+
+            if (currentZoneId && finalMinutes > 0) {
+                zoneMinutes[currentZoneId] = (zoneMinutes[currentZoneId] || 0) + finalMinutes;
+            }
+
+            // Per-zone completion check — only in non-CUMULATIVE mode
+            if (currentZoneId && rules.completionMode !== 'CUMULATIVE') {
+                const zoneRuleForCompletion = zones.find(z => z.id === currentZoneId);
+                if (zoneRuleForCompletion) {
+                    const zoneGoal = zoneRuleForCompletion.goalMinutes || rules.globalGoalMinutes || 0;
+                    if (zoneGoal > 0 && (zoneMinutes[currentZoneId] || 0) >= zoneGoal) {
+                        zoneCompleted[currentZoneId] = true;
+                    }
+                }
+            }
+
+            // isCompleted = any zone completed OR cumulative goal met
+            const anyZoneCompleted = Object.values(zoneCompleted).some(v => v === true);
+            const cumulativeCompleted = rules.completionMode === 'CUMULATIVE'
+                && rules.cumulativeGoalMinutes
+                && newTotal >= rules.cumulativeGoalMinutes;
+            const isCompleted = anyZoneCompleted || !!cumulativeCompleted;
 
             const exitNow = Timestamp.now();
 
             await updateDoc(regRef, {
                 attendanceStatus: 'OUTSIDE',
                 currentZone: null,
-                totalMinutes: newTotal, // Idempotent update
+                totalMinutes: newTotal,
+                dailyMinutes: dailyMinutes,
+                zoneMinutes: zoneMinutes,
+                zoneCompleted: zoneCompleted,
                 isCompleted: isCompleted,
                 lastCheckOut: exitNow
             });
@@ -355,6 +390,7 @@ const AttendanceLivePage: React.FC = () => {
                 type: 'EXIT',
                 zoneId: currentZoneId,
                 timestamp: exitNow,
+                date: todayStr,
                 method: 'MANUAL_ADMIN',
                 rawDuration: durationMinutes,
                 deduction,
@@ -370,6 +406,7 @@ const AttendanceLivePage: React.FC = () => {
                     scannedQr: badgeQr,
                     locationId: currentZoneId,
                     timestamp: exitNow,
+                    date: todayStr,
                     method: 'MANUAL_ADMIN',
                     registrationId: regId,
                     isExternal: reg?.isExternal || false,
@@ -638,8 +675,22 @@ const AttendanceLivePage: React.FC = () => {
                                             <div className="col-span-3 min-w-0">
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-bold text-slate-900 truncate">{r.userName}</span>
-                                                    {r.isCompleted && (
-                                                        <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                                                    {zones.length <= 1 ? (
+                                                        r.isCompleted && <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                                                    ) : (
+                                                        <div className="flex gap-1">
+                                                            {zones.map(z => {
+                                                                const done = r.zoneCompleted?.[z.id] === true;
+                                                                return (
+                                                                    <span key={z.id} className={cn(
+                                                                        "text-[10px] px-1 py-0.5 rounded font-medium",
+                                                                        done ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
+                                                                    )} title={`${z.name}: ${done ? '완료' : '진행중'}`}>
+                                                                        {z.name.slice(0, 2)}{done ? '✓' : '…'}
+                                                                    </span>
+                                                                );
+                                                            })}
+                                                        </div>
                                                     )}
                                                 </div>
                                                 <div className="text-xs text-slate-500 truncate" title={r.affiliation || r.userEmail}>
@@ -687,8 +738,16 @@ const AttendanceLivePage: React.FC = () => {
                                                             const mins = parseInt(newVal);
                                                             if (!isNaN(mins)) {
                                                                 const collectionName = r.isExternal ? 'external_attendees' : 'registrations';
+                                                                const updatedDailyMinutes = { ...(r.dailyMinutes || {}) };
+                                                                updatedDailyMinutes[selectedDate] = mins;
+                                                                const updatedZoneMinutes = { ...(r.zoneMinutes || {}) };
+                                                                if (r.currentZone) {
+                                                                    updatedZoneMinutes[r.currentZone] = mins;
+                                                                }
                                                                 await updateDoc(doc(db, 'conferences', cid!, collectionName, r.id), {
-                                                                    totalMinutes: mins
+                                                                    totalMinutes: mins,
+                                                                    dailyMinutes: updatedDailyMinutes,
+                                                                    zoneMinutes: updatedZoneMinutes,
                                                                 });
                                                                 toast.success('수정되었습니다.');
                                                             }

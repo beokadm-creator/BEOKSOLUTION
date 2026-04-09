@@ -32,6 +32,8 @@ type ZoneBreak = {
 
 type AttendanceZone = {
     id: string;
+    name?: string;
+    goalMinutes?: number;
     start?: string;
     end?: string;
     breaks?: ZoneBreak[];
@@ -66,6 +68,8 @@ type BadgeUiState = {
     isCompleted?: boolean;
     lastCheckIn?: TimestampLike;
     baseMinutes?: number;
+    zoneMinutes?: Record<string, number>;
+    zoneCompleted?: Record<string, boolean>;
 };
 
 type StampTourConfig = {
@@ -239,6 +243,8 @@ const StandAloneBadgePage: React.FC = () => {
                     const uiIsCompleted = !!d.isCompleted;
                     const lastCheckIn = d.lastCheckIn;
                     const baseMinutes = Number(d.totalMinutes || 0);
+                    const zoneMinutes = d.zoneMinutes as Record<string, number> | undefined;
+                    const zoneCompleted = d.zoneCompleted as Record<string, boolean> | undefined;
 
                     setUi({
                         name: uiName,
@@ -254,7 +260,9 @@ const StandAloneBadgePage: React.FC = () => {
                         receiptNumber: uiReceiptNumber,
                         isCompleted: uiIsCompleted,
                         lastCheckIn,
-                        baseMinutes
+                        baseMinutes,
+                        zoneMinutes,
+                        zoneCompleted
                     });
                     setLiveMinutes(baseMinutes); // Will be recalculated by the interval if inside
                     setStatus("READY");

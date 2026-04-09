@@ -49,23 +49,23 @@ async function getAutoCheckoutConfig(): Promise<AutoCheckoutConfig> {
 
     if (!configDoc.exists) {
       return {
-        enabled: false,
-        dryRun: true,
+        enabled: true,
+        dryRun: false,
         whitelist: [],
       };
     }
 
     const data = configDoc.data() || {};
     return {
-      enabled: data.enabled ?? false,
-      dryRun: data.dry_run ?? true,
+      enabled: data.enabled ?? true,
+      dryRun: data.dry_run ?? false,
       whitelist: Array.isArray(data.whitelist) ? data.whitelist : [],
     };
   } catch (error) {
     logger.error('[AutoCheckout] Failed to get config:', error);
     return {
-      enabled: false,
-      dryRun: true,
+      enabled: true,
+      dryRun: false,
       whitelist: [],
     };
   }
@@ -212,7 +212,7 @@ async function processConferenceAutoCheckout(
         const batchResult = await batchCreateExitLogs(
           confId,
           zone.id,
-          currentTime,
+          now,
           config.dryRun,
           zoneConfig
         );

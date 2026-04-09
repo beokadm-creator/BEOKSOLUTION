@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Loader2, Download, CheckCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { cn } from '../../lib/utils';
 
 // --- Types for Settings ---
 interface BreakTime {
@@ -66,6 +67,8 @@ interface ParticipantRecord {
     lastCheckIn?: any;
     lastCheckOut?: any;
     currentZone?: string | null;
+    zoneMinutes: Record<string, number>;
+    zoneCompleted: Record<string, boolean>;
 }
 
 // Robust timestamp parser to handle all Firestore/JS variations
@@ -174,6 +177,8 @@ const StatisticsPage: React.FC = () => {
                     lastCheckIn: data.lastCheckIn,
                     lastCheckOut: data.lastCheckOut,
                     currentZone: data.currentZone || null,
+                    zoneMinutes: data.zoneMinutes || {},
+                    zoneCompleted: data.zoneCompleted || {},
                 };
             });
 
@@ -207,6 +212,8 @@ const StatisticsPage: React.FC = () => {
                     lastCheckIn: data.lastCheckIn,
                     lastCheckOut: data.lastCheckOut,
                     currentZone: data.currentZone || null,
+                    zoneMinutes: data.zoneMinutes || {},
+                    zoneCompleted: data.zoneCompleted || {},
                 };
             });
 
@@ -293,11 +300,13 @@ const StatisticsPage: React.FC = () => {
                 liveTotalMinutes = p.totalMinutes + Math.max(0, diffMins - liveDeduction);
             }
 
+            const anyZoneDone = Object.values(p.zoneCompleted || {}).some(v => v === true);
+
             let isCompliant: boolean;
             if (currentRule.completionMode === 'CUMULATIVE') {
                 isCompliant = p.isCompleted || (liveTotalMinutes >= globalGoal);
             } else {
-                isCompliant = liveTotalMinutes >= globalGoal;
+                isCompliant = anyZoneDone || (liveTotalMinutes >= globalGoal);
             }
 
             // Fallback for missing firstEntryTime and lastExitTime
@@ -340,13 +349,12 @@ const StatisticsPage: React.FC = () => {
                 exitTime = entryTime + (liveTotalMinutes * 60000);
             }
 
-            // Zone별 시간 분배 (등록자 totalMinutes를 zone 수에 비례하여 추정 — 단순 통계용)
-            // 실제 zone별 정밀 통계는 access_logs 기반 분석 필요
             const zones: Record<string, number> = {};
+            const zoneComp: Record<string, boolean> = {};
             if (currentRule.zones.length > 0) {
-                const perZone = Math.floor(liveTotalMinutes / currentRule.zones.length);
                 currentRule.zones.forEach(z => {
-                    zones[z.id] = perZone;
+                    zones[z.id] = p.zoneMinutes?.[z.id] || 0;
+                    zoneComp[z.id] = p.zoneCompleted?.[z.id] || false;
                 });
             }
 
@@ -366,6 +374,7 @@ const StatisticsPage: React.FC = () => {
                 firstEntryTime: entryTime,
                 lastExitTime: exitTime,
                 zones,
+                zoneComp,
                 isCompliant,
                 logCount: 0, // 서브컬렉션 fetch 없이 표시
             };
@@ -439,7 +448,8 @@ const StatisticsPage: React.FC = () => {
                 '수강완료표기': u.isCompliant ? 'Y' : 'N',
                 ...rules[selectedDate].zones.reduce((acc, z) => ({
                     ...acc,
-                    [`${z.name} (min)`]: u.zones[z.id] || 0
+                    [`${z.name} 수강인정(분)`]: u.zones[z.id] || 0,
+                    [`${z.name} 수강완료`]: (u.zoneComp?.[z.id] || false) ? 'Y' : 'N',
                 }), {})
             }));
 
@@ -713,14 +723,31 @@ const StatisticsPage: React.FC = () => {
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell>
-                                                        {user.isCompliant ? (
-                                                            <Badge className="bg-green-500 hover:bg-green-600">
-                                                                <CheckCircle className="w-3 h-3 mr-1" /> 수강 완료
-                                                            </Badge>
+                                                        {rules[selectedDate]?.zones?.length <= 1 ? (
+                                                            user.isCompliant ? (
+                                                                <Badge className="bg-green-500 hover:bg-green-600">
+                                                                    <CheckCircle className="w-3 h-3 mr-1" /> 수강 완료
+                                                                </Badge>
+                                                            ) : (
+                                                                <Badge variant="outline" className="text-gray-500">
+                                                                    {user.totalMinutes > 0 ? '수강 중' : '미입장'}
+                                                                </Badge>
+                                                            )
                                                         ) : (
-                                                            <Badge variant="outline" className="text-gray-500">
-                                                                {user.totalMinutes > 0 ? '수강 중' : '미입장'}
-                                                            </Badge>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {rules[selectedDate].zones.map(z => {
+                                                                    const done = user.zoneComp?.[z.id] || false;
+                                                                    const mins = user.zones?.[z.id] || 0;
+                                                                    return (
+                                                                        <span key={z.id} className={cn(
+                                                                            "text-[10px] px-1.5 py-0.5 rounded font-medium",
+                                                                            done ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
+                                                                        )}>
+                                                                            {z.name.slice(0, 3)}{done ? '✓' : `${mins}m`}
+                                                                        </span>
+                                                                    );
+                                                                })}
+                                                            </div>
                                                         )}
                                                     </TableCell>
                                                     <TableCell className="text-right font-bold text-lg">
