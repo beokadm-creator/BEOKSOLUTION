@@ -84,3 +84,51 @@ export const calculateStayTime = (
 
     return Math.floor(totalMinutes);
 };
+
+export interface ZoneConfig {
+    start?: string;
+    end?: string;
+    breaks?: { start: string; end: string }[];
+    ruleDate?: string;
+}
+
+export function calculateRecognizedMinutes(
+    lastCheckInDate: Date,
+    exitTime: Date,
+    zoneConfig?: ZoneConfig
+): number {
+    let boundedStart = lastCheckInDate;
+    let boundedEnd = exitTime;
+    let rawDurationMinutes = 0;
+    let recognizedMinutes = 0;
+
+    if (zoneConfig?.start && zoneConfig?.end) {
+        const kstMs = lastCheckInDate.getTime() + 9 * 60 * 60 * 1000;
+        const dateStr = zoneConfig.ruleDate || new Date(kstMs).toISOString().split('T')[0];
+        const zoneStart = new Date(`${dateStr}T${zoneConfig.start}:00+09:00`);
+        const zoneEnd = new Date(`${dateStr}T${zoneConfig.end}:00+09:00`);
+        boundedStart = new Date(Math.max(lastCheckInDate.getTime(), zoneStart.getTime()));
+        boundedEnd = new Date(Math.min(exitTime.getTime(), zoneEnd.getTime()));
+    }
+
+    if (boundedEnd > boundedStart) {
+        rawDurationMinutes = Math.floor((boundedEnd.getTime() - boundedStart.getTime()) / 60000);
+
+        let deduction = 0;
+        if (zoneConfig?.breaks && Array.isArray(zoneConfig.breaks)) {
+            for (const brk of zoneConfig.breaks) {
+                const kstMs = lastCheckInDate.getTime() + 9 * 60 * 60 * 1000;
+                const dateStr = zoneConfig.ruleDate || new Date(kstMs).toISOString().split('T')[0];
+                const breakStart = new Date(`${dateStr}T${brk.start}:00+09:00`);
+                const breakEnd = new Date(`${dateStr}T${brk.end}:00+09:00`);
+                const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());
+                const overlapEnd = Math.min(boundedEnd.getTime(), breakEnd.getTime());
+                if (overlapEnd > overlapStart) {
+                    deduction += Math.floor((overlapEnd - overlapStart) / 60000);
+                }
+            }
+        }
+        recognizedMinutes = Math.max(0, rawDurationMinutes - deduction);
+    }
+    return recognizedMinutes;
+}

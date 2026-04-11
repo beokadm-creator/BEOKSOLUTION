@@ -161,12 +161,12 @@ function getKstToday(now: Date = new Date()): string {
  */
 function isZoneEnded(zoneEnd: string, currentTime: Date): boolean {
   const [endHour, endMinute] = zoneEnd.split(':').map(Number);
-  const currentHour = currentTime.getHours();
-  const currentMinute = currentTime.getMinutes();
-  
+  const currentHour = currentTime.getUTCHours();
+  const currentMinute = currentTime.getUTCMinutes();
+
   const endMinutes = endHour * 60 + endMinute;
   const currentMinutes = currentHour * 60 + currentMinute;
-  
+
   return currentMinutes >= endMinutes;
 }
 

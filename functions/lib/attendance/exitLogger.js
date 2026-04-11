@@ -117,7 +117,9 @@ async function createExitLog(confId, registrationId, zoneId, exitTime, isExterna
     const registrationRef = getDb().doc(`conferences/${confId}/${collectionName}/${registrationId}`);
     const logsRef = getDb().collection(`conferences/${confId}/${collectionName}/${registrationId}/logs`);
     const accessLogsRef = getDb().collection(`conferences/${confId}/access_logs`);
-    const today = exitTime.toISOString().split('T')[0];
+    // Extract KST date from real UTC time
+    const kstMs = exitTime.getTime() + 9 * 60 * 60 * 1000;
+    const today = new Date(kstMs).toISOString().split('T')[0];
     const resolvedZoneConfig = zoneConfig || await fetchZoneConfig(confId, zoneId);
     try {
         return await getDb().runTransaction(async (transaction) => {
@@ -162,7 +164,8 @@ async function createExitLog(confId, registrationId, zoneId, exitTime, isExterna
                 let boundedStart = lastCheckInDate;
                 let boundedEnd = exitTime;
                 if ((resolvedZoneConfig === null || resolvedZoneConfig === void 0 ? void 0 : resolvedZoneConfig.start) && (resolvedZoneConfig === null || resolvedZoneConfig === void 0 ? void 0 : resolvedZoneConfig.end)) {
-                    const dateStr = resolvedZoneConfig.ruleDate || lastCheckInDate.toISOString().split('T')[0];
+                    const kstMs = lastCheckInDate.getTime() + 9 * 60 * 60 * 1000;
+                    const dateStr = resolvedZoneConfig.ruleDate || new Date(kstMs).toISOString().split('T')[0];
                     const zoneStart = new Date(`${dateStr}T${resolvedZoneConfig.start}:00+09:00`);
                     const zoneEnd = new Date(`${dateStr}T${resolvedZoneConfig.end}:00+09:00`);
                     boundedStart = new Date(Math.max(lastCheckInDate.getTime(), zoneStart.getTime()));
@@ -173,7 +176,8 @@ async function createExitLog(confId, registrationId, zoneId, exitTime, isExterna
                     let deduction = 0;
                     if ((resolvedZoneConfig === null || resolvedZoneConfig === void 0 ? void 0 : resolvedZoneConfig.breaks) && Array.isArray(resolvedZoneConfig.breaks)) {
                         for (const brk of resolvedZoneConfig.breaks) {
-                            const dateStr = resolvedZoneConfig.ruleDate || lastCheckInDate.toISOString().split('T')[0];
+                            const kstMs = lastCheckInDate.getTime() + 9 * 60 * 60 * 1000;
+                            const dateStr = resolvedZoneConfig.ruleDate || new Date(kstMs).toISOString().split('T')[0];
                             const breakStart = new Date(`${dateStr}T${brk.start}:00+09:00`);
                             const breakEnd = new Date(`${dateStr}T${brk.end}:00+09:00`);
                             const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());
@@ -188,19 +192,31 @@ async function createExitLog(confId, registrationId, zoneId, exitTime, isExterna
             }
             const previousTotalMinutes = registration.totalMinutes || 0;
             const newTotalMinutes = previousTotalMinutes + recognizedMinutes;
-            const todayStr = exitTime.toISOString().split('T')[0];
+            // KST date from real UTC time
+            const kstMs = exitTime.getTime() + 9 * 60 * 60 * 1000;
+            const todayStr = new Date(kstMs).toISOString().split('T')[0];
             const dailyMinutes = { ...(registration.dailyMinutes || {}) };
             dailyMinutes[todayStr] = (dailyMinutes[todayStr] || 0) + recognizedMinutes;
-            let newIsCompleted = registration.isCompleted || false;
-            if ((resolvedZoneConfig === null || resolvedZoneConfig === void 0 ? void 0 : resolvedZoneConfig.completionMode) === 'CUMULATIVE') {
-                const goal = resolvedZoneConfig.cumulativeGoalMinutes || 0;
-                if (goal > 0 && newTotalMinutes >= goal)
-                    newIsCompleted = true;
+            // Per-zone tracking
+            const zoneMinutes = { ...(registration.zoneMinutes || {}) };
+            const zoneCompleted = { ...(registration.zoneCompleted || {}) };
+            // Add recognized minutes to the zone being checked out
+            if (zoneId && recognizedMinutes > 0) {
+                zoneMinutes[zoneId] = (zoneMinutes[zoneId] || 0) + recognizedMinutes;
             }
-            else {
-                const dailyGoal = (resolvedZoneConfig === null || resolvedZoneConfig === void 0 ? void 0 : resolvedZoneConfig.goalMinutes) || (resolvedZoneConfig === null || resolvedZoneConfig === void 0 ? void 0 : resolvedZoneConfig.globalGoalMinutes) || 0;
-                newIsCompleted = dailyGoal > 0 && (dailyMinutes[todayStr] || 0) >= dailyGoal;
+            // Per-zone completion check — skip in CUMULATIVE mode
+            if (zoneId && recognizedMinutes > 0 && (resolvedZoneConfig === null || resolvedZoneConfig === void 0 ? void 0 : resolvedZoneConfig.completionMode) !== 'CUMULATIVE') {
+                const zoneGoal = (resolvedZoneConfig === null || resolvedZoneConfig === void 0 ? void 0 : resolvedZoneConfig.goalMinutes) || (resolvedZoneConfig === null || resolvedZoneConfig === void 0 ? void 0 : resolvedZoneConfig.globalGoalMinutes) || 0;
+                if (zoneGoal > 0 && (zoneMinutes[zoneId] || 0) >= zoneGoal) {
+                    zoneCompleted[zoneId] = true;
+                }
             }
+            // isCompleted = any zone completed OR cumulative goal met
+            const anyZoneCompleted = Object.values(zoneCompleted).some(v => v === true);
+            const cumulativeCompleted = (resolvedZoneConfig === null || resolvedZoneConfig === void 0 ? void 0 : resolvedZoneConfig.completionMode) === 'CUMULATIVE'
+                && !!resolvedZoneConfig.cumulativeGoalMinutes
+                && newTotalMinutes >= (resolvedZoneConfig.cumulativeGoalMinutes || 0);
+            const newIsCompleted = anyZoneCompleted || !!cumulativeCompleted || (registration.isCompleted || false);
             if (dryRun) {
                 console.log(`[DRY-RUN] Would create EXIT for ${registrationId} in ${zoneId} at ${exitTime.toISOString()}, +${recognizedMinutes}min, total=${newTotalMinutes}, completed=${newIsCompleted}`);
                 return { success: true, reason: 'DRY_RUN', registrationId, zoneId, exitTime };
@@ -226,6 +242,8 @@ async function createExitLog(confId, registrationId, zoneId, exitTime, isExterna
                 lastCheckOut: exitTimestamp,
                 totalMinutes: newTotalMinutes,
                 dailyMinutes: dailyMinutes,
+                zoneMinutes: zoneMinutes,
+                zoneCompleted: zoneCompleted,
                 isCompleted: newIsCompleted,
             });
             const accessLogRef = accessLogsRef.doc();
@@ -290,25 +308,33 @@ async function batchCreateExitLogs(confId, zoneId, exitTime, dryRun = false, zon
     let successful = 0;
     let failed = 0;
     const registrations = await findParticipantsInZone(confId, zoneId, 'registrations');
-    for (const reg of registrations) {
-        const result = await createExitLog(confId, reg.id, zoneId, exitTime, false, dryRun, zoneConfig);
-        results.push(result);
-        if (result.success) {
-            successful++;
-        }
-        else {
-            failed++;
+    // Process in chunks to avoid timeout (H1 fix)
+    const CHUNK_SIZE = 20;
+    for (let i = 0; i < registrations.length; i += CHUNK_SIZE) {
+        const chunk = registrations.slice(i, i + CHUNK_SIZE);
+        const chunkResults = await Promise.all(chunk.map(reg => createExitLog(confId, reg.id, zoneId, exitTime, false, dryRun, zoneConfig)));
+        for (const result of chunkResults) {
+            results.push(result);
+            if (result.success) {
+                successful++;
+            }
+            else {
+                failed++;
+            }
         }
     }
     const externalAttendees = await findParticipantsInZone(confId, zoneId, 'external_attendees');
-    for (const ext of externalAttendees) {
-        const result = await createExitLog(confId, ext.id, zoneId, exitTime, true, dryRun, zoneConfig);
-        results.push(result);
-        if (result.success) {
-            successful++;
-        }
-        else {
-            failed++;
+    for (let i = 0; i < externalAttendees.length; i += CHUNK_SIZE) {
+        const chunk = externalAttendees.slice(i, i + CHUNK_SIZE);
+        const chunkResults = await Promise.all(chunk.map(ext => createExitLog(confId, ext.id, zoneId, exitTime, true, dryRun, zoneConfig)));
+        for (const result of chunkResults) {
+            results.push(result);
+            if (result.success) {
+                successful++;
+            }
+            else {
+                failed++;
+            }
         }
     }
     return {

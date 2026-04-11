@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { getAuth, onAuthStateChanged } from 'firebase/auth'; // RAW SDK
 import { getFirestore, collection, query, where, onSnapshot, orderBy, type Query, getDocs, doc, getDoc } from 'firebase/firestore'; // RAW SDK
@@ -275,7 +275,7 @@ const StandAloneBadgePage: React.FC = () => {
                     const snapReg = await getDocs(qReg);
                     if (!snapReg.empty) {
                         console.log('[StandAloneBadgePage] Found in REGISTRATIONS');
-                        if (lastQueryRef) lastQueryRef.current = qReg;
+                        lastQueryRef.current = qReg;
                         lastSourceRef.current = 'REGULAR';
                         unsubscribeDB = onSnapshot(qReg, (snap) => processSnapshot(snap, 'REGULAR'));
                     } else {
@@ -283,7 +283,7 @@ const StandAloneBadgePage: React.FC = () => {
                         const snapExt = await getDocs(qExt);
                         if (!snapExt.empty) {
                             console.log('[StandAloneBadgePage] Found in EXTERNAL_ATTENDEES');
-                            if (lastQueryRef) lastQueryRef.current = qExt;
+                            lastQueryRef.current = qExt;
                             lastSourceRef.current = 'EXTERNAL';
                             unsubscribeDB = onSnapshot(qExt, (snap) => processSnapshot(snap, 'EXTERNAL'));
                         } else {
@@ -345,8 +345,11 @@ const StandAloneBadgePage: React.FC = () => {
             // Poll every 2 seconds to check if badge has been issued
             // Faster polling for immediate switch after InfoDesk scan
             refreshIntervalRef.current = setInterval(() => {
+                const currentQuery = lastQueryRef.current;
+                if (!currentQuery) return; // H2 Fix: Safe type guard
+
                 setRefreshing(true);
-                getDocs(lastQueryRef.current!)
+                getDocs(currentQuery)
                     .then((snap) => {
                         if (snap.empty || !lastSourceRef.current) return;
 
@@ -405,9 +408,10 @@ const StandAloneBadgePage: React.FC = () => {
             let boundedEnd = now;
 
             if (zoneRule && zoneRule.start && zoneRule.end) {
-                const localDateStr = zoneRule.ruleDate || start.getFullYear() + "-" + String(start.getMonth() + 1).padStart(2, '0') + "-" + String(start.getDate()).padStart(2, '0');
-                const sessionStart = new Date(`${localDateStr}T${zoneRule.start}:00`);
-                const sessionEnd = new Date(`${localDateStr}T${zoneRule.end}:00`);
+                const kstMs = start.getTime() + 9 * 60 * 60 * 1000;
+                const localDateStr = zoneRule.ruleDate || new Date(kstMs).toISOString().split('T')[0];
+                const sessionStart = new Date(`${localDateStr}T${zoneRule.start}:00+09:00`);
+                const sessionEnd = new Date(`${localDateStr}T${zoneRule.end}:00+09:00`);
 
                 boundedStart = new Date(Math.max(start.getTime(), sessionStart.getTime()));
                 boundedEnd = new Date(Math.min(now.getTime(), sessionEnd.getTime()));
@@ -418,9 +422,10 @@ const StandAloneBadgePage: React.FC = () => {
 
                 if (zoneRule && zoneRule.breaks && Array.isArray(zoneRule.breaks)) {
                     zoneRule.breaks.forEach((brk) => {
-                        const localDateStr = zoneRule.ruleDate || start.getFullYear() + "-" + String(start.getMonth() + 1).padStart(2, '0') + "-" + String(start.getDate()).padStart(2, '0');
-                        const breakStart = new Date(`${localDateStr}T${brk.start}:00`);
-                        const breakEnd = new Date(`${localDateStr}T${brk.end}:00`);
+                        const kstMs = start.getTime() + 9 * 60 * 60 * 1000;
+                        const localDateStr = zoneRule.ruleDate || new Date(kstMs).toISOString().split('T')[0];
+                        const breakStart = new Date(`${localDateStr}T${brk.start}:00+09:00`);
+                        const breakEnd = new Date(`${localDateStr}T${brk.end}:00+09:00`);
                         const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());
                         const overlapEnd = Math.min(boundedEnd.getTime(), breakEnd.getTime());
                         if (overlapEnd > overlapStart) {

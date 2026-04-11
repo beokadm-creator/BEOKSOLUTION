@@ -102,11 +102,13 @@ const AttendanceLivePage: React.FC = () => {
                     const list = [];
                     const curr = new Date(start);
                     while (curr <= end) {
-                        list.push(curr.toISOString().split('T')[0]);
+                        const kstMs = curr.getTime() + 9 * 60 * 60 * 1000;
+                        list.push(new Date(kstMs).toISOString().split('T')[0]);
                         curr.setDate(curr.getDate() + 1);
                     }
                     setAvailableDates(list);
-                    const today = new Date().toISOString().slice(0, 10);
+                    const todayKstMs = new Date().getTime() + 9 * 60 * 60 * 1000;
+                    const today = new Date(todayKstMs).toISOString().slice(0, 10);
                     if (!list.includes(today) && list.length > 0) {
                         setSelectedDate(list[0]);
                     }

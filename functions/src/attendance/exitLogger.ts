@@ -194,7 +194,8 @@ export async function createExitLog(
         let boundedEnd = exitTime;
 
         if (resolvedZoneConfig?.start && resolvedZoneConfig?.end) {
-          const dateStr = resolvedZoneConfig.ruleDate || lastCheckInDate.toISOString().split('T')[0];
+          const kstMs = lastCheckInDate.getTime() + 9 * 60 * 60 * 1000;
+          const dateStr = resolvedZoneConfig.ruleDate || new Date(kstMs).toISOString().split('T')[0];
           const zoneStart = new Date(`${dateStr}T${resolvedZoneConfig.start}:00+09:00`);
           const zoneEnd = new Date(`${dateStr}T${resolvedZoneConfig.end}:00+09:00`);
           boundedStart = new Date(Math.max(lastCheckInDate.getTime(), zoneStart.getTime()));
@@ -207,7 +208,8 @@ export async function createExitLog(
           let deduction = 0;
           if (resolvedZoneConfig?.breaks && Array.isArray(resolvedZoneConfig.breaks)) {
             for (const brk of resolvedZoneConfig.breaks) {
-              const dateStr = resolvedZoneConfig.ruleDate || lastCheckInDate.toISOString().split('T')[0];
+              const kstMs = lastCheckInDate.getTime() + 9 * 60 * 60 * 1000;
+              const dateStr = resolvedZoneConfig.ruleDate || new Date(kstMs).toISOString().split('T')[0];
               const breakStart = new Date(`${dateStr}T${brk.start}:00+09:00`);
               const breakEnd = new Date(`${dateStr}T${brk.end}:00+09:00`);
               const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());
@@ -370,27 +372,40 @@ export async function batchCreateExitLogs(
 
   const registrations = await findParticipantsInZone(confId, zoneId, 'registrations');
   
-  for (const reg of registrations) {
-    const result = await createExitLog(confId, reg.id, zoneId, exitTime, false, dryRun, zoneConfig);
-    results.push(result);
+  // Process in chunks to avoid timeout (H1 fix)
+  const CHUNK_SIZE = 20;
+  
+  for (let i = 0; i < registrations.length; i += CHUNK_SIZE) {
+    const chunk = registrations.slice(i, i + CHUNK_SIZE);
+    const chunkResults = await Promise.all(
+      chunk.map(reg => createExitLog(confId, reg.id, zoneId, exitTime, false, dryRun, zoneConfig))
+    );
     
-    if (result.success) {
-      successful++;
-    } else {
-      failed++;
+    for (const result of chunkResults) {
+      results.push(result);
+      if (result.success) {
+        successful++;
+      } else {
+        failed++;
+      }
     }
   }
 
   const externalAttendees = await findParticipantsInZone(confId, zoneId, 'external_attendees');
   
-  for (const ext of externalAttendees) {
-    const result = await createExitLog(confId, ext.id, zoneId, exitTime, true, dryRun, zoneConfig);
-    results.push(result);
+  for (let i = 0; i < externalAttendees.length; i += CHUNK_SIZE) {
+    const chunk = externalAttendees.slice(i, i + CHUNK_SIZE);
+    const chunkResults = await Promise.all(
+      chunk.map(ext => createExitLog(confId, ext.id, zoneId, exitTime, true, dryRun, zoneConfig))
+    );
     
-    if (result.success) {
-      successful++;
-    } else {
-      failed++;
+    for (const result of chunkResults) {
+      results.push(result);
+      if (result.success) {
+        successful++;
+      } else {
+        failed++;
+      }
     }
   }
 
