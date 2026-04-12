@@ -260,11 +260,6 @@ export const useAuth = () => {
 
     return {
         auth,
-        logout,
-        // Keep these if RegistrationPage calls them, but they might be deprecated
-        requestKoreanAuth: async () => { },
-        verifyKoreanAuth: async () => { },
-        requestForeignerAuth: async () => { },
-        verifyForeignerAuth: async () => { }
+        logout
     };
 };

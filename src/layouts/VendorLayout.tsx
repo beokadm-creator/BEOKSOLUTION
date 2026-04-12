@@ -189,7 +189,7 @@ export default function VendorLayout() {
   if (!vid) return <div>Invalid Vendor ID</div>;
 
   return (
-    <VendorProvider value={{ ...vendorLogic, isConsentGiven: false, setConsentGiven: () => {}, societyId: subdomain || undefined }}>
+    <VendorProvider value={{ ...vendorLogic, societyId: subdomain || undefined }}>
       <div className="flex flex-col h-screen bg-zinc-950 text-white font-sans">
          {/* Header */}
          <header className="h-14 border-b border-zinc-800 flex items-center justify-between px-4 bg-zinc-900 shadow-sm z-10">

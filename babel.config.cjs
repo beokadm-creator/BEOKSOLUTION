@@ -1,0 +1,16 @@
+module.exports = {
+  presets: [
+    ['@babel/preset-env', {
+      targets: {
+        node: 'current',
+      },
+      modules: 'auto',
+    }],
+    ['@babel/preset-typescript', {
+      allowDeclareFields: true,
+      isTSX: false,
+      allExtensions: true,
+    }],
+  ],
+  plugins: [],
+};

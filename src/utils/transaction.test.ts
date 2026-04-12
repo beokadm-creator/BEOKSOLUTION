@@ -4,9 +4,10 @@
  * 목적: 트랜잭션 헬퍼 유틸리티 테스트
  * - generateConfirmationQr: 확인 QR 데이터 생성
  * - generateBadgeQr: 배지 QR 생성 (UUID)
+ * - generateReceiptNumber: 영수증 번호 생성 (Firestore transaction)
  */
 
-import { generateConfirmationQr, generateBadgeQr } from './transaction';
+import { generateConfirmationQr, generateBadgeQr, generateReceiptNumber } from './transaction';
 
 // uuid 모듈 ESM 문제로 mock 사용
 jest.mock('uuid', () => ({
@@ -97,26 +98,150 @@ describe('transaction', () => {
     });
   });
 
-  describe('generateReceiptNumber (integration test concept)', () => {
-    // 실제 Firestore transaction을 사용하는 함수이므로
-    // 실제 통합 테스트에서는 mock transaction을 전달해야 함
-    // 여기서는 형식만 검증
+  describe('generateReceiptNumber', () => {
+    const conferenceId = 'test-conf-123';
+    const currentYear = new Date().getFullYear();
 
-    it('영수증 번호 형식: {Year}-SP-{Serial}', () => {
-      // 예: 2026-SP-001
-      const currentYear = new Date().getFullYear();
-      const format = `${currentYear}-SP-`;
+    it('receiptConfig가 있으면 올바른 영수증 번호를 반환한다', async () => {
+      const mockTransaction = {
+        get: jest.fn().mockReturnValue({
+          exists: jest.fn(() => true),
+          data: jest.fn(() => ({
+            receiptConfig: { nextSerialNo: 1 }
+          }))
+        }),
+        update: jest.fn()
+      };
 
-      expect(format).toMatch(/^\d{4}-SP-$/);
+      const result = await generateReceiptNumber(conferenceId, mockTransaction);
+
+      expect(result).toBe(`${currentYear}-SP-001`);
+      expect(mockTransaction.get).toHaveBeenCalledTimes(1);
+      expect(mockTransaction.update).toHaveBeenCalledTimes(1);
+      expect(mockTransaction.update).toHaveBeenCalledWith(
+        undefined,
+        { 'receiptConfig.nextSerialNo': 2 }
+      );
     });
 
-    it('시리얼 번호는 3자리 숫자여야 한다', () => {
-      // 예: 001, 002, 999
-      const padStart = (num: number) => String(num).padStart(3, '0');
+    it('시리얼 번호가 증가하면 올바르게 포맷팅한다 (001, 010, 999)', async () => {
+      const testCases = [
+        { serial: 1, expected: '001' },
+        { serial: 10, expected: '010' },
+        { serial: 999, expected: '999' }
+      ];
 
-      expect(padStart(1)).toBe('001');
-      expect(padStart(999)).toBe('999');
-      expect(padStart(1000)).toBe('1000'); // 4자리 (경계 케이스)
+      for (const { serial, expected } of testCases) {
+        const mockTransaction = {
+          get: jest.fn().mockReturnValue({
+            exists: jest.fn(() => true),
+            data: jest.fn(() => ({
+              receiptConfig: { nextSerialNo: serial }
+            }))
+          }),
+          update: jest.fn()
+        };
+
+        const result = await generateReceiptNumber(conferenceId, mockTransaction);
+
+        expect(result).toBe(`${currentYear}-SP-${expected}`);
+        expect(mockTransaction.update).toHaveBeenCalledWith(
+          undefined,
+          { 'receiptConfig.nextSerialNo': serial + 1 }
+        );
+      }
+    });
+
+    it('config 문서가 없으면 에러를 throw한다', async () => {
+      const mockTransaction = {
+        get: jest.fn().mockReturnValue({
+          exists: jest.fn(() => false),
+          data: jest.fn()
+        }),
+        update: jest.fn()
+      };
+
+      await expect(
+        generateReceiptNumber(conferenceId, mockTransaction)
+      ).rejects.toThrow('Config not found');
+
+      expect(mockTransaction.update).not.toHaveBeenCalled();
+    });
+
+    it('receiptConfig.nextSerialNo가 없으면 기본값 1을 사용한다', async () => {
+      const mockTransaction = {
+        get: jest.fn().mockReturnValue({
+          exists: jest.fn(() => true),
+          data: jest.fn(() => ({
+            receiptConfig: {}
+          }))
+        }),
+        update: jest.fn()
+      };
+
+      const result = await generateReceiptNumber(conferenceId, mockTransaction);
+
+      expect(result).toBe(`${currentYear}-SP-001`);
+      expect(mockTransaction.update).toHaveBeenCalledWith(
+        undefined,
+        { 'receiptConfig.nextSerialNo': 2 }
+      );
+    });
+
+    it('receiptConfig가 없으면 기본값 1을 사용한다', async () => {
+      const mockTransaction = {
+        get: jest.fn().mockReturnValue({
+          exists: jest.fn(() => true),
+          data: jest.fn(() => ({}))
+        }),
+        update: jest.fn()
+      };
+
+      const result = await generateReceiptNumber(conferenceId, mockTransaction);
+
+      expect(result).toBe(`${currentYear}-SP-001`);
+      expect(mockTransaction.update).toHaveBeenCalledWith(
+        undefined,
+        { 'receiptConfig.nextSerialNo': 2 }
+      );
+    });
+
+    it('transaction.update가 올바른 경로와 값으로 호출되는지 확인한다', async () => {
+      const mockTransaction = {
+        get: jest.fn().mockReturnValue({
+          exists: jest.fn(() => true),
+          data: jest.fn(() => ({
+            receiptConfig: { nextSerialNo: 5 }
+          }))
+        }),
+        update: jest.fn()
+      };
+
+      await generateReceiptNumber(conferenceId, mockTransaction);
+
+      expect(mockTransaction.update).toHaveBeenCalledTimes(1);
+      expect(mockTransaction.update).toHaveBeenCalledWith(
+        undefined,
+        { 'receiptConfig.nextSerialNo': 6 }
+      );
+    });
+
+    it('올바른 형식의 영수증 번호를 생성한다', async () => {
+      const mockTransaction = {
+        get: jest.fn().mockReturnValue({
+          exists: jest.fn(() => true),
+          data: jest.fn(() => ({
+            receiptConfig: { nextSerialNo: 42 }
+          }))
+        }),
+        update: jest.fn()
+      };
+
+      const result = await generateReceiptNumber(conferenceId, mockTransaction);
+
+      const receiptPattern = /^\d{4}-SP-\d{3}$/;
+      expect(result).toMatch(receiptPattern);
+      expect(result).toContain(`${currentYear}-SP-`);
     });
   });
 });

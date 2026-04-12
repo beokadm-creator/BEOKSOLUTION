@@ -1,13 +1,18 @@
 export default {
-  preset: 'ts-jest',
-  testEnvironment: 'jsdom', // React 컴포넌트 테스트를 위해 jsdom 사용
+  testEnvironment: 'jsdom',
   roots: ['<rootDir>/src'],
   testMatch: [
     '**/__tests__/**/*.+(ts|tsx|js)',
     '**/*.(test|spec).+(ts|tsx|js)'
   ],
   transform: {
-    '^.+\\.(ts|tsx)$': 'ts-jest'
+    '^.+\\.(ts|tsx)$': ['esbuild-jest', {
+      loaders: {
+        '.ts': 'ts',
+        '.tsx': 'tsx',
+      },
+      inject: ['<rootDir>/src/test/import-meta-shim.ts'],
+    }],
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   setupFilesAfterEnv: ['<rootDir>/src/test/setup.ts'],
@@ -17,10 +22,10 @@ export default {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@testing-library/react$': '<rootDir>/node_modules/@testing-library/react',
-    '^../firebase$': '<rootDir>/src/firebase.mock.ts', // firebase.ts 모킹
+    '^../firebase$': '<rootDir>/src/firebase.mock.ts',
   },
 
-  // 커버리지 설정 (선택 사항)
+  // 커버리지 설정
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
     '!src/**/*.d.ts',

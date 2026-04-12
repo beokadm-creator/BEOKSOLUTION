@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { getRemoteConfig, getValue, fetchAndActivate, RemoteConfig } from 'firebase/remote-config';
+import { getRemoteConfig, fetchAndActivate, getValue } from 'firebase/remote-config';
 import { useAuth } from '../hooks/useAuth';
 import app from '../firebase';
 
@@ -50,9 +50,6 @@ export function FeatureFlagProvider({ children }: FeatureFlagProviderProps) {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Store remote config instance for potential future use (e.g., manual refresh)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [remoteConfig, setRemoteConfig] = useState<RemoteConfig | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -75,9 +72,6 @@ export function FeatureFlagProvider({ children }: FeatureFlagProviderProps) {
           auto_checkout_dry_run: true,
           auto_checkout_whitelist: '[]',
         };
-
-        // Store remote config instance for later use (if needed)
-        setRemoteConfig(rc);
 
         // Fetch and activate
         await fetchAndActivate(rc);

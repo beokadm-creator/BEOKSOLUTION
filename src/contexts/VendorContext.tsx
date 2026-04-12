@@ -8,8 +8,6 @@ import { useVendor } from '../hooks/useVendor';
 type UseVendorReturn = ReturnType<typeof useVendor>;
 
 interface VendorContextType extends UseVendorReturn {
-    isConsentGiven: boolean; // Maintained for backward compatibility or UI state
-    setConsentGiven: (val: boolean) => void;
     societyId?: string; // Add societyId for compatibility
 }
 
