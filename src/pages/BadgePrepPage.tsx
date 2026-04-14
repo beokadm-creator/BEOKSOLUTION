@@ -35,6 +35,7 @@ import {
   resolveConferenceIdFromRoute,
   resolvePublicSlugFromConferenceId,
 } from "../utils/conferenceRoute";
+import { TranslationPanel } from "../components/translation/TranslationPanel";
 
 interface TokenValidationResult {
   valid: boolean;
