@@ -1,20 +1,53 @@
 import { useState, useEffect, useRef } from 'react';
 import { translationDb as rtdb } from '../lib/translationFirebase';
-import { ref, onValue, get, query, orderByChild, equalTo } from 'firebase/database';
+import { ref, onValue, off, get, query, limitToLast, orderByChild, endBefore } from 'firebase/database';
 
-export const useProjectStream = (
-  projectIdOrSlug: string | undefined, 
-  activeSessionId: string | null,
-  options: { subscribe?: boolean } = { subscribe: true }
-) => {
+export const useProjectStream = (projectIdOrSlug: string | undefined, options: { subscribe?: boolean } = { subscribe: true }) => {
   const [realProjectId, setRealProjectId] = useState<string | null>(null);
   const [streamData, setStreamData] = useState<Record<string, { original: string; refined?: string; ko?: string; en?: string; status: 'raw' | 'translating' | 'final' | 'merged'; timestamp: number; seq?: number; mergedIds?: string[], sessionId?: string }> | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const oldestTimestampRef = useRef<number | null>(null);
+
+  const loadOlderMessages = async () => {
+    if (!realProjectId || !hasMore || !oldestTimestampRef.current) return;
+    
+    try {
+      const olderQuery = query(
+        ref(rtdb, `projects/${realProjectId}/stream`),
+        orderByChild('timestamp'),
+        endBefore(oldestTimestampRef.current),
+        limitToLast(50)
+      );
+      
+      const snapshot = await get(olderQuery);
+      const data = snapshot.val();
+      
+      if (data) {
+        const items = Object.values(data) as any[];
+        if (items.length > 0) {
+          const newOldest = Math.min(...items.map(i => i.timestamp));
+          oldestTimestampRef.current = newOldest;
+          
+          setStreamData(prev => ({
+            ...data,
+            ...prev
+          }));
+        }
+        if (items.length < 50) {
+          setHasMore(false);
+        }
+      } else {
+        setHasMore(false);
+      }
+    } catch (err) {
+      console.error("과거 메시지 불러오기 실패:", err);
+    }
+  };
 
   useEffect(() => {
     if (!projectIdOrSlug) {
-      setStreamData(null);
       setLoading(false);
       return;
     }
@@ -29,26 +62,44 @@ export const useProjectStream = (
         setRealProjectId(resolvedId);
 
         if (options.subscribe) {
-          // If activeSessionId is null/empty, we don't subscribe to the stream
-          // because it will cause permission denied or fetch the whole DB.
-          // Wait until there is a valid session ID.
-          if (!activeSessionId) {
-            setStreamData({});
-            setLoading(false);
-            return;
-          }
-
           const streamQuery = query(
             ref(rtdb, `projects/${resolvedId}/stream`),
-            orderByChild('sessionId'),
-            equalTo(activeSessionId)
+            orderByChild('timestamp'),
+            limitToLast(50)
           );
 
           unsubscribeStream = onValue(streamQuery, (snapshot: any) => {
             if (!mounted) return;
             const data = snapshot.val() || {};
             
-            setStreamData(data);
+            if (!oldestTimestampRef.current && Object.keys(data).length > 0) {
+              const items = Object.values(data) as any[];
+              oldestTimestampRef.current = Math.min(...items.map(i => i.timestamp));
+            }
+
+            setStreamData(prev => {
+              if (!prev) return data;
+              const next = { ...prev };
+              
+              const dataKeys = Object.keys(data);
+              if (dataKeys.length > 0) {
+                const dataItems = Object.values(data) as any[];
+                const minTimestampInData = Math.min(...dataItems.map(i => i.timestamp));
+                
+                // If an item in prev is >= minTimestampInData but is missing in data, it was deleted
+                Object.keys(next).forEach(key => {
+                  if (next[key] && next[key].timestamp >= minTimestampInData && !data[key]) {
+                    delete next[key];
+                  }
+                });
+              } else {
+                // If data is completely empty, it means the stream is cleared
+                return {};
+              }
+              
+              return { ...next, ...data };
+            });
+            
             setLoading(false);
           }, (err) => {
             console.error("Stream subscription error:", err);
@@ -74,7 +125,7 @@ export const useProjectStream = (
         unsubscribeStream();
       }
     };
-  }, [projectIdOrSlug, activeSessionId, options.subscribe]);
+  }, [projectIdOrSlug, options.subscribe]);
 
-  return { realProjectId, streamData, loading, error };
+  return { realProjectId, streamData, loading, error, loadOlderMessages, hasMore };
 };
