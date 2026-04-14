@@ -19,8 +19,8 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
 
   // Load available halls (projects)
   useEffect(() => {
-    const loadProjects = async () => {
-      const projSnap = await get(ref(rtdb, 'projects'));
+    const projectsRef = ref(rtdb, 'projects');
+    const unsubscribe = onValue(projectsRef, (projSnap) => {
       if (projSnap.exists()) {
         const data = projSnap.val();
         let list = Object.keys(data).map(k => {
@@ -46,10 +46,19 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
              list = filtered;
           }
         }
+        
         setProjects(list);
+
+        // Auto-select project if there's only one matching the conference
+        if (list.length === 1) {
+          setSelectedProjectId(prev => prev || list[0].slug);
+        }
+      } else {
+        setProjects([]);
       }
-    };
-    loadProjects();
+    });
+
+    return () => unsubscribe();
   }, [defaultConferenceId]);
 
   // Subscribe to active session for selected project
@@ -65,11 +74,24 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   // Subscribe to stream
   const { streamData } = useProjectStream(selectedProjectId, { subscribe: !!selectedProjectId });
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isAutoScroll, setIsAutoScroll] = useState(true);
+
+  // Handle scroll events to detect if user manually scrolled up
+  const handleScroll = () => {
+    if (!containerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 150;
+    setIsAutoScroll(isAtBottom);
+  };
 
   // Scroll to bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [streamData]);
+    if (isAutoScroll && messagesEndRef.current) {
+      // Use 'auto' instead of 'smooth' to prevent jittering when rapid updates arrive
+      messagesEndRef.current.scrollIntoView({ behavior: "auto", block: "end" });
+    }
+  }, [streamData, isAutoScroll]);
 
   const segmentsMap = streamData || {};
   const segmentsOrder = Object.keys(segmentsMap)
@@ -136,7 +158,11 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div 
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth"
+      >
         {!activeSessionId ? (
           <div className="flex items-center justify-center h-full text-gray-500">
             진행 중인 세션이 없습니다.

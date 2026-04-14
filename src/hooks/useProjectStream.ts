@@ -53,8 +53,7 @@ export const useProjectStream = (projectIdOrSlug: string | undefined, options: {
     }
 
     let mounted = true;
-    let streamRef: any = null;
-    let streamListener: any = null;
+    let unsubscribeStream: (() => void) | null = null;
 
     const resolveAndSubscribe = async () => {
       try {
@@ -68,9 +67,8 @@ export const useProjectStream = (projectIdOrSlug: string | undefined, options: {
             orderByChild('timestamp'),
             limitToLast(50)
           );
-          streamRef = streamQuery;
 
-          streamListener = (snapshot: any) => {
+          unsubscribeStream = onValue(streamQuery, (snapshot: any) => {
             if (!mounted) return;
             const data = snapshot.val() || {};
             
@@ -84,8 +82,7 @@ export const useProjectStream = (projectIdOrSlug: string | undefined, options: {
               ...data
             }));
             setLoading(false);
-          };
-          onValue(streamQuery, streamListener, (err) => {
+          }, (err) => {
             console.error("Stream subscription error:", err);
             if (mounted) {
               setError(err instanceof Error ? err.message : String(err));
@@ -105,8 +102,8 @@ export const useProjectStream = (projectIdOrSlug: string | undefined, options: {
 
     return () => {
       mounted = false;
-      if (streamRef && streamListener) {
-        off(streamRef, 'value', streamListener);
+      if (unsubscribeStream) {
+        unsubscribeStream();
       }
     };
   }, [projectIdOrSlug, options.subscribe]);
