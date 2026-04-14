@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { translationDb as rtdb } from '../../lib/translationFirebase';
 import { ref, get, onValue } from 'firebase/database';
 import { useProjectStream } from '../../hooks/useProjectStream';
@@ -119,7 +119,8 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   }, [selectedProjectId]);
 
   // Subscribe to stream
-  const { streamData } = useProjectStream(selectedProjectId, activeSessionId, { subscribe: !!selectedProjectId && !!activeSessionId });
+  const streamOptions = useMemo(() => ({ subscribe: !!selectedProjectId && !!activeSessionId }), [selectedProjectId, activeSessionId]);
+  const { streamData } = useProjectStream(selectedProjectId, activeSessionId, streamOptions);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const segmentsMap = streamData || {};
