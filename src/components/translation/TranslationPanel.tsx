@@ -16,6 +16,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeSessionInfo, setActiveSessionInfo] = useState<any | null>(null);
+  const [lastFlushTime, setLastFlushTime] = useState<number>(0);
   const [activeLang, setActiveLang] = useState<string>('ko');
 
   // Load available halls (projects)
@@ -99,8 +100,17 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
         setActiveSessionInfo(null);
       }
     });
+
+    // Subscribe to state/lastFlushTime to handle "Clear Screen" from admin
+    const flushTimeRef = ref(rtdb, `projects/${selectedProjectId}/state/lastFlushTime`);
+    const unsubscribeFlushTime = onValue(flushTimeRef, (snap) => {
+      setLastFlushTime(snap.val() || 0);
+    });
     
-    return () => unsubscribeActive();
+    return () => {
+      unsubscribeActive();
+      unsubscribeFlushTime();
+    };
   }, [selectedProjectId]);
 
   // Subscribe to stream
@@ -127,6 +137,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   const segmentsMap = streamData || {};
   const segmentsOrder = Object.keys(segmentsMap)
     .filter(k => segmentsMap[k]?.sessionId === activeSessionId)
+    .filter(k => (segmentsMap[k]?.timestamp || 0) >= lastFlushTime)
     .sort((a, b) => (segmentsMap[a]?.timestamp || 0) - (segmentsMap[b]?.timestamp || 0));
 
   if (!selectedProjectId) {
