@@ -94,10 +94,13 @@ describe('useCheckIn', () => {
     },
   };
 
-  const createMockDocRef = (path: string) => ({
-    path,
-    type: 'document',
-  });
+  const createMockDocRef = (...args: unknown[]) => {
+    const path = typeof args[1] === 'string' ? args[1] : '';
+    return {
+      path,
+      type: 'document',
+    };
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -408,18 +411,31 @@ describe('useCheckIn', () => {
         badgeQr: null,
       };
 
+      const mockDocSnap = {
+        exists: jest.fn(() => true),
+        id: mockRegId,
+        data: jest.fn(() => registrationWithoutBadge),
+      };
+      const mockUserDocSnap = {
+        exists: jest.fn(() => true),
+        data: jest.fn(() => mockUser),
+      };
       const mockInfoDocSnap = {
         exists: jest.fn(() => true),
         data: jest.fn(() => mockConferenceInfo),
       };
 
-      (getDoc as jest.Mock).mockResolvedValueOnce(mockInfoDocSnap);
+      (getDoc as jest.Mock)
+        .mockResolvedValueOnce(mockDocSnap)
+        .mockResolvedValueOnce(mockUserDocSnap)
+        .mockResolvedValueOnce(mockInfoDocSnap);
       (updateDoc as jest.Mock).mockResolvedValue(undefined);
 
       const { result } = renderHook(() => useCheckIn(mockConferenceId));
 
-      result.current.scannedReg = registrationWithoutBadge;
-      result.current.scannedUser = mockUser;
+      await act(async () => {
+        await result.current.scanConfirmationQr(mockRegId);
+      });
 
       await act(async () => {
         await result.current.issueBadge();
@@ -440,17 +456,30 @@ describe('useCheckIn', () => {
         checkInTime: Timestamp.now(),
       };
 
+      const mockDocSnap = {
+        exists: jest.fn(() => true),
+        id: mockRegId,
+        data: jest.fn(() => registrationWithBadge),
+      };
+      const mockUserDocSnap = {
+        exists: jest.fn(() => true),
+        data: jest.fn(() => mockUser),
+      };
       const mockInfoDocSnap = {
         exists: jest.fn(() => true),
         data: jest.fn(() => mockConferenceInfo),
       };
-      (getDoc as jest.Mock).mockResolvedValueOnce(mockInfoDocSnap);
+      (getDoc as jest.Mock)
+        .mockResolvedValueOnce(mockDocSnap)
+        .mockResolvedValueOnce(mockUserDocSnap)
+        .mockResolvedValueOnce(mockInfoDocSnap);
       (updateDoc as jest.Mock).mockResolvedValue(undefined);
 
       const { result } = renderHook(() => useCheckIn(mockConferenceId));
 
-      result.current.scannedReg = registrationWithBadge;
-      result.current.scannedUser = mockUser;
+      await act(async () => {
+        await result.current.scanConfirmationQr(mockRegId);
+      });
 
       await act(async () => {
         await result.current.issueBadge();
@@ -477,17 +506,30 @@ describe('useCheckIn', () => {
         checkInTime: originalCheckInTime,
       };
 
+      const mockDocSnap = {
+        exists: jest.fn(() => true),
+        id: mockRegId,
+        data: jest.fn(() => registrationWithBadge),
+      };
+      const mockUserDocSnap = {
+        exists: jest.fn(() => true),
+        data: jest.fn(() => mockUser),
+      };
       const mockInfoDocSnap = {
         exists: jest.fn(() => true),
         data: jest.fn(() => mockConferenceInfo),
       };
-      (getDoc as jest.Mock).mockResolvedValueOnce(mockInfoDocSnap);
+      (getDoc as jest.Mock)
+        .mockResolvedValueOnce(mockDocSnap)
+        .mockResolvedValueOnce(mockUserDocSnap)
+        .mockResolvedValueOnce(mockInfoDocSnap);
       (updateDoc as jest.Mock).mockResolvedValue(undefined);
 
       const { result } = renderHook(() => useCheckIn(mockConferenceId));
 
-      result.current.scannedReg = registrationWithBadge;
-      result.current.scannedUser = mockUser;
+      await act(async () => {
+        await result.current.scanConfirmationQr(mockRegId);
+      });
 
       await act(async () => {
         await result.current.issueBadge();
@@ -515,17 +557,30 @@ describe('useCheckIn', () => {
     });
 
     it('should handle Firestore update errors', async () => {
+      const mockDocSnap = {
+        exists: jest.fn(() => true),
+        id: mockRegId,
+        data: jest.fn(() => mockRegistration),
+      };
+      const mockUserDocSnap = {
+        exists: jest.fn(() => true),
+        data: jest.fn(() => mockUser),
+      };
       const mockInfoDocSnap = {
         exists: jest.fn(() => true),
         data: jest.fn(() => mockConferenceInfo),
       };
-      (getDoc as jest.Mock).mockResolvedValueOnce(mockInfoDocSnap);
+      (getDoc as jest.Mock)
+        .mockResolvedValueOnce(mockDocSnap)
+        .mockResolvedValueOnce(mockUserDocSnap)
+        .mockResolvedValueOnce(mockInfoDocSnap);
       (updateDoc as jest.Mock).mockRejectedValue(new Error('Update failed'));
 
       const { result } = renderHook(() => useCheckIn(mockConferenceId));
 
-      result.current.scannedReg = mockRegistration;
-      result.current.scannedUser = mockUser;
+      await act(async () => {
+        await result.current.scanConfirmationQr(mockRegId);
+      });
 
       await act(async () => {
         await result.current.issueBadge();
@@ -536,17 +591,30 @@ describe('useCheckIn', () => {
     });
 
     it('should handle missing badge layout gracefully', async () => {
+      const mockDocSnap = {
+        exists: jest.fn(() => true),
+        id: mockRegId,
+        data: jest.fn(() => mockRegistration),
+      };
+      const mockUserDocSnap = {
+        exists: jest.fn(() => true),
+        data: jest.fn(() => mockUser),
+      };
       const mockInfoDocSnap = {
         exists: jest.fn(() => true),
         data: jest.fn(() => ({})),
       };
-      (getDoc as jest.Mock).mockResolvedValueOnce(mockInfoDocSnap);
+      (getDoc as jest.Mock)
+        .mockResolvedValueOnce(mockDocSnap)
+        .mockResolvedValueOnce(mockUserDocSnap)
+        .mockResolvedValueOnce(mockInfoDocSnap);
       (updateDoc as jest.Mock).mockResolvedValue(undefined);
 
       const { result } = renderHook(() => useCheckIn(mockConferenceId));
 
-      result.current.scannedReg = mockRegistration;
-      result.current.scannedUser = mockUser;
+      await act(async () => {
+        await result.current.scanConfirmationQr(mockRegId);
+      });
 
       await act(async () => {
         await result.current.issueBadge();
@@ -563,17 +631,30 @@ describe('useCheckIn', () => {
         resolveUpdate = resolve;
       });
 
+      const mockDocSnap = {
+        exists: jest.fn(() => true),
+        id: mockRegId,
+        data: jest.fn(() => mockRegistration),
+      };
+      const mockUserDocSnap = {
+        exists: jest.fn(() => true),
+        data: jest.fn(() => mockUser),
+      };
       const mockInfoDocSnap = {
         exists: jest.fn(() => true),
         data: jest.fn(() => mockConferenceInfo),
       };
-      (getDoc as jest.Mock).mockResolvedValueOnce(mockInfoDocSnap);
+      (getDoc as jest.Mock)
+        .mockResolvedValueOnce(mockDocSnap)
+        .mockResolvedValueOnce(mockUserDocSnap)
+        .mockResolvedValueOnce(mockInfoDocSnap);
       (updateDoc as jest.Mock).mockReturnValue(pendingPromise);
 
       const { result } = renderHook(() => useCheckIn(mockConferenceId));
 
-      result.current.scannedReg = mockRegistration;
-      result.current.scannedUser = mockUser;
+      await act(async () => {
+        await result.current.scanConfirmationQr(mockRegId);
+      });
 
       act(() => {
         result.current.issueBadge();

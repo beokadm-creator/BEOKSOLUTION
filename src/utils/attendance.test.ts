@@ -149,13 +149,14 @@ describe('calculateStayTime', () => {
     });
 
     it('휴게 시간이 체류 시간과 겹치지 않으면 공제하지 않는다', () => {
-      const baseTime = Math.floor(Date.now() / 1000);
+      const entryTime = createLocalTimestamp(9, 0);   // 9:00 AM local
+      const exitTime = createLocalTimestamp(10, 0);   // 10:00 AM local
       // 9:00 ENTRY - 10:00 EXIT (60 minutes)
       // Break: 11:00-12:00 (no overlap)
       // Expected: 60 minutes (no deduction)
       const logs: AccessLog[] = [
-        createLog('ENTRY', baseTime),             // 9:00
-        createLog('EXIT', baseTime + 3600),       // 10:00
+        createLog('ENTRY', entryTime),             // 9:00
+        createLog('EXIT', exitTime),               // 10:00
       ];
 
       const breakTimes = [

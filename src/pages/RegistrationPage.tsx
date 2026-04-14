@@ -1,78 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
-import { useConference } from '../hooks/useConference';
-import { useAuth } from '../hooks/useAuth';
-import { useRegistration } from '../hooks/useRegistration';
-import { useUserStore } from '../store/userStore';
-import { usePricing } from '../hooks/usePricing';
-import { doc, setDoc, getDoc, Timestamp, getDocs, collection } from 'firebase/firestore';
-import { db, auth as firebaseAuth } from '../firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { loadPaymentWidget, PaymentWidgetInstance } from '@tosspayments/payment-widget-sdk';
-import { v4 as uuidv4 } from 'uuid';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/card';
-import { CheckCircle2, Loader2, Save, CreditCard, ChevronLeft } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { AddonSelector } from '../components/eregi/AddonSelector';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import LoadingSpinner from '../components/common/LoadingSpinner';
-import { WideFooterPreview } from '../components/conference/wide-preview/WideFooterPreview';
-import { toFirestoreUserData } from '../utils/userDataMapper';
-import type { ConferenceOption } from '../types/schema';
+import React from 'react';
+import LoadingSpinner from '@/components/common/LoadingSpinner';
+import { WideFooterPreview } from '@/components/conference/wide-preview/WideFooterPreview';
+import { AddonSelector } from '@/components/eregi/AddonSelector';
+import type { ConferenceOption } from '@/types/schema';
+import { useRegistrationState } from '@/features/registration/hooks/useRegistrationState';
+import { RegistrationHeader } from '@/features/registration/components/RegistrationHeader';
+import { BasicInfoForm } from '@/features/registration/components/BasicInfoForm';
+import { PaymentSection } from '@/features/registration/components/PaymentSection';
+import { RefundPolicyModal } from '@/features/registration/components/RefundPolicyModal';
 
-// Dynamic Types based on DB
-interface RegistrationPeriod {
-    id: string;
-    name: { ko: string; en?: string };
-    type: 'EARLY' | 'REGULAR' | 'ONSITE';
-    startDate: Timestamp;
-    endDate: Timestamp;
-    totalPrices: Record<string, number>; // { [gradeId]: totalPrice }
-}
-
-interface RegistrationSettings {
-    periods: RegistrationPeriod[];
-    refundPolicy?: string;
-}
-
-interface InfraSettings {
-    payment: {
-        domestic: {
-            provider: string;
-            apiKey: string;
-            secretKey?: string;
-            isTestMode: boolean;
-        };
-        global?: {
-            enabled: boolean;
-            provider: string;
-            merchantId: string;
-            secretKey: string;
-            currency: string;
-        };
-    };
-}
-
-interface Grade {
-    id: string;
-    name: string;
-    code: string;
-}
-
-interface MemberVerificationData {
-    id?: string;
-    societyId?: string;
-    grade?: string;
-    name?: string;
-    code?: string;
-    expiry?: string;
-}
-
-
-// Wrapper component for AddonSelector with feature flag protection
 function AddonSelectorWrapper({
     conferenceId,
     language,
@@ -84,19 +20,12 @@ function AddonSelectorWrapper({
     toggleOption: (option: ConferenceOption) => void;
     isOptionSelected: (optionId: string) => boolean;
 }) {
-    // const { isEnabled } = useFeatureFlags(); // Unused - feature flag removed
-    // [Fix] Enable for all in production if not explicitly disabled
-    // If the conference has no options, AddonSelector itself will return null.
-    // So we don't need to block it here with a feature flag if we want it live.
-    // const addonsEnabled = isEnabled('optional_addons_enabled');
     const addonsEnabled = true;
 
-    // DEV ????????????????URL ?????????낟??????????類??癲???????ル뒌?????????????椰???믩꾨젩???汝뷴젆?琉????????μ떜媛?걫??곷묄??
     const isDev = window.location.hostname.includes('--dev-') ||
         window.location.hostname === 'localhost' ||
         new URLSearchParams(window.location.search).get('debug_addons') === 'true';
 
-    // Don't render if feature flag is disabled AND not in DEV mode
     if (!addonsEnabled && !isDev) {
         return null;
     }
@@ -112,967 +41,86 @@ function AddonSelectorWrapper({
 }
 
 export default function RegistrationPage() {
-    const { slug } = useParams<{ slug: string }>();
-    const navigate = useNavigate();
+    const state = useRegistrationState();
 
-    // Hooks
-    const { id: confId, info, loading: confLoading } = useConference();
-    const { auth } = useAuth();
-
-    const { language, setLanguage } = useUserStore();
-    const [searchParams] = useSearchParams();
-    const location = useLocation();
-    const state = location.state as {
-        memberVerified?: boolean;
-        memberName?: string;
-        memberGrade?: string;
-        memberCode?: string;
-        memberVerificationId?: string;
-        memberExpiry?: string;
-        memberVerification?: MemberVerificationData;
-        memberVerificationData?: MemberVerificationData & { memberDocId?: string };
-        calculatedPrice?: number; // Pre-calculated totalPrice from modal
-    } || {};
-
-    // Params from Modal (State > SearchParams > sessionStorage fallback)
-    const memberVerified = state.memberVerified || searchParams.get('memberVerified') === 'true';
-    const paramMemberName = state.memberName || searchParams.get('memberName') || '';
-    const paramMemberGrade = state.memberGrade || searchParams.get('memberGrade') || '';
-    const paramMemberCode = state.memberCode || searchParams.get('memberCode') || '';
-
-    // Try to get calculated totalPrice - sessionStorage FIRST for reliability
-    let paramCalculatedPrice: number | undefined = undefined;
-
-    try {
-        // Priority 1: Check sessionStorage for member verification
-        const storageKey = `member_verification_${confId}`;
-        const sessionData = sessionStorage.getItem(storageKey);
-        if (sessionData) {
-            const parsed = JSON.parse(sessionData);
-            if (typeof parsed.calculatedPrice === 'number') {
-                paramCalculatedPrice = parsed.calculatedPrice;
-                console.log('[RegistrationPage] Using calculated totalPrice from member verification sessionStorage:', paramCalculatedPrice);
-            }
-        }
-
-        // Priority 2: Check sessionStorage for non-member selection
-        if (paramCalculatedPrice === undefined) {
-            const nonMemberKey = `non_member_selection_${confId}`;
-            const nonMemberData = sessionStorage.getItem(nonMemberKey);
-            if (nonMemberData) {
-                const parsed = JSON.parse(nonMemberData);
-                if (typeof parsed.calculatedPrice === 'number') {
-                    paramCalculatedPrice = parsed.calculatedPrice;
-                    console.log('[RegistrationPage] Using calculated totalPrice from non-member sessionStorage:', paramCalculatedPrice);
-                }
-            }
-        }
-
-        // Priority 3: Check location.state (may be lost during navigation)
-        if (paramCalculatedPrice === undefined && location.state && typeof (location.state as { calculatedPrice?: number }).calculatedPrice === 'number') {
-            paramCalculatedPrice = (location.state as { calculatedPrice?: number }).calculatedPrice;
-            console.log('[RegistrationPage] Using calculated totalPrice from location.state:', paramCalculatedPrice);
-        }
-    } catch (e) {
-        console.warn('[RegistrationPage] Failed to read calculated totalPrice:', e);
-    }
-
-    useRegistration(confId || '', auth.user);
-    const [isProcessing, setIsProcessing] = useState(false);
-
-    // State - Settings
-    const [regSettings, setRegSettings] = useState<RegistrationSettings | null>(null);
-    const [activePeriod, setActivePeriod] = useState<RegistrationPeriod | null>(null);
-    const [grades, setGrades] = useState<Grade[]>([]);
-
-    // Payment Config
-    const [tossClientKey, setTossClientKey] = useState<string | null>(null);
-    const [paymentWidget, setPaymentWidget] = useState<PaymentWidgetInstance | null>(null);
-    const paymentMethodsWidgetRef = useRef<HTMLDivElement>(null);
-    const paymentMethodsInstanceRef = useRef<unknown>(null);
-
-    // State - Form
-    const [formData, setFormData] = useState({
-        name: paramMemberName,
-        email: '',
-        phone: '',
-        affiliation: '',
-        licenseNumber: paramMemberCode,
-        simplePassword: '',
-        confirmPassword: ''
-    });
-
-    const [isInfoSaved, setIsInfoSaved] = useState(false);
-    const [finalCategory, setFinalCategory] = useState('');
-
-    // Pricing hook for optional add-ons
-    const {
-        basePrice,
-        totalPrice,
-        optionsTotal,
-        selectedOptions,
-        toggleOption,
-        isOptionSelected,
-        setBasePrice: updateBasePrice
-    } = usePricing(0);
-
-    // [Fix-Step 156] selectedTier state to ensure grade/tier is saved
-    const [selectedTier, setSelectedTier] = useState<string>('');
-
-    // [Fix-Step 330] Ensure Language Consistency
-    useEffect(() => {
-        const urlLang = searchParams.get('lang');
-        if (urlLang === 'ko' || urlLang === 'en') {
-            if (language !== urlLang) {
-                setLanguage(urlLang);
-            }
-        }
-    }, [searchParams, language, setLanguage]);
-
-    // Initialization
-    const [isInitializing, setIsInitializing] = useState(true);
-    const [footerInfo, setFooterInfo] = useState<Record<string, unknown> | null>(null);
-    const [societyName, setSocietyName] = useState<string>('');
-    const [showRefundModal, setShowRefundModal] = useState(false);
-
-    useEffect(() => {
-        if (auth.loading) return;
-
-        const societyId = info?.societyId;
-        if (!confId || !societyId) {
-            setIsInitializing(false);
-            return;
-        }
-
-        const initializeRegistration = async () => {
-            setIsInitializing(true);
-            try {
-                // 1. Load Settings (including footer info)
-                const [regSnap, gradesSnap, infraSnap, societySnap] = await Promise.all([
-                    getDoc(doc(db, `conferences/${confId}/settings/registration`)),
-                    getDocs(collection(db, `societies/${societyId}/settings/grades/list`)),
-                    getDoc(doc(db, `societies/${societyId}/settings/infrastructure`)),
-                    getDoc(doc(db, 'societies', societyId))
-                ]);
-
-                // Footer Info & Society Name
-                if (societySnap.exists()) {
-                    const sData = societySnap.data();
-                    setFooterInfo(sData.footerInfo);
-                    setSocietyName(sData.name?.ko || sData.name?.en || societyId.toUpperCase());
-                }
-
-                // Registration Settings
-                if (regSnap.exists()) {
-                    const data = regSnap.data() as RegistrationSettings;
-                    setRegSettings(data);
-                    const now = new Date();
-                    const period = data.periods.find(p => {
-                        const start = p.startDate.toDate();
-                        const end = p.endDate.toDate();
-                        // Extend end to end-of-day (23:59:59.999) to include the full last day
-                        const endOfDay = new Date(end);
-                        endOfDay.setHours(23, 59, 59, 999);
-                        return now >= start && now <= endOfDay;
-                    });
-                    if (period) setActivePeriod(period);
-                }
-
-                // Grades
-                let loadedGrades: Grade[] = [];
-                if (!gradesSnap.empty) {
-                    loadedGrades = gradesSnap.docs.map((d) => ({
-                        id: d.id,
-                        name: d.data().name,
-                        code: d.data().code
-                    }));
-                    setGrades(loadedGrades);
-                }
-
-                // Infra (Payment)
-                const defaultClientKey = "test_gck_4yKeq5bgrpXJA4nz4qxArGX0lzW6";
-                if (infraSnap.exists()) {
-                    const data = infraSnap.data() as InfraSettings;
-                    const domesticPayment = data.payment?.domestic;
-                    // const useGlobalPayment = language === 'en' && data.payment?.global?.enabled;
-
-                    // Use DB key if configured, otherwise fallback to default test key
-                    const apiKey = domesticPayment?.apiKey || defaultClientKey;
-                    setTossClientKey(apiKey);
-
-                    // Log current mode for debugging
-                    console.log('[Payment] Provider:', domesticPayment?.provider, 'Test Mode:', domesticPayment?.isTestMode);
-                } else {
-                    setTossClientKey(defaultClientKey);
-                }
-
-                // 2. Pre-fill User Data if logged in
-                if (auth.user) {
-                    const uData = auth.user;
-                    setFormData(prev => ({
-                        ...prev,
-                        name: prev.name || uData.name || '',
-                        email: uData.email || '',
-                        phone: uData.phone || '', // ??ConferenceUser has phone
-                        affiliation: uData.organization || '', // ??ConferenceUser.organization -> UI.affiliation
-                        licenseNumber: prev.licenseNumber || uData.licenseNumber || ''
-                    }));
-                }
-            } catch (error) {
-                console.error("Init failed:", error);
-                toast.error("초기화에 실패했습니다.");
-            } finally {
-                setIsInitializing(false);
-            }
-        };
-
-        initializeRegistration();
-    }, [confId, info?.societyId, language, auth.loading, auth.user]);
-
-    // Calculate Price based on Grade
-    useEffect(() => {
-        // PRIORITY 1: Use pre-calculated totalPrice from modal if available
-        if (paramCalculatedPrice !== undefined && paramCalculatedPrice >= 0) {
-            console.log('[RegistrationPage] Using pre-calculated totalPrice from modal:', paramCalculatedPrice);
-            updateBasePrice(paramCalculatedPrice);
-
-            // Determine category name
-            let categoryPrefix = 'Registration';
-            if (activePeriod) {
-                categoryPrefix = activePeriod.name.ko;
-            } else {
-                categoryPrefix = language === 'ko' ? '\uD559\uC220\uB300\uD68C \uB4F1\uB85D' : 'Conference Registration';
-            }
-
-            // Still need to determine the category name
-            let targetGradeId = '';
-            if (paramMemberGrade) {
-                if (grades.length > 0) {
-                    const normalizedServer = String(paramMemberGrade).toLowerCase().replace(/\s/g, '');
-                    const matched = grades.find(g => {
-                        const gId = (g.id || '').toLowerCase().replace(/\s/g, '');
-                        const gCode = (g.code || '').toLowerCase().replace(/\s/g, '');
-                        let gName = '';
-                        const nameObj = g.name;
-                        if (nameObj && typeof nameObj === 'object') {
-                            const koName = (nameObj as { ko?: string }).ko || '';
-                            const enName = (nameObj as { en?: string }).en || '';
-                            gName = (koName + enName).toLowerCase().replace(/\s/g, '');
-                        } else {
-                            gName = String(nameObj || '').toLowerCase().replace(/\s/g, '');
-                        }
-                        return gId === normalizedServer || gCode === normalizedServer || gName === normalizedServer || gName.includes(normalizedServer);
-                    });
-                    if (matched) {
-                        targetGradeId = matched.code || matched.id;
-                    }
-                }
-                if (!targetGradeId && activePeriod?.totalPrices && activePeriod.totalPrices[paramMemberGrade] !== undefined) {
-                    targetGradeId = paramMemberGrade;
-                }
-            }
-
-            // [Fix-Step 156] Update selectedTier state
-            setSelectedTier(targetGradeId);
-
-            if (targetGradeId) {
-                const gradeNameObj = grades.find(g => g.id === targetGradeId || g.code === targetGradeId)?.name || null;
-                let gradeName = '';
-                if (gradeNameObj && typeof gradeNameObj === 'object' && gradeNameObj !== null) {
-                    const ko = (gradeNameObj as { ko?: string }).ko || '';
-                    const en = (gradeNameObj as { en?: string }).en || '';
-                    gradeName = language === 'en' ? (en || ko) : (ko || en);
-                } else if (gradeNameObj) {
-                    gradeName = String(gradeNameObj);
-                }
-
-                if (!gradeName) {
-                    const dbGrade = grades.find(g => g.id === targetGradeId || g.code === targetGradeId);
-                    if (dbGrade) {
-                        const dbGradeName = dbGrade.name;
-                        if (dbGradeName && typeof dbGradeName === 'object' && dbGradeName !== null) {
-                            const ko = (dbGradeName as { ko?: string }).ko || '';
-                            const en = (dbGradeName as { en?: string }).en || '';
-                            gradeName = language === 'en' ? (en || ko) : (ko || en);
-                        } else if (dbGradeName) {
-                            gradeName = String(dbGradeName || '');
-                        }
-                    } else {
-                        gradeName = targetGradeId;
-                    }
-                }
-
-                setFinalCategory(`${categoryPrefix} - ${gradeName}`);
-            } else {
-                setFinalCategory(categoryPrefix);
-            }
-            return;
-        }
-
-        if (!activePeriod) return;
-
-        // PRIORITY 2: Fall back to original calculation logic if no pre-calculated totalPrice
-        let targetGradeId = '';
-
-        // 1. Try to use passed grade (from URL or State)
-        if (paramMemberGrade) {
-            // A. Search in Grades List (if available) - search by code, name, or id
-            if (grades.length > 0) {
-                const normalizedServer = String(paramMemberGrade).toLowerCase().replace(/\s/g, '');
-                const matched = grades.find(g => {
-                    const gId = (g.id || '').toLowerCase().replace(/\s/g, '');
-                    const gCode = (g.code || '').toLowerCase().replace(/\s/g, '');
-
-                    // Handle name as object {ko, en} or string
-                    let gName = '';
-                    const nameObj = g.name;
-                    if (nameObj && typeof nameObj === 'object') {
-                        const koName = (nameObj as { ko?: string }).ko || '';
-                        const enName = (nameObj as { en?: string }).en || '';
-                        gName = (koName + enName).toLowerCase().replace(/\s/g, '');
-                    } else {
-                        gName = String(nameObj || '').toLowerCase().replace(/\s/g, '');
-                    }
-
-                    return gId === normalizedServer || gCode === normalizedServer || gName === normalizedServer || gName.includes(normalizedServer);
-                });
-                // FIXED: Use grade.code (not Firestore doc ID) for totalPrice lookup
-                if (matched) {
-                    console.log('[Grade Match] Matched grade:', matched.code, 'from input:', paramMemberGrade);
-                    targetGradeId = matched.code || matched.id;
-                }
-            }
-
-            // B. If not found in grades, check if it's a direct totalPrice key (e.g. non-member types)
-            if (!targetGradeId && activePeriod.totalPrices && activePeriod.totalPrices[paramMemberGrade] !== undefined) {
-                console.log('[Grade Match] Using direct totalPrice key:', paramMemberGrade);
-                targetGradeId = paramMemberGrade;
-            }
-        }
-
-        // 2. Fallback: Default to 'Non-member' if nothing selected/found
-        if (!targetGradeId) {
-            // Try finding "Non-member" in grades list first
-            const nonMember = grades.find(g => {
-                const n = String(g.name || '').toLowerCase();  // ??Safe handling of undefined name
-                return n.includes('\uBE44\uD68C\uC6D0') || n.includes('non-member');
-            });
-            if (nonMember) {
-                targetGradeId = nonMember.code || nonMember.id;
-            } else if (activePeriod.totalPrices && activePeriod.totalPrices['Non-member'] !== undefined) {
-                // Direct fallback to 'Non-member' key
-                targetGradeId = 'Non-member';
-            }
-        }
-
-        if (targetGradeId) {
-            // FIXED: Search by both id and code when looking up grade name
-            const gradeNameObj = grades.find(g => g.id === targetGradeId || g.code === targetGradeId)?.name || null;
-
-            // Extract name from object {ko, en} based on language
-            let gradeName = '';
-            if (gradeNameObj && typeof gradeNameObj === 'object' && gradeNameObj !== null) {
-                const ko = (gradeNameObj as { ko?: string }).ko || '';
-                const en = (gradeNameObj as { en?: string }).en || '';
-                gradeName = language === 'en' ? (en || ko) : (ko || en);
-            } else if (gradeNameObj) {
-                gradeName = String(gradeNameObj);
-            }
-
-            // Fallback name for non-member types not in grades list
-            if (!gradeName) {
-                // Try one more time to fetch from DB grades using ID match
-                const dbGrade = grades.find(g => g.id === targetGradeId || g.code === targetGradeId);
-                if (dbGrade) {
-                    const dbGradeName = dbGrade.name;
-                    if (dbGradeName && typeof dbGradeName === 'object' && dbGradeName !== null) {
-                        const ko = (dbGradeName as { ko?: string }).ko || '';
-                        const en = (dbGradeName as { en?: string }).en || '';
-                        gradeName = language === 'en' ? (en || ko) : (ko || en);
-                    }
-                } else {
-                    // Last resort: Show ID itself if no name found anywhere
-                    gradeName = targetGradeId;
-                }
-            }
-
-            const p = activePeriod.totalPrices[targetGradeId] ?? 0;
-            updateBasePrice(p);
-            setFinalCategory(`${activePeriod.name.ko} - ${gradeName}`);
-        }
-
-        // [Fix-Step 156] Update selectedTier state
-        setSelectedTier(targetGradeId);
-
-    }, [activePeriod, grades, paramMemberGrade, language, paramCalculatedPrice, updateBasePrice]);
-
-
-    // Payment Widget Init
-    useEffect(() => {
-        if (isInfoSaved && tossClientKey) {
-            (async () => {
-                const customerKey = auth.user ? auth.user.id : uuidv4();
-                try {
-                    const widget = await loadPaymentWidget(tossClientKey, customerKey);
-                    setPaymentWidget(widget);
-                } catch (error) {
-                    console.error("Failed to load payment widget:", error);
-                }
-            })();
-        }
-    }, [isInfoSaved, auth.user, tossClientKey]);
-
-    useEffect(() => {
-        if (paymentWidget && paymentMethodsWidgetRef.current && totalPrice >= 0) {
-            const amount = { value: totalPrice };
-
-            if (paymentMethodsInstanceRef.current) {
-                // Update existing widget amount
-                console.log('[PaymentWidget] Updating amount:', totalPrice);
-                paymentMethodsInstanceRef.current.updateAmount(amount);
-            } else {
-                // Initial Render
-                console.log('[PaymentWidget] Rendering methods with:', totalPrice);
-                paymentMethodsInstanceRef.current = paymentWidget.renderPaymentMethods(
-                    '#payment-widget',
-                    amount,
-                    { variantKey: 'DEFAULT' }
-                );
-            }
-
-
-
-        }
-
-        // paymentMethodsInstanceRef is a ref and should not be in dependencies
-
-    }, [paymentWidget, totalPrice]);
-
-    // Reset instance ref if widget changes
-    useEffect(() => {
-        paymentMethodsInstanceRef.current = null;
-
-        // paymentMethodsInstanceRef is a ref and should not be in dependencies
-
-    }, [paymentWidget]);
-
-
-    // Handlers
-    const handleLoginAndLoad = async () => {
-        if (!formData.email || !formData.simplePassword) {
-            toast.error(language === 'ko' ? "이메일과 비밀번호를 입력해주세요." : "Please enter email and password.");
-            return;
-        }
-
-        setIsProcessing(true);
-        try {
-            await signInWithEmailAndPassword(firebaseAuth, formData.email, formData.simplePassword);
-            toast.success(language === 'ko' ? "기존 정보를 불러왔습니다." : "User info loaded.");
-            // useEffect will handle form population
-        } catch (error: unknown) {
-            console.error("Login failed:", error);
-            if (error && typeof error === 'object' && 'code' in error && (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password')) {
-                toast.error(language === 'ko' ? "일치하는 계정을 찾지 못했습니다. 아래 정보를 직접 입력해주세요." : "No record found. Please fill in details.");
-            } else {
-                const message = error instanceof Error ? error.message : 'Unknown error';
-                toast.error("Login failed: " + message);
-            }
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-
-    const handleSaveBasicInfo = async () => {
-        if (!formData.name || !formData.email || !formData.phone || !formData.affiliation) {
-            toast.error(language === 'ko' ? "필수 항목을 모두 입력해주세요." : "Please fill in all required fields.");
-            return;
-        }
-
-        if (!auth.user && !formData.simplePassword) {
-            toast.error(language === 'ko' ? "비밀번호를 입력해주세요." : "Please enter a password.");
-            return;
-        }
-
-        setIsProcessing(true);
-        try {
-            // 1. Create User (Sign Up) or Update if logged in
-            let uid = auth.user?.id || firebaseAuth.currentUser?.uid;
-
-            if (!uid) {
-                // Not logged in -> Create Account
-                try {
-                    const userCredential = await createUserWithEmailAndPassword(firebaseAuth, formData.email, formData.simplePassword);
-                    uid = userCredential.user.uid;
-                    toast.success(language === 'ko' ? "계정이 생성되었습니다." : "Account created successfully.");
-                } catch (authError: unknown) {
-                    const err = authError as { code?: string };
-                    if (err.code === 'auth/email-already-in-use') {
-                        // Try logging in if email exists
-                        try {
-                            const userCredential = await signInWithEmailAndPassword(firebaseAuth, formData.email, formData.simplePassword);
-                            uid = userCredential.user.uid;
-                            toast.success(language === 'ko' ? "로그인되었습니다." : "Logged in successfully.");
-                        } catch (loginError: unknown) {
-                            const err = loginError as { code?: string };
-                            if (err.code === 'auth/wrong-password') {
-                                toast.error(language === 'ko' ? "이미 가입된 이메일입니다. 비밀번호를 확인해주세요." : "Email already exists. Please check your password.");
-                                setIsProcessing(false);
-                                return;
-                            } else {
-                                throw authError; // Throw original error if not wrong password
-                            }
-                        }
-                    } else {
-                        throw authError;
-                    }
-                }
-            }
-
-            // 2. Save User Info to users/{uid}
-            if (uid) {
-                const userDataToSave = toFirestoreUserData({
-                    name: formData.name,
-                    email: formData.email,
-                    phone: formData.phone,
-                    organization: formData.affiliation, // UI??affiliation, DB??organization????????????
-                    licenseNumber: formData.licenseNumber
-                });
-
-                await setDoc(doc(db, 'users', uid), {
-                    ...userDataToSave,
-                    simplePassword: formData.simplePassword ? btoa(formData.simplePassword) : null, // Legacy support
-                    updatedAt: Timestamp.now()
-                }, { merge: true });
-            }
-
-            setIsInfoSaved(true);
-            toast.success(language === 'ko' ? "기본 정보가 저장되었습니다." : "Basic info saved.");
-
-            // Scroll to payment
-            setTimeout(() => {
-                document.getElementById('payment-section')?.scrollIntoView({ behavior: 'smooth' });
-            }, 100);
-
-        } catch (e: unknown) {
-            console.error("Save info failed:", e);
-            const message = e instanceof Error ? e.message : 'Unknown error';
-            toast.error(language === 'ko' ? `저장에 실패했습니다: ${message}` : `Save failed: ${message}`);
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-
-    const handlePayment = async () => {
-        if (!confId) return;
-        setIsProcessing(true);
-
-        try {
-            // 1. Create PENDING Registration
-            // [Fix-Step 146] Custom Order ID Format
-            const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, ""); // 20260115
-            const rand = Math.random().toString(36).substring(2, 6).toUpperCase(); // 4 chars
-            const prefix = info?.societyId ? info.societyId.toUpperCase() : 'CONF';
-            const orderId = `${prefix}-${dateStr}-${rand}`;
-
-            const regRef = doc(collection(db, `conferences/${confId}/registrations`));
-
-            const regData = {
-                id: regRef.id,
-                userId: auth.user?.id || firebaseAuth.currentUser?.uid || 'GUEST',
-                userInfo: {
-                    name: formData.name,
-                    email: formData.email,
-                    phone: formData.phone,
-                    affiliation: formData.affiliation,
-                    licenseNumber: formData.licenseNumber // [Fix-Step 156] Include licenseNumber in userInfo
-                },
-                conferenceId: confId,
-                status: 'PENDING',
-                paymentStatus: 'PENDING',
-                amount: totalPrice,
-                tier: selectedTier, // [Fix-Step 156] Include tier
-                categoryName: finalCategory,
-                orderId: orderId,
-                licenseNumber: formData.licenseNumber, // [Fix-Step 156] Include licenseNumber at root
-                // [Fix-Option] Include selected options
-                baseAmount: basePrice,
-                optionsTotal: optionsTotal,
-                selectedOptions: selectedOptions.map(o => ({
-                    optionId: o.option.id,
-                    name: o.option.name,
-                    price: o.option.price,
-                    quantity: o.quantity,
-                    totalPrice: o.option.price * o.quantity
-                })),
-                createdAt: Timestamp.now(),
-                updatedAt: Timestamp.now()
-            };
-
-            // Determine and attach member verification data if available
-            // Priority: location.state > sessionStorage > URL params
-            const mvFromURL: MemberVerificationData | null = (() => {
-                // Try sessionStorage first (persists across refresh)
-                const storageKey = `member_verification_${confId}`;
-                const sessionData = sessionStorage.getItem(storageKey);
-                let fromStorage: MemberVerificationData | null = null;
-                if (sessionData) {
-                    try {
-                        fromStorage = JSON.parse(sessionData);
-                    } catch (e) {
-                        console.warn('Failed to parse sessionStorage member verification data:', e);
-                    }
-                }
-
-                const candidate = {
-                    id: state.memberVerificationId || state.memberVerification?.id || state.memberVerificationData?.id || state.memberVerificationData?.memberDocId || fromStorage?.id || '',
-                    societyId: info?.societyId || fromStorage?.societyId || '',
-                    grade: (paramMemberGrade || state.memberGrade || state.memberVerification?.grade || state.memberVerificationData?.grade || fromStorage?.grade || ''),
-                    name: (paramMemberName || state.memberName || state.memberVerification?.name || state.memberVerificationData?.name || fromStorage?.name || ''),
-                    code: (paramMemberCode || state.memberCode || state.memberVerification?.code || state.memberVerificationData?.code || fromStorage?.code || ''),
-                    expiry: state.memberExpiry || state.memberVerification?.expiry || state.memberVerificationData?.expiry || fromStorage?.expiry || ''
-                };
-                const hasData = !!(candidate.name || candidate.code || candidate.id);
-                return hasData ? candidate : null;
-            })();
-            if (mvFromURL) {
-                // Attach to regData so Cloud Functions can lock the member code after payment
-                // @ts-expect-error - memberVerificationData is added dynamically for Cloud Functions
-                regData.memberVerificationData = mvFromURL;
-            }
-
-            // [Modified] Do NOT save to Firestore yet (Prevent Garbage)
-            // Save to sessionStorage to retrieve after success
-            sessionStorage.setItem(`pending_reg_${orderId}`, JSON.stringify(regData));
-
-            // 2. Process Payment
-            if (paymentWidget) {
-                const origin = window.location.origin;
-                const successUrl = `${origin}/payment/success?slug=${slug}&societyId=${info?.societyId}&confId=${confId}&regId=${regRef.id}`;
-                const failUrl = `${origin}/${slug}/register/fail?regId=${regRef.id}`;
-
-                await paymentWidget.requestPayment({
-                    orderId: orderId,
-                    orderName: `${finalCategory}`,
-                    customerName: formData.name,
-                    customerEmail: formData.email,
-                    successUrl,
-                    failUrl,
-                });
-            } else {
-                toast.error("Payment widget is not ready.");
-                setIsProcessing(false);
-            }
-
-        } catch (error) {
-            console.error("Payment Error:", error);
-            toast.error("결제 시작 실패");
-            setIsProcessing(false);
-        }
-    };
-
-    if (confLoading || isInitializing) {
+    if (state.confLoading || state.isInitializing) {
         return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><LoadingSpinner /></div>;
     }
 
     return (
         <div className="min-h-screen flex flex-col bg-gray-50">
-            {/* HEADER */}
-            <header className="bg-white shadow-sm py-4 px-6 flex justify-between items-center sticky top-0 z-10">
-                <div className="font-bold text-xl text-blue-900">{info?.societyId?.toUpperCase() || 'Academic Society'}</div>
-                <button
-                    type="button"
-                    onClick={() => setLanguage(language === 'ko' ? 'en' : 'ko')}
-                    className="px-3 py-1 rounded text-sm font-bold bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
-                >
-                    {language === 'ko' ? 'EN' : 'KO'}
-                </button>
-            </header>
+            <RegistrationHeader
+                societyId={state.info?.societyId}
+                societyName={state.societyName}
+                language={state.language}
+                setLanguage={state.setLanguage}
+                info={state.info}
+                slug={state.slug}
+                navigate={state.navigate}
+            />
 
-            {/* BODY */}
-            <main className="flex-grow py-12 px-4 sm:px-6 lg:px-8">
-                {isProcessing && (
+            <main className="flex-grow py-12 px-4 sm:px-6 lg:px-8 relative">
+                {state.isProcessing && (
                     <div className="fixed inset-0 z-[9999] bg-white/80 backdrop-blur-sm flex items-center justify-center">
                         <LoadingSpinner />
                     </div>
                 )}
 
                 <div className="max-w-3xl mx-auto space-y-8">
-                    {/* Header */}
-                    <div>
-                        <Button variant="ghost" className="pl-0 mb-4" onClick={() => navigate(`/${slug}`)}>
-                            <ChevronLeft className="w-5 h-5 mr-1" />
-                            {language === 'ko' ? '\uD648\uC73C\uB85C' : 'Home'}
-                        </Button>
-                        <h1 className="text-3xl font-bold text-gray-900">
-                            {language === 'ko' ? societyName + ' \uB4F1\uB85D \uD398\uC774\uC9C0' : societyName + ' Conference Registration Page'}
-                        </h1>
-                        <p className="mt-2 text-gray-600">
-                            {info?.title ? (language === 'ko' ? info.title.ko : info.title.en) : 'Conference'}
-                        </p>
-                    </div>
+                    <BasicInfoForm
+                        language={state.language}
+                        formData={state.formData}
+                        setFormData={state.setFormData}
+                        isInfoSaved={state.isInfoSaved}
+                        setIsInfoSaved={state.setIsInfoSaved}
+                        memberVerified={state.memberVerified}
+                        paramMemberCode={state.paramMemberCode}
+                        auth={state.auth}
+                        isProcessing={state.isProcessing}
+                        handleLoginAndLoad={state.handleLoginAndLoad}
+                        handleSaveBasicInfo={state.handleSaveBasicInfo}
+                    />
 
-                    {/* Step 1: Basic Info */}
-                    <Card className={`transition-all duration-300 ${isInfoSaved ? 'opacity-70 grayscale' : 'shadow-lg border-blue-200'}`}>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isInfoSaved ? 'bg-green-100 text-green-600' : 'bg-blue-600 text-white'}`}>
-                                    {isInfoSaved ? <CheckCircle2 className="w-5 h-5" /> : '1'}
-                                </div>
-                                {language === 'ko' ? '기본 정보' : 'Basic Information'}
-                            </CardTitle>
-                            <CardDescription>
-                                {language === 'ko' ? '등록을 위해 기본 정보를 입력해주세요.' : 'Please enter your basic information for registration.'}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {/* 1. Email & Password (Guest Login / Create) */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200 mb-4">
-                                <div className="space-y-2">
-                                    <Label>{language === 'ko' ? '이메일' : 'Email'} <span className="text-red-500">*</span></Label>
-                                    <Input
-                                        type="email"
-                                        value={formData.email}
-                                        onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                        readOnly={isInfoSaved || !!auth.user}
-                                        className={isInfoSaved || !!auth.user ? 'bg-gray-100' : 'bg-white'}
-                                        placeholder="email@example.com"
-                                    />
-                                </div>
-
-                                {/* Password: Show for guests (non-authenticated users) */}
-                                {!auth.user && (
-                                    <div className="space-y-2">
-                                        <Label className="flex justify-between items-center">
-                                            <span>
-                                                {language === 'ko' ? '비밀번호' : 'Password'} <span className="text-red-500">*</span>
-                                            </span>
-                                            {/* Load Button for Guests */}
-                                            <button
-                                                type="button"
-                                                onClick={handleLoginAndLoad}
-                                                className="text-xs text-blue-600 hover:underline font-medium"
-                                                disabled={isProcessing}
-                                            >
-                                                {language === 'ko' ? '기존 정보 불러오기' : 'Load Existing Info'}
-                                            </button>
-                                        </Label>
-                                        <Input
-                                            type="password"
-                                            value={formData.simplePassword}
-                                            onChange={e => setFormData({ ...formData, simplePassword: e.target.value })}
-                                            readOnly={isInfoSaved}
-                                            className="bg-white"
-                                            placeholder={language === 'ko' ? '비밀번호를 입력하세요' : 'Enter password'}
-                                        />
-                                        <p className="text-xs text-gray-500">
-                                            * {language === 'ko' ? '기존 가입자는 정보를 불러오고, 처음 등록하는 경우에는 계정이 자동 생성됩니다.' : 'Existing users: info auto-loads. New users: account created.'}
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* 2. Personal Info */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>{language === 'ko' ? '이름' : 'Name'} <span className="text-red-500">*</span></Label>
-                                    <Input
-                                        value={formData.name}
-                                        onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                        readOnly={memberVerified || isInfoSaved}
-                                        className={memberVerified || isInfoSaved ? 'bg-gray-100' : ''}
-                                        placeholder="이름을 입력하세요"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>{language === 'ko' ? '소속' : 'Affiliation'} <span className="text-red-500">*</span></Label>
-                                    <Input
-                                        value={formData.affiliation}
-                                        onChange={e => setFormData({ ...formData, affiliation: e.target.value })}
-                                        readOnly={isInfoSaved}
-                                        className={isInfoSaved ? 'bg-gray-100' : ''}
-                                        placeholder="소속을 입력하세요"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>{language === 'ko' ? '면허번호' : 'License Number'} <span className="text-red-500">*</span></Label>
-                                    <Input
-                                        value={formData.licenseNumber}
-                                        onChange={e => setFormData({ ...formData, licenseNumber: e.target.value })}
-                                        readOnly={isInfoSaved || (memberVerified && !!paramMemberCode)}
-                                        className={isInfoSaved || (memberVerified && !!paramMemberCode) ? 'bg-gray-100' : ''}
-                                        placeholder="면허번호를 입력하세요"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>{language === 'ko' ? '휴대폰 번호' : 'Phone'} <span className="text-red-500">*</span></Label>
-                                    <Input
-                                        value={formData.phone}
-                                        onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                                        readOnly={isInfoSaved}
-                                        className={isInfoSaved ? 'bg-gray-100' : ''}
-                                        placeholder="010-1234-5678"
-                                    />
-                                </div>
-                            </div>
-                        </CardContent>
-                        <CardFooter className={`${isInfoSaved ? 'hidden' : 'block'}`}>
-                            <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={handleSaveBasicInfo} disabled={isProcessing}>
-                                <Save className="w-4 h-4 mr-2" />
-                                {language === 'ko' ? '기본 정보 저장' : 'Save Basic Info'}
-                            </Button>
-                        </CardFooter>
-                        {isInfoSaved && (
-                            <div className="absolute top-4 right-4">
-                                <Button variant="ghost" size="sm" onClick={() => setIsInfoSaved(false)}>
-                                    {language === 'ko' ? '수정' : 'Edit'}
-                                </Button>
-                            </div>
-                        )}
-                    </Card>
-
-                    {/* Optional Add-ons - Feature Flag Protected */}
-                    {confId && (
+                    {state.confId && (
                         <AddonSelectorWrapper
-                            conferenceId={confId}
-                            language={language}
-                            toggleOption={toggleOption}
-                            isOptionSelected={isOptionSelected}
+                            conferenceId={state.confId}
+                            language={state.language}
+                            toggleOption={state.pricing.toggleOption}
+                            isOptionSelected={state.pricing.isOptionSelected}
                         />
                     )}
 
-                    {/* Step 2: Payment */}
-                    {isInfoSaved && (
-                        <Card id="payment-section" className="shadow-lg border-blue-200 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center">
-                                        2
-                                    </div>
-                                    {language === 'ko' ? '결제' : 'Payment'}
-                                </CardTitle>
-                                <CardDescription>
-                                    {language === 'ko' ? '결제를 완료하면 등록이 마무리됩니다.' : 'Complete payment to finish registration.'}
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-6">
-                                <div className="bg-slate-50 p-6 rounded-xl border">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <div>
-                                            <p className="text-sm text-gray-500">Registration Type</p>
-                                            <p className="font-bold text-lg text-slate-900">{finalCategory}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-sm text-gray-500">Base Fee</p>
-                                            <p className="text-lg font-semibold text-slate-700">{basePrice.toLocaleString()}원</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Options Details - New List */}
-                                    {optionsTotal > 0 && (
-                                        <div className="space-y-2 py-3 border-t border-slate-200 mt-2">
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                                                {language === 'ko' ? '선택 옵션 상세' : 'Selected Options Breakdown'}
-                                            </p>
-                                            {selectedOptions.map((item, idx) => (
-                                                <div key={idx} className="flex justify-between items-start text-sm">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-slate-700 font-medium">
-                                                            {item.option.name[language] || item.option.name.ko}
-                                                        </span>
-                                                        <span className="text-[11px] text-slate-500">
-                                                            {item.option.price.toLocaleString()}원 x {item.quantity}
-                                                        </span>
-                                                    </div>
-                                                    <span className="font-semibold text-slate-800">
-                                                        {(item.option.price * item.quantity).toLocaleString()}원
-                                                    </span>
-                                                </div>
-                                            ))}
-                                            <div className="flex justify-between items-center pt-2 mt-1 border-t border-dashed border-slate-200">
-                                                <span className="text-xs font-bold text-blue-600">
-                                                    {language === 'ko' ? '옵션 합계' : 'Options Subtotal'}
-                                                </span>
-                                                <span className="text-sm font-bold text-blue-600">
-                                                    + {optionsTotal.toLocaleString()}원
-                                                </span>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Total */}
-                                    <div className="flex justify-between items-center py-3 border-t-2 border-slate-300 mt-2">
-                                        <div>
-                                            <p className="text-sm font-medium text-slate-700">{language === 'ko' ? '총 결제 금액' : 'Total Amount'}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-2xl font-bold text-blue-600">{totalPrice.toLocaleString()}원</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-
-                                {/* Payment Widget Area */}
-                                <div id="payment-widget" ref={paymentMethodsWidgetRef} className="min-h-[300px]" />
-                            </CardContent>
-                            <CardFooter>
-                                <Button
-                                    className="w-full h-12 text-lg font-bold bg-blue-600 hover:bg-blue-700 shadow-md"
-                                    onClick={handlePayment}
-                                    disabled={isProcessing || !paymentWidget}
-                                >
-                                    {isProcessing ? (
-                                        <>
-                                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                                            {language === 'ko' ? '결제 진행 중...' : 'Processing...'}
-                                        </>
-                                    ) : (
-                                        <>
-                                            <CreditCard className="w-5 h-5 mr-2" />
-                                            {language === 'ko' ? '결제하기' : 'Pay Now'}
-                                        </>
-                                    )}
-                                </Button>
-                            </CardFooter>
-                        </Card>
-                    )}
+                    <PaymentSection
+                        language={state.language}
+                        isInfoSaved={state.isInfoSaved}
+                        finalCategory={state.finalCategory}
+                        basePrice={state.pricing.basePrice}
+                        optionsTotal={state.pricing.optionsTotal}
+                        selectedOptions={state.pricing.selectedOptions}
+                        totalPrice={state.pricing.totalPrice}
+                        paymentMethodsWidgetRef={state.paymentMethodsWidgetRef}
+                        handlePayment={state.handlePayment}
+                        isProcessing={state.isProcessing}
+                        paymentWidgetReady={!!state.paymentWidget}
+                    />
                 </div>
             </main>
 
-            {/* FOOTER - WideFooterPreview */}
             <WideFooterPreview
-                society={footerInfo ? {
-                    name: societyName || info?.societyId,  // Use societyName from Firestore if available, fallback to societyId
-                    footerInfo
+                society={state.footerInfo ? {
+                    name: state.societyName || state.info?.societyId || '',
+                    footerInfo: state.footerInfo
                 } : undefined}
-                language={language}
+                language={state.language}
             />
 
-            {/* Refund Policy Modal - Floating Trigger Button */}
-            <button
-                type="button"
-                onClick={() => setShowRefundModal(true)}
-                className="fixed bottom-4 right-4 z-40 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-bold transition-colors"
-            >
-                {language === 'ko' ? '환불 규정' : 'Refund Policy'}
-            </button>
-
-            {/* Refund Policy Modal */}
-            <Dialog open={showRefundModal} onOpenChange={setShowRefundModal}>
-                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>{language === 'ko' ? '환불 규정' : 'Refund Policy'}</DialogTitle>
-                    </DialogHeader>
-                    <div className="mt-4 whitespace-pre-wrap text-sm text-slate-600 leading-relaxed">
-                        {regSettings?.refundPolicy || (info as ConferenceInfo)?.refundPolicy || "등록 이후 환불 규정은 학회 운영 방침을 따릅니다. 자세한 사항은 사무국으로 문의해주세요."}
-
-                    </div>
-                    <div className="mt-6 flex justify-end">
-                        <Button onClick={() => setShowRefundModal(false)}>
-                            {language === 'ko' ? '닫기' : 'Close'}
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <RefundPolicyModal
+                language={state.language}
+                showRefundModal={state.showRefundModal}
+                setShowRefundModal={state.setShowRefundModal}
+                regSettings={state.regSettings}
+                info={state.info}
+            />
         </div>
     );
 }

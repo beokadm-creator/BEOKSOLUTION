@@ -1,0 +1,179 @@
+import React, { useEffect, useState } from 'react';
+import { AlertCircle, CheckCircle2, Copy, ExternalLink, Loader2, MessageCircle } from 'lucide-react';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import toast from 'react-hot-toast';
+
+import { Button } from '@/components/ui/button';
+import { db } from '@/firebase';
+import type { ExternalAttendeeDoc, TokenStatus } from '../types';
+
+type Props = {
+  attendee: ExternalAttendeeDoc;
+  confId: string | null;
+  confBaseUrl: string;
+  confSlug: string;
+  onResend: () => void;
+  isProcessing: boolean;
+};
+
+export const VoucherLinkSection: React.FC<Props> = ({
+  attendee,
+  confId,
+  confBaseUrl,
+  confSlug,
+  onResend,
+  isProcessing,
+}) => {
+  const [badgeToken, setBadgeToken] = useState<string | null>(null);
+  const [tokenStatus, setTokenStatus] = useState<TokenStatus>('loading');
+
+  useEffect(() => {
+    if (!confId || !attendee.id) return;
+
+    const fetchToken = async () => {
+      try {
+        if (attendee.badgePrepToken) {
+          const tokenSnap = await getDoc(doc(db, `conferences/${confId}/badge_tokens`, attendee.badgePrepToken));
+          if (tokenSnap.exists()) {
+            const data = tokenSnap.data() as { status?: string };
+            setTokenStatus(
+              data.status === 'ACTIVE' ? 'active' : data.status === 'ISSUED' ? 'issued' : 'expired',
+            );
+          } else {
+            setTokenStatus('active');
+          }
+          setBadgeToken(attendee.badgePrepToken);
+          return;
+        }
+
+        const q = query(
+          collection(db, `conferences/${confId}/badge_tokens`),
+          where('registrationId', '==', attendee.id),
+          where('status', '==', 'ACTIVE'),
+          orderBy('createdAt', 'desc'),
+          limit(1),
+        );
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          setBadgeToken((snapshot.docs[0].data() as { token?: string }).token || null);
+          setTokenStatus('active');
+        } else {
+          const qIssued = query(
+            collection(db, `conferences/${confId}/badge_tokens`),
+            where('registrationId', '==', attendee.id),
+            where('status', '==', 'ISSUED'),
+            orderBy('createdAt', 'desc'),
+            limit(1),
+          );
+          const issuedSnap = await getDocs(qIssued);
+          if (!issuedSnap.empty) {
+            setBadgeToken((issuedSnap.docs[0].data() as { token?: string }).token || null);
+            setTokenStatus('issued');
+          } else {
+            setTokenStatus('none');
+          }
+        }
+      } catch (err) {
+        console.error('[VoucherLinkSection] Failed to fetch badge token:', err);
+        setTokenStatus('none');
+      }
+    };
+
+    fetchToken();
+  }, [attendee.id, attendee.badgePrepToken, confId]);
+
+  const badgePrepUrl = badgeToken ? `${confBaseUrl}/${confSlug}/badge-prep/${badgeToken}` : null;
+
+  return (
+    <div className="p-5 border rounded-lg">
+      <h3 className="text-sm font-bold text-gray-500 uppercase mb-3">바우처 링크 (Badge Prep)</h3>
+
+      {tokenStatus === 'loading' && (
+        <div className="flex items-center gap-2 text-gray-500 text-sm">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          토큰 조회 중...
+        </div>
+      )}
+
+      {tokenStatus === 'none' && (
+        <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-amber-800">발급된 바우처 토큰이 없습니다</p>
+            <p className="text-xs text-amber-600 mt-1">알림톡을 발송하면 badge prep 토큰이 자동 생성됩니다.</p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onResend}
+              disabled={isProcessing}
+              className="mt-2 text-amber-700 border-amber-300 hover:bg-amber-50"
+            >
+              <MessageCircle className="w-4 h-4 mr-1" />
+              알림톡 발송
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {(tokenStatus === 'active' || tokenStatus === 'issued' || tokenStatus === 'expired') && badgePrepUrl && (
+        <div className="space-y-3">
+          <div
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+              tokenStatus === 'active'
+                ? 'bg-green-100 text-green-700'
+                : tokenStatus === 'issued'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-gray-100 text-gray-500'
+            }`}
+          >
+            <CheckCircle2 className="w-3 h-3" />
+            {tokenStatus === 'active' ? '활성 토큰' : tokenStatus === 'issued' ? '명찰 발급 완료' : '만료됨'}
+          </div>
+
+          <div className="p-3 bg-gray-50 rounded-lg border">
+            <p className="text-xs text-gray-500 mb-1.5">Badge Prep URL (사용자에게 전달)</p>
+            <p className="text-xs font-mono text-gray-800 break-all">{badgePrepUrl}</p>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                navigator.clipboard.writeText(badgePrepUrl);
+                toast.success('링크가 복사되었습니다.');
+              }}
+              className="flex-1"
+            >
+              <Copy className="w-4 h-4 mr-1" />
+              링크 복사
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => window.open(badgePrepUrl, '_blank')}
+              className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+            >
+              <ExternalLink className="w-4 h-4 mr-1" />
+              바우처 열기
+            </Button>
+          </div>
+
+          {tokenStatus === 'active' && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onResend}
+              disabled={isProcessing}
+              className="w-full text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+            >
+              <MessageCircle className="w-4 h-4 mr-1" />
+              알림톡 재발송
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
