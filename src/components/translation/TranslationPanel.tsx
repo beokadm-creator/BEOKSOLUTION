@@ -272,7 +272,21 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
             if (!seg) return null;
             if (seg.status === 'merged') return null;
 
-            const text = seg[activeLang as keyof typeof seg] as string || seg.refined || seg.original;
+            let text = "";
+            let isFallback = false;
+
+            if (activeLang === 'ko') {
+              text = seg.ko as string || seg.refined || seg.original || "";
+            } else if (activeLang === 'en') {
+              text = seg.en as string || "";
+              if (!text) {
+                text = seg.ko as string || seg.refined || seg.original || "";
+                isFallback = true;
+              }
+            } else {
+              text = seg.refined || seg.original || "";
+            }
+
             if (!text) return null;
 
             if (activeLang === 'en' && /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(text)) {
@@ -287,7 +301,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
 
             return (
               <div key={id} className={`transition-opacity ${seg.status === 'final' ? 'opacity-100' : 'opacity-70'}`}>
-                <p style={{ fontSize: `${fontSize}px` }} className="break-words">{text}</p>
+                <p style={{ fontSize: `${fontSize}px`, color: isFallback ? '#6b7280' : 'white' }} className="break-words">{text}</p>
               </div>
             );
           })
