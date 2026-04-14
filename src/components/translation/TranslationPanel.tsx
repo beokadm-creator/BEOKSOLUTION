@@ -289,10 +289,19 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
 
             if (!text) return null;
 
+            // 영어 모드에서 번역을 기다리는 동안, 아직 한국어만 있는 경우
+            // 원래 시스템처럼 아예 노출시키지 않거나 투명하게 처리합니다.
+            // 하지만 "아예 안나온다"면 opacity-0가 문제를 일으켰을 수 있으므로
+            // 원래 시스템(AudienceView.tsx)과 100% 동일한 로직으로 복원합니다.
+            // 원래 AudienceView.tsx 로직:
+            // if (activeLang === 'en' && /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(text)) {
+            //     return <TextItem ... isRaw={true} opacity={0.6} color="#6b7280" /> (즉, 흐릿하게 보여줌)
+            // }
+
             if (activeLang === 'en' && /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(text)) {
               return (
-                <div key={id} className="transition-opacity opacity-0">
-                  <p style={{ fontSize: `${fontSize}px`, color: '#6b7280' }} className="break-words">
+                <div key={id} className={`transition-opacity ${seg.status === 'final' ? 'opacity-100' : 'opacity-70'}`}>
+                  <p style={{ fontSize: `${fontSize}px`, color: '#9ca3af', opacity: 0.6 }} className="break-words">
                     {text}
                   </p>
                 </div>
@@ -301,7 +310,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
 
             return (
               <div key={id} className={`transition-opacity ${seg.status === 'final' ? 'opacity-100' : 'opacity-70'}`}>
-                <p style={{ fontSize: `${fontSize}px`, color: isFallback ? '#6b7280' : 'white' }} className="break-words">{text}</p>
+                <p style={{ fontSize: `${fontSize}px`, color: isFallback ? '#9ca3af' : 'white' }} className="break-words">{text}</p>
               </div>
             );
           })
