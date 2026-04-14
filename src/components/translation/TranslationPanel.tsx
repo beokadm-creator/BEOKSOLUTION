@@ -80,7 +80,17 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
         const sessionRef = ref(rtdb, `projects/${selectedProjectId}/sessions/${sessId}`);
         get(sessionRef).then(sessSnap => {
           if (sessSnap.exists()) {
-            setActiveSessionInfo(sessSnap.val());
+            const sessData = sessSnap.val();
+            setActiveSessionInfo(sessData);
+            
+            // Set default language based on sourceLanguage
+            // If source is Korean (ko), default to English (en)
+            // If source is English (en), default to Korean (ko)
+            if (sessData.sourceLanguage === 'ko') {
+              setActiveLang('en');
+            } else if (sessData.sourceLanguage === 'en') {
+              setActiveLang('ko');
+            }
           } else {
             setActiveSessionInfo(null);
           }
@@ -171,9 +181,9 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
             <button
               key={lang}
               onClick={() => setActiveLang(lang)}
-              className={`px-3 py-1 text-xs rounded-full ${activeLang === lang ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+              className={`px-3 py-1 text-xs rounded-full font-bold ${activeLang === lang ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
             >
-              {lang === 'ko' ? '한국어' : lang === 'en' ? 'English' : '日本語'}
+              {lang === 'ko' ? 'KR' : lang === 'en' ? 'EN' : 'JA'}
             </button>
           ))}
         </div>
