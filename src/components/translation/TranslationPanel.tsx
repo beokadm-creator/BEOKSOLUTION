@@ -177,13 +177,13 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
           <span className="font-bold">{project?.name || selectedProjectId}</span>
         </div>
         <div className="flex gap-2">
-          {['ko', 'en', 'ja'].filter(l => project?.targetLanguages?.includes(l) || ['ko', 'en'].includes(l)).map(lang => (
+          {['ko', 'en'].filter(l => project?.targetLanguages?.includes(l) || ['ko', 'en'].includes(l)).map(lang => (
             <button
               key={lang}
               onClick={() => setActiveLang(lang)}
               className={`px-3 py-1 text-xs rounded-full font-bold ${activeLang === lang ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
             >
-              {lang === 'ko' ? 'KR' : lang === 'en' ? 'EN' : 'JA'}
+              {lang === 'ko' ? 'KR' : 'EN'}
             </button>
           ))}
         </div>

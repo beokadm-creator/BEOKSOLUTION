@@ -8,7 +8,7 @@ export const useProjectStream = (
   options: { subscribe?: boolean } = { subscribe: true }
 ) => {
   const [realProjectId, setRealProjectId] = useState<string | null>(null);
-  const [streamData, setStreamData] = useState<Record<string, { original: string; refined?: string; ko?: string; en?: string; ja?: string; status: 'raw' | 'translating' | 'final' | 'merged'; timestamp: number; seq?: number; mergedIds?: string[], sessionId?: string }> | null>(null);
+  const [streamData, setStreamData] = useState<Record<string, { original: string; refined?: string; ko?: string; en?: string; status: 'raw' | 'translating' | 'final' | 'merged'; timestamp: number; seq?: number; mergedIds?: string[], sessionId?: string }> | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
