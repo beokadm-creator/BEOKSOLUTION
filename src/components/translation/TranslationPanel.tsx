@@ -124,7 +124,6 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
 
   const segmentsMap = streamData || {};
   const segmentsOrder = Object.keys(segmentsMap)
-    .filter(k => segmentsMap[k]?.sessionId === activeSessionId)
     .filter(k => (segmentsMap[k]?.timestamp || 0) >= lastFlushTime)
     .sort((a, b) => (segmentsMap[a]?.timestamp || 0) - (segmentsMap[b]?.timestamp || 0));
 
