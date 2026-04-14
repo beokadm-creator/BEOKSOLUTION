@@ -19,6 +19,11 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   const [lastFlushTime, setLastFlushTime] = useState<number>(0);
   const [activeLang, setActiveLang] = useState<string>('ko');
 
+  // Viewer Settings
+  const [fontSize, setFontSize] = useState<number>(18);
+  const [letterSpacing, setLetterSpacing] = useState<number>(0);
+  const [lineHeight, setLineHeight] = useState<number>(1.6);
+
   // Load available halls (projects)
   useEffect(() => {
     const projectsRef = ref(rtdb, 'projects');
@@ -116,29 +121,17 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   // Subscribe to stream
   const { streamData } = useProjectStream(selectedProjectId, activeSessionId, { subscribe: !!selectedProjectId && !!activeSessionId });
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isAutoScroll, setIsAutoScroll] = useState(true);
-
-  // Handle scroll events to detect if user manually scrolled up
-  const handleScroll = () => {
-    if (!containerRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 150;
-    setIsAutoScroll(isAtBottom);
-  };
-
-  // Scroll to bottom
-  useEffect(() => {
-    if (isAutoScroll && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
-    }
-  }, [streamData, isAutoScroll]);
 
   const segmentsMap = streamData || {};
   const segmentsOrder = Object.keys(segmentsMap)
     .filter(k => segmentsMap[k]?.sessionId === activeSessionId)
     .filter(k => (segmentsMap[k]?.timestamp || 0) >= lastFlushTime)
     .sort((a, b) => (segmentsMap[a]?.timestamp || 0) - (segmentsMap[b]?.timestamp || 0));
+
+  // Scroll to bottom when a new segment is added
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [segmentsOrder.length]);
 
   if (!selectedProjectId) {
     return (
@@ -177,7 +170,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
 
   return (
     <div className="relative bg-gray-900 text-white rounded-2xl flex flex-col h-[500px] overflow-hidden shadow-xl mt-6">
-      <div className="p-4 bg-gray-800 border-b border-gray-700 flex justify-between items-center">
+      <div className="p-4 bg-gray-800 border-b border-gray-700 flex justify-between items-center flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <button 
             onClick={() => setSelectedProjectId(null)}
@@ -185,18 +178,44 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
           >
             ← 뒤로
           </button>
-          <span className="font-bold">{project?.name || selectedProjectId}</span>
+          <span className="font-bold truncate max-w-[120px] sm:max-w-[200px]">{project?.name || selectedProjectId}</span>
         </div>
-        <div className="flex gap-2">
-          {['ko', 'en'].filter(l => project?.targetLanguages?.includes(l) || ['ko', 'en'].includes(l)).map(lang => (
-            <button
-              key={lang}
-              onClick={() => setActiveLang(lang)}
-              className={`px-3 py-1 text-xs rounded-full font-bold ${activeLang === lang ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
-            >
-              {lang === 'ko' ? 'KR' : 'EN'}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 px-2 py-1 rounded-md border bg-gray-900 border-gray-700 shadow-sm hidden sm:flex">
+            <button onClick={() => setFontSize(v => Math.max(12, v - 2))} className="p-1 hover:bg-white/10 rounded text-xs font-medium text-gray-400 hover:text-white">A−</button>
+            <button onClick={() => setFontSize(v => Math.min(48, v + 2))} className="p-1 hover:bg-white/10 rounded text-sm font-bold text-gray-400 hover:text-white">A+</button>
+            <div className="w-px h-3 bg-gray-700 mx-1"></div>
+            <button onClick={() => setLetterSpacing(v => Math.max(-1, parseFloat((v - 0.5).toFixed(1))))} className="p-1 hover:bg-white/10 rounded text-xs font-medium text-gray-400 hover:text-white">↔−</button>
+            <button onClick={() => setLetterSpacing(v => Math.min(8, parseFloat((v + 0.5).toFixed(1))))} className="p-1 hover:bg-white/10 rounded text-xs font-medium text-gray-400 hover:text-white">↔+</button>
+            <div className="w-px h-3 bg-gray-700 mx-1"></div>
+            <button onClick={() => setLineHeight(v => Math.max(1.0, parseFloat((v - 0.1).toFixed(1))))} className="p-1 hover:bg-white/10 rounded text-xs font-medium text-gray-400 hover:text-white">↕−</button>
+            <button onClick={() => setLineHeight(v => Math.min(4.0, parseFloat((v + 0.1).toFixed(1))))} className="p-1 hover:bg-white/10 rounded text-xs font-medium text-gray-400 hover:text-white">↕+</button>
+          </div>
+          <div className="flex gap-2">
+            {['ko', 'en'].filter(l => project?.targetLanguages?.includes(l) || ['ko', 'en'].includes(l)).map(lang => (
+              <button
+                key={lang}
+                onClick={() => setActiveLang(lang)}
+                className={`px-3 py-1 text-xs rounded-full font-bold ${activeLang === lang ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+              >
+                {lang === 'ko' ? 'KR' : 'EN'}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      
+      {/* Mobile Settings Bar */}
+      <div className="sm:hidden bg-gray-800 border-b border-gray-700 px-4 py-2 flex justify-between items-center overflow-x-auto">
+        <div className="flex items-center gap-1">
+          <button onClick={() => setFontSize(v => Math.max(12, v - 2))} className="p-1.5 hover:bg-white/10 rounded text-xs font-medium text-gray-400 hover:text-white">A−</button>
+          <button onClick={() => setFontSize(v => Math.min(48, v + 2))} className="p-1.5 hover:bg-white/10 rounded text-sm font-bold text-gray-400 hover:text-white">A+</button>
+          <div className="w-px h-3 bg-gray-700 mx-1"></div>
+          <button onClick={() => setLetterSpacing(v => Math.max(-1, parseFloat((v - 0.5).toFixed(1))))} className="p-1.5 hover:bg-white/10 rounded text-xs font-medium text-gray-400 hover:text-white">↔−</button>
+          <button onClick={() => setLetterSpacing(v => Math.min(8, parseFloat((v + 0.5).toFixed(1))))} className="p-1.5 hover:bg-white/10 rounded text-xs font-medium text-gray-400 hover:text-white">↔+</button>
+          <div className="w-px h-3 bg-gray-700 mx-1"></div>
+          <button onClick={() => setLineHeight(v => Math.max(1.0, parseFloat((v - 0.1).toFixed(1))))} className="p-1.5 hover:bg-white/10 rounded text-xs font-medium text-gray-400 hover:text-white">↕−</button>
+          <button onClick={() => setLineHeight(v => Math.min(4.0, parseFloat((v + 0.1).toFixed(1))))} className="p-1.5 hover:bg-white/10 rounded text-xs font-medium text-gray-400 hover:text-white">↕+</button>
         </div>
       </div>
 
@@ -236,9 +255,8 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
       )}
 
       <div 
-        ref={containerRef}
-        onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth relative"
+        className="flex-1 overflow-y-auto p-4 space-y-4 relative"
+        style={{ letterSpacing: `${letterSpacing}px`, lineHeight }}
       >
         {!activeSessionId ? (
           <div className="flex items-center justify-center h-full text-gray-500">
@@ -257,28 +275,19 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
             const text = seg[activeLang as keyof typeof seg] as string || seg.refined || seg.original;
             if (!text) return null;
 
+            if (activeLang === 'en' && /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(text)) {
+              return null;
+            }
+
             return (
               <div key={id} className={`transition-opacity ${seg.status === 'final' ? 'opacity-100' : 'opacity-70'}`}>
-                <p className="text-lg leading-relaxed">{text}</p>
+                <p style={{ fontSize: `${fontSize}px` }} className="break-words">{text}</p>
               </div>
             );
           })
         )}
         <div ref={messagesEndRef} className="h-1" />
       </div>
-
-      {!isAutoScroll && (
-        <button
-          onClick={() => {
-            setIsAutoScroll(true);
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-          }}
-          className="absolute bottom-6 right-6 bg-blue-600 hover:bg-blue-500 text-white rounded-full p-3 shadow-lg shadow-black/50 transition-all flex items-center justify-center animate-bounce"
-          title="최신 번역 보기"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
-        </button>
-      )}
     </div>
   );
 };
