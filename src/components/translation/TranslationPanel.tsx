@@ -141,7 +141,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
           </span>
-          실시간 AI 번역 - 홀 선택
+          {activeLang === 'en' ? 'Live AI Translation - Select Room' : '실시간 AI 번역 - 홀 선택'}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {projects.map(p => (
@@ -152,13 +152,13 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
             >
               <div className="font-bold text-gray-800">{p.name || p.slug}</div>
               <div className="text-xs text-gray-500 mt-1">
-                지원 언어: {p.targetLanguages?.join(', ') || 'ko, en'}
+                {activeLang === 'en' ? 'Supported Languages' : '지원 언어'}: {p.targetLanguages?.join(', ') || 'ko, en'}
               </div>
             </button>
           ))}
           {projects.length === 0 && (
             <div className="col-span-full text-center py-8 text-gray-500">
-              현재 진행 중인 번역 세션이 없습니다.
+              {activeLang === 'en' ? 'No active translation sessions.' : '현재 진행 중인 번역 세션이 없습니다.'}
             </div>
           )}
         </div>
@@ -176,7 +176,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
             onClick={() => setSelectedProjectId(null)}
             className="text-gray-400 hover:text-white"
           >
-            ← 뒤로
+            ← {activeLang === 'en' ? 'Back' : '뒤로'}
           </button>
           <span className="font-bold truncate max-w-[120px] sm:max-w-[200px]">{project?.name || selectedProjectId}</span>
         </div>
@@ -235,7 +235,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
               )}
             </div>
             <h4 className="text-sm font-bold text-gray-200 truncate">
-              {activeSessionInfo.topic || '진행 중인 세션'}
+              {activeSessionInfo.topic || (activeLang === 'en' ? 'Active Session' : '진행 중인 세션')}
             </h4>
           </div>
           {activeSessionInfo.speaker && (
@@ -260,11 +260,11 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
       >
         {!activeSessionId ? (
           <div className="flex items-center justify-center h-full text-gray-500">
-            진행 중인 세션이 없습니다.
+            {activeLang === 'en' ? 'No active session.' : '진행 중인 세션이 없습니다.'}
           </div>
         ) : segmentsOrder.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-500">
-            번역을 대기 중입니다...
+            {activeLang === 'en' ? 'Waiting for translation...' : '번역을 대기 중입니다...'}
           </div>
         ) : (
           segmentsOrder.map(id => {
@@ -276,7 +276,13 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
             if (!text) return null;
 
             if (activeLang === 'en' && /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(text)) {
-              return null;
+              return (
+                <div key={id} className="transition-opacity opacity-0">
+                  <p style={{ fontSize: `${fontSize}px`, color: '#6b7280' }} className="break-words">
+                    {text}
+                  </p>
+                </div>
+              );
             }
 
             return (
