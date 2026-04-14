@@ -46,8 +46,8 @@ const PlatformHome: React.FC = () => {
                     const start = safeFormatDate(data.dates?.start);
 
                     // [Fix-Step 263] Normalize societyId
-                    const rawSocId = data.societyId || 'kap';
-                    const normalizedSocId = typeof rawSocId === 'string' ? rawSocId.toLowerCase() : 'kap';
+                    const rawSocId = data.societyId || 'kadd';
+                    const normalizedSocId = typeof rawSocId === 'string' ? rawSocId.toLowerCase() : 'kadd';
 
                     console.log(` - Conf: ${doc.id} / Society: ${normalizedSocId} / Status: ${data.status}`);
 

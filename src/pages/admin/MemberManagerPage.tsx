@@ -102,7 +102,6 @@ const MemberManagerPage: React.FC = () => {
         if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') return parts[0];
         // Handle kadd.localhost format explicitly
         if (parts.length === 2 && parts[1] === 'localhost') return parts[0];
-        if (hostname === 'localhost' || hostname === '127.0.0.1') return 'kap';
         return null;
     };
 

@@ -99,9 +99,6 @@ export default function InfraPage() {
             if (!targetId && parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') {
                 targetId = parts[0];
             }
-            if (!targetId && (hostname === 'localhost' || hostname === '127.0.0.1')) {
-                targetId = 'kap'; // Fallback
-            }
 
             if (!targetId) {
                 setLoading(false);
@@ -148,9 +145,6 @@ export default function InfraPage() {
         let targetId = selectedSocietyId;
         if (!targetId && parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') {
             targetId = parts[0];
-        }
-        if (!targetId && (hostname === 'localhost' || hostname === '127.0.0.1')) {
-            targetId = 'kap';
         }
 
         if (!targetId) {
