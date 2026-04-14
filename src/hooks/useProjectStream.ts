@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { translationDb as rtdb } from '../lib/translationFirebase';
 import { ref, onValue, off, get, query, limitToLast, orderByChild, endBefore } from 'firebase/database';
 
-export const useProjectStream = (projectIdOrSlug: string | undefined, options: { subscribe?: boolean } = { subscribe: true }) => {
+export const useProjectStream = (projectIdOrSlug: string | undefined, activeSessionId?: string | null, options: { subscribe?: boolean } = { subscribe: true }) => {
   const [realProjectId, setRealProjectId] = useState<string | null>(null);
   const [streamData, setStreamData] = useState<Record<string, { original: string; refined?: string; ko?: string; en?: string; status: 'raw' | 'translating' | 'final' | 'merged'; timestamp: number; seq?: number; mergedIds?: string[], sessionId?: string }> | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
