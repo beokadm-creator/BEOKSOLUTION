@@ -15,6 +15,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   const [projects, setProjects] = useState<ProjectSettings[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [activeSessionInfo, setActiveSessionInfo] = useState<any | null>(null);
   const [activeLang, setActiveLang] = useState<string>('ko');
 
   // Load available halls (projects)
@@ -63,16 +64,37 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
 
   // Subscribe to active session for selected project
   useEffect(() => {
-    if (!selectedProjectId) return;
+    if (!selectedProjectId) {
+      setActiveSessionId(null);
+      setActiveSessionInfo(null);
+      return;
+    }
+    
     const activeRef = ref(rtdb, `projects/${selectedProjectId}/activeSessionId`);
-    const unsubscribe = onValue(activeRef, (snap) => {
-      setActiveSessionId(snap.val());
+    const unsubscribeActive = onValue(activeRef, (snap) => {
+      const sessId = snap.val();
+      setActiveSessionId(sessId);
+      
+      if (sessId) {
+        // Fetch session info
+        const sessionRef = ref(rtdb, `projects/${selectedProjectId}/sessions/${sessId}`);
+        get(sessionRef).then(sessSnap => {
+          if (sessSnap.exists()) {
+            setActiveSessionInfo(sessSnap.val());
+          } else {
+            setActiveSessionInfo(null);
+          }
+        });
+      } else {
+        setActiveSessionInfo(null);
+      }
     });
-    return () => unsubscribe();
+    
+    return () => unsubscribeActive();
   }, [selectedProjectId]);
 
   // Subscribe to stream
-  const { streamData } = useProjectStream(selectedProjectId, { subscribe: !!selectedProjectId });
+  const { streamData } = useProjectStream(selectedProjectId, activeSessionId, { subscribe: !!selectedProjectId && !!activeSessionId });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
@@ -88,8 +110,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   // Scroll to bottom
   useEffect(() => {
     if (isAutoScroll && messagesEndRef.current) {
-      // Use 'auto' instead of 'smooth' to prevent jittering when rapid updates arrive
-      messagesEndRef.current.scrollIntoView({ behavior: "auto", block: "end" });
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
     }
   }, [streamData, isAutoScroll]);
 
@@ -134,7 +155,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   const project = projects.find(p => p.slug === selectedProjectId);
 
   return (
-    <div className="bg-gray-900 text-white rounded-2xl flex flex-col h-[500px] overflow-hidden shadow-xl mt-6">
+    <div className="relative bg-gray-900 text-white rounded-2xl flex flex-col h-[500px] overflow-hidden shadow-xl mt-6">
       <div className="p-4 bg-gray-800 border-b border-gray-700 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <button 
@@ -158,10 +179,45 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
         </div>
       </div>
 
+      {activeSessionInfo && (
+        <div className="bg-gray-800/80 border-b border-gray-700 p-3 px-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                </span>
+                LIVE
+              </span>
+              {activeSessionInfo.startTime && (
+                <span className="text-xs text-gray-400">{activeSessionInfo.startTime}</span>
+              )}
+            </div>
+            <h4 className="text-sm font-bold text-gray-200 truncate">
+              {activeSessionInfo.topic || '진행 중인 세션'}
+            </h4>
+          </div>
+          {activeSessionInfo.speaker && (
+            <div className="flex items-center gap-2 bg-gray-900/50 rounded-lg px-3 py-2 border border-gray-700/50 flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-blue-900 flex items-center justify-center text-blue-300 font-bold text-sm">
+                {activeSessionInfo.speaker.charAt(0)}
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-gray-200">{activeSessionInfo.speaker}</span>
+                {activeSessionInfo.affiliation && (
+                  <span className="text-[10px] text-gray-500 truncate max-w-[120px]">{activeSessionInfo.affiliation}</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div 
         ref={containerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth"
+        className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth relative"
       >
         {!activeSessionId ? (
           <div className="flex items-center justify-center h-full text-gray-500">
@@ -187,8 +243,21 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
             );
           })
         )}
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} className="h-1" />
       </div>
+
+      {!isAutoScroll && (
+        <button
+          onClick={() => {
+            setIsAutoScroll(true);
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+          }}
+          className="absolute bottom-6 right-6 bg-blue-600 hover:bg-blue-500 text-white rounded-full p-3 shadow-lg shadow-black/50 transition-all flex items-center justify-center animate-bounce"
+          title="최신 번역 보기"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+        </button>
+      )}
     </div>
   );
 };
