@@ -13,7 +13,7 @@ export const useProjectStream = (
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!projectIdOrSlug || !activeSessionId) {
+    if (!projectIdOrSlug) {
       setStreamData(null);
       setLoading(false);
       return;
@@ -29,6 +29,15 @@ export const useProjectStream = (
         setRealProjectId(resolvedId);
 
         if (options.subscribe) {
+          // If activeSessionId is null/empty, we don't subscribe to the stream
+          // because it will cause permission denied or fetch the whole DB.
+          // Wait until there is a valid session ID.
+          if (!activeSessionId) {
+            setStreamData({});
+            setLoading(false);
+            return;
+          }
+
           const streamQuery = query(
             ref(rtdb, `projects/${resolvedId}/stream`),
             orderByChild('sessionId'),
@@ -39,8 +48,6 @@ export const useProjectStream = (
             if (!mounted) return;
             const data = snapshot.val() || {};
             
-            // Just replace the entire state with the current session's data
-            // This automatically handles deletions and additions perfectly
             setStreamData(data);
             setLoading(false);
           }, (err) => {
