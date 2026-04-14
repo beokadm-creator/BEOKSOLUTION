@@ -304,7 +304,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
               return (
                 <div key={id} className={`transition-opacity ${seg.status === 'final' ? 'opacity-100' : 'opacity-70'}`}>
                   <p style={{ fontSize: `${fontSize}px`, color: '#9ca3af', opacity: 0.6 }} className="break-words">
-                    {text}
+                    {/* 오리지널처럼 text를 렌더링하지 않고 빈 문자열만 렌더링하여 한글이 절대 보이지 않게 함 */}
                   </p>
                 </div>
               );
