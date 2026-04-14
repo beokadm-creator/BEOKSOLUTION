@@ -77,28 +77,10 @@ export const useProjectStream = (projectIdOrSlug: string | undefined, options: {
               oldestTimestampRef.current = Math.min(...items.map(i => i.timestamp));
             }
 
-            setStreamData(prev => {
-              if (!prev) return data;
-              const next = { ...prev };
-              
-              const dataKeys = Object.keys(data);
-              if (dataKeys.length > 0) {
-                const dataItems = Object.values(data) as any[];
-                const minTimestampInData = Math.min(...dataItems.map(i => i.timestamp));
-                
-                // If an item in prev is >= minTimestampInData but is missing in data, it was deleted
-                Object.keys(next).forEach(key => {
-                  if (next[key] && next[key].timestamp >= minTimestampInData && !data[key]) {
-                    delete next[key];
-                  }
-                });
-              } else {
-                // If data is completely empty, it means the stream is cleared
-                return {};
-              }
-              
-              return { ...next, ...data };
-            });
+            setStreamData(prev => ({
+              ...prev,
+              ...data
+            }));
             
             setLoading(false);
           }, (err) => {
