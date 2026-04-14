@@ -123,6 +123,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const segmentsMap = streamData || {};
+
   const segmentsOrder = Object.keys(segmentsMap)
     .filter(k => segmentsMap[k]?.sessionId === activeSessionId)
     .filter(k => (segmentsMap[k]?.timestamp || 0) >= lastFlushTime)
