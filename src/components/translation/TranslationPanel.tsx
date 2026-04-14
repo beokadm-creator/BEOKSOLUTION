@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { translationDb as rtdb } from '../../lib/translationFirebase';
 import { ref, get, onValue } from 'firebase/database';
 import { useProjectStream } from '../../hooks/useProjectStream';
+import TextItem from './TextItem';
 
 interface ProjectSettings {
   name: string;
@@ -16,7 +17,6 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeSessionInfo, setActiveSessionInfo] = useState<any | null>(null);
-  const [lastFlushTime, setLastFlushTime] = useState<number>(0);
   const [activeLang, setActiveLang] = useState<string>('ko');
 
   // Viewer Settings
@@ -106,15 +106,8 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
       }
     });
 
-    // Subscribe to state/lastFlushTime to handle "Clear Screen" from admin
-    const flushTimeRef = ref(rtdb, `projects/${selectedProjectId}/state/lastFlushTime`);
-    const unsubscribeFlushTime = onValue(flushTimeRef, (snap) => {
-      setLastFlushTime(snap.val() || 0);
-    });
-    
     return () => {
       unsubscribeActive();
-      unsubscribeFlushTime();
     };
   }, [selectedProjectId]);
 
@@ -127,13 +120,18 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
 
   const segmentsOrder = Object.keys(segmentsMap)
     .filter(k => segmentsMap[k]?.sessionId === activeSessionId)
-    .filter(k => (segmentsMap[k]?.timestamp || 0) >= lastFlushTime)
     .sort((a, b) => (segmentsMap[a]?.timestamp || 0) - (segmentsMap[b]?.timestamp || 0));
 
   // Scroll to bottom when a new segment is added
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [segmentsOrder.length]);
+
+  const [now, setNow] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   if (!selectedProjectId) {
     return (
@@ -172,6 +170,12 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
 
   return (
     <div className="relative bg-gray-900 text-white rounded-2xl flex flex-col h-[500px] overflow-hidden shadow-xl mt-6">
+      <style>{`
+        @keyframes blink-cursor {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+      `}</style>
       <div className="p-4 bg-gray-800 border-b border-gray-700 flex justify-between items-center flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <button 
@@ -300,20 +304,37 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
             //     return <TextItem ... isRaw={true} opacity={0.6} color="#6b7280" /> (즉, 흐릿하게 보여줌)
             // }
 
+            const isTranslating = seg.status === 'translating';
+            const isFinal = seg.status === 'final';
+            const isTimeOut = (now - (seg.timestamp || 0)) > 5000;
+            const showAsRaw = !isFinal && !isTimeOut && !isFallback;
+
             if (activeLang === 'en' && /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(text)) {
               return (
-                <div key={id} className={`transition-opacity ${seg.status === 'final' ? 'opacity-100' : 'opacity-70'}`}>
-                  <p style={{ fontSize: `${fontSize}px`, color: '#9ca3af', opacity: 0.6 }} className="break-words">
-                    {/* 오리지널처럼 text를 렌더링하지 않고 빈 문자열만 렌더링하여 한글이 절대 보이지 않게 함 */}
-                  </p>
-                </div>
+                <TextItem
+                  key={id}
+                  id={id}
+                  text=""
+                  isRaw={true}
+                  targetLang={activeLang}
+                  fontSize={`${fontSize}px`}
+                  color="#9ca3af"
+                  opacity={0.6}
+                />
               );
             }
 
             return (
-              <div key={id} className={`transition-opacity ${seg.status === 'final' ? 'opacity-100' : 'opacity-70'}`}>
-                <p style={{ fontSize: `${fontSize}px`, color: isFallback ? '#9ca3af' : 'white' }} className="break-words">{text}</p>
-              </div>
+              <TextItem
+                key={id}
+                id={id}
+                text={text}
+                isRaw={showAsRaw}
+                targetLang={activeLang}
+                fontSize={`${fontSize}px`}
+                color={isFallback ? "#9ca3af" : "white"}
+                opacity={!showAsRaw && !isTranslating ? 1 : 0.7}
+              />
             );
           })
         )}
