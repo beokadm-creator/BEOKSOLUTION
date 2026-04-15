@@ -17,7 +17,7 @@ export const badgeConfigRepo = {
       height: data.badgeLayout.height || 1200,
       elements: data.badgeLayout.elements || [],
       unit: data.badgeLayout.unit,
-      enableCutting: data.badgeLayout.enableCutting || false,
+      enableCutting: data.badgeLayout.enableCutting ?? true,
       printerDpmm: data.badgeLayout.printerDpmm,
       printOffsetXmm: data.badgeLayout.printOffsetXmm,
       printOffsetYmm: data.badgeLayout.printOffsetYmm,

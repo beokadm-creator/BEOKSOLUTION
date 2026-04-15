@@ -80,7 +80,7 @@ const BadgeEditorPage: React.FC = () => {
     const [printerDpmm, setPrinterDpmm] = useState(8);
     const [printOffsetXmm, setPrintOffsetXmm] = useState(0);
     const [printOffsetYmm, setPrintOffsetYmm] = useState(0);
-    const [enableCutting, setEnableCutting] = useState(false);
+    const [enableCutting, setEnableCutting] = useState(true);
     const [mediaType, setMediaType] = useState(0); // 0: Gap, 1: Continuous, 2: Black Mark
     const [marginXMm, setMarginXMm] = useState(0);
     const [marginYMm, setMarginYMm] = useState(0);
@@ -142,7 +142,7 @@ const BadgeEditorPage: React.FC = () => {
                 setPrinterDpmm(layout.printerDpmm || 8);
                 setPrintOffsetXmm(layout.printOffsetXmm || 0);
                 setPrintOffsetYmm(layout.printOffsetYmm || 0);
-                setEnableCutting(layout.enableCutting || false);
+                setEnableCutting(layout.enableCutting ?? true);
                 setMediaType(layout.mediaType || 0);
                 setMarginXMm(layout.marginXMm || 0);
                 setMarginYMm(layout.marginYMm || 0);
