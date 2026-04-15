@@ -17,13 +17,14 @@ import { registrationFunctions } from "../services/registrationFunctions";
 import type { BulkSendModalState, RegistrationOptionSummary, RootRegistration } from "../types";
 import { displayTier, getRegistrationDisplayAmount, statusToKorean } from "../utils/formatters";
 
-const FALLBACK_BADGE_LAYOUT: { width: number; height: number; elements: BadgeElement[]; enableCutting?: boolean } = {
-  width: 800,
-  height: 1200,
+const FALLBACK_BADGE_LAYOUT: { width: number; height: number; elements: BadgeElement[]; enableCutting?: boolean; unit?: 'px' | 'mm' } = {
+  width: 100,
+  height: 240,
+  unit: 'mm',
   elements: [
-    { x: 400, y: 150, fontSize: 6, isVisible: true, type: "QR" },
-    { x: 400, y: 450, fontSize: 4, isVisible: true, type: "NAME" },
-    { x: 400, y: 600, fontSize: 2, isVisible: true, type: "ORG" },
+    { x: 50, y: 20, fontSize: 25, isVisible: true, type: "QR" },
+    { x: 50, y: 60, fontSize: 6, isVisible: true, type: "NAME" },
+    { x: 50, y: 80, fontSize: 4, isVisible: true, type: "ORG" },
   ],
 };
 

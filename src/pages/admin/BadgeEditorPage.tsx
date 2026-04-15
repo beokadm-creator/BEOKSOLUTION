@@ -173,7 +173,8 @@ const BadgeEditorPage: React.FC = () => {
                 printerDpmm,
                 printOffsetXmm,
                 printOffsetYmm,
-                enableCutting
+                enableCutting,
+                unit: 'mm'
             });
             toast.success('명찰 레이아웃이 저장되었습니다! ✅');
         } catch (e: any) {
