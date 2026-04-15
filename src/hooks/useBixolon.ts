@@ -70,7 +70,8 @@ export const useBixolon = () => {
         const safeHeightMm = layout.height > 350 ? layout.height / 3.78 : layout.height;
         
         const widthDots = mmToDots(safeWidthMm, dpmm);
-        const autoCutFeedMm = safeHeightMm <= 240 ? 40 : 0;
+        // 240mm 전용 피드 로직 수정: 명찰 크기에 관계없이 일관된 커팅
+        const autoCutFeedMm = 0; // 자동 피드 제거
         const cutFeedMm = layout.enableCutting !== false ? (layout.cutFeedMm ?? autoCutFeedMm) : 0;
         const heightDots = mmToDots(safeHeightMm + Math.max(cutFeedMm, 0), dpmm);
 
