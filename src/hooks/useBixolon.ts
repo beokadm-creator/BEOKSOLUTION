@@ -79,7 +79,9 @@ export const useBixolon = () => {
         };
 
         let fIdx = 7;
-        functions[`func${String(fIdx++).padStart(2, '0')}`] = { "setAutoCutter": [1, 1] };
+        const cutType = layout.cutPaperType ?? 0;
+        const cutterEnabled = layout.enableCutting !== false ? 1 : 0;
+        functions[`func${String(fIdx++).padStart(2, '0')}`] = { "setAutoCutter": [cutterEnabled, cutType] };
         for (const el of layout.elements) {
             if (!el.isVisible) continue;
 
@@ -172,10 +174,6 @@ export const useBixolon = () => {
         }
 
         functions[`func${String(fIdx++).padStart(2, '0')}`] = { "printBuffer": [] };
-        if (layout.enableCutting !== false) {
-            const cutType = layout.cutPaperType ?? 0;
-            functions[`func${String(fIdx++).padStart(2, '0')}`] = { "cutPaper": [cutType] };
-        }
 
         return { "id": Math.floor(Math.random() * 1000) + 1, "functions": functions };
     };
@@ -188,9 +186,34 @@ export const useBixolon = () => {
                 headers: { "Content-Type": "text/plain" },
                 body: JSON.stringify(payload)
             });
-            return response.ok;
+            const text = await response.text();
+            if (!response.ok) {
+                setError(text || `${response.status} ${response.statusText}`);
+                return false;
+            }
+            if (text) {
+                try {
+                    const data = JSON.parse(text) as Record<string, unknown>;
+                    const resultCode = String(
+                        (data.ResultCode ?? data.resultCode ?? data.result ?? data.code ?? '')
+                    ).toLowerCase();
+                    if (
+                        resultCode &&
+                        resultCode !== 'success' &&
+                        resultCode !== '0' &&
+                        resultCode !== 'ok'
+                    ) {
+                        setError(text);
+                        return false;
+                    }
+                } catch {
+                    void 0;
+                }
+            }
+            return true;
         } catch (e) {
             console.error("[Bixolon] HTTP Post failed:", e);
+            setError('로컬 WebPrint 에이전트 연결 실패 (127.0.0.1:18080)');
             return false;
         }
     };
@@ -222,7 +245,7 @@ export const useBixolon = () => {
                     func01: { clearBuffer: [] },
                     func02: { directDrawHex: ['400D'] },
                     func03: { clearBuffer: [] },
-                    func04: { setAutoCutter: [1, 1] },
+                    func04: { setAutoCutter: [1, 0] },
                 },
             };
             console.log('[Bixolon Renewal] Reset Payload:', JSON.stringify(payload));

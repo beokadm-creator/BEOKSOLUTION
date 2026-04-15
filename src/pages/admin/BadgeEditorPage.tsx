@@ -209,7 +209,16 @@ const BadgeEditorPage: React.FC = () => {
                 {
                     width: 100,
                     height: 240,
-                    elements: [],
+                    elements: [
+                        {
+                            x: 0,
+                            y: 0,
+                            fontSize: 1,
+                            isVisible: true,
+                            type: 'CUSTOM',
+                            content: '.',
+                        },
+                    ],
                     unit: 'mm',
                     enableCutting: true,
                     printerDpmm,
