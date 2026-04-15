@@ -40,6 +40,7 @@ export const useBixolon = () => {
             mediaType?: number;
             marginXMm?: number;
             marginYMm?: number;
+            cutPaperType?: 0 | 1;
         },
         userData: {
             name: string; org: string; category?: string;
@@ -174,7 +175,7 @@ export const useBixolon = () => {
         functions[`func${String(fIdx++).padStart(2, '0')}`] = { "printBuffer": [] };
         
         if (layout.enableCutting) {
-            const cutType = mediaType === 2 ? 0 : 1;
+            const cutType = layout.cutPaperType ?? (mediaType === 2 ? 0 : 1);
             functions[`func${String(fIdx++).padStart(2, '0')}`] = { "cutPaper": [cutType] };
         }
 
