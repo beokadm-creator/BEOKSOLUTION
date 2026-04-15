@@ -344,6 +344,15 @@ export const useExternalAttendeeActions = ({
           ],
         };
 
+        // DEBUG: 실제 로드된 레이아웃 확인
+        console.log('🔍 [EXTERNAL DEBUG] Loaded Layout:', {
+          source: layoutSource,
+          width: activeLayout.width,
+          height: activeLayout.height,
+          unit: activeLayout.unit,
+          fromDB: badgeLayout ? 'YES' : 'NO (fallback)'
+        });
+
         toast.loading(
           `라벨 프린터 전송 중... (${layoutSource}, ${activeLayout.width}×${activeLayout.height}${activeLayout.unit ? ` ${activeLayout.unit}` : ''})`,
           { id: toastId },
