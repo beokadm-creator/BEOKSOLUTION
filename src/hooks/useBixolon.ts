@@ -212,5 +212,30 @@ export const useBixolon = () => {
         }
     };
 
-    return { printBadge, printing, error };
+    const resetPrinter = async (): Promise<boolean> => {
+        setPrinting(true);
+        setError(null);
+        try {
+            const payload = {
+                id: Math.floor(Math.random() * 1000) + 1,
+                functions: {
+                    func01: { clearBuffer: [] },
+                    func02: { directDrawHex: ['400D'] },
+                    func03: { clearBuffer: [] },
+                    func04: { setAutoCutter: [1, 1] },
+                },
+            };
+            console.log('[Bixolon Renewal] Reset Payload:', JSON.stringify(payload));
+            const success = await printViaHttp(payload);
+            setPrinting(false);
+            return success;
+        } catch (err) {
+            console.error('[Bixolon Renewal] Reset Error:', err);
+            setError('시스템 오류');
+            setPrinting(false);
+            return false;
+        }
+    };
+
+    return { printBadge, resetPrinter, printing, error };
 };

@@ -70,7 +70,7 @@ const MmInput: React.FC<{
 const BadgeEditorPage: React.FC = () => {
     const { id: confId, info, loading: confLoading } = useConference();
     const { saveBadgeLayout, loading: saving } = useAdmin(confId || '');
-    const { printBadge, printing: bixolonPrinting, error: bixolonError } = useBixolon();
+    const { printBadge, resetPrinter, printing: bixolonPrinting, error: bixolonError } = useBixolon();
 
     const [elements, setElements] = useState<BadgeElement[]>([]);
     const [canvasSize, setCanvasSize] = useState({
@@ -236,6 +236,20 @@ const BadgeEditorPage: React.FC = () => {
         } catch (e) {
             console.error(e);
             toast.error('테스트 출력 실패', { id: toastId, duration: 6000 });
+        }
+    };
+
+    const handleResetPrinter = async () => {
+        const toastId = 'bixolon-reset';
+        if (bixolonPrinting) return;
+        toast.loading('프린터 리셋 중...', { id: toastId });
+        try {
+            const ok = await resetPrinter();
+            if (ok) toast.success('프린터 리셋 완료', { id: toastId });
+            else toast.error(bixolonError || '프린터 리셋 실패', { id: toastId, duration: 6000 });
+        } catch (e) {
+            console.error(e);
+            toast.error('프린터 리셋 실패', { id: toastId, duration: 6000 });
         }
     };
 
@@ -484,6 +498,18 @@ const BadgeEditorPage: React.FC = () => {
                                 onClick={() => handleTestCut(1)}
                             >
                                 커팅 테스트(1)
+                            </Button>
+                        </div>
+                        <div className="mt-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-9 text-[11px] w-full"
+                                disabled={bixolonPrinting}
+                                onClick={handleResetPrinter}
+                            >
+                                프린터 리셋
                             </Button>
                         </div>
                     </div>
