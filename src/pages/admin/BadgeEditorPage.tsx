@@ -207,21 +207,18 @@ const BadgeEditorPage: React.FC = () => {
         try {
             const ok = await printBadge(
                 {
-                    width: canvasSize.width,
-                    height: canvasSize.height,
-                    elements: [
-                        { type: 'NAME', x: 10, y: 10, fontSize: 6, isVisible: true } as BadgeElement,
-                        { type: 'QR', x: 10, y: 20, fontSize: 25, isVisible: true } as BadgeElement,
-                    ],
+                    width: 100,
+                    height: 240,
+                    elements: [],
                     unit: 'mm',
                     enableCutting: true,
                     printerDpmm,
-                    printOffsetXmm,
-                    printOffsetYmm,
-                    printStartOffsetMm,
+                    printOffsetXmm: 0,
+                    printOffsetYmm: 0,
+                    printStartOffsetMm: 0,
                     mediaType,
-                    marginXMm,
-                    marginYMm,
+                    marginXMm: 0,
+                    marginYMm: 0,
                     cutPaperType,
                 },
                 {
