@@ -18,13 +18,17 @@ export const badgeConfigRepo = {
       elements: data.badgeLayout.elements || [],
       unit: data.badgeLayout.unit,
       enableCutting: data.badgeLayout.enableCutting ?? true,
+      printerFont: data.badgeLayout.printerFont,
       printerDpmm: data.badgeLayout.printerDpmm,
       printOffsetXmm: data.badgeLayout.printOffsetXmm,
       printOffsetYmm: data.badgeLayout.printOffsetYmm,
       printStartOffsetMm: data.badgeLayout.printStartOffsetMm,
       mediaType: data.badgeLayout.mediaType,
+      labelGapMm: data.badgeLayout.labelGapMm,
+      cutFeedMm: data.badgeLayout.cutFeedMm,
       marginXMm: data.badgeLayout.marginXMm,
       marginYMm: data.badgeLayout.marginYMm,
+      cutPaperType: data.badgeLayout.cutPaperType,
     };
   },
 };

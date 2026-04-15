@@ -72,8 +72,11 @@ const InfodeskPage: React.FC = () => {
         printOffsetYmm?: number;
         printStartOffsetMm?: number;
         mediaType?: number;
+        labelGapMm?: number;
+        cutFeedMm?: number;
         marginXMm?: number;
         marginYMm?: number;
+        cutPaperType?: 0 | 1;
     } | null>(null);
     const [attendeeCache, setAttendeeCache] = useState<Map<string, any>>(new Map());
     const inputRef = useRef<HTMLInputElement>(null);
@@ -100,10 +103,10 @@ const InfodeskPage: React.FC = () => {
                 if (layoutSnap.exists()) {
                     const data = layoutSnap.data();
                     if (data.badgeLayoutEnabled) {
-                        setBadgeLayout({
-                            width: data.badgeLayout?.width || 800,
-                            height: data.badgeLayout?.height || 1200,
-                            elements: data.badgeLayout?.elements || [],
+                        const nextLayout = {
+                            width: data.badgeLayout?.width ?? 100,
+                            height: data.badgeLayout?.height ?? 240,
+                            elements: data.badgeLayout?.elements ?? [],
                             unit: data.badgeLayout?.unit,
                             enableCutting: data.badgeLayout?.enableCutting ?? true,
                             printerDpmm: data.badgeLayout?.printerDpmm,
@@ -111,9 +114,13 @@ const InfodeskPage: React.FC = () => {
                             printOffsetYmm: data.badgeLayout?.printOffsetYmm,
                             printStartOffsetMm: data.badgeLayout?.printStartOffsetMm,
                             mediaType: data.badgeLayout?.mediaType,
+                            labelGapMm: data.badgeLayout?.labelGapMm,
+                            cutFeedMm: data.badgeLayout?.cutFeedMm,
                             marginXMm: data.badgeLayout?.marginXMm,
                             marginYMm: data.badgeLayout?.marginYMm,
-                        });
+                            cutPaperType: data.badgeLayout?.cutPaperType,
+                        };
+                        setBadgeLayout(nextLayout);
                     }
                 }
 
@@ -210,7 +217,6 @@ const InfodeskPage: React.FC = () => {
             let isExternal = regId.startsWith('EXT-');
 
             if (!regData) {
-                console.log(`[Cache Miss] Fetching ${regId} from Firestore`);
                 if (isExternal) {
                     const extRef = doc(db, `conferences/${targetConferenceId}/external_attendees`, regId);
                     const extSnap = await getDoc(extRef);

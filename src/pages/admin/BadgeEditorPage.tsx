@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import Draggable from 'react-draggable';
 import { useConference } from '../../hooks/useConference';
 import { useAdmin } from '../../hooks/useAdmin';
-import { useBixolon } from '../../hooks/useBixolon';
 import { BadgeElement } from '../../types/schema';
 import toast from 'react-hot-toast';
 import { Button } from '../../components/ui/button';
@@ -14,7 +13,7 @@ const toMm = (px: number) => parseFloat((px / PX_PER_MM).toFixed(1));
 const toPx = (mm: number) => Math.round(mm * PX_PER_MM);
 
 const DEFAULT_BADGE_WIDTH_MM = 100;
-const DEFAULT_BADGE_HEIGHT_MM = 280;
+const DEFAULT_BADGE_HEIGHT_MM = 240;
 
 const MmInput: React.FC<{
     valueMm: number | undefined;
@@ -23,7 +22,8 @@ const MmInput: React.FC<{
     step?: number;
     className?: string;
     allowEmpty?: boolean;
-}> = ({ valueMm, onChange, placeholder, step = 0.5, className = '', allowEmpty = false }) => {
+    disabled?: boolean;
+}> = ({ valueMm, onChange, placeholder, step = 0.5, className = '', allowEmpty = false, disabled = false }) => {
     const [localVal, setLocalVal] = useState<string>(
         valueMm !== undefined ? String(valueMm) : ''
     );
@@ -45,6 +45,7 @@ const MmInput: React.FC<{
             step={step}
             value={localVal}
             placeholder={placeholder}
+            disabled={disabled}
             className={`border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 ${className}`}
             onFocus={() => { isFocused.current = true; }}
             onChange={e => setLocalVal(e.target.value)}
@@ -70,7 +71,6 @@ const MmInput: React.FC<{
 const BadgeEditorPage: React.FC = () => {
     const { id: confId, info, loading: confLoading } = useConference();
     const { saveBadgeLayout, loading: saving } = useAdmin(confId || '');
-    const { printBadge, resetPrinter, printing: bixolonPrinting, error: bixolonError } = useBixolon();
 
     const [elements, setElements] = useState<BadgeElement[]>([]);
     const [canvasSize, setCanvasSize] = useState({
@@ -80,6 +80,7 @@ const BadgeEditorPage: React.FC = () => {
     const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
     const [bgUrl, setBgUrl] = useState<string | undefined>(undefined);
     const [printerDpmm, setPrinterDpmm] = useState(8);
+    const [printerFont, setPrinterFont] = useState('Malgun Gothic');
     const [printOffsetXmm, setPrintOffsetXmm] = useState(0);
     const [printOffsetYmm, setPrintOffsetYmm] = useState(0);
     const [printStartOffsetMm, setPrintStartOffsetMm] = useState(0);
@@ -148,12 +149,17 @@ const BadgeEditorPage: React.FC = () => {
                 }
                 setBgUrl(layout.backgroundImageUrl);
                 setPrinterDpmm(layout.printerDpmm || 8);
+                setPrinterFont((layout as any).printerFont || 'Malgun Gothic');
                 setPrintOffsetXmm(layout.printOffsetXmm || 0);
                 setPrintOffsetYmm(layout.printOffsetYmm || 0);
                 setPrintStartOffsetMm(layout.printStartOffsetMm || 0);
                 setEnableCutting(layout.enableCutting ?? true);
                 setMediaType(layout.mediaType || 0);
-                setLabelGapMm(layout.labelGapMm ?? 3);
+                const nextMediaType = layout.mediaType || 0;
+                const nextGap = layout.labelGapMm;
+                setLabelGapMm(
+                    nextMediaType === 1 ? 0 : (nextGap && nextGap > 0 ? nextGap : 3)
+                );
                 setCutFeedMm(layout.cutFeedMm ?? 0);
                 setMarginXMm(layout.marginXMm || 0);
                 setMarginYMm(layout.marginYMm || 0);
@@ -179,18 +185,23 @@ const BadgeEditorPage: React.FC = () => {
 
     const handleSave = async () => {
         try {
-            await saveBadgeLayout(canvasSize.width, canvasSize.height, elements, bgUrl, {
+            const effectiveLabelGapMm = mediaType === 1 ? 0 : (labelGapMm > 0 ? labelGapMm : 3);
+            const extraSettingsToSave = {
+                printerFont,
                 printerDpmm,
                 printOffsetXmm,
                 printOffsetYmm,
                 printStartOffsetMm,
                 enableCutting,
                 mediaType,
-                labelGapMm,
+                labelGapMm: effectiveLabelGapMm,
                 cutFeedMm,
                 marginXMm,
                 marginYMm,
                 unit: 'mm'
+            };
+            await saveBadgeLayout(canvasSize.width, canvasSize.height, elements, bgUrl, {
+                ...extraSettingsToSave
             });
             toast.success('명찰 레이아웃이 저장되었습니다! ✅');
         } catch (e: any) {
@@ -205,70 +216,6 @@ const BadgeEditorPage: React.FC = () => {
             } else {
                 toast.error(`저장 실패: ${e?.message || '알 수 없는 오류'}`);
             }
-        }
-    };
-
-    const handleTestCut = async (cutPaperType: 0 | 1) => {
-        const toastId = 'bixolon-test';
-        if (bixolonPrinting) return;
-        toast.loading('테스트 출력 중...', { id: toastId });
-        try {
-            const ok = await printBadge(
-                {
-                    width: canvasSize.width,
-                    height: canvasSize.height,
-                    elements: [
-                        {
-                            x: 0,
-                            y: 0,
-                            fontSize: 1,
-                            isVisible: true,
-                            type: 'CUSTOM',
-                            content: '.',
-                        },
-                    ],
-                    unit: 'mm',
-                    enableCutting: true,
-                    printerDpmm,
-                    printOffsetXmm,
-                    printOffsetYmm,
-                    printStartOffsetMm,
-                    mediaType,
-                    labelGapMm,
-                    cutFeedMm,
-                    marginXMm,
-                    marginYMm,
-                    cutPaperType,
-                },
-                {
-                    name: 'TEST',
-                    org: 'TEST',
-                    category: 'TEST',
-                    license: 'TEST',
-                    price: 'TEST',
-                    affiliation: 'TEST',
-                    qrData: 'TEST',
-                },
-            );
-            if (ok) toast.success('테스트 출력 성공', { id: toastId });
-            else toast.error(bixolonError || '테스트 출력 실패', { id: toastId, duration: 6000 });
-        } catch (e) {
-            console.error(e);
-            toast.error('테스트 출력 실패', { id: toastId, duration: 6000 });
-        }
-    };
-
-    const handleResetPrinter = async () => {
-        const toastId = 'bixolon-reset';
-        if (bixolonPrinting) return;
-        toast.loading('프린터 리셋 중...', { id: toastId });
-        try {
-            const ok = await resetPrinter();
-            if (ok) toast.success('프린터 리셋 완료', { id: toastId });
-            else toast.error(bixolonError || '프린터 리셋 실패', { id: toastId, duration: 6000 });
-        } catch (e) {
-            console.error(e);
-            toast.error('프린터 리셋 실패', { id: toastId, duration: 6000 });
         }
     };
 
@@ -416,6 +363,16 @@ const BadgeEditorPage: React.FC = () => {
                                 </select>
                             </div>
                             <div className="space-y-1">
+                                <label className="text-[11px] font-medium text-slate-500 ml-1">프린터 폰트</label>
+                                <input
+                                    type="text"
+                                    value={printerFont}
+                                    onChange={(e) => setPrinterFont(e.target.value)}
+                                    className="border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 w-full"
+                                    placeholder="예: Malgun Gothic, NanumSquareB"
+                                />
+                            </div>
+                            <div className="space-y-1">
                                 <label className="text-[11px] font-medium text-slate-500 ml-1">용지 타입 (센서)</label>
                                 <select
                                     value={mediaType}
@@ -430,8 +387,17 @@ const BadgeEditorPage: React.FC = () => {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
-                                <label className="text-[11px] font-medium text-slate-500 ml-1">라벨 간격 (mm)</label>
-                                <MmInput valueMm={labelGapMm} onChange={mm => mm !== undefined && setLabelGapMm(mm)} step={0.1} className="w-full" />
+                                <label className="text-[11px] font-medium text-slate-500 ml-1">갭/마크 길이 (mm)</label>
+                                <MmInput
+                                    valueMm={mediaType === 1 ? 0 : labelGapMm}
+                                    onChange={mm => {
+                                        if (mediaType === 1) return;
+                                        if (mm !== undefined) setLabelGapMm(mm);
+                                    }}
+                                    step={0.1}
+                                    className="w-full"
+                                    disabled={mediaType === 1}
+                                />
                             </div>
                             <div />
                         </div>
@@ -512,40 +478,6 @@ const BadgeEditorPage: React.FC = () => {
                             <label htmlFor="enableCutting" className="text-[11px] font-medium text-slate-500">
                                 인쇄 후 자동 커팅 활성화
                             </label>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 mt-3">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-9 text-[11px]"
-                                disabled={bixolonPrinting}
-                                onClick={() => handleTestCut(0)}
-                            >
-                                커팅 테스트(0)
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-9 text-[11px]"
-                                disabled={bixolonPrinting}
-                                onClick={() => handleTestCut(1)}
-                            >
-                                커팅 테스트(1)
-                            </Button>
-                        </div>
-                        <div className="mt-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-9 text-[11px] w-full"
-                                disabled={bixolonPrinting}
-                                onClick={handleResetPrinter}
-                            >
-                                프린터 리셋
-                            </Button>
                         </div>
                     </div>
 

@@ -8,6 +8,11 @@ const PRINTER_NAME = 'Printer1';
 // Renewal: 무조건 mm를 받아서 dots로 변환 (추론/px 로직 전면 폐기)
 const mmToDots = (mm: number, dpmm: number) => Math.round(mm * dpmm);
 
+const asciiToHex = (text: string) =>
+    Array.from(text)
+        .map((ch) => ch.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase())
+        .join('');
+
 export const useBixolon = () => {
     const [printing, setPrinting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -33,6 +38,7 @@ export const useBixolon = () => {
             height: number;
             elements: BadgeElement[];
             enableCutting?: boolean;
+            printerFont?: string;
             printerDpmm?: number;
             printOffsetXmm?: number;
             printOffsetYmm?: number;
@@ -59,61 +65,45 @@ export const useBixolon = () => {
         const marginXDots = mmToDots(layout.marginXMm || 0, dpmm);
         const marginYDots = mmToDots(layout.marginYMm || 0, dpmm);
         
-        // Media Type (0: Gap, 1: Continuous, 2: Black Mark)
-        const mediaType = layout.mediaType || 0;
-        // 블랙마크 모드에서는 gap과 offset 설정이 다름
-        const setLengthOffsetDots = mediaType === 1 ? 0 :
-                                   mediaType === 2 ? mmToDots(layout.printStartOffsetMm || 5, dpmm) :
-                                   mmToDots(layout.printStartOffsetMm || 0, dpmm);
-        const gapDots = mediaType === 1 ? 0 :
-                       mediaType === 2 ? 0 :
-                       mmToDots(layout.labelGapMm ?? 3, dpmm);
-
         // Paper Size (mm -> dots)
         // 만약 기존 px 데이터(width > 250)가 넘어오면 mm 단위로 변환하여 오작동 방지
         const safeWidthMm = layout.width > 250 ? layout.width / 3.78 : layout.width;
         const safeHeightMm = layout.height > 350 ? layout.height / 3.78 : layout.height;
-        
-        const widthDots = mmToDots(safeWidthMm, dpmm);
-        // 블랙마크 방식에서는 추가 피드 불필요 - 마크에서 정확히 커팅
-        const autoCutFeedMm = 0;
-        const cutFeedMm = layout.enableCutting !== false ? (layout.cutFeedMm ?? autoCutFeedMm) : 0;
-        const heightDots = mmToDots(safeHeightMm + Math.max(cutFeedMm, 0), dpmm);
 
-        // DEBUG: 실제 사용되는 값들 로깅
-        console.log('🔍 [BIXOLON DEBUG] Layout Input:', {
-            original: { width: layout.width, height: layout.height },
-            safe: { width: safeWidthMm, height: safeHeightMm },
-            feed: { auto: autoCutFeedMm, final: cutFeedMm },
-            final: { widthDots, heightDots, heightMm: safeHeightMm + Math.max(cutFeedMm, 0) }
-        });
+        const widthDots = mmToDots(safeWidthMm, dpmm);
+        const heightDots = mmToDots(safeHeightMm, dpmm);
+
+        const mediaType = layout.mediaType ?? 0;
+        const labelGapMm = layout.labelGapMm;
+        const effectiveLabelGapMm =
+            mediaType === 1 ? 0 : (labelGapMm && labelGapMm > 0 ? labelGapMm : 3);
+        const labelGapDots = mmToDots(effectiveLabelGapMm, dpmm);
+        const printStartOffsetDots = mmToDots(layout.printStartOffsetMm ?? 0, dpmm);
+        const cutFeedDots = mmToDots(layout.cutFeedMm ?? 0, dpmm);
+        const enableCutting = layout.enableCutting ?? true;
+        const cutPaperType = layout.cutPaperType ?? 0;
+        const printerFont = layout.printerFont || 'Malgun Gothic';
 
         const functions: Record<string, any> = {
             "func01": { "clearBuffer": [] },
-            "func02": { "setMargin": [marginXDots, marginYDots] },
-            "func03": { "setReferencePoint": [0, 0] },
-            "func04": { "setDirection": [0] },
-            "func05": { "setWidth": [widthDots] },
-            "func06": { "setLength": [heightDots, gapDots, mediaType, setLengthOffsetDots] }
+            "func02": { "directDrawHex": [asciiToHex(`CUT${enableCutting ? 1 : 0}\r`)] },
+            "func03": { "directDrawHex": [asciiToHex(`CL${heightDots}\r`)] },
+            "func04": { "setMargin": [marginXDots, marginYDots] },
+            "func05": { "setReferencePoint": [0, 0] },
+            "func06": { "setDirection": [0] },
+            "func07": { "setWidth": [widthDots] },
+            "func08": { "setLength": [heightDots, labelGapDots, mediaType, printStartOffsetDots] },
+            "func09": { "setAutoCutter": enableCutting ? [1, cutPaperType] : [0, 0] }
         };
 
-        let fIdx = 7;
-        const cutType = layout.cutPaperType ?? 0;
-        const cutterEnabled = layout.enableCutting !== false ? 1 : 0;
-        functions[`func${String(fIdx++).padStart(2, '0')}`] = { "setAutoCutter": [cutterEnabled, cutType] };
+        let fIdx = 10;
         for (const el of layout.elements) {
             if (!el.isVisible) continue;
 
             // X, Y (mm -> dots)
             // 레거시 px 데이터가 섞여 들어오는 것을 방지하기 위해 x가 200 이상이면 비정상으로 간주하고 mm로 보정
             const safeXMm = el.x > 250 ? el.x / 3.78 : el.x;
-            let safeYMm = el.y > 350 ? el.y / 3.78 : el.y;
-
-            // 240mm 용지에서 하단 공백을 줄이기 위해 Y 오프셋 추가
-            if (safeHeightMm === 240 && safeYMm > 0) {
-                safeYMm = safeYMm + 20; // 20mm 아래로 이동 (용지 범위 내)
-                console.log(`📍 [OFFSET DEBUG] Y: ${el.y} + 20mm → ${safeYMm.toFixed(1)}mm`);
-            }
+            const safeYMm = el.y > 350 ? el.y / 3.78 : el.y;
 
             const safeFontSizeMm = el.fontSize > 100 && el.type !== 'IMAGE' ? el.fontSize / 3.78 : el.fontSize;
 
@@ -191,7 +181,7 @@ export const useBixolon = () => {
                     functions[`func${String(fIdx++).padStart(2, '0')}`] = {
                         "drawTrueTypeFont": [
                             lineText, printXDots, Math.round(currentLineYDots),
-                            "Malgun Gothic", fontDots,
+                            printerFont, fontDots,
                             0, false, true, false, false
                         ]
                     };
@@ -249,12 +239,10 @@ export const useBixolon = () => {
         setError(null);
         try {
             const payload = buildPrintData(layout, userData);
-            console.log('[Bixolon Renewal] Final Payload:', JSON.stringify(payload));
             const success = await printViaHttp(payload);
             setPrinting(false);
             return success;
         } catch (err) {
-            console.error('[Bixolon Renewal] Error:', err);
             setError('시스템 오류');
             setPrinting(false);
             return false;
@@ -274,12 +262,10 @@ export const useBixolon = () => {
                     func04: { setAutoCutter: [1, 0] },
                 },
             };
-            console.log('[Bixolon Renewal] Reset Payload:', JSON.stringify(payload));
             const success = await printViaHttp(payload);
             setPrinting(false);
             return success;
         } catch (err) {
-            console.error('[Bixolon Renewal] Reset Error:', err);
             setError('시스템 오류');
             setPrinting(false);
             return false;

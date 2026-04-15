@@ -20,13 +20,17 @@ export type BadgeLayout = {
   elements: BadgeElement[];
   unit?: "px" | "mm";
   enableCutting?: boolean;
+  printerFont?: string;
   printerDpmm?: number;
   printOffsetXmm?: number;
   printOffsetYmm?: number;
   printStartOffsetMm?: number;
   mediaType?: number;
+  labelGapMm?: number;
+  cutFeedMm?: number;
   marginXMm?: number;
   marginYMm?: number;
+  cutPaperType?: 0 | 1;
 };
 
 export type BulkSendResult = {
@@ -53,13 +57,17 @@ export type BadgeConfigDoc = {
     elements?: BadgeElement[];
     unit?: "px" | "mm";
     enableCutting?: boolean;
+    printerFont?: string;
     printerDpmm?: number;
     printOffsetXmm?: number;
     printOffsetYmm?: number;
     printStartOffsetMm?: number;
     mediaType?: number;
+    labelGapMm?: number;
+    cutFeedMm?: number;
     marginXMm?: number;
     marginYMm?: number;
+    cutPaperType?: 0 | 1;
   };
   updatedAt?: Timestamp;
 };
