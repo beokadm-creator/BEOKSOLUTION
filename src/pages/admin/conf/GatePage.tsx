@@ -18,6 +18,12 @@ interface ScannerState {
         affiliation: string;
     };
     actionType?: 'ENTER' | 'EXIT';
+    recognizedMinutes?: number;
+    totalMinutes?: number;
+    todayMinutes?: number;
+    goalMinutes?: number;
+    remainingMinutes?: number;
+    isCompleted?: boolean;
 }
 
 const GatePage: React.FC = () => {
@@ -76,7 +82,11 @@ const GatePage: React.FC = () => {
                         }
                     });
 
-                    const uniqueZones = Array.from(new Map(allZones.map(item => [item.id, item])).values());
+                    const kstToday = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+                    const zonesToUse = allZones.some(z => z.ruleDate === kstToday)
+                        ? allZones.filter(z => z.ruleDate === kstToday)
+                        : allZones;
+                    const uniqueZones = Array.from(new Map(zonesToUse.map(item => [item.name || item.id, item])).values());
                     setZones(uniqueZones);
 
                     const key = `eregi_conf_${confId}_settings`;
@@ -85,7 +95,9 @@ const GatePage: React.FC = () => {
                         try {
                             const parsed = JSON.parse(saved);
                             if (parsed.gate?.mode) setMode(parsed.gate.mode);
-                            if (parsed.gate?.zoneId) setSelectedZoneId(parsed.gate.zoneId);
+                            if (parsed.gate?.zoneId && uniqueZones.some(z => z.id === parsed.gate.zoneId)) {
+                                setSelectedZoneId(parsed.gate.zoneId);
+                            }
                         } catch (e) {
                             console.error("Failed to parse settings", e);
                         }
@@ -273,6 +285,11 @@ const GatePage: React.FC = () => {
                 && newTotal >= ruleForCumulative.cumulativeGoalMinutes;
             isComp = anyZoneCompleted || !!cumulativeCompleted || isComp;
 
+            const goalMinutes = ruleForCumulative?.completionMode === 'CUMULATIVE'
+                ? (ruleForCumulative?.cumulativeGoalMinutes || 0)
+                : (ruleForCumulative?.globalGoalMinutes || 0);
+            const remainingMinutes = goalMinutes > 0 ? Math.max(0, goalMinutes - newTotal) : 0;
+
             tx.update(regRef, {
                 attendanceStatus: action === 'ENTER' ? 'INSIDE' : 'OUTSIDE',
                 currentZone: action === 'ENTER' ? targetZoneId : null,
@@ -290,7 +307,18 @@ const GatePage: React.FC = () => {
             const accRef = doc(collection(db, `conferences/${confId}/access_logs`));
             tx.set(accRef, { action: action === 'ENTER' ? 'ENTRY' : 'EXIT', scannedQr: data.badgeQr || id, locationId: action === 'ENTER' ? targetZoneId : curZoneId, timestamp: tsNow, date: todayStr, method: 'KIOSK_GATE', registrationId: id, isExternal: isExt, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
 
-            return { actionText: text, actionType: action, userName: name, affiliation: aff };
+            return {
+                actionText: text,
+                actionType: action,
+                userName: name,
+                affiliation: aff,
+                recognizedMinutes: minsToAdd,
+                totalMinutes: newTotal,
+                todayMinutes: dailyMinutes[todayStr] || 0,
+                goalMinutes,
+                remainingMinutes,
+                isCompleted: isComp
+            };
         });
     };
 
