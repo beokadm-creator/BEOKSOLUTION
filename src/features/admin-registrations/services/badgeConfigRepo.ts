@@ -21,6 +21,7 @@ export const badgeConfigRepo = {
       printerDpmm: data.badgeLayout.printerDpmm,
       printOffsetXmm: data.badgeLayout.printOffsetXmm,
       printOffsetYmm: data.badgeLayout.printOffsetYmm,
+      printStartOffsetMm: data.badgeLayout.printStartOffsetMm,
       mediaType: data.badgeLayout.mediaType,
       marginXMm: data.badgeLayout.marginXMm,
       marginYMm: data.badgeLayout.marginYMm,

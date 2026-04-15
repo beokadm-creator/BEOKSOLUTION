@@ -23,6 +23,10 @@ export type BadgeLayout = {
   printerDpmm?: number;
   printOffsetXmm?: number;
   printOffsetYmm?: number;
+  printStartOffsetMm?: number;
+  mediaType?: number;
+  marginXMm?: number;
+  marginYMm?: number;
 };
 
 export type BulkSendResult = {
@@ -52,6 +56,10 @@ export type BadgeConfigDoc = {
     printerDpmm?: number;
     printOffsetXmm?: number;
     printOffsetYmm?: number;
+    printStartOffsetMm?: number;
+    mediaType?: number;
+    marginXMm?: number;
+    marginYMm?: number;
   };
   updatedAt?: Timestamp;
 };
