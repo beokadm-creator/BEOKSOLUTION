@@ -107,7 +107,15 @@ export const useBixolon = () => {
             // X, Y (mm -> dots)
             // 레거시 px 데이터가 섞여 들어오는 것을 방지하기 위해 x가 200 이상이면 비정상으로 간주하고 mm로 보정
             const safeXMm = el.x > 250 ? el.x / 3.78 : el.x;
-            const safeYMm = el.y > 350 ? el.y / 3.78 : el.y;
+            let safeYMm = el.y > 350 ? el.y / 3.78 : el.y;
+
+            // 280mm 기준 레이아웃을 현재 용지 크기에 맞게 스케일링
+            if (safeHeightMm !== 280 && safeYMm > 0) {
+                const scale = safeHeightMm / 280;
+                safeYMm = safeYMm * scale;
+                console.log(`🎯 [SCALE DEBUG] Y: ${el.y} → ${safeYMm.toFixed(1)}mm (scale: ${scale.toFixed(3)})`);
+            }
+
             const safeFontSizeMm = el.fontSize > 100 && el.type !== 'IMAGE' ? el.fontSize / 3.78 : el.fontSize;
 
             const baseXDots = mmToDots(safeXMm, dpmm);
