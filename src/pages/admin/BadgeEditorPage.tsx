@@ -14,7 +14,7 @@ const toMm = (px: number) => parseFloat((px / PX_PER_MM).toFixed(1));
 const toPx = (mm: number) => Math.round(mm * PX_PER_MM);
 
 const DEFAULT_BADGE_WIDTH_MM = 100;
-const DEFAULT_BADGE_HEIGHT_MM = 240;
+const DEFAULT_BADGE_HEIGHT_MM = 280;
 
 const MmInput: React.FC<{
     valueMm: number | undefined;
