@@ -64,9 +64,9 @@ export const useBixolon = () => {
         const gapDots = mediaType === 1 ? 0 : mmToDots(layout.labelGapMm ?? 3, dpmm);
 
         // Paper Size (mm -> dots)
-        // 만약 기존 px 데이터(width > 250)가 넘어오면 강제로 mm 비율(100x240)로 클램핑하여 오작동 방지
-        const safeWidthMm = mediaType === 0 ? 100 : (layout.width > 250 ? 100 : layout.width);
-        const safeHeightMm = mediaType === 0 ? 240 : (layout.height > 350 ? 240 : layout.height);
+        // 만약 기존 px 데이터(width > 250)가 넘어오면 mm 단위로 변환하여 오작동 방지
+        const safeWidthMm = layout.width > 250 ? layout.width / 3.78 : layout.width;
+        const safeHeightMm = layout.height > 350 ? layout.height / 3.78 : layout.height;
         
         const widthDots = mmToDots(safeWidthMm, dpmm);
         const heightDots = mmToDots(safeHeightMm, dpmm);

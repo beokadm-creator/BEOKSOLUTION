@@ -159,7 +159,49 @@ const BadgeEditorPage: React.FC = () => {
         }
     }, [info]);
 
-    const handleDragStop = (idx: number, e: unknown, data: { x: number, y: number }) => {
+    // 임시: 데이터베이스 280 → 240 수정 함수
+    const fixDatabaseHeight = async () => {
+        if (!confId) return;
+
+        try {
+            console.log('🔧 Fixing database height from 280 to 240...');
+
+            // 현재 데이터 확인
+            const { doc, getDoc, updateDoc } = await import('firebase/firestore');
+            const { db } = await import('../../firebase');
+
+            // info/general 수정
+            const infoRef = doc(db, `conferences/${confId}/info/general`);
+            const infoSnap = await getDoc(infoRef);
+
+            if (infoSnap.exists() && infoSnap.data().badgeLayout?.height === 280) {
+                await updateDoc(infoRef, {
+                    'badgeLayout.height': 240
+                });
+                console.log('✅ Fixed info/general: 280 → 240');
+            }
+
+            // settings/badge_config 수정
+            const settingsRef = doc(db, `conferences/${confId}/settings/badge_config`);
+            const settingsSnap = await getDoc(settingsRef);
+
+            if (settingsSnap.exists() && settingsSnap.data().badgeLayout?.height === 280) {
+                await updateDoc(settingsRef, {
+                    'badgeLayout.height': 240
+                });
+                console.log('✅ Fixed settings/badge_config: 280 → 240');
+            }
+
+            alert('✅ 데이터베이스 수정 완료! 페이지를 새로고침하세요.');
+            window.location.reload();
+
+        } catch (error) {
+            console.error('❌ Database fix error:', error);
+            alert('❌ 데이터베이스 수정 실패');
+        }
+    };
+
+    const handleDragStop = (idx: number, _e: unknown, data: { x: number, y: number }) => {
         const newEls = [...elements];
         newEls[idx] = { ...newEls[idx], x: toMm(data.x), y: toMm(data.y) };
         setElements(newEls);
@@ -363,10 +405,15 @@ const BadgeEditorPage: React.FC = () => {
                 <div>
                     <div className="flex items-center justify-between mb-6">
                         <h2 className="text-xl font-bold text-slate-900">명찰 레이아웃 편집기</h2>
-                        <Button onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-700">
-                            <Save className="w-4 h-4 mr-2" />
-                            {saving ? '저장 중...' : '저장'}
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button onClick={fixDatabaseHeight} className="bg-red-600 hover:bg-red-700 text-xs px-2 py-1">
+                                DB 280→240 수정
+                            </Button>
+                            <Button onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-700">
+                                <Save className="w-4 h-4 mr-2" />
+                                {saving ? '저장 중...' : '저장'}
+                            </Button>
+                        </div>
                     </div>
 
                     <div className="space-y-4">
