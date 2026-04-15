@@ -39,6 +39,7 @@ export const useBixolon = () => {
             printStartOffsetMm?: number;
             mediaType?: number;
             labelGapMm?: number;
+            cutFeedMm?: number;
             marginXMm?: number;
             marginYMm?: number;
             cutPaperType?: 0 | 1;
@@ -69,7 +70,9 @@ export const useBixolon = () => {
         const safeHeightMm = layout.height > 350 ? layout.height / 3.78 : layout.height;
         
         const widthDots = mmToDots(safeWidthMm, dpmm);
-        const heightDots = mmToDots(safeHeightMm, dpmm);
+        const autoCutFeedMm = safeHeightMm <= 240 ? 40 : 0;
+        const cutFeedMm = layout.enableCutting !== false ? (layout.cutFeedMm ?? autoCutFeedMm) : 0;
+        const heightDots = mmToDots(safeHeightMm + Math.max(cutFeedMm, 0), dpmm);
 
         const functions: Record<string, any> = {
             "func01": { "clearBuffer": [] },

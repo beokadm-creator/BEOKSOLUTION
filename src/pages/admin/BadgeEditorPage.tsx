@@ -86,6 +86,7 @@ const BadgeEditorPage: React.FC = () => {
     const [enableCutting, setEnableCutting] = useState(true);
     const [mediaType, setMediaType] = useState(0); // 0: Gap, 1: Continuous, 2: Black Mark
     const [labelGapMm, setLabelGapMm] = useState(3);
+    const [cutFeedMm, setCutFeedMm] = useState(0);
     const [marginXMm, setMarginXMm] = useState(0);
     const [marginYMm, setMarginYMm] = useState(0);
     const prevBadgeLayoutRef = useRef(info?.badgeLayout);
@@ -115,6 +116,7 @@ const BadgeEditorPage: React.FC = () => {
                 unit?: 'px' | 'mm';
                 mediaType?: number;
                 labelGapMm?: number;
+                cutFeedMm?: number;
                 marginXMm?: number;
                 marginYMm?: number;
             };
@@ -152,6 +154,7 @@ const BadgeEditorPage: React.FC = () => {
                 setEnableCutting(layout.enableCutting ?? true);
                 setMediaType(layout.mediaType || 0);
                 setLabelGapMm(layout.labelGapMm ?? 3);
+                setCutFeedMm(layout.cutFeedMm ?? 0);
                 setMarginXMm(layout.marginXMm || 0);
                 setMarginYMm(layout.marginYMm || 0);
             }, 0);
@@ -184,6 +187,7 @@ const BadgeEditorPage: React.FC = () => {
                 enableCutting,
                 mediaType,
                 labelGapMm,
+                cutFeedMm,
                 marginXMm,
                 marginYMm,
                 unit: 'mm'
@@ -231,6 +235,7 @@ const BadgeEditorPage: React.FC = () => {
                     printStartOffsetMm,
                     mediaType,
                     labelGapMm,
+                    cutFeedMm,
                     marginXMm,
                     marginYMm,
                     cutPaperType,
@@ -463,7 +468,16 @@ const BadgeEditorPage: React.FC = () => {
                                     className="border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 w-full"
                                 />
                             </div>
-                            <div />
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-medium text-slate-500 ml-1">커팅 여유 (mm)</label>
+                                <input
+                                    type="number"
+                                    step={0.1}
+                                    value={cutFeedMm}
+                                    onChange={(e) => setCutFeedMm(parseFloat(e.target.value || '0'))}
+                                    className="border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 w-full"
+                                />
+                            </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
