@@ -70,10 +70,6 @@ const InfodeskPage: React.FC = () => {
         printerDpmm?: number;
         printOffsetXmm?: number;
         printOffsetYmm?: number;
-        printStartOffsetMm?: number;
-        mediaType?: number;
-        marginXMm?: number;
-        marginYMm?: number;
     } | null>(null);
     const [attendeeCache, setAttendeeCache] = useState<Map<string, any>>(new Map());
     const inputRef = useRef<HTMLInputElement>(null);
@@ -105,14 +101,10 @@ const InfodeskPage: React.FC = () => {
                             height: data.badgeLayout?.height || 1200,
                             elements: data.badgeLayout?.elements || [],
                             unit: data.badgeLayout?.unit,
-                            enableCutting: data.badgeLayout?.enableCutting ?? true,
+                            enableCutting: data.badgeLayout?.enableCutting || false,
                             printerDpmm: data.badgeLayout?.printerDpmm,
                             printOffsetXmm: data.badgeLayout?.printOffsetXmm,
                             printOffsetYmm: data.badgeLayout?.printOffsetYmm,
-                            printStartOffsetMm: data.badgeLayout?.printStartOffsetMm,
-                            mediaType: data.badgeLayout?.mediaType,
-                            marginXMm: data.badgeLayout?.marginXMm,
-                            marginYMm: data.badgeLayout?.marginYMm,
                         });
                     }
                 }
