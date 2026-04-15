@@ -78,9 +78,7 @@ export const useBixolon = () => {
         };
 
         let fIdx = 7;
-        if (layout.enableCutting !== false) {
-            functions[`func${String(fIdx++).padStart(2, '0')}`] = { "setAutoCutter": [1, 1] };
-        }
+        functions[`func${String(fIdx++).padStart(2, '0')}`] = { "setAutoCutter": [1, 1] };
         for (const el of layout.elements) {
             if (!el.isVisible) continue;
 
