@@ -9,40 +9,34 @@ import ImageUpload from '../../components/ui/ImageUpload';
 import { ImageIcon, Trash2, Save, Maximize, Plus } from 'lucide-react';
 
 const PX_PER_MM = 3.779527;
-const toMm = (px: number) => parseFloat((px / PX_PER_MM).toFixed(2));
-const toPx = (mm: string | number) => Math.round(Number(mm) * PX_PER_MM);
+const toMm = (px: number) => parseFloat((px / PX_PER_MM).toFixed(1));
+const toPx = (mm: number) => Math.round(mm * PX_PER_MM);
 
 const DEFAULT_BADGE_WIDTH_MM = 100;
 const DEFAULT_BADGE_HEIGHT_MM = 240;
 
-/**
- * MmInput: mm 단위 입력 컴포넌트
- * - 입력 중에는 로컬 문자열 상태를 유지 (자연스러운 연속 입력 가능)
- * - 포커스를 벗어날 때(blur) px로 변환하여 저장
- */
 const MmInput: React.FC<{
-    valuePx: number | undefined;
-    onChange: (px: number | undefined) => void;
+    valueMm: number | undefined;
+    onChange: (mm: number | undefined) => void;
     placeholder?: string;
     step?: number;
     className?: string;
     allowEmpty?: boolean;
-}> = ({ valuePx, onChange, placeholder, step = 0.5, className = '', allowEmpty = false }) => {
+}> = ({ valueMm, onChange, placeholder, step = 0.5, className = '', allowEmpty = false }) => {
     const [localVal, setLocalVal] = useState<string>(
-        valuePx !== undefined ? String(toMm(valuePx)) : ''
+        valueMm !== undefined ? String(valueMm) : ''
     );
 
-    // 외부에서 valuePx가 바뀌면 로컬 상태를 동기화 (포커스 중이 아닐 때만)
     const isFocused = useRef(false);
-    const prevValuePxRef = useRef(valuePx);
+    const prevValueMmRef = useRef(valueMm);
     useEffect(() => {
-        if (!isFocused.current && valuePx !== prevValuePxRef.current) {
+        if (!isFocused.current && valueMm !== prevValueMmRef.current) {
             setTimeout(() => {
-                setLocalVal(valuePx !== undefined ? String(toMm(valuePx)) : '');
+                setLocalVal(valueMm !== undefined ? String(valueMm) : '');
             }, 0);
-            prevValuePxRef.current = valuePx;
+            prevValueMmRef.current = valueMm;
         }
-    }, [valuePx]);
+    }, [valueMm]);
 
     return (
         <input
@@ -62,9 +56,9 @@ const MmInput: React.FC<{
                 } else {
                     const num = parseFloat(raw);
                     if (!isNaN(num)) {
-                        const px = toPx(num);
-                        onChange(px);
-                        setLocalVal(String(toMm(px)));
+                        const mm = parseFloat(num.toFixed(1));
+                        onChange(mm);
+                        setLocalVal(String(mm));
                     }
                 }
             }}
@@ -78,8 +72,8 @@ const BadgeEditorPage: React.FC = () => {
 
     const [elements, setElements] = useState<BadgeElement[]>([]);
     const [canvasSize, setCanvasSize] = useState({
-        width: toPx(DEFAULT_BADGE_WIDTH_MM),
-        height: toPx(DEFAULT_BADGE_HEIGHT_MM)
+        width: DEFAULT_BADGE_WIDTH_MM,
+        height: DEFAULT_BADGE_HEIGHT_MM
     });
     const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
     const [bgUrl, setBgUrl] = useState<string | undefined>(undefined);
@@ -118,30 +112,26 @@ const BadgeEditorPage: React.FC = () => {
                         ? layout.unit
                         : (layout.width && layout.width <= 250 && layout.height && layout.height <= 350 ? 'mm' : 'px');
 
-                const convertedElements = (layout.elements || []).map((el) => {
-                    if (detectedUnit === 'px') return el;
-
-                    return {
+                if (detectedUnit === 'px') {
+                    const convertedElements = (layout.elements || []).map((el) => ({
                         ...el,
-                        x: toPx(el.x),
-                        y: toPx(el.y),
-                        fontSize: toPx(el.fontSize),
-                        maxWidth: el.maxWidth !== undefined ? toPx(el.maxWidth) : undefined,
-                    };
-                });
-
-                const widthPx =
-                    detectedUnit === 'px'
-                        ? (layout.width || toPx(DEFAULT_BADGE_WIDTH_MM))
-                        : toPx(layout.width || DEFAULT_BADGE_WIDTH_MM);
-
-                const heightPx =
-                    detectedUnit === 'px'
-                        ? (layout.height || toPx(DEFAULT_BADGE_HEIGHT_MM))
-                        : toPx(layout.height || DEFAULT_BADGE_HEIGHT_MM);
-
-                setElements(convertedElements);
-                setCanvasSize({ width: widthPx, height: heightPx });
+                        x: toMm(el.x),
+                        y: toMm(el.y),
+                        fontSize: toMm(el.fontSize),
+                        maxWidth: el.maxWidth !== undefined ? toMm(el.maxWidth) : undefined,
+                    }));
+                    setElements(convertedElements);
+                    setCanvasSize({
+                        width: toMm(layout.width || toPx(DEFAULT_BADGE_WIDTH_MM)),
+                        height: toMm(layout.height || toPx(DEFAULT_BADGE_HEIGHT_MM)),
+                    });
+                } else {
+                    setElements(layout.elements || []);
+                    setCanvasSize({
+                        width: layout.width || DEFAULT_BADGE_WIDTH_MM,
+                        height: layout.height || DEFAULT_BADGE_HEIGHT_MM,
+                    });
+                }
                 setBgUrl(layout.backgroundImageUrl);
                 setPrinterDpmm(layout.printerDpmm || 8);
                 setPrintOffsetXmm(layout.printOffsetXmm || 0);
@@ -154,7 +144,7 @@ const BadgeEditorPage: React.FC = () => {
 
     const handleDragStop = (idx: number, e: unknown, data: { x: number, y: number }) => {
         const newEls = [...elements];
-        newEls[idx] = { ...newEls[idx], x: Math.round(data.x), y: Math.round(data.y) };
+        newEls[idx] = { ...newEls[idx], x: toMm(data.x), y: toMm(data.y) };
         setElements(newEls);
         if (!selectedIndices.includes(idx)) {
             setSelectedIndices([idx]);
@@ -194,9 +184,9 @@ const BadgeEditorPage: React.FC = () => {
 
     const addElement = (type: BadgeElement['type']) => {
         const newElement: BadgeElement = {
-            x: Math.round(canvasSize.width / 2),
-            y: toPx(20),
-            fontSize: type === 'QR' ? 80 : 24,
+            x: parseFloat((canvasSize.width / 2).toFixed(1)),
+            y: 20,
+            fontSize: type === 'QR' ? 25 : 6,
             isVisible: true,
             type,
             content: type === 'CUSTOM' ? 'New Text' : undefined
@@ -224,11 +214,10 @@ const BadgeEditorPage: React.FC = () => {
         selectedIndices.forEach(idx => {
             const node = document.getElementById(`badge-el-${idx}`);
             if (node) {
-                // getBoundingClientRect는 소수점 단위 너비까지 정확히 반환합니다.
                 const rect = node.getBoundingClientRect();
-                const nodeWidth = rect.width;
-                const newX = Math.round((canvasSize.width - nodeWidth) / 2);
-                newEls[idx] = { ...newEls[idx], x: newX };
+                const nodeWidthMm = toMm(rect.width);
+                const newXmm = parseFloat(((canvasSize.width - nodeWidthMm) / 2).toFixed(1));
+                newEls[idx] = { ...newEls[idx], x: newXmm };
             }
         });
         setElements(newEls);
@@ -247,7 +236,7 @@ const BadgeEditorPage: React.FC = () => {
             <div className="flex-1 overflow-auto p-12 flex items-center justify-center">
                 <div
                     className="relative bg-white shadow-2xl border border-slate-200"
-                    style={{ width: canvasSize.width, height: canvasSize.height }}
+                    style={{ width: toPx(canvasSize.width), height: toPx(canvasSize.height) }}
                     onClick={() => setSelectedIndices([])}
                 >
                     {/* Background Image Layer */}
@@ -300,11 +289,11 @@ const BadgeEditorPage: React.FC = () => {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <label className="text-[11px] font-medium text-slate-500 ml-1">가로 (mm)</label>
-                                <MmInput valuePx={canvasSize.width} onChange={px => px !== undefined && setCanvasSize(p => ({ ...p, width: px }))} className="w-full" />
+                                <MmInput valueMm={canvasSize.width} onChange={mm => mm !== undefined && setCanvasSize(p => ({ ...p, width: mm }))} className="w-full" />
                             </div>
                             <div className="space-y-1">
                                 <label className="text-[11px] font-medium text-slate-500 ml-1">세로 (mm)</label>
-                                <MmInput valuePx={canvasSize.height} onChange={px => px !== undefined && setCanvasSize(p => ({ ...p, height: px }))} className="w-full" />
+                                <MmInput valueMm={canvasSize.height} onChange={mm => mm !== undefined && setCanvasSize(p => ({ ...p, height: mm }))} className="w-full" />
                             </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -314,7 +303,7 @@ const BadgeEditorPage: React.FC = () => {
                                     variant="outline"
                                     size="sm"
                                     className="h-8 text-[11px]"
-                                    onClick={() => setCanvasSize({ width: toPx(DEFAULT_BADGE_WIDTH_MM), height: toPx(mm) })}
+                                    onClick={() => setCanvasSize({ width: DEFAULT_BADGE_WIDTH_MM, height: mm })}
                                 >
                                     100×{mm}
                                 </Button>
@@ -491,12 +480,12 @@ const BadgeEditorPage: React.FC = () => {
                                 {!(elements[selectedIndices[0]].textAlign === 'center' && !elements[selectedIndices[0]].maxWidth) && (
                                     <div className="space-y-1">
                                         <label className="text-[11px] font-medium text-slate-500 ml-1">X 좌표 (mm)</label>
-                                        <MmInput valuePx={elements[selectedIndices[0]].x} onChange={px => px !== undefined && updateElement(selectedIndices[0], 'x', px)} className="w-full" />
+                                        <MmInput valueMm={elements[selectedIndices[0]].x} onChange={mm => mm !== undefined && updateElement(selectedIndices[0], 'x', mm)} className="w-full" />
                                     </div>
                                 )}
                                 <div className="space-y-1">
                                     <label className="text-[11px] font-medium text-slate-500 ml-1">Y 좌표 (mm)</label>
-                                    <MmInput valuePx={elements[selectedIndices[0]].y} onChange={px => px !== undefined && updateElement(selectedIndices[0], 'y', px)} className="w-full" />
+                                    <MmInput valueMm={elements[selectedIndices[0]].y} onChange={mm => mm !== undefined && updateElement(selectedIndices[0], 'y', mm)} className="w-full" />
                                 </div>
                             </div>
 
@@ -505,7 +494,7 @@ const BadgeEditorPage: React.FC = () => {
                                 <div className="space-y-4">
                                     <div className="space-y-1">
                                         <label className="text-[11px] font-medium text-slate-500 ml-1">크기 (Width, mm)</label>
-                                        <MmInput valuePx={elements[selectedIndices[0]].fontSize} onChange={px => px !== undefined && updateElement(selectedIndices[0], 'fontSize', px)} placeholder="이미지 가로 크기" className="w-full" />
+                                        <MmInput valueMm={elements[selectedIndices[0]].fontSize} onChange={mm => mm !== undefined && updateElement(selectedIndices[0], 'fontSize', mm)} placeholder="이미지 가로 크기" className="w-full" />
                                     </div>
                                     <div className="space-y-1">
                                         <label className="text-[11px] font-medium text-slate-500 ml-1">이미지 업로드</label>
@@ -517,7 +506,7 @@ const BadgeEditorPage: React.FC = () => {
                                     <label className="text-[11px] font-medium text-slate-500 ml-1">
                                         {elements[selectedIndices[0]].type === 'QR' ? 'QR 크기 (mm)' : '글자 크기 (mm)'}
                                     </label>
-                                    <MmInput valuePx={elements[selectedIndices[0]].fontSize} onChange={px => px !== undefined && updateElement(selectedIndices[0], 'fontSize', px)} className="w-full" />
+                                    <MmInput valueMm={elements[selectedIndices[0]].fontSize} onChange={mm => mm !== undefined && updateElement(selectedIndices[0], 'fontSize', mm)} className="w-full" />
                                 </div>
                             )}
 
@@ -535,8 +524,8 @@ const BadgeEditorPage: React.FC = () => {
                                     <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">영역 지정 (최대 너비)</p>
                                     <div className="flex gap-2 items-center">
                                         <MmInput
-                                            valuePx={elements[selectedIndices[0]].maxWidth}
-                                            onChange={px => updateElement(selectedIndices[0], 'maxWidth', px)}
+                                            valueMm={elements[selectedIndices[0]].maxWidth}
+                                            onChange={mm => updateElement(selectedIndices[0], 'maxWidth', mm)}
                                             placeholder="제한 없음 (mm)"
                                             allowEmpty
                                             className="flex-1 border-amber-200 bg-amber-50/30"
@@ -548,7 +537,7 @@ const BadgeEditorPage: React.FC = () => {
                                     </div>
                                     <p className="text-[10px] text-slate-400">
                                         {elements[selectedIndices[0]].maxWidth
-                                            ? `✅ ${toMm(elements[selectedIndices[0]].maxWidth!)}mm 가로 크기에 도달하면, 폰트 크기 유지한 채로 아래로 줄을 내립니다.`
+                                            ? `✅ ${elements[selectedIndices[0]].maxWidth!}mm 가로 크기에 도달하면, 폰트 크기 유지한 채로 아래로 줄을 내립니다.`
                                             : '텍스트 박스의 크기를 지정합니다. 너비를 초과하면 자동 줄바꿈되며 중앙정렬 됩니다.'}
                                     </p>
                                 </div>
@@ -593,14 +582,14 @@ const DraggableNode: React.FC<DraggableNodeProps> = ({ el, idx, isSelected, prev
     const renderContent = () => {
         if (el.type === 'QR') {
             return (
-                <div style={{ width: el.fontSize, height: el.fontSize }} className="bg-black flex items-center justify-center text-white text-[10px]">
+                <div style={{ width: toPx(el.fontSize), height: toPx(el.fontSize) }} className="bg-black flex items-center justify-center text-white text-[10px]">
                     QR CODE
                 </div>
             );
         }
         if (el.type === 'IMAGE') {
             return (
-                <div style={{ width: el.fontSize }}>
+                <div style={{ width: toPx(el.fontSize) }}>
                     {el.content ? (
                         <img src={el.content} alt="badge-asset" className="w-full h-auto object-contain pointer-events-none" />
                     ) : (
@@ -616,7 +605,7 @@ const DraggableNode: React.FC<DraggableNodeProps> = ({ el, idx, isSelected, prev
         return (
             <div
                 style={{
-                    fontSize: el.fontSize,
+                    fontSize: toPx(el.fontSize),
                     lineHeight: 1.35,
                     whiteSpace: el.maxWidth ? 'normal' : 'nowrap',
                     wordBreak: el.maxWidth ? 'keep-all' : 'normal',
@@ -631,7 +620,7 @@ const DraggableNode: React.FC<DraggableNodeProps> = ({ el, idx, isSelected, prev
     return (
         <Draggable
             nodeRef={nodeRef}
-            position={{ x: posX, y: el.y }}
+            position={{ x: toPx(posX), y: toPx(el.y) }}
             axis={isCanvasCentered ? 'y' : 'both'}
             onStop={(e, data) => onDragStop(idx, e, data)}
             onStart={(e) => onSelect(e as React.MouseEvent)}
@@ -644,7 +633,7 @@ const DraggableNode: React.FC<DraggableNodeProps> = ({ el, idx, isSelected, prev
                 style={{
                     left: 0,
                     top: 0,
-                    ...(boxWidth ? { width: boxWidth, textAlign: isCentered ? 'center' : 'left' } : {}),
+                    ...(boxWidth ? { width: toPx(boxWidth), textAlign: isCentered ? 'center' : 'left' } : {}),
                     ...(el.maxWidth ? { border: '1px dashed rgba(245, 158, 11, 0.4)', backgroundColor: 'rgba(254, 252, 232, 0.3)' } : {})
                 }}
                 onClick={(e) => {
