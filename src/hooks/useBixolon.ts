@@ -59,7 +59,7 @@ export const useBixolon = () => {
         
         // Media Type (0: Gap, 1: Continuous, 2: Black Mark)
         const mediaType = layout.mediaType || 0;
-        const setLengthOffsetDots = mediaType === 2 ? mmToDots(layout.printStartOffsetMm || 0, dpmm) : 0;
+        const setLengthOffsetDots = mediaType === 1 ? 0 : mmToDots(layout.printStartOffsetMm || 0, dpmm);
 
         // Paper Size (mm -> dots)
         // 만약 기존 px 데이터(width > 250)가 넘어오면 강제로 mm 비율(100x240)로 클램핑하여 오작동 방지
