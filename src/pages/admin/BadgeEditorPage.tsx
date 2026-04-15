@@ -200,7 +200,7 @@ const BadgeEditorPage: React.FC = () => {
         }
     };
 
-    const handleTestCut = async () => {
+    const handleTestCut = async (cutPaperType: 0 | 1) => {
         const toastId = 'bixolon-cut-test';
         if (bixolonPrinting) return;
         toast.loading('테스트 출력 중...', { id: toastId });
@@ -222,6 +222,7 @@ const BadgeEditorPage: React.FC = () => {
                     marginXMm,
                     marginYMm,
                     enableCutting: true,
+                    cutPaperType,
                 },
                 {
                     name: 'TEST',
@@ -473,7 +474,7 @@ const BadgeEditorPage: React.FC = () => {
                                 size="sm"
                                 className="h-9 text-[11px]"
                                 disabled={bixolonPrinting}
-                                onClick={handleTestCut}
+                                onClick={() => handleTestCut(0)}
                             >
                                 커팅 테스트(0)
                             </Button>
@@ -483,7 +484,7 @@ const BadgeEditorPage: React.FC = () => {
                                 size="sm"
                                 className="h-9 text-[11px]"
                                 disabled={bixolonPrinting}
-                                onClick={handleTestCut}
+                                onClick={() => handleTestCut(1)}
                             >
                                 커팅 테스트(1)
                             </Button>
