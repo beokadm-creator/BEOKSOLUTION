@@ -79,6 +79,9 @@ export const useBixolon = () => {
         };
 
         let fIdx = 7;
+        if (layout.enableCutting) {
+            functions[`func${String(fIdx++).padStart(2, '0')}`] = { "setAutoCutter": [1, 1] };
+        }
         for (const el of layout.elements) {
             if (!el.isVisible) continue;
 
@@ -173,11 +176,6 @@ export const useBixolon = () => {
         }
 
         functions[`func${String(fIdx++).padStart(2, '0')}`] = { "printBuffer": [] };
-        
-        if (layout.enableCutting) {
-            const cutType = layout.cutPaperType ?? (mediaType === 2 ? 0 : 1);
-            functions[`func${String(fIdx++).padStart(2, '0')}`] = { "cutPaper": [cutType] };
-        }
 
         return { "id": Math.floor(Math.random() * 1000) + 1, "functions": functions };
     };
