@@ -201,19 +201,20 @@ const BadgeEditorPage: React.FC = () => {
     };
 
     const handleTestCut = async (cutPaperType: 0 | 1) => {
-        const toastId = 'bixolon-cut-test';
+        const toastId = 'bixolon-test';
         if (bixolonPrinting) return;
         toast.loading('테스트 출력 중...', { id: toastId });
         try {
             const ok = await printBadge(
                 {
-                    width: 100,
-                    height: 240,
-                    unit: 'mm',
+                    width: canvasSize.width,
+                    height: canvasSize.height,
                     elements: [
                         { type: 'NAME', x: 10, y: 10, fontSize: 6, isVisible: true } as BadgeElement,
                         { type: 'QR', x: 10, y: 20, fontSize: 25, isVisible: true } as BadgeElement,
                     ],
+                    unit: 'mm',
+                    enableCutting: true,
                     printerDpmm,
                     printOffsetXmm,
                     printOffsetYmm,
@@ -221,7 +222,6 @@ const BadgeEditorPage: React.FC = () => {
                     mediaType,
                     marginXMm,
                     marginYMm,
-                    enableCutting: true,
                     cutPaperType,
                 },
                 {
