@@ -85,6 +85,7 @@ const BadgeEditorPage: React.FC = () => {
     const [printStartOffsetMm, setPrintStartOffsetMm] = useState(0);
     const [enableCutting, setEnableCutting] = useState(true);
     const [mediaType, setMediaType] = useState(0); // 0: Gap, 1: Continuous, 2: Black Mark
+    const [labelGapMm, setLabelGapMm] = useState(3);
     const [marginXMm, setMarginXMm] = useState(0);
     const [marginYMm, setMarginYMm] = useState(0);
     const prevBadgeLayoutRef = useRef(info?.badgeLayout);
@@ -113,6 +114,7 @@ const BadgeEditorPage: React.FC = () => {
                 enableCutting?: boolean;
                 unit?: 'px' | 'mm';
                 mediaType?: number;
+                labelGapMm?: number;
                 marginXMm?: number;
                 marginYMm?: number;
             };
@@ -149,6 +151,7 @@ const BadgeEditorPage: React.FC = () => {
                 setPrintStartOffsetMm(layout.printStartOffsetMm || 0);
                 setEnableCutting(layout.enableCutting ?? true);
                 setMediaType(layout.mediaType || 0);
+                setLabelGapMm(layout.labelGapMm ?? 3);
                 setMarginXMm(layout.marginXMm || 0);
                 setMarginYMm(layout.marginYMm || 0);
             }, 0);
@@ -180,6 +183,7 @@ const BadgeEditorPage: React.FC = () => {
                 printStartOffsetMm,
                 enableCutting,
                 mediaType,
+                labelGapMm,
                 marginXMm,
                 marginYMm,
                 unit: 'mm'
@@ -226,6 +230,7 @@ const BadgeEditorPage: React.FC = () => {
                     printOffsetYmm,
                     printStartOffsetMm,
                     mediaType,
+                    labelGapMm,
                     marginXMm,
                     marginYMm,
                     cutPaperType,
@@ -417,6 +422,13 @@ const BadgeEditorPage: React.FC = () => {
                                     <option value={2}>Black Mark (블랙마크)</option>
                                 </select>
                             </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-medium text-slate-500 ml-1">라벨 간격 (mm)</label>
+                                <MmInput valueMm={labelGapMm} onChange={mm => mm !== undefined && setLabelGapMm(mm)} step={0.1} className="w-full" />
+                            </div>
+                            <div />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
