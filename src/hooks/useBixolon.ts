@@ -74,6 +74,14 @@ export const useBixolon = () => {
         const cutFeedMm = layout.enableCutting !== false ? (layout.cutFeedMm ?? autoCutFeedMm) : 0;
         const heightDots = mmToDots(safeHeightMm + Math.max(cutFeedMm, 0), dpmm);
 
+        // DEBUG: 실제 사용되는 값들 로깅
+        console.log('🔍 [BIXOLON DEBUG] Layout Input:', {
+            original: { width: layout.width, height: layout.height },
+            safe: { width: safeWidthMm, height: safeHeightMm },
+            feed: { auto: autoCutFeedMm, final: cutFeedMm },
+            final: { widthDots, heightDots, heightMm: safeHeightMm + Math.max(cutFeedMm, 0) }
+        });
+
         const functions: Record<string, any> = {
             "func01": { "clearBuffer": [] },
             "func02": { "setMargin": [marginXDots, marginYDots] },
