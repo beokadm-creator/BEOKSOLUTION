@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import Draggable from 'react-draggable';
 import { useConference } from '../../hooks/useConference';
 import { useAdmin } from '../../hooks/useAdmin';
-import { useBixolon } from '../../hooks/useBixolon';
 import { BadgeElement } from '../../types/schema';
 import toast from 'react-hot-toast';
 import { Button } from '../../components/ui/button';
@@ -70,7 +69,6 @@ const MmInput: React.FC<{
 const BadgeEditorPage: React.FC = () => {
     const { id: confId, info, loading: confLoading } = useConference();
     const { saveBadgeLayout, loading: saving } = useAdmin(confId || '');
-    const { printBadge, printing: bixolonPrinting, error: bixolonError } = useBixolon();
 
     const [elements, setElements] = useState<BadgeElement[]>([]);
     const [canvasSize, setCanvasSize] = useState({
@@ -197,48 +195,6 @@ const BadgeEditorPage: React.FC = () => {
             } else {
                 toast.error(`저장 실패: ${e?.message || '알 수 없는 오류'}`);
             }
-        }
-    };
-
-    const handleTestCut = async (cutPaperType: 0 | 1) => {
-        const toastId = 'bixolon-test';
-        if (bixolonPrinting) return;
-        toast.loading('테스트 출력 중...', { id: toastId });
-        try {
-            const ok = await printBadge(
-                {
-                    width: canvasSize.width,
-                    height: canvasSize.height,
-                    elements: [
-                        { type: 'NAME', x: 10, y: 10, fontSize: 6, isVisible: true } as BadgeElement,
-                        { type: 'QR', x: 10, y: 20, fontSize: 25, isVisible: true } as BadgeElement,
-                    ],
-                    unit: 'mm',
-                    enableCutting: true,
-                    printerDpmm,
-                    printOffsetXmm,
-                    printOffsetYmm,
-                    printStartOffsetMm,
-                    mediaType,
-                    marginXMm,
-                    marginYMm,
-                    cutPaperType,
-                },
-                {
-                    name: 'TEST',
-                    org: 'TEST',
-                    category: 'TEST',
-                    license: 'TEST',
-                    price: 'TEST',
-                    affiliation: 'TEST',
-                    qrData: 'TEST',
-                },
-            );
-            if (ok) toast.success('테스트 출력 성공', { id: toastId });
-            else toast.error(bixolonError || '테스트 출력 실패', { id: toastId, duration: 6000 });
-        } catch (e) {
-            console.error(e);
-            toast.error('테스트 출력 실패', { id: toastId, duration: 6000 });
         }
     };
 
@@ -466,28 +422,6 @@ const BadgeEditorPage: React.FC = () => {
                             <label htmlFor="enableCutting" className="text-[11px] font-medium text-slate-500">
                                 인쇄 후 자동 커팅 활성화
                             </label>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 mt-3">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-9 text-[11px]"
-                                disabled={bixolonPrinting}
-                                onClick={() => handleTestCut(0)}
-                            >
-                                커팅 테스트(0)
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-9 text-[11px]"
-                                disabled={bixolonPrinting}
-                                onClick={() => handleTestCut(1)}
-                            >
-                                커팅 테스트(1)
-                            </Button>
                         </div>
                     </div>
 
