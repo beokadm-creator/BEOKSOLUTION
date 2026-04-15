@@ -111,8 +111,8 @@ export const useBixolon = () => {
 
             // 240mm 용지에서 하단 공백을 줄이기 위해 Y 오프셋 추가
             if (safeHeightMm === 240 && safeYMm > 0) {
-                safeYMm = safeYMm + 40; // 40mm 아래로 이동
-                console.log(`📍 [OFFSET DEBUG] Y: ${el.y} + 40mm → ${safeYMm.toFixed(1)}mm`);
+                safeYMm = safeYMm + 20; // 20mm 아래로 이동 (용지 범위 내)
+                console.log(`📍 [OFFSET DEBUG] Y: ${el.y} + 20mm → ${safeYMm.toFixed(1)}mm`);
             }
 
             const safeFontSizeMm = el.fontSize > 100 && el.type !== 'IMAGE' ? el.fontSize / 3.78 : el.fontSize;
