@@ -70,7 +70,8 @@ export const useBixolon = () => {
         const safeHeightMm = layout.height > 350 ? layout.height / 3.78 : layout.height;
         
         const widthDots = mmToDots(safeWidthMm, dpmm);
-        const autoCutFeedMm = safeHeightMm <= 240 ? 40 : 0;
+        // 블랙마크 방식에서는 추가 피드 불필요 - 마크에서 정확히 커팅
+        const autoCutFeedMm = 0;
         const cutFeedMm = layout.enableCutting !== false ? (layout.cutFeedMm ?? autoCutFeedMm) : 0;
         const heightDots = mmToDots(safeHeightMm + Math.max(cutFeedMm, 0), dpmm);
 
