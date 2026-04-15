@@ -172,7 +172,8 @@ export const useBixolon = () => {
         functions[`func${String(fIdx++).padStart(2, '0')}`] = { "printBuffer": [] };
         
         if (layout.enableCutting) {
-            functions[`func${String(fIdx++).padStart(2, '0')}`] = { "cutPaper": [1] };
+            const cutType = mediaType === 2 ? 0 : 1;
+            functions[`func${String(fIdx++).padStart(2, '0')}`] = { "cutPaper": [cutType] };
         }
 
         return { "id": Math.floor(Math.random() * 1000) + 1, "functions": functions };
