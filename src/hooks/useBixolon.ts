@@ -5,43 +5,24 @@ import { BadgeElement } from '../types/schema';
 const SDK_BASE_URL = `http://127.0.0.1:18080/WebPrintSDK`;
 const PRINTER_NAME = 'Printer1';
 
-const PX_PER_MM = 3.779527;
-const pxToDots = (px: number, dpmm: number) => Math.round(px * (dpmm / PX_PER_MM));
+// Renewal: 무조건 mm를 받아서 dots로 변환 (추론/px 로직 전면 폐기)
 const mmToDots = (mm: number, dpmm: number) => Math.round(mm * dpmm);
-
-const detectLayoutUnit = (layout: {
-    width?: number;
-    height?: number;
-    unit?: 'px' | 'mm';
-}): 'px' | 'mm' => {
-    if (layout.unit === 'px' || layout.unit === 'mm') return layout.unit;
-
-    const width = layout.width || 0;
-    const height = layout.height || 0;
-    if (width > 0 && width <= 250 && height > 0 && height <= 350) return 'mm';
-
-    return 'px';
-};
-
-const valueToDots = (value: number, dpmm: number, unit: 'px' | 'mm') =>
-    unit === 'mm' ? mmToDots(value, dpmm) : pxToDots(value, dpmm);
 
 export const useBixolon = () => {
     const [printing, setPrinting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     /**
-     * 텍스트의 추정 너비를 dots 단위로 계산 (볼드체 특성 반영)
-     * 한글 ≈ fontSize * 1.15, 영문/숫자 ≈ fontSize * 0.65
+     * 텍스트의 추정 너비를 dots 단위로 계산 (Malgun Gothic Bold 기준)
      */
     const estimateTextWidthDots = (text: string, fontDots: number): number => {
         let w = 0;
         for (const ch of text) {
             const code = ch.charCodeAt(0);
-            if (code >= 0xAC00 && code <= 0xD7A3) w += fontDots * 1.15;
-            else if (code >= 0x4E00 && code <= 0x9FFF) w += fontDots * 1.15;
-            else if (code >= 0xFF00 && code <= 0xFFEF) w += fontDots * 1.15;
-            else w += fontDots * 0.65;
+            if (code >= 0xAC00 && code <= 0xD7A3) w += fontDots * 1.15; // 한글
+            else if (code >= 0x4E00 && code <= 0x9FFF) w += fontDots * 1.15; // 한자
+            else if (code >= 0xFF00 && code <= 0xFFEF) w += fontDots * 1.15; // 전각 문자
+            else w += fontDots * 0.65; // 영문/숫자
         }
         return Math.round(w);
     };
@@ -55,43 +36,54 @@ export const useBixolon = () => {
             printerDpmm?: number;
             printOffsetXmm?: number;
             printOffsetYmm?: number;
-            unit?: 'px' | 'mm';
         },
         userData: {
             name: string; org: string; category?: string;
             license?: string; price?: string; affiliation?: string; qrData: string;
         }
     ) => {
-        const dpmm = layout.printerDpmm || 8;
-        const unit = detectLayoutUnit(layout);
-        const offsetXdots = Math.round((layout.printOffsetXmm || 0) * dpmm);
-        const offsetYdots = Math.round((layout.printOffsetYmm || 0) * dpmm);
+        const dpmm = layout.printerDpmm || 8; // 203 DPI = 8 dpmm
+        
+        // Offset (mm -> dots)
+        const offsetXdots = mmToDots(layout.printOffsetXmm || 0, dpmm);
+        const offsetYdots = mmToDots(layout.printOffsetYmm || 0, dpmm);
 
-        const widthDots = valueToDots(layout.width || 400, dpmm, unit);
-        const heightDots = valueToDots(layout.height || 600, dpmm, unit);
+        // Paper Size (mm -> dots)
+        // 만약 기존 px 데이터(width > 250)가 넘어오면 강제로 mm 비율(100x240)로 클램핑하여 오작동 방지
+        const safeWidthMm = layout.width > 250 ? 100 : layout.width;
+        const safeHeightMm = layout.height > 350 ? 240 : layout.height;
+        
+        const widthDots = mmToDots(safeWidthMm, dpmm);
+        const heightDots = mmToDots(safeHeightMm, dpmm);
 
         const functions: Record<string, any> = {
             "func01": { "clearBuffer": [] },
             "func02": { "setReferencePoint": [0, 0] },
             "func03": { "setDirection": [0] },
             "func04": { "setWidth": [widthDots] },
-            "func05": { "setLength": [heightDots, 24, 0, 0] }
+            "func05": { "setLength": [heightDots, 24, 0, 0] } // Gap length 24 고정
         };
 
         let fIdx = 6;
         for (const el of layout.elements) {
             if (!el.isVisible) continue;
 
-            const baseXDots = valueToDots(el.x, dpmm, unit);
-            const baseYDots = valueToDots(el.y, dpmm, unit) + offsetYdots;
+            // X, Y (mm -> dots)
+            // 레거시 px 데이터가 섞여 들어오는 것을 방지하기 위해 x가 200 이상이면 비정상으로 간주하고 mm로 보정
+            const safeXMm = el.x > 250 ? el.x / 3.78 : el.x;
+            const safeYMm = el.y > 350 ? el.y / 3.78 : el.y;
+            const safeFontSizeMm = el.fontSize > 100 && el.type !== 'IMAGE' ? el.fontSize / 3.78 : el.fontSize;
+
+            const baseXDots = mmToDots(safeXMm, dpmm);
+            const baseYDots = mmToDots(safeYMm, dpmm) + offsetYdots;
 
             const content = el.type === 'CUSTOM'
                 ? (el.content || '')
                 : (userData[el.type.toLowerCase() as keyof typeof userData] || '');
 
             if (el.type === 'QR') {
-                const qrSizeDots = valueToDots(el.fontSize || 80, dpmm, unit);
-                const qrMag = Math.max(1, Math.min(10, Math.round(qrSizeDots / 28)));
+                const qrSizeDots = mmToDots(safeFontSizeMm || 25, dpmm);
+                const qrMag = Math.max(1, Math.min(10, Math.round(qrSizeDots / 28))); // 빅솔론 QR 배율 (1~10)
                 functions[`func${String(fIdx++).padStart(2, '0')}`] = {
                     "drawQRCode": [
                         userData.qrData || 'NO_DATA', baseXDots + offsetXdots, baseYDots, 1, "M", qrMag, 0
@@ -100,25 +92,26 @@ export const useBixolon = () => {
             } else if (el.type === 'IMAGE') {
                 functions[`func${String(fIdx++).padStart(2, '0')}`] = {
                     "drawBitmap": [
-                        content, baseXDots + offsetXdots, baseYDots, valueToDots(el.fontSize || 100, dpmm, unit), 0
+                        content, baseXDots + offsetXdots, baseYDots, mmToDots(safeFontSizeMm || 50, dpmm), 0
                     ]
                 };
             } else {
                 if (!content) continue;
 
-                const fontDots = valueToDots(el.fontSize || 24, dpmm, unit);
+                const fontDots = mmToDots(safeFontSizeMm || 6, dpmm);
                 let lines = [content];
-                const lineSpacingDots = fontDots * 0.35; // 기본 줄간격 1.35x
+                const lineSpacingDots = fontDots * 0.35; // 줄간격
 
-                // 지정된 너비 초과 시 폰트 크기 원본 유지한 채 그대로 줄바꿈(Multi-line)
-                if (el.maxWidth) {
-                    const maxDots = valueToDots(el.maxWidth, dpmm, unit);
+                // 최대 너비(maxWidth) 지정 시 자동 줄바꿈
+                const safeMaxWidthMm = el.maxWidth ? (el.maxWidth > 250 ? el.maxWidth / 3.78 : el.maxWidth) : undefined;
+                
+                if (safeMaxWidthMm) {
+                    const maxDots = mmToDots(safeMaxWidthMm, dpmm);
                     const estWidth = estimateTextWidthDots(content, fontDots);
 
                     if (estWidth > maxDots) {
                         lines = [];
                         let currentLine = '';
-                        // 단어를 찢지 않으려면 띄어쓰기로 분리 가능하지만 일단 한 글자씩 밀어내기 방식
                         for (let i = 0; i < content.length; i++) {
                             const tempWidth = estimateTextWidthDots(currentLine + content[i], fontDots);
                             if (tempWidth > maxDots && currentLine.length > 0) {
@@ -132,26 +125,27 @@ export const useBixolon = () => {
                     }
                 }
 
-                // 각 라인별로 드로잉 (가운데 정렬 반영)
+                // 라인별 출력
                 lines.forEach((lineText, lineIdx) => {
                     const currentLineYDots = baseYDots + (lineIdx * (fontDots + lineSpacingDots));
-                    let printXDots: number;
+                    let printXDots = baseXDots + offsetXdots;
 
+                    // 가운데 정렬 (Renewal: 무조건 x 좌표 무시가 아니라, 지정된 영역이 있으면 그 안에서 중앙 정렬)
                     if (el.textAlign === 'center') {
                         const lineWidthDots = estimateTextWidthDots(lineText, fontDots);
-                        if (el.maxWidth) {
-                            const maxDots = valueToDots(el.maxWidth, dpmm, unit);
-                            // 지정된 영역(x ~ x+maxWidth) 안에서 중앙 정렬
-                            const centerXDots = baseXDots + maxDots / 2;
-                            printXDots = Math.round(centerXDots - lineWidthDots / 2) + offsetXdots;
+                        if (safeMaxWidthMm) {
+                            // 지정된 maxWidth 영역 안에서 중앙 정렬 (기준점은 X)
+                            const maxDots = mmToDots(safeMaxWidthMm, dpmm);
+                            const centerOfBoxDots = baseXDots + (maxDots / 2);
+                            printXDots = Math.round(centerOfBoxDots - (lineWidthDots / 2)) + offsetXdots;
                         } else {
-                            // 영역 설정이 없으면 캔버스 전체 기준 중앙 정렬
-                            printXDots = Math.round((widthDots - lineWidthDots) / 2) + offsetXdots;
+                            // maxWidth가 없을 때는 사용자가 지정한 X 좌표 자체를 텍스트의 "중심점"으로 취급
+                            printXDots = Math.round(baseXDots - (lineWidthDots / 2)) + offsetXdots;
                         }
-                        printXDots = Math.max(printXDots, offsetXdots);
-                    } else {
-                        printXDots = baseXDots + offsetXdots;
                     }
+
+                    // 프린터 밖으로 나가지 않도록 최소 0 이상 유지
+                    printXDots = Math.max(printXDots, offsetXdots);
 
                     functions[`func${String(fIdx++).padStart(2, '0')}`] = {
                         "drawTrueTypeFont": [
@@ -193,12 +187,12 @@ export const useBixolon = () => {
         setError(null);
         try {
             const payload = buildPrintData(layout, userData);
-            console.log('[Bixolon] Payload with Offset:', JSON.stringify(payload));
+            console.log('[Bixolon Renewal] Final Payload:', JSON.stringify(payload));
             const success = await printViaHttp(payload);
             setPrinting(false);
             return success;
         } catch (err) {
-            console.error('[Bixolon] Error:', err);
+            console.error('[Bixolon Renewal] Error:', err);
             setError('시스템 오류');
             setPrinting(false);
             return false;
