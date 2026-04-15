@@ -17,6 +17,7 @@ import { db } from '@/firebase';
 import { useBixolon } from '@/hooks/useBixolon';
 import type { BadgeElement } from '@/types/schema';
 import type { ExternalAttendeeDoc } from '../types';
+import { badgeConfigRepo } from '@/features/admin-registrations/services/badgeConfigRepo';
 
 type Params = {
   confId: string | null;
@@ -250,29 +251,46 @@ export const useExternalAttendeeActions = ({
       if (bixolonPrinting) return;
 
       const qrData = attendee.badgeQr || attendee.id;
-      toast.loading('라벨 프린터 전송 중...', { id: 'bixolon-print' });
+      const toastId = 'bixolon-print';
+      toast.loading('라벨 프린터 전송 중...', { id: toastId });
 
       try {
-        let badgeLayout: { width: number; height: number; elements: BadgeElement[]; enableCutting?: boolean } | null =
-          null;
+        const tryGetLegacyBadgeLayout = async (conferenceId: string) => {
+          const snap = await getDoc(doc(db, `conferences/${conferenceId}/info/general`));
+          if (!snap.exists()) return null;
+          const data = snap.data() as { badgeLayout?: unknown };
+          return data.badgeLayout as
+            | {
+                width: number;
+                height: number;
+                elements: BadgeElement[];
+                unit?: 'px' | 'mm';
+                enableCutting?: boolean;
+                printerDpmm?: number;
+                printOffsetXmm?: number;
+                printOffsetYmm?: number;
+              }
+            | null;
+        };
+
+        let badgeLayout:
+          | {
+              width: number;
+              height: number;
+              elements: BadgeElement[];
+              unit?: 'px' | 'mm';
+              enableCutting?: boolean;
+              printerDpmm?: number;
+              printOffsetXmm?: number;
+              printOffsetYmm?: number;
+            }
+          | null = null;
+        let layoutSource = 'fallback';
 
         if (confId) {
           try {
-            const cfgSnap = await getDoc(doc(db, `conferences/${confId}/settings/badge_config`));
-            if (cfgSnap.exists()) {
-              const data = cfgSnap.data() as {
-                badgeLayoutEnabled?: boolean;
-                badgeLayout?: { width?: number; height?: number; elements?: BadgeElement[]; enableCutting?: boolean };
-              };
-              if (data.badgeLayoutEnabled && data.badgeLayout) {
-                badgeLayout = {
-                  width: data.badgeLayout.width || 800,
-                  height: data.badgeLayout.height || 1200,
-                  elements: data.badgeLayout.elements || [],
-                  enableCutting: data.badgeLayout.enableCutting || false,
-                };
-              }
-            }
+            badgeLayout = await badgeConfigRepo.getActiveBadgeLayout(confId);
+            if (badgeLayout) layoutSource = `badge_config:${confId}`;
           } catch (fetchErr) {
             console.error('[Bixolon] badge_config fetch failed:', fetchErr);
           }
@@ -284,35 +302,34 @@ export const useExternalAttendeeActions = ({
             const snap = await getDocs(q);
             if (!snap.empty) {
               const cid = snap.docs[0].id;
-              const cfgSnap = await getDoc(doc(db, `conferences/${cid}/settings/badge_config`));
-              if (cfgSnap.exists()) {
-                const data = cfgSnap.data() as {
-                  badgeLayoutEnabled?: boolean;
-                  badgeLayout?: {
-                    width?: number;
-                    height?: number;
-                    elements?: BadgeElement[];
-                    enableCutting?: boolean;
-                    printerDpmm?: number;
-                    printOffsetXmm?: number;
-                    printOffsetYmm?: number;
-                  };
-                };
-                if (data.badgeLayoutEnabled && data.badgeLayout) {
-                  badgeLayout = {
-                    width: data.badgeLayout.width || 800,
-                    height: data.badgeLayout.height || 1200,
-                    elements: data.badgeLayout.elements || [],
-                    enableCutting: data.badgeLayout.enableCutting || false,
-                    printerDpmm: data.badgeLayout.printerDpmm,
-                    printOffsetXmm: data.badgeLayout.printOffsetXmm,
-                    printOffsetYmm: data.badgeLayout.printOffsetYmm,
-                  };
-                }
-              }
+              badgeLayout = await badgeConfigRepo.getActiveBadgeLayout(cid);
+              if (badgeLayout) layoutSource = `badge_config(slug):${cid}`;
             }
           } catch (fetchErr) {
             console.debug('Failed to fetch config by slug', fetchErr);
+          }
+        }
+
+        if (!badgeLayout && confId) {
+          try {
+            badgeLayout = await tryGetLegacyBadgeLayout(confId);
+            if (badgeLayout) layoutSource = `info/general:${confId}`;
+          } catch (fetchErr) {
+            console.error('[Bixolon] legacy badgeLayout fetch failed:', fetchErr);
+          }
+        }
+
+        if (!badgeLayout && slug) {
+          try {
+            const q = query(collection(db, 'conferences'), where('slug', '==', slug));
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+              const cid = snap.docs[0].id;
+              badgeLayout = await tryGetLegacyBadgeLayout(cid);
+              if (badgeLayout) layoutSource = `info/general(slug):${cid}`;
+            }
+          } catch (fetchErr) {
+            console.debug('Failed to fetch legacy layout by slug', fetchErr);
           }
         }
 
@@ -327,6 +344,11 @@ export const useExternalAttendeeActions = ({
           ],
         };
 
+        toast.loading(
+          `라벨 프린터 전송 중... (${layoutSource}, ${activeLayout.width}×${activeLayout.height}${activeLayout.unit ? ` ${activeLayout.unit}` : ''})`,
+          { id: toastId },
+        );
+
         const printSuccess = await printBadge(activeLayout, {
           name: attendee.name || '',
           org: attendee.organization || '',
@@ -338,13 +360,13 @@ export const useExternalAttendeeActions = ({
         });
 
         if (printSuccess) {
-          toast.success('라벨 출력 성공', { id: 'bixolon-print' });
+          toast.success('라벨 출력 성공', { id: toastId });
         } else {
-          toast.error(bixolonError || '라벨 출력 실패', { id: 'bixolon-print', duration: 6000 });
+          toast.error(bixolonError || '라벨 출력 실패', { id: toastId, duration: 6000 });
         }
       } catch (error) {
         console.error('Bixolon print error:', error);
-        toast.error('프린터 오류 발생', { id: 'bixolon-print' });
+        toast.error('프린터 오류 발생', { id: toastId });
       }
     },
     [bixolonError, bixolonPrinting, confId, printBadge, slug],
