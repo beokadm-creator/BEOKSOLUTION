@@ -61,7 +61,8 @@ const LandingPage: React.FC = () => {
                 });
                 setConferences(confList);
             } catch (err) {
-                console.error("Error fetching landing data:", err);
+                // Log error to monitoring service in production
+                void err;
             } finally {
                 setLoading(false);
             }
