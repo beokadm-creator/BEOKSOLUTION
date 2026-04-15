@@ -81,6 +81,9 @@ const BadgeEditorPage: React.FC = () => {
     const [printOffsetXmm, setPrintOffsetXmm] = useState(0);
     const [printOffsetYmm, setPrintOffsetYmm] = useState(0);
     const [enableCutting, setEnableCutting] = useState(false);
+    const [mediaType, setMediaType] = useState(0); // 0: Gap, 1: Continuous, 2: Black Mark
+    const [marginXMm, setMarginXMm] = useState(0);
+    const [marginYMm, setMarginYMm] = useState(0);
     const prevBadgeLayoutRef = useRef(info?.badgeLayout);
 
     const previewData = {
@@ -105,6 +108,9 @@ const BadgeEditorPage: React.FC = () => {
                 printOffsetYmm?: number;
                 enableCutting?: boolean;
                 unit?: 'px' | 'mm';
+                mediaType?: number;
+                marginXMm?: number;
+                marginYMm?: number;
             };
             setTimeout(() => {
                 const detectedUnit =
@@ -137,6 +143,9 @@ const BadgeEditorPage: React.FC = () => {
                 setPrintOffsetXmm(layout.printOffsetXmm || 0);
                 setPrintOffsetYmm(layout.printOffsetYmm || 0);
                 setEnableCutting(layout.enableCutting || false);
+                setMediaType(layout.mediaType || 0);
+                setMarginXMm(layout.marginXMm || 0);
+                setMarginYMm(layout.marginYMm || 0);
             }, 0);
             prevBadgeLayoutRef.current = info.badgeLayout;
         }
@@ -164,6 +173,9 @@ const BadgeEditorPage: React.FC = () => {
                 printOffsetXmm,
                 printOffsetYmm,
                 enableCutting,
+                mediaType,
+                marginXMm,
+                marginYMm,
                 unit: 'mm'
             });
             toast.success('명찰 레이아웃이 저장되었습니다! ✅');
@@ -313,16 +325,30 @@ const BadgeEditorPage: React.FC = () => {
 
                     <div className="space-y-4 pt-4 border-t border-slate-100">
                         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">프린터 보정</h3>
-                        <div className="space-y-1">
-                            <label className="text-[11px] font-medium text-slate-500 ml-1">해상도 (dpmm)</label>
-                            <select
-                                value={printerDpmm}
-                                onChange={(e) => setPrinterDpmm(parseInt(e.target.value, 10))}
-                                className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                            >
-                                <option value={8}>203 DPI (8 dpmm)</option>
-                                <option value={12}>300 DPI (12 dpmm)</option>
-                            </select>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-medium text-slate-500 ml-1">해상도 (dpmm)</label>
+                                <select
+                                    value={printerDpmm}
+                                    onChange={(e) => setPrinterDpmm(parseInt(e.target.value, 10))}
+                                    className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                                >
+                                    <option value={8}>203 DPI (8 dpmm)</option>
+                                    <option value={12}>300 DPI (12 dpmm)</option>
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-medium text-slate-500 ml-1">용지 타입 (센서)</label>
+                                <select
+                                    value={mediaType}
+                                    onChange={(e) => setMediaType(parseInt(e.target.value, 10))}
+                                    className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                                >
+                                    <option value={0}>Gap (라벨지)</option>
+                                    <option value={1}>Continuous (연속용지)</option>
+                                    <option value={2}>Black Mark (블랙마크)</option>
+                                </select>
+                            </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
@@ -342,6 +368,28 @@ const BadgeEditorPage: React.FC = () => {
                                     step={0.1}
                                     value={printOffsetYmm}
                                     onChange={(e) => setPrintOffsetYmm(parseFloat(e.target.value || '0'))}
+                                    className="border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 w-full"
+                                />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-medium text-slate-500 ml-1">하드웨어 마진 X (mm)</label>
+                                <input
+                                    type="number"
+                                    step={0.1}
+                                    value={marginXMm}
+                                    onChange={(e) => setMarginXMm(parseFloat(e.target.value || '0'))}
+                                    className="border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 w-full"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-medium text-slate-500 ml-1">하드웨어 마진 Y (mm)</label>
+                                <input
+                                    type="number"
+                                    step={0.1}
+                                    value={marginYMm}
+                                    onChange={(e) => setMarginYMm(parseFloat(e.target.value || '0'))}
                                     className="border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 w-full"
                                 />
                             </div>

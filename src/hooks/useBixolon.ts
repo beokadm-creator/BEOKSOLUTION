@@ -36,6 +36,9 @@ export const useBixolon = () => {
             printerDpmm?: number;
             printOffsetXmm?: number;
             printOffsetYmm?: number;
+            mediaType?: number;
+            marginXMm?: number;
+            marginYMm?: number;
         },
         userData: {
             name: string; org: string; category?: string;
@@ -48,6 +51,13 @@ export const useBixolon = () => {
         const offsetXdots = mmToDots(layout.printOffsetXmm || 0, dpmm);
         const offsetYdots = mmToDots(layout.printOffsetYmm || 0, dpmm);
 
+        // Hardware Margin (mm -> dots)
+        const marginXDots = mmToDots(layout.marginXMm || 0, dpmm);
+        const marginYDots = mmToDots(layout.marginYMm || 0, dpmm);
+        
+        // Media Type (0: Gap, 1: Continuous, 2: Black Mark)
+        const mediaType = layout.mediaType || 0;
+
         // Paper Size (mm -> dots)
         // 만약 기존 px 데이터(width > 250)가 넘어오면 강제로 mm 비율(100x240)로 클램핑하여 오작동 방지
         const safeWidthMm = layout.width > 250 ? 100 : layout.width;
@@ -58,13 +68,14 @@ export const useBixolon = () => {
 
         const functions: Record<string, any> = {
             "func01": { "clearBuffer": [] },
-            "func02": { "setReferencePoint": [0, 0] },
-            "func03": { "setDirection": [0] },
-            "func04": { "setWidth": [widthDots] },
-            "func05": { "setLength": [heightDots, 24, 0, 0] } // Gap length 24 고정
+            "func02": { "setMargin": [marginXDots, marginYDots] },
+            "func03": { "setReferencePoint": [0, 0] },
+            "func04": { "setDirection": [0] },
+            "func05": { "setWidth": [widthDots] },
+            "func06": { "setLength": [heightDots, mediaType === 1 ? 0 : 24, mediaType, 0] } // Gap length 24 고정
         };
 
-        let fIdx = 6;
+        let fIdx = 7;
         for (const el of layout.elements) {
             if (!el.isVisible) continue;
 
