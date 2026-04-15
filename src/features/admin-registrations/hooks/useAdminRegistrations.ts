@@ -15,18 +15,8 @@ import { fetchAllRegistrations } from "../services/fetchAllRegistrations";
 import { badgeConfigRepo } from "../services/badgeConfigRepo";
 import { registrationFunctions } from "../services/registrationFunctions";
 import type { BulkSendModalState, RegistrationOptionSummary, RootRegistration } from "../types";
-import { displayTier, getRegistrationDisplayAmount, statusToKorean } from "../utils/formatters";
-
-const FALLBACK_BADGE_LAYOUT: { width: number; height: number; elements: BadgeElement[]; enableCutting?: boolean; unit?: 'px' | 'mm' } = {
-  width: 100,
-  height: 240,
-  unit: 'mm',
-  elements: [
-    { x: 50, y: 20, fontSize: 25, isVisible: true, type: "QR" },
-    { x: 50, y: 60, fontSize: 6, isVisible: true, type: "NAME" },
-    { x: 50, y: 80, fontSize: 4, isVisible: true, type: "ORG" },
-  ],
-};
+import { getFunctions, httpsCallable } from "firebase/functions";
+import toast from "react-hot-toast";
 
 export const useAdminRegistrations = (params: { conferenceId: string | null }) => {
   const { conferenceId } = params;
@@ -324,18 +314,22 @@ export const useAdminRegistrations = (params: { conferenceId: string | null }) =
           null;
 
         if (conferenceId) {
-          console.log("[Bixolon] Fetching latest layout from settings/badge_config...");
-          try {
-            badgeLayout = await badgeConfigRepo.getActiveBadgeLayout(conferenceId);
-            if (badgeLayout) {
-              console.log("[Bixolon] 최신 로드 완료:", badgeLayout);
+            console.log("[Bixolon] Fetching latest layout from settings/badge_config...");
+            try {
+              badgeLayout = await badgeConfigRepo.getActiveBadgeLayout(conferenceId);
+              if (badgeLayout) {
+                console.log("[Bixolon] 최신 로드 완료:", badgeLayout);
+              }
+            } catch (fetchErr) {
+              console.error("[Bixolon] badge_config fetch failed:", fetchErr);
             }
-          } catch (fetchErr) {
-            console.error("[Bixolon] badge_config fetch failed:", fetchErr);
           }
-        }
-
-        const activeLayout = badgeLayout || FALLBACK_BADGE_LAYOUT;
+  
+          if (!badgeLayout) {
+            toast.error("명찰 레이아웃이 설정되지 않았습니다.", { id: toastId });
+            return;
+          }
+          const activeLayout = badgeLayout;
 
         let userName = reg.userName || "";
         let userAffiliation = reg.userOrg || reg.affiliation || "";
