@@ -109,11 +109,10 @@ export const useBixolon = () => {
             const safeXMm = el.x > 250 ? el.x / 3.78 : el.x;
             let safeYMm = el.y > 350 ? el.y / 3.78 : el.y;
 
-            // 280mm 기준 레이아웃을 현재 용지 크기에 맞게 스케일링
-            if (safeHeightMm !== 280 && safeYMm > 0) {
-                const scale = safeHeightMm / 280;
-                safeYMm = safeYMm * scale;
-                console.log(`🎯 [SCALE DEBUG] Y: ${el.y} → ${safeYMm.toFixed(1)}mm (scale: ${scale.toFixed(3)})`);
+            // 240mm 용지에서 하단 공백을 줄이기 위해 Y 오프셋 추가
+            if (safeHeightMm === 240 && safeYMm > 0) {
+                safeYMm = safeYMm + 40; // 40mm 아래로 이동
+                console.log(`📍 [OFFSET DEBUG] Y: ${el.y} + 40mm → ${safeYMm.toFixed(1)}mm`);
             }
 
             const safeFontSizeMm = el.fontSize > 100 && el.type !== 'IMAGE' ? el.fontSize / 3.78 : el.fontSize;
