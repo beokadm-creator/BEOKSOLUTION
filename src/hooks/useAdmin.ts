@@ -34,7 +34,8 @@ export const useAdmin = (conferenceId: string) => {
                 height,
                 elements: cleanElements,
                 backgroundImageUrl: backgroundImageUrl ?? null,
-                ...extraSettings // printXOffset 등이 여기에 포함됨
+                ...extraSettings,
+                unit: extraSettings?.unit ?? 'px'
             };
 
             // 1. Legacy Location: info/general
@@ -48,7 +49,7 @@ export const useAdmin = (conferenceId: string) => {
             await setDoc(settingsRef, {
                 badgeLayout: {
                     ...badgeLayoutData,
-                    enableCutting: true
+                    enableCutting: extraSettings?.enableCutting ?? true
                 },
                 badgeLayoutEnabled: true,
                 updatedAt: Timestamp.now()

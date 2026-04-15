@@ -61,7 +61,16 @@ const InfodeskPage: React.FC = () => {
         lastScanned: ''
     });
 
-    const [badgeLayout, setBadgeLayout] = useState<{ width: number; height: number; elements: BadgeElement[]; enableCutting?: boolean } | null>(null);
+    const [badgeLayout, setBadgeLayout] = useState<{
+        width: number;
+        height: number;
+        elements: BadgeElement[];
+        unit?: 'px' | 'mm';
+        enableCutting?: boolean;
+        printerDpmm?: number;
+        printOffsetXmm?: number;
+        printOffsetYmm?: number;
+    } | null>(null);
     const [attendeeCache, setAttendeeCache] = useState<Map<string, any>>(new Map());
     const inputRef = useRef<HTMLInputElement>(null);
     const [inputValue, setInputValue] = useState('');
@@ -91,7 +100,11 @@ const InfodeskPage: React.FC = () => {
                             width: data.badgeLayout?.width || 800,
                             height: data.badgeLayout?.height || 1200,
                             elements: data.badgeLayout?.elements || [],
-                            enableCutting: data.badgeLayout?.enableCutting || false
+                            unit: data.badgeLayout?.unit,
+                            enableCutting: data.badgeLayout?.enableCutting || false,
+                            printerDpmm: data.badgeLayout?.printerDpmm,
+                            printOffsetXmm: data.badgeLayout?.printOffsetXmm,
+                            printOffsetYmm: data.badgeLayout?.printOffsetYmm,
                         });
                     }
                 }

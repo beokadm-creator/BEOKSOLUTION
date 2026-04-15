@@ -18,7 +18,11 @@ export type BadgeLayout = {
   width: number;
   height: number;
   elements: BadgeElement[];
+  unit?: "px" | "mm";
   enableCutting?: boolean;
+  printerDpmm?: number;
+  printOffsetXmm?: number;
+  printOffsetYmm?: number;
 };
 
 export type BulkSendResult = {
@@ -43,8 +47,11 @@ export type BadgeConfigDoc = {
     width?: number;
     height?: number;
     elements?: BadgeElement[];
+    unit?: "px" | "mm";
     enableCutting?: boolean;
+    printerDpmm?: number;
+    printOffsetXmm?: number;
+    printOffsetYmm?: number;
   };
   updatedAt?: Timestamp;
 };
-

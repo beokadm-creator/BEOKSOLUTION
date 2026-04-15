@@ -12,6 +12,9 @@ const PX_PER_MM = 3.779527;
 const toMm = (px: number) => parseFloat((px / PX_PER_MM).toFixed(2));
 const toPx = (mm: string | number) => Math.round(Number(mm) * PX_PER_MM);
 
+const DEFAULT_BADGE_WIDTH_MM = 100;
+const DEFAULT_BADGE_HEIGHT_MM = 240;
+
 /**
  * MmInput: mm 단위 입력 컴포넌트
  * - 입력 중에는 로컬 문자열 상태를 유지 (자연스러운 연속 입력 가능)
@@ -74,9 +77,16 @@ const BadgeEditorPage: React.FC = () => {
     const { saveBadgeLayout, loading: saving } = useAdmin(confId || '');
 
     const [elements, setElements] = useState<BadgeElement[]>([]);
-    const [canvasSize, setCanvasSize] = useState({ width: 400, height: 600 });
+    const [canvasSize, setCanvasSize] = useState({
+        width: toPx(DEFAULT_BADGE_WIDTH_MM),
+        height: toPx(DEFAULT_BADGE_HEIGHT_MM)
+    });
     const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
     const [bgUrl, setBgUrl] = useState<string | undefined>(undefined);
+    const [printerDpmm, setPrinterDpmm] = useState(8);
+    const [printOffsetXmm, setPrintOffsetXmm] = useState(0);
+    const [printOffsetYmm, setPrintOffsetYmm] = useState(0);
+    const [enableCutting, setEnableCutting] = useState(false);
     const prevBadgeLayoutRef = useRef(info?.badgeLayout);
 
     const previewData = {
@@ -91,13 +101,52 @@ const BadgeEditorPage: React.FC = () => {
 
     useEffect(() => {
         if (info?.badgeLayout && info.badgeLayout !== prevBadgeLayoutRef.current) {
+            const layout = info.badgeLayout as unknown as {
+                width?: number;
+                height?: number;
+                elements?: BadgeElement[];
+                backgroundImageUrl?: string;
+                printerDpmm?: number;
+                printOffsetXmm?: number;
+                printOffsetYmm?: number;
+                enableCutting?: boolean;
+                unit?: 'px' | 'mm';
+            };
             setTimeout(() => {
-                setElements(info.badgeLayout.elements || []);
-                setCanvasSize({
-                    width: info.badgeLayout.width || 400,
-                    height: info.badgeLayout.height || 600
+                const detectedUnit =
+                    layout.unit === 'px' || layout.unit === 'mm'
+                        ? layout.unit
+                        : (layout.width && layout.width <= 250 && layout.height && layout.height <= 350 ? 'mm' : 'px');
+
+                const convertedElements = (layout.elements || []).map((el) => {
+                    if (detectedUnit === 'px') return el;
+
+                    return {
+                        ...el,
+                        x: toPx(el.x),
+                        y: toPx(el.y),
+                        fontSize: toPx(el.fontSize),
+                        maxWidth: el.maxWidth !== undefined ? toPx(el.maxWidth) : undefined,
+                    };
                 });
-                setBgUrl(info.badgeLayout.backgroundImageUrl);
+
+                const widthPx =
+                    detectedUnit === 'px'
+                        ? (layout.width || toPx(DEFAULT_BADGE_WIDTH_MM))
+                        : toPx(layout.width || DEFAULT_BADGE_WIDTH_MM);
+
+                const heightPx =
+                    detectedUnit === 'px'
+                        ? (layout.height || toPx(DEFAULT_BADGE_HEIGHT_MM))
+                        : toPx(layout.height || DEFAULT_BADGE_HEIGHT_MM);
+
+                setElements(convertedElements);
+                setCanvasSize({ width: widthPx, height: heightPx });
+                setBgUrl(layout.backgroundImageUrl);
+                setPrinterDpmm(layout.printerDpmm || 8);
+                setPrintOffsetXmm(layout.printOffsetXmm || 0);
+                setPrintOffsetYmm(layout.printOffsetYmm || 0);
+                setEnableCutting(layout.enableCutting || false);
             }, 0);
             prevBadgeLayoutRef.current = info.badgeLayout;
         }
@@ -120,7 +169,12 @@ const BadgeEditorPage: React.FC = () => {
 
     const handleSave = async () => {
         try {
-            await saveBadgeLayout(canvasSize.width, canvasSize.height, elements, bgUrl);
+            await saveBadgeLayout(canvasSize.width, canvasSize.height, elements, bgUrl, {
+                printerDpmm,
+                printOffsetXmm,
+                printOffsetYmm,
+                enableCutting
+            });
             toast.success('명찰 레이아웃이 저장되었습니다! ✅');
         } catch (e: any) {
             console.error(e);
@@ -139,8 +193,8 @@ const BadgeEditorPage: React.FC = () => {
 
     const addElement = (type: BadgeElement['type']) => {
         const newElement: BadgeElement = {
-            x: 50,
-            y: 50,
+            x: Math.round(canvasSize.width / 2),
+            y: toPx(20),
             fontSize: type === 'QR' ? 80 : 24,
             isVisible: true,
             type,
@@ -206,7 +260,10 @@ const BadgeEditorPage: React.FC = () => {
 
                     {/* Grid Overlay (Optional) */}
                     <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
-                        style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 0)', backgroundSize: '20px 20px' }}
+                        style={{
+                            backgroundImage: 'radial-gradient(#000 1px, transparent 0)',
+                            backgroundSize: `${toPx(5)}px ${toPx(5)}px`
+                        }}
                     />
 
                     {elements.map((el, idx) => (
@@ -248,6 +305,68 @@ const BadgeEditorPage: React.FC = () => {
                                 <label className="text-[11px] font-medium text-slate-500 ml-1">세로 (mm)</label>
                                 <MmInput valuePx={canvasSize.height} onChange={px => px !== undefined && setCanvasSize(p => ({ ...p, height: px }))} className="w-full" />
                             </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {[240, 260, 280, 300, 320, 350].map((mm) => (
+                                <Button
+                                    key={mm}
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 text-[11px]"
+                                    onClick={() => setCanvasSize({ width: toPx(DEFAULT_BADGE_WIDTH_MM), height: toPx(mm) })}
+                                >
+                                    100×{mm}
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="space-y-4 pt-4 border-t border-slate-100">
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">프린터 보정</h3>
+                        <div className="space-y-1">
+                            <label className="text-[11px] font-medium text-slate-500 ml-1">해상도 (dpmm)</label>
+                            <select
+                                value={printerDpmm}
+                                onChange={(e) => setPrinterDpmm(parseInt(e.target.value, 10))}
+                                className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                            >
+                                <option value={8}>203 DPI (8 dpmm)</option>
+                                <option value={12}>300 DPI (12 dpmm)</option>
+                            </select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-medium text-slate-500 ml-1">X 오프셋 (mm)</label>
+                                <input
+                                    type="number"
+                                    step={0.1}
+                                    value={printOffsetXmm}
+                                    onChange={(e) => setPrintOffsetXmm(parseFloat(e.target.value || '0'))}
+                                    className="border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 w-full"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-medium text-slate-500 ml-1">Y 오프셋 (mm)</label>
+                                <input
+                                    type="number"
+                                    step={0.1}
+                                    value={printOffsetYmm}
+                                    onChange={(e) => setPrintOffsetYmm(parseFloat(e.target.value || '0'))}
+                                    className="border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 w-full"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 mt-4">
+                            <input
+                                type="checkbox"
+                                id="enableCutting"
+                                checked={enableCutting}
+                                onChange={e => setEnableCutting(e.target.checked)}
+                                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                            />
+                            <label htmlFor="enableCutting" className="text-[11px] font-medium text-slate-500">
+                                인쇄 후 자동 커팅 활성화
+                            </label>
                         </div>
                     </div>
 
@@ -539,4 +658,3 @@ const DraggableNode: React.FC<DraggableNodeProps> = ({ el, idx, isSelected, prev
 };
 
 export default BadgeEditorPage;
-

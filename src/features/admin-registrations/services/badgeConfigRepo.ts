@@ -16,8 +16,11 @@ export const badgeConfigRepo = {
       width: data.badgeLayout.width || 800,
       height: data.badgeLayout.height || 1200,
       elements: data.badgeLayout.elements || [],
+      unit: data.badgeLayout.unit,
       enableCutting: data.badgeLayout.enableCutting || false,
+      printerDpmm: data.badgeLayout.printerDpmm,
+      printOffsetXmm: data.badgeLayout.printOffsetXmm,
+      printOffsetYmm: data.badgeLayout.printOffsetYmm,
     };
   },
 };
-

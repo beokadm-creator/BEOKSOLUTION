@@ -173,6 +173,11 @@ export interface ConferenceInfo {
     height: number;
     elements: BadgeElement[];
     backgroundImageUrl?: string; // Background image for positioning/printing
+    unit?: 'px' | 'mm';
+    printerDpmm?: number;
+    printOffsetXmm?: number;
+    printOffsetYmm?: number;
+    enableCutting?: boolean;
   };
   receiptConfig: {
     issuerName: string;

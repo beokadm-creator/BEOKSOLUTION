@@ -288,7 +288,15 @@ export const useExternalAttendeeActions = ({
               if (cfgSnap.exists()) {
                 const data = cfgSnap.data() as {
                   badgeLayoutEnabled?: boolean;
-                  badgeLayout?: { width?: number; height?: number; elements?: BadgeElement[]; enableCutting?: boolean };
+                  badgeLayout?: {
+                    width?: number;
+                    height?: number;
+                    elements?: BadgeElement[];
+                    enableCutting?: boolean;
+                    printerDpmm?: number;
+                    printOffsetXmm?: number;
+                    printOffsetYmm?: number;
+                  };
                 };
                 if (data.badgeLayoutEnabled && data.badgeLayout) {
                   badgeLayout = {
@@ -296,6 +304,9 @@ export const useExternalAttendeeActions = ({
                     height: data.badgeLayout.height || 1200,
                     elements: data.badgeLayout.elements || [],
                     enableCutting: data.badgeLayout.enableCutting || false,
+                    printerDpmm: data.badgeLayout.printerDpmm,
+                    printOffsetXmm: data.badgeLayout.printOffsetXmm,
+                    printOffsetYmm: data.badgeLayout.printOffsetYmm,
                   };
                 }
               }

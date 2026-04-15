@@ -5,21 +5,26 @@ import { BadgeElement } from '../types/schema';
 const SDK_BASE_URL = `http://127.0.0.1:18080/WebPrintSDK`;
 const PRINTER_NAME = 'Printer1';
 
-/**
- * 정밀 변환 상수 (DPI 매칭)
- * 1mm = 8 dots (203 DPI)
- * 1mm = 3.779527 px (96 DPI)
- * Factor = 8 / 3.779527 = 2.11666667
- */
-const PX_TO_DOTS = 2.11666667;
-const pxToDots = (px: number) => Math.round(px * PX_TO_DOTS);
+const PX_PER_MM = 3.779527;
+const pxToDots = (px: number, dpmm: number) => Math.round(px * (dpmm / PX_PER_MM));
+const mmToDots = (mm: number, dpmm: number) => Math.round(mm * dpmm);
 
-/**
- * 하드웨어 여백 보정 (Calibration)
- * 만약 출력물이 우측으로 쏠린다면 OFFSET_X를 음수값(예: -16 => -2mm)으로 조절합니다.
- */
-const GLOBAL_OFFSET_X = -8; // 기본 -1mm 보정 (우측 쏠림 방지)
-const GLOBAL_OFFSET_Y = 0;
+const detectLayoutUnit = (layout: {
+    width?: number;
+    height?: number;
+    unit?: 'px' | 'mm';
+}): 'px' | 'mm' => {
+    if (layout.unit === 'px' || layout.unit === 'mm') return layout.unit;
+
+    const width = layout.width || 0;
+    const height = layout.height || 0;
+    if (width > 0 && width <= 250 && height > 0 && height <= 350) return 'mm';
+
+    return 'px';
+};
+
+const valueToDots = (value: number, dpmm: number, unit: 'px' | 'mm') =>
+    unit === 'mm' ? mmToDots(value, dpmm) : pxToDots(value, dpmm);
 
 export const useBixolon = () => {
     const [printing, setPrinting] = useState(false);
@@ -42,14 +47,28 @@ export const useBixolon = () => {
     };
 
     const buildPrintData = (
-        layout: { width: number; height: number; elements: BadgeElement[]; enableCutting?: boolean },
+        layout: {
+            width: number;
+            height: number;
+            elements: BadgeElement[];
+            enableCutting?: boolean;
+            printerDpmm?: number;
+            printOffsetXmm?: number;
+            printOffsetYmm?: number;
+            unit?: 'px' | 'mm';
+        },
         userData: {
             name: string; org: string; category?: string;
             license?: string; price?: string; affiliation?: string; qrData: string;
         }
     ) => {
-        const widthDots = pxToDots(layout.width || 400);
-        const heightDots = pxToDots(layout.height || 600);
+        const dpmm = layout.printerDpmm || 8;
+        const unit = detectLayoutUnit(layout);
+        const offsetXdots = Math.round((layout.printOffsetXmm || 0) * dpmm);
+        const offsetYdots = Math.round((layout.printOffsetYmm || 0) * dpmm);
+
+        const widthDots = valueToDots(layout.width || 400, dpmm, unit);
+        const heightDots = valueToDots(layout.height || 600, dpmm, unit);
 
         const functions: Record<string, any> = {
             "func01": { "clearBuffer": [] },
@@ -63,37 +82,37 @@ export const useBixolon = () => {
         for (const el of layout.elements) {
             if (!el.isVisible) continue;
 
-            const baseXDots = pxToDots(el.x);
-            const baseYDots = pxToDots(el.y) + GLOBAL_OFFSET_Y;
+            const baseXDots = valueToDots(el.x, dpmm, unit);
+            const baseYDots = valueToDots(el.y, dpmm, unit) + offsetYdots;
 
             const content = el.type === 'CUSTOM'
                 ? (el.content || '')
                 : (userData[el.type.toLowerCase() as keyof typeof userData] || '');
 
             if (el.type === 'QR') {
-                const qrSizeDots = pxToDots(el.fontSize || 80);
+                const qrSizeDots = valueToDots(el.fontSize || 80, dpmm, unit);
                 const qrMag = Math.max(1, Math.min(10, Math.round(qrSizeDots / 28)));
                 functions[`func${String(fIdx++).padStart(2, '0')}`] = {
                     "drawQRCode": [
-                        userData.qrData || 'NO_DATA', baseXDots + GLOBAL_OFFSET_X, baseYDots, 1, "M", qrMag, 0
+                        userData.qrData || 'NO_DATA', baseXDots + offsetXdots, baseYDots, 1, "M", qrMag, 0
                     ]
                 };
             } else if (el.type === 'IMAGE') {
                 functions[`func${String(fIdx++).padStart(2, '0')}`] = {
                     "drawBitmap": [
-                        content, baseXDots + GLOBAL_OFFSET_X, baseYDots, pxToDots(el.fontSize || 100), 0
+                        content, baseXDots + offsetXdots, baseYDots, valueToDots(el.fontSize || 100, dpmm, unit), 0
                     ]
                 };
             } else {
                 if (!content) continue;
 
-                const fontDots = pxToDots(el.fontSize || 24);
+                const fontDots = valueToDots(el.fontSize || 24, dpmm, unit);
                 let lines = [content];
                 const lineSpacingDots = fontDots * 0.35; // 기본 줄간격 1.35x
 
                 // 지정된 너비 초과 시 폰트 크기 원본 유지한 채 그대로 줄바꿈(Multi-line)
                 if (el.maxWidth) {
-                    const maxDots = pxToDots(el.maxWidth);
+                    const maxDots = valueToDots(el.maxWidth, dpmm, unit);
                     const estWidth = estimateTextWidthDots(content, fontDots);
 
                     if (estWidth > maxDots) {
@@ -121,17 +140,17 @@ export const useBixolon = () => {
                     if (el.textAlign === 'center') {
                         const lineWidthDots = estimateTextWidthDots(lineText, fontDots);
                         if (el.maxWidth) {
-                            const maxDots = pxToDots(el.maxWidth);
+                            const maxDots = valueToDots(el.maxWidth, dpmm, unit);
                             // 지정된 영역(x ~ x+maxWidth) 안에서 중앙 정렬
                             const centerXDots = baseXDots + maxDots / 2;
-                            printXDots = Math.round(centerXDots - lineWidthDots / 2) + GLOBAL_OFFSET_X;
+                            printXDots = Math.round(centerXDots - lineWidthDots / 2) + offsetXdots;
                         } else {
                             // 영역 설정이 없으면 캔버스 전체 기준 중앙 정렬
-                            printXDots = Math.round((widthDots - lineWidthDots) / 2) + GLOBAL_OFFSET_X;
+                            printXDots = Math.round((widthDots - lineWidthDots) / 2) + offsetXdots;
                         }
-                        printXDots = Math.max(printXDots, GLOBAL_OFFSET_X); // 음수 방지
+                        printXDots = Math.max(printXDots, offsetXdots);
                     } else {
-                        printXDots = baseXDots + GLOBAL_OFFSET_X;
+                        printXDots = baseXDots + offsetXdots;
                     }
 
                     functions[`func${String(fIdx++).padStart(2, '0')}`] = {
@@ -145,7 +164,12 @@ export const useBixolon = () => {
             }
         }
 
-        functions[`func${String(fIdx).padStart(2, '0')}`] = { "printBuffer": [] };
+        functions[`func${String(fIdx++).padStart(2, '0')}`] = { "printBuffer": [] };
+        
+        if (layout.enableCutting) {
+            functions[`func${String(fIdx++).padStart(2, '0')}`] = { "cutPaper": [1] };
+        }
+
         return { "id": Math.floor(Math.random() * 1000) + 1, "functions": functions };
     };
 
