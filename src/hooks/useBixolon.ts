@@ -40,7 +40,6 @@ export const useBixolon = () => {
             mediaType?: number;
             marginXMm?: number;
             marginYMm?: number;
-            cutPaperType?: 0 | 1;
         },
         userData: {
             name: string; org: string; category?: string;
@@ -151,18 +150,16 @@ export const useBixolon = () => {
                     if (el.textAlign === 'center') {
                         const lineWidthDots = estimateTextWidthDots(lineText, fontDots);
                         if (safeMaxWidthMm) {
-                            // 지정된 maxWidth 영역 안에서 중앙 정렬 (기준점은 X)
-                            const maxDots = mmToDots(safeMaxWidthMm, dpmm);
-                            const centerOfBoxDots = baseXDots + (maxDots / 2);
-                            printXDots = Math.round(centerOfBoxDots - (lineWidthDots / 2)) + offsetXdots;
+                            const boxWidthDots = mmToDots(safeMaxWidthMm, dpmm);
+                            const boxLeftDots = baseXDots + offsetXdots;
+                            printXDots = Math.round(boxLeftDots + ((boxWidthDots - lineWidthDots) / 2));
                         } else {
-                            // maxWidth가 없을 때는 사용자가 지정한 X 좌표 자체를 텍스트의 "중심점"으로 취급
-                            printXDots = Math.round(baseXDots - (lineWidthDots / 2)) + offsetXdots;
+                            printXDots = Math.round(((widthDots - lineWidthDots) / 2) + offsetXdots);
                         }
                     }
 
                     // 프린터 밖으로 나가지 않도록 최소 0 이상 유지
-                    printXDots = Math.max(printXDots, offsetXdots);
+                    printXDots = Math.max(printXDots, 0);
 
                     functions[`func${String(fIdx++).padStart(2, '0')}`] = {
                         "drawTrueTypeFont": [
