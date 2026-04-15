@@ -8,6 +8,11 @@ html {
 }
 
 @theme {
+  /* Academic Elegance Typography System */
+  --font-display: 'Spectral', 'Charter', 'Georgia', serif;
+  --font-body: 'Source Sans 3', system-ui, sans-serif;
+  --font-mono: 'Berkeley Mono', 'JetBrains Mono', 'Consolas', monospace;
+
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
@@ -35,6 +40,28 @@ html {
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
 
+  /* eRegi Design Tokens for Tailwind */
+  --color-eregi-primary: hsl(var(--eregi-primary));
+  --color-eregi-primary-hover: hsl(var(--eregi-primary-hover));
+  --color-eregi-primary-foreground: hsl(var(--eregi-primary-foreground));
+
+  --color-eregi-secondary: hsl(var(--eregi-secondary));
+  --color-eregi-secondary-hover: hsl(var(--eregi-secondary-hover));
+  --color-eregi-secondary-foreground: hsl(var(--eregi-secondary-foreground));
+
+  --color-eregi-neutral-50: hsl(var(--eregi-neutral-50));
+  --color-eregi-neutral-100: hsl(var(--eregi-neutral-100));
+  --color-eregi-neutral-200: hsl(var(--eregi-neutral-200));
+
+  --color-eregi-success: hsl(var(--eregi-success));
+  --color-eregi-success-foreground: hsl(var(--eregi-success-foreground));
+
+  --color-eregi-warning: hsl(var(--eregi-warning));
+  --color-eregi-warning-foreground: hsl(var(--eregi-warning-foreground));
+
+  --color-eregi-error: hsl(var(--eregi-error));
+  --color-eregi-error-foreground: hsl(var(--eregi-error-foreground));
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
@@ -42,6 +69,7 @@ html {
 
 @layer base {
   :root {
+    /* Base system colors */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 
@@ -51,7 +79,7 @@ html {
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 222.2 47.4% 11.2%;
+    --primary: 210 40% 20%; /* eRegi academic blue */
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -68,9 +96,31 @@ html {
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --ring: 210 40% 20%;
 
     --radius: 0.5rem;
+
+    /* eRegi Academic Color System */
+    --eregi-primary: 210 100% 20%; /* #003366 equivalent in HSL */
+    --eregi-primary-hover: 210 100% 13%; /* #002244 equivalent */
+    --eregi-primary-foreground: 0 0% 100%;
+
+    --eregi-secondary: 210 67% 38%; /* #24669e equivalent */
+    --eregi-secondary-hover: 210 100% 20%;
+    --eregi-secondary-foreground: 0 0% 100%;
+
+    --eregi-neutral-50: 210 38% 97%; /* #f0f5fa equivalent */
+    --eregi-neutral-100: 210 33% 92%; /* #e1ecf6 equivalent */
+    --eregi-neutral-200: 210 25% 84%; /* #c3daee equivalent */
+
+    --eregi-success: 142 76% 36%;
+    --eregi-success-foreground: 0 0% 100%;
+
+    --eregi-warning: 38 92% 50%;
+    --eregi-warning-foreground: 0 0% 100%;
+
+    --eregi-error: 0 84% 60%;
+    --eregi-error-foreground: 0 0% 100%;
   }
 
   .dark {
@@ -83,7 +133,7 @@ html {
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
+    --primary: 210 40% 85%;
     --primary-foreground: 222.2 47.4% 11.2%;
 
     --secondary: 217.2 32.6% 17.5%;
@@ -101,6 +151,28 @@ html {
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
+    /* eRegi Dark Mode Colors */
+    --eregi-primary: 210 60% 75%;
+    --eregi-primary-hover: 210 70% 80%;
+    --eregi-primary-foreground: 210 100% 10%;
+
+    --eregi-secondary: 210 40% 60%;
+    --eregi-secondary-hover: 210 50% 70%;
+    --eregi-secondary-foreground: 210 100% 10%;
+
+    --eregi-neutral-50: 217.2 32.6% 15%;
+    --eregi-neutral-100: 217.2 32.6% 20%;
+    --eregi-neutral-200: 217.2 32.6% 25%;
+
+    --eregi-success: 142 50% 55%;
+    --eregi-success-foreground: 142 76% 10%;
+
+    --eregi-warning: 38 70% 55%;
+    --eregi-warning-foreground: 38 92% 15%;
+
+    --eregi-error: 0 70% 65%;
+    --eregi-error-foreground: 0 84% 15%;
   }
 }
 
@@ -111,5 +183,154 @@ html {
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Reduced motion support for accessibility */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* Text overflow and international text handling */
+  .text-overflow-safe {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+
+  /* Enhanced focus indicators for better accessibility */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* Academic Elegance spacing system - 4pt base */
+  .space-academic-xs { gap: 0.25rem; } /* 4px */
+  .space-academic-sm { gap: 0.5rem; }  /* 8px */
+  .space-academic-md { gap: 0.75rem; } /* 12px */
+  .space-academic-lg { gap: 1rem; }    /* 16px */
+  .space-academic-xl { gap: 1.5rem; }  /* 24px */
+  .space-academic-2xl { gap: 2rem; }   /* 32px */
+  .space-academic-3xl { gap: 3rem; }   /* 48px */
+  .space-academic-4xl { gap: 4rem; }   /* 64px */
+
+  /* Consistent border radius for Academic Elegance */
+  .radius-academic-sm { border-radius: 0.5rem; }  /* 8px */
+  .radius-academic-md { border-radius: 0.75rem; } /* 12px */
+  .radius-academic-lg { border-radius: 1rem; }    /* 16px */
+
+  /* High contrast mode support */
+  @media (prefers-contrast: high) {
+    :root {
+      --border: 0 0% 20%;
+      --ring: 0 0% 10%;
+    }
+  }
+
+  /* Academic Elegance Animation System */
+
+  /* Refined easing curves for scholarly interfaces */
+  .ease-subtle { transition-timing-function: cubic-bezier(0.25, 1, 0.5, 1); }
+  .ease-refined { transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
+  .ease-decisive { transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+
+  /* Scroll-triggered animations */
+  .animate-fade-in-up[data-scroll] {
+    opacity: 0;
+    transform: translateY(1rem);
+    transition: all 400ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .animate-fade-in-up[data-scroll].is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .animate-fade-in[data-scroll] {
+    opacity: 0;
+    transition: opacity 300ms cubic-bezier(0.25, 1, 0.5, 1);
+  }
+
+  .animate-fade-in[data-scroll].is-visible {
+    opacity: 1;
+  }
+
+  .animate-scale-in[data-scroll] {
+    opacity: 0;
+    transform: scale(0.95);
+    transition: all 400ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .animate-scale-in[data-scroll].is-visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  /* Academic button interactions */
+  .btn-academic {
+    transition: all 200ms cubic-bezier(0.25, 1, 0.5, 1);
+  }
+
+  .btn-academic:hover {
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 8px 25px -8px hsl(var(--eregi-primary) / 0.3);
+  }
+
+  .btn-academic:active {
+    transform: translateY(0) scale(0.98);
+    transition-duration: 100ms;
+  }
+
+  /* Card hover interactions */
+  .card-academic {
+    transition: all 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .card-academic:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px -8px hsl(var(--eregi-neutral-200) / 0.3);
+  }
+
+  /* Staggered entrance animations */
+  .stagger-children > * {
+    animation-delay: calc(var(--stagger-delay, 0) * 100ms);
+  }
+
+  /* Page entrance animation */
+  @keyframes page-enter {
+    from {
+      opacity: 0;
+      transform: translateY(0.5rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .page-enter {
+    animation: page-enter 500ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-in-up,
+    .animate-fade-in,
+    .animate-scale-in,
+    .btn-academic,
+    .card-academic {
+      animation: none !important;
+      transition: none !important;
+    }
+
+    .btn-academic:hover,
+    .card-academic:hover {
+      transform: none !important;
+    }
   }
 }

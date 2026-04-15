@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '../ui/button';
 import { AlertTriangle, RefreshCcw } from 'lucide-react';
 
@@ -29,8 +29,8 @@ export class GlobalErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
-          <div className="bg-white p-8 md:p-10 rounded-3xl shadow-2xl border border-slate-100 max-w-lg w-full text-center space-y-8 relative overflow-hidden">
+        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4" role="main" aria-labelledby="error-title">
+          <div className="bg-white p-8 md:p-10 rounded-3xl shadow-2xl border border-slate-100 max-w-lg w-full text-center space-y-8 relative overflow-hidden text-overflow-safe">
             {/* Background Decoration */}
             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-red-400 via-amber-400 to-red-400"></div>
 
@@ -41,10 +41,10 @@ export class GlobalErrorBoundary extends Component<Props, State> {
             </div>
 
             <div className="space-y-4">
-              <h1 className="text-2xl md:text-3xl font-bold text-slate-800 tracking-tight">
+              <h1 id="error-title" className="text-2xl md:text-3xl font-bold text-slate-800 tracking-tight">
                 시스템 접속이 원활하지 않습니다.
               </h1>
-              <p className="text-slate-500 text-sm md:text-base leading-relaxed break-keep">
+              <p className="text-slate-500 text-sm md:text-base leading-relaxed break-keep" aria-describedby="error-title">
                 일시적인 시스템 오류 또는 네트워크 문제로 인해 페이지를 불러오지 못했습니다.<br />
                 이용에 불편을 드려 대단히 죄송합니다. 잠시 후 다시 시도해 주시기 바랍니다.
               </p>

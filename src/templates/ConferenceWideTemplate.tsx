@@ -129,7 +129,7 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
       </div>
 
       {/* 4. Mobile-Optimized Bottom Tab Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-lg z-50 safe-area-inset-bottom">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-eregi-neutral-100 shadow-lg z-50 safe-area-inset-bottom">
         <div className="max-w-7xl mx-auto px-2 sm:px-4">
           <div className="flex items-center justify-between gap-2 py-3 sm:py-4">
             {/* Tab Buttons */}

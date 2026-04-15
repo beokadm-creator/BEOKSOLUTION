@@ -102,7 +102,7 @@ export const WideHero: React.FC<WideHeroProps> = ({
         } else {
           // URL에서 societyId 추출
           const hostname = window.location.hostname;
-          let societyIdToUse = extractSocietyFromHost(hostname) || DOMAIN_CONFIG.DEFAULT_SOCIETY;
+          const societyIdToUse = extractSocietyFromHost(hostname) || DOMAIN_CONFIG.DEFAULT_SOCIETY;
 
           confIdToUse = `${societyIdToUse}_${targetSlug}`;
         }
@@ -158,13 +158,13 @@ export const WideHero: React.FC<WideHeroProps> = ({
         </span>
 
         {/* Title - Improved Typography & Mobile Optimization */}
-        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold font-heading-1 leading-tight md:leading-[1.15] mb-6 md:mb-8 drop-shadow-2xl max-w-4xl md:max-w-5xl px-2">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold font-heading-1 leading-tight md:leading-[1.15] mb-6 md:mb-8 drop-shadow-2xl max-w-4xl md:max-w-5xl px-2 break-words overflow-wrap-anywhere hyphens-auto">
           {t(title)}
         </h1>
 
         {/* Subtitle - Better Mobile Readability */}
         {subtitle && (
-          <p className="text-base sm:text-xl md:text-2xl lg:text-3xl text-blue-50/90 md:text-slate-200 mb-10 md:mb-12 max-w-2xl md:max-w-3xl font-normal md:font-light leading-relaxed md:leading-relaxed drop-shadow-md px-4">
+          <p className="text-base sm:text-xl md:text-2xl lg:text-3xl text-blue-50/90 md:text-slate-200 mb-10 md:mb-12 max-w-2xl md:max-w-3xl font-normal md:font-light leading-relaxed md:leading-relaxed drop-shadow-md px-4 break-words overflow-wrap-anywhere hyphens-auto">
             {t(subtitle)}
           </p>
         )}

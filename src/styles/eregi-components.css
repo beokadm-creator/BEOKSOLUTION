@@ -1,30 +1,58 @@
 @layer components {
+  /*
+   * DEPRECATED: These button classes are replaced by Button component variants.
+   * Use <Button variant="eregi-primary" /> instead of class="eregi-btn-primary"
+   * Kept for backward compatibility - remove in next major version.
+   */
   .eregi-btn-primary {
-    @apply bg-[#003366] text-white shadow-md hover:bg-[#002244] transition-all duration-200 px-6 py-2.5 rounded-xl font-medium flex items-center justify-center gap-2;
+    @apply bg-eregi-primary text-eregi-primary-foreground shadow-md hover:bg-eregi-primary-hover transition-all duration-200 px-6 py-2.5 rounded-xl font-medium flex items-center justify-center gap-2;
   }
 
   .eregi-btn-secondary {
-    @apply bg-white border border-[#003366] text-[#003366] hover:bg-[#f0f5fa] transition-all duration-200 px-6 py-2.5 rounded-xl font-medium flex items-center justify-center gap-2;
+    @apply bg-background border border-eregi-primary text-eregi-primary hover:bg-eregi-neutral-50 transition-all duration-200 px-6 py-2.5 rounded-xl font-medium flex items-center justify-center gap-2;
   }
 
+  /* Core Academic Components - Use these for custom implementations */
   .eregi-card {
-    @apply bg-white border border-[#e1ecf6] shadow-sm hover:shadow-md transition-all duration-300 rounded-xl p-6;
+    @apply bg-card border border-eregi-neutral-100 shadow-sm hover:shadow-md transition-all duration-300 rounded-xl p-6;
   }
 
   .eregi-input {
-    @apply w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#c3daee] focus:border-[#003366] transition-all duration-200;
+    @apply w-full border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-eregi-neutral-200 focus:border-eregi-primary transition-all duration-200 bg-background text-foreground;
   }
 
   .eregi-label {
-    @apply block text-sm font-medium text-gray-700 mb-1.5;
+    @apply block text-sm font-medium text-foreground mb-1.5;
   }
 
   .eregi-label-required::after {
     content: "*";
-    @apply text-red-500 ml-1;
+    @apply text-eregi-error ml-1;
   }
-  
+
   .eregi-link {
-    @apply text-[#24669e] hover:text-[#003366] font-medium hover:underline transition-colors;
+    @apply text-eregi-secondary hover:text-eregi-primary font-medium hover:underline transition-colors;
+  }
+
+  /* Academic Alert Patterns */
+  .eregi-alert-error {
+    @apply bg-eregi-error/10 border border-eregi-error/30 text-eregi-error px-4 py-3 rounded-xl;
+  }
+
+  .eregi-alert-success {
+    @apply bg-eregi-success/10 border border-eregi-success/30 text-eregi-success px-4 py-3 rounded-xl;
+  }
+
+  .eregi-alert-warning {
+    @apply bg-eregi-warning/10 border border-eregi-warning/30 text-eregi-warning px-4 py-3 rounded-xl;
+  }
+
+  /* Academic Container Patterns */
+  .eregi-surface {
+    @apply bg-card border border-eregi-neutral-100 shadow-sm rounded-xl;
+  }
+
+  .eregi-content-spacing {
+    @apply space-y-6;
   }
 }

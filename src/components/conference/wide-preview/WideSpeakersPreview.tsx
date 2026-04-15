@@ -22,6 +22,13 @@ export const WideSpeakersPreview: React.FC<WideSpeakersPreviewProps> = ({ speake
         return (lang === 'en' ? val.en : val.ko) || val.ko || '';
     };
 
+    const getPresentationTitle = (speaker: Speaker) => {
+        const value = speaker.presentationTitle as unknown as Record<string, string> | string | undefined;
+        if (!value) return lang === 'ko' ? '주제 미정' : 'TBD';
+        if (typeof value === 'string') return value;
+        return value[lang] || value.ko || t(speaker.presentationTitle) || (lang === 'ko' ? '주제 미정' : 'TBD');
+    };
+
     if (!speakers || speakers.length === 0) return null;
 
     return (
@@ -113,12 +120,7 @@ export const WideSpeakersPreview: React.FC<WideSpeakersPreviewProps> = ({ speake
                                         </h5>
                                     </div>
                                     <p className="text-xl md:text-2xl font-bold text-slate-800 leading-relaxed">
-                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                        {(selectedSpeaker.presentationTitle as any)?.[lang] ||
-                                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                         (selectedSpeaker.presentationTitle as any)?.ko ||
-                                         t(selectedSpeaker.presentationTitle) ||
-                                         (lang === 'ko' ? '주제 미정' : 'TBD')}
+                                        {getPresentationTitle(selectedSpeaker)}
                                     </p>
                                 </div>
 

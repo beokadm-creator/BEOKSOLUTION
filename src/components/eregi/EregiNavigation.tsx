@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { LogOut, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getAuth } from 'firebase/auth';
+import { Button } from '../ui/button';
 
 interface EregiNavigationProps {
     transparent?: boolean;
@@ -32,7 +33,7 @@ const EregiNavigation: React.FC<EregiNavigationProps> = ({
     onLogout
 }) => {
     const navigate = useNavigate();
-    const { auth: { user: authUser } } = useAuth('');
+    const { auth: { user: authUser } } = useAuth();
 
     // Determine effective user
     const displayUser = useMemo(() => customUser || (authUser ? {
@@ -49,16 +50,6 @@ const EregiNavigation: React.FC<EregiNavigationProps> = ({
         }
     };
 
-    // Debug logging
-    React.useEffect(() => {
-        console.log('[EregiNavigation] displayUser:', displayUser);
-        console.log('[EregiNavigation] authUser:', {
-            name: authUser?.name,
-            email: authUser?.email,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            displayName: (authUser as any)?.displayName
-        });
-    }, [displayUser, authUser]);
 
     const handleMyPage = () => {
         if (customUser) {
@@ -79,7 +70,7 @@ const EregiNavigation: React.FC<EregiNavigationProps> = ({
     };
 
     return (
-        <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${transparent ? 'bg-white/80 backdrop-blur-md border-b border-transparent' : 'bg-white border-b border-slate-100 shadow-sm'}`}>
+        <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-refined animate-fade-in ${transparent ? 'bg-white/95 border-b border-eregi-neutral-100/50 shadow-sm' : 'bg-white border-b border-eregi-neutral-100 shadow-sm'}`}>
             <div className="max-w-[1400px] mx-auto px-6 h-20 flex justify-between items-center">
 
                 {/* BRANDING: Society/Conference Identity Only */}
@@ -126,14 +117,14 @@ const EregiNavigation: React.FC<EregiNavigationProps> = ({
                                 </div>
                                 <button
                                     onClick={handleMyPage}
-                                    className={`w-9 h-9 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center hover:bg-slate-200 transition ${customUser ? 'cursor-default hover:bg-slate-100' : ''}`}
+                                    className={`w-9 h-9 bg-eregi-neutral-50 text-muted-foreground rounded-full flex items-center justify-center btn-academic ${customUser ? 'cursor-default hover:bg-eregi-neutral-50' : 'hover:bg-eregi-neutral-100'}`}
                                     title="My Page"
                                 >
                                     <UserIcon size={18} />
                                 </button>
                                 <button
                                     onClick={handleLogout}
-                                    className="w-9 h-9 bg-slate-100 text-red-500 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-600 transition"
+                                    className="w-9 h-9 bg-eregi-neutral-50 text-eregi-error rounded-full flex items-center justify-center btn-academic hover:bg-eregi-error/10 hover:text-eregi-error"
                                     title="Logout"
                                 >
                                     <LogOut size={16} />
@@ -147,12 +138,13 @@ const EregiNavigation: React.FC<EregiNavigationProps> = ({
                                 >
                                     Login
                                 </button>
-                                <button
+                                <Button
                                     onClick={() => navigate('/auth?mode=signup')}
-                                    className="eregi-btn-primary py-2 px-5 text-sm"
+                                    variant="eregi-primary"
+                                    size="sm"
                                 >
                                     Sign Up
-                                </button>
+                                </Button>
                             </>
                         )}
                     </div>
