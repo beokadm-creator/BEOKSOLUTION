@@ -16,7 +16,6 @@ import { badgeConfigRepo } from "../services/badgeConfigRepo";
 import { registrationFunctions } from "../services/registrationFunctions";
 import type { BulkSendModalState, RegistrationOptionSummary, RootRegistration } from "../types";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import toast from "react-hot-toast";
 
 export const useAdminRegistrations = (params: { conferenceId: string | null }) => {
   const { conferenceId } = params;
