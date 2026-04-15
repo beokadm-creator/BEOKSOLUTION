@@ -173,7 +173,7 @@ export const useBixolon = () => {
 
         functions[`func${String(fIdx++).padStart(2, '0')}`] = { "printBuffer": [] };
         if (layout.enableCutting !== false) {
-            const cutType = layout.cutPaperType ?? 1;
+            const cutType = layout.cutPaperType ?? 0;
             functions[`func${String(fIdx++).padStart(2, '0')}`] = { "cutPaper": [cutType] };
         }
 
