@@ -865,8 +865,9 @@ const ExternalAttendeePage: React.FC = () => {
                         // 인포데스크와 동일하게 badgeLayoutEnabled가 true인 경우만 DB 레이아웃 사용
                         if (data.badgeLayoutEnabled && data.badgeLayout) {
                             badgeLayout = {
-                                width: data.badgeLayout.width || 800,
-                                height: data.badgeLayout.height || 1200,
+                                ...data.badgeLayout,
+                                width: data.badgeLayout.width || 100,
+                                height: data.badgeLayout.height || 240,
                                 elements: data.badgeLayout.elements || [],
                                 enableCutting: data.badgeLayout.enableCutting || false
                             };
@@ -889,8 +890,9 @@ const ExternalAttendeePage: React.FC = () => {
                             const data = cfgSnap.data();
                             if (data.badgeLayoutEnabled && data.badgeLayout) {
                                 badgeLayout = {
-                                    width: data.badgeLayout.width || 800,
-                                    height: data.badgeLayout.height || 1200,
+                                    ...data.badgeLayout,
+                                    width: data.badgeLayout.width || 100,
+                                    height: data.badgeLayout.height || 240,
                                     elements: data.badgeLayout.elements || [],
                                     enableCutting: data.badgeLayout.enableCutting || false
                                 };
@@ -904,12 +906,13 @@ const ExternalAttendeePage: React.FC = () => {
 
             // 3. Info Desk와 동일한 기본 레이아웃 폴백 적용 (v356 로직 동기화)
             const activeLayout = badgeLayout || {
-                width: 800,
-                height: 1200,
+                width: 100,
+                height: 240,
+                unit: 'mm',
                 elements: [
-                    { x: 400, y: 150, fontSize: 6, isVisible: true, type: 'QR' } as any,
-                    { x: 400, y: 450, fontSize: 4, isVisible: true, type: 'NAME' } as any,
-                    { x: 400, y: 600, fontSize: 2, isVisible: true, type: 'ORG' } as any
+                    { x: 50, y: 20, fontSize: 25, isVisible: true, type: 'QR' } as any,
+                    { x: 50, y: 60, fontSize: 6, isVisible: true, type: 'NAME' } as any,
+                    { x: 50, y: 80, fontSize: 4, isVisible: true, type: 'ORG' } as any
                 ]
             };
 
