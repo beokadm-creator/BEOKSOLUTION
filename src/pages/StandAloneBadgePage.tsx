@@ -79,6 +79,9 @@ type AttendanceZone = {
 
 type AttendanceRule = {
   zones?: Array<Omit<AttendanceZone, "ruleDate">>;
+  completionMode?: "DAILY_SEPARATE" | "CUMULATIVE";
+  globalGoalMinutes?: number;
+  cumulativeGoalMinutes?: number;
 };
 
 type AttendanceSettings = {
@@ -88,6 +91,24 @@ type AttendanceSettings = {
 type BadgeConfig = {
   materialsUrls?: Array<{ name: string; url: string }>;
   translationUrl?: string;
+  menuVisibility?: {
+    status?: boolean;
+    sessions?: boolean;
+    materials?: boolean;
+    program?: boolean;
+    translation?: boolean;
+    stampTour?: boolean;
+    home?: boolean;
+  };
+  menuLabels?: {
+    status?: { ko?: string; en?: string };
+    sessions?: { ko?: string; en?: string };
+    materials?: { ko?: string; en?: string };
+    program?: { ko?: string; en?: string };
+    translation?: { ko?: string; en?: string };
+    stampTour?: { ko?: string; en?: string };
+    home?: { ko?: string; en?: string };
+  };
 };
 
 type BadgeUiState = {
@@ -105,6 +126,7 @@ type BadgeUiState = {
   isCompleted?: boolean;
   lastCheckIn?: TimestampLike;
   baseMinutes?: number;
+  dailyMinutes?: Record<string, number>;
   zoneMinutes?: Record<string, number>;
   zoneCompleted?: Record<string, boolean>;
 };
@@ -147,6 +169,11 @@ const StandAloneBadgePage: React.FC = () => {
   const [ui, setUi] = useState<BadgeUiState | null>(null);
   const [zones, setZones] = useState<AttendanceZone[]>([]);
   const [liveMinutes, setLiveMinutes] = useState<number>(0);
+  const [liveSessionMinutes, setLiveSessionMinutes] = useState<number>(0);
+  const [attendanceMode, setAttendanceMode] = useState<
+    "DAILY_SEPARATE" | "CUMULATIVE"
+  >("DAILY_SEPARATE");
+  const [attendanceGoalMinutes, setAttendanceGoalMinutes] = useState<number>(0);
   const [badgeConfig, setBadgeConfig] = useState<BadgeConfig | null>(null);
   const [stampConfig, setStampConfig] = useState<StampTourConfig | null>(null);
   const [stampBoothCandidates, setStampBoothCandidates] = useState<
@@ -180,6 +207,19 @@ const StandAloneBadgePage: React.FC = () => {
         ? `${Math.floor(minutes / 60)}시간 ${minutes % 60}분`
         : `${Math.floor(minutes / 60)}h ${minutes % 60}m`,
     [badgeLang],
+  );
+
+  const getMenuLabel = useCallback(
+    (
+      key: keyof NonNullable<BadgeConfig["menuLabels"]>,
+      fallbackKo: string,
+      fallbackEn: string,
+    ) => {
+      const labels = badgeConfig?.menuLabels?.[key];
+      if (badgeLang === "ko") return labels?.ko || fallbackKo;
+      return labels?.en || fallbackEn;
+    },
+    [badgeConfig?.menuLabels, badgeLang],
   );
 
   // Helper to determine correct confId
@@ -261,6 +301,42 @@ const StandAloneBadgePage: React.FC = () => {
                 }
               });
               setZones(allZones);
+
+              const kstToday = new Date().toLocaleDateString("sv-SE", {
+                timeZone: "Asia/Seoul",
+              });
+              const todayRule = allRules[kstToday];
+              const ruleEntries = Object.entries(allRules);
+              const cumulativeRule =
+                ruleEntries.find(
+                  ([, r]) =>
+                    r?.completionMode === "CUMULATIVE" &&
+                    Number(r.cumulativeGoalMinutes || 0) > 0,
+                ) ||
+                ruleEntries.find(([, r]) => r?.completionMode === "CUMULATIVE");
+
+              const resolvedMode: "DAILY_SEPARATE" | "CUMULATIVE" =
+                (cumulativeRule?.[1]?.completionMode as
+                  | "DAILY_SEPARATE"
+                  | "CUMULATIVE"
+                  | undefined) ||
+                (todayRule?.completionMode as
+                  | "DAILY_SEPARATE"
+                  | "CUMULATIVE"
+                  | undefined) ||
+                "DAILY_SEPARATE";
+
+              const resolvedGoal =
+                resolvedMode === "CUMULATIVE"
+                  ? Number(
+                      cumulativeRule?.[1]?.cumulativeGoalMinutes ||
+                        todayRule?.cumulativeGoalMinutes ||
+                        0,
+                    )
+                  : Number(todayRule?.globalGoalMinutes || 0);
+
+              setAttendanceMode(resolvedMode);
+              setAttendanceGoalMinutes(resolvedGoal);
             }
 
             if (configSnap.exists()) {
@@ -311,6 +387,9 @@ const StandAloneBadgePage: React.FC = () => {
           const uiIsCompleted = !!d.isCompleted;
           const lastCheckIn = d.lastCheckIn;
           const baseMinutes = Number(d.totalMinutes || 0);
+          const dailyMinutes = d.dailyMinutes as
+            | Record<string, number>
+            | undefined;
           const zoneMinutes = d.zoneMinutes as
             | Record<string, number>
             | undefined;
@@ -333,10 +412,12 @@ const StandAloneBadgePage: React.FC = () => {
             isCompleted: uiIsCompleted,
             lastCheckIn,
             baseMinutes,
+            dailyMinutes,
             zoneMinutes,
             zoneCompleted,
           });
           setLiveMinutes(baseMinutes); // Will be recalculated by the interval if inside
+          setLiveSessionMinutes(0);
           setStatus("READY");
           setMsg("");
         };
@@ -490,6 +571,7 @@ const StandAloneBadgePage: React.FC = () => {
     const updateLiveMinutes = () => {
       if (ui.status !== "INSIDE" || !ui.lastCheckIn) {
         setLiveMinutes(ui.baseMinutes || 0);
+          setLiveSessionMinutes(0);
         return;
       }
 
@@ -553,6 +635,7 @@ const StandAloneBadgePage: React.FC = () => {
       }
 
       const activeMinutes = Math.max(0, durationMinutes - deduction);
+      setLiveSessionMinutes(activeMinutes);
       setLiveMinutes((ui.baseMinutes || 0) + activeMinutes);
     };
 
@@ -815,6 +898,48 @@ const StandAloneBadgePage: React.FC = () => {
   const showBadgeQr = ui.issued;
   const qrValue = showBadgeQr ? ui.badgeQr || `BADGE-${ui.id}` : ui.id;
 
+  const menuVisibility = {
+    status: badgeConfig?.menuVisibility?.status ?? true,
+    sessions: badgeConfig?.menuVisibility?.sessions ?? true,
+    materials: badgeConfig?.menuVisibility?.materials ?? true,
+    program: badgeConfig?.menuVisibility?.program ?? true,
+    translation: badgeConfig?.menuVisibility?.translation ?? true,
+    stampTour: badgeConfig?.menuVisibility?.stampTour ?? true,
+    home: badgeConfig?.menuVisibility?.home ?? true,
+  };
+  const effectiveMenuVisibility =
+    menuVisibility.status ||
+    menuVisibility.sessions ||
+    menuVisibility.materials ||
+    menuVisibility.program ||
+    menuVisibility.translation ||
+    menuVisibility.stampTour
+      ? menuVisibility
+      : { ...menuVisibility, status: true };
+  const translationEnabled =
+    badgeConfig?.translationUrl !== "HIDE" && effectiveMenuVisibility.translation;
+  const tabsOrder = [
+    effectiveMenuVisibility.status ? "status" : null,
+    effectiveMenuVisibility.sessions ? "sessions" : null,
+    effectiveMenuVisibility.materials ? "materials" : null,
+    effectiveMenuVisibility.program ? "program" : null,
+    translationEnabled ? "translation" : null,
+    effectiveMenuVisibility.stampTour ? "stamp-tour" : null,
+  ].filter(Boolean) as string[];
+  const defaultTab = tabsOrder[0] || "status";
+  const gridColsClass =
+    tabsOrder.length === 1
+      ? "grid-cols-1"
+      : tabsOrder.length === 2
+        ? "grid-cols-2"
+        : tabsOrder.length === 3
+          ? "grid-cols-3"
+          : tabsOrder.length === 4
+            ? "grid-cols-4"
+            : tabsOrder.length === 5
+              ? "grid-cols-5"
+              : "grid-cols-6";
+
   console.log("[StandAloneBadgePage] QR Display Debug:", {
     issued: ui.issued,
     badgeQr: ui.badgeQr,
@@ -826,89 +951,89 @@ const StandAloneBadgePage: React.FC = () => {
   // VOUCHER STATE (not issued yet)
   if (!ui.issued) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 flex flex-col items-center justify-center p-4 font-sans">
+      <div className="min-h-screen bg-eregi-neutral-50 flex flex-col items-center justify-center p-4 font-body">
         <div className="w-full max-w-sm">
-          <div className="mb-3 flex justify-end gap-2">
+          <div className="mb-4 flex justify-end gap-2">
             <button
               type="button"
               onClick={() => setBadgeLang("ko")}
-              className={`rounded-full px-3 py-1 text-xs font-bold ${badgeLang === "ko" ? "bg-amber-600 text-white" : "bg-white text-amber-700 border border-amber-200"}`}
+              className={`rounded-full px-4 py-2 text-sm font-body font-semibold transition-colors ${badgeLang === "ko" ? "bg-eregi-primary text-eregi-primary-foreground" : "bg-card text-muted-foreground border border-eregi-neutral-200 hover:bg-eregi-neutral-50"}`}
             >
-              KO
+              한국어
             </button>
             <button
               type="button"
               onClick={() => setBadgeLang("en")}
-              className={`rounded-full px-3 py-1 text-xs font-bold ${badgeLang === "en" ? "bg-amber-600 text-white" : "bg-white text-amber-700 border border-amber-200"}`}
+              className={`rounded-full px-4 py-2 text-sm font-body font-semibold transition-colors ${badgeLang === "en" ? "bg-eregi-primary text-eregi-primary-foreground" : "bg-card text-muted-foreground border border-eregi-neutral-200 hover:bg-eregi-neutral-50"}`}
             >
-              EN
+              English
             </button>
           </div>
-          {/* Temporary Voucher Card - Visually Distinct from Issued Badge */}
-          <div className="bg-white border-4 border-amber-300 rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden">
+          {/* Temporary Voucher Card - Academic Elegance Design */}
+          <div className="bg-card border-2 border-eregi-primary/20 rounded-xl p-6 text-center shadow-lg relative overflow-hidden">
             {refreshing && (
-              <div className="absolute top-3 right-3 z-10">
-                <RefreshCw className="w-5 h-5 text-amber-600 animate-spin" />
+              <div className="absolute top-4 right-4 z-10">
+                <RefreshCw className="w-5 h-5 text-eregi-primary animate-spin" />
               </div>
             )}
 
             {/* Pending Badge Indicator - Top Banner */}
-            <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-amber-400 to-orange-400 py-2 px-4">
-              <div className="flex items-center justify-center gap-2 text-white">
+            <div className="absolute top-0 left-0 right-0 bg-eregi-primary/10 border-b border-eregi-primary/20 py-3 px-4">
+              <div className="flex items-center justify-center gap-2 text-eregi-primary">
                 <Clock className="w-4 h-4 animate-pulse" />
-                <span className="text-xs font-bold tracking-wide">
-                  {t("명찰 발급 대기", "BADGE PENDING")}
+                <span className="text-sm font-body font-semibold tracking-wide">
+                  {t("명찰 발급 대기 중", "Badge Pending")}
                 </span>
               </div>
             </div>
 
             {/* Watermark Background */}
-            <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none mt-8">
-              <div className="text-8xl font-black text-gray-900 transform -rotate-12">
-                {t("임시", "TEMPORARY")}
+            <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none mt-12">
+              <div className="text-6xl font-display font-semibold text-muted-foreground/50 transform -rotate-12">
+                {t("VOUCHER", "VOUCHER")}
               </div>
             </div>
 
             {/* Content Container - Relative to sit above watermark */}
-            <div className="relative z-10 mt-8">
+            <div className="relative z-10 mt-12">
               {/* Header with Icon */}
-              <div className="mb-4">
-                <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <FileText className="w-8 h-8 text-amber-600" />
+              <div className="mb-6">
+                <div className="w-16 h-16 bg-eregi-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FileText className="w-8 h-8 text-eregi-primary" />
                 </div>
-                <h1 className="text-xl font-black mb-1 tracking-wide text-amber-700">
+                <h1 className="text-xl font-display font-semibold mb-2 tracking-wide text-eregi-primary">
                   {t("등록 확인 바우처", "Registration Voucher")}
                 </h1>
-                <p className="text-xs font-medium text-amber-600 uppercase tracking-wider">
-                  {t("현장 확인용", "For On-site Check-in")}
+                <p className="text-sm font-body font-medium text-muted-foreground tracking-wide">
+                  {t("현장에서 디지털 명찰을 발급받으세요", "Get your digital badge on-site")}
                 </p>
               </div>
 
               {/* Warning Notice */}
-              <div className="bg-amber-50 border-2 border-amber-200 rounded-xl py-2 px-3 mb-4">
-                <p className="text-xs font-bold text-amber-800">
+              <div className="bg-eregi-primary/5 border border-eregi-primary/20 rounded-xl py-3 px-4 mb-6">
+                <p className="text-sm font-body font-medium text-eregi-primary leading-relaxed">
                   {t(
-                    "현장 등록 데스크에서 이 QR을 보여주시면 명찰 발급을 진행할 수 있습니다.",
-                    "Show this QR at the registration desk to receive your badge.",
+                    "💡 현장 등록 데스크에서 아래 QR코드를 제시하여 디지털 명찰을 발급받으세요",
+                    "💡 Show this QR code at the registration desk to receive your digital badge"
                   )}
                 </p>
               </div>
 
               {/* Organization */}
-              <p className="text-sm text-gray-600 font-medium mb-1">{ui.aff}</p>
+              <p className="text-base font-body font-medium text-muted-foreground mb-2">{ui.aff}</p>
 
               {/* Name */}
-              <h2 className="text-3xl font-black text-gray-900 mb-4 tracking-tight">
+              <h2 className="text-3xl font-display font-semibold text-foreground mb-6 tracking-tight">
                 {ui.name}
               </h2>
 
               {/* Receipt Number - Prominent */}
               {ui.receiptNumber && (
-                <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl py-3 px-4 mb-4 border border-amber-200">
-                  <p className="text-xs font-bold text-amber-600 uppercase mb-1">
-                    {t("접수 번호", "Receipt Number")}
+                <div className="bg-eregi-primary/5 border border-eregi-primary/20 rounded-xl py-4 px-5 mb-6">
+                  <p className="text-sm font-body font-medium text-eregi-primary mb-1">
+                    {t("등록 번호", "Registration Number")}
                   </p>
-                  <p className="text-xl font-black text-amber-700 tracking-wider">
+                  <p className="text-xl font-display font-semibold text-eregi-primary tracking-wider">
                     {ui.receiptNumber}
                   </p>
                 </div>
@@ -916,11 +1041,11 @@ const StandAloneBadgePage: React.FC = () => {
 
               {/* License Number */}
               {ui.license && ui.license !== "-" && (
-                <div className="bg-gray-50 rounded-lg py-2 px-3 mb-4">
-                  <p className="text-xs font-semibold text-gray-600">
+                <div className="bg-eregi-neutral-50 border border-eregi-neutral-200 rounded-lg py-3 px-4 mb-6">
+                  <p className="text-sm font-body font-medium text-muted-foreground mb-1">
                     {t("면허번호", "License No.")}
                   </p>
-                  <p className="text-sm font-bold text-gray-800">
+                  <p className="text-base font-body font-semibold text-foreground">
                     {ui.license}
                   </p>
                 </div>
@@ -968,180 +1093,256 @@ const StandAloneBadgePage: React.FC = () => {
           )}
 
           {/* Home Button */}
-          <button
-            onClick={() => navigate(`/${publicSlug}`)}
-            className="block w-full mt-4 py-3 px-6 bg-white text-amber-700 font-bold rounded-xl hover:bg-amber-50 transition-colors text-center border-2 border-amber-200 shadow-md"
-          >
-            {t("행사 홈으로", "Back to event home")}
-          </button>
+          {effectiveMenuVisibility.home && (
+            <button
+              onClick={() => navigate(`/${publicSlug}`)}
+              className="block w-full mt-4 py-3 px-6 bg-white text-amber-700 font-bold rounded-xl hover:bg-amber-50 transition-colors text-center border-2 border-amber-200 shadow-md"
+            >
+              {getMenuLabel("home", "학술대회 홈페이지로 이동", "Conference Home")}
+            </button>
+          )}
         </div>
       </div>
     );
   }
 
   // ISSUED BADGE STATE
+  const todayKey = new Date().toLocaleDateString("sv-SE", {
+    timeZone: "Asia/Seoul",
+  });
+  const todayAccumulated =
+    (ui?.dailyMinutes?.[todayKey] || 0) +
+    (ui?.status === "INSIDE" ? liveSessionMinutes : 0);
+  const remainingMinutes =
+    attendanceGoalMinutes > 0
+      ? Math.max(0, attendanceGoalMinutes - liveMinutes)
+      : 0;
+  const progressPercent =
+    attendanceGoalMinutes > 0
+      ? Math.min(100, Math.floor((liveMinutes / attendanceGoalMinutes) * 100))
+      : 0;
+
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 flex flex-col p-4 font-sans">
-      <div className="w-full max-w-sm mx-auto flex-1 flex flex-col justify-center py-6">
-        <div className="mb-3 flex justify-end gap-2">
+    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex flex-col p-4 font-body relative">
+      {/* Elegant background pattern */}
+      <div className="absolute inset-0 opacity-30" style={{backgroundImage: "url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"30\" fill=\"%23e2e8f0\" fill-opacity=\"0.15\"/></svg>')"}} />
+
+      <div className="w-full max-w-sm mx-auto flex-1 flex flex-col justify-center py-6 relative z-10">
+        <div className="mb-4 flex justify-end gap-2">
           <button
             type="button"
             onClick={() => setBadgeLang("ko")}
-            className={`rounded-full px-3 py-1 text-xs font-bold ${badgeLang === "ko" ? "bg-emerald-600 text-white" : "bg-white text-emerald-700 border border-emerald-200"}`}
+            className={`rounded-full px-5 py-2.5 text-sm font-body font-semibold shadow-sm transition-all duration-200 ${badgeLang === "ko" ? "bg-gradient-to-r from-eregi-primary to-blue-600 text-white shadow-lg scale-105" : "bg-white/90 text-eregi-primary border-2 border-eregi-primary/30 hover:border-eregi-primary/50 backdrop-blur-sm"}`}
           >
-            KO
+            한국어
           </button>
           <button
             type="button"
             onClick={() => setBadgeLang("en")}
-            className={`rounded-full px-3 py-1 text-xs font-bold ${badgeLang === "en" ? "bg-emerald-600 text-white" : "bg-white text-emerald-700 border border-emerald-200"}`}
+            className={`rounded-full px-5 py-2.5 text-sm font-body font-semibold shadow-sm transition-all duration-200 ${badgeLang === "en" ? "bg-gradient-to-r from-eregi-primary to-blue-600 text-white shadow-lg scale-105" : "bg-white/90 text-eregi-primary border-2 border-eregi-primary/30 hover:border-eregi-primary/50 backdrop-blur-sm"}`}
           >
-            EN
+            English
           </button>
         </div>
-        {/* Digital Badge Card - Professional Name Tag */}
-        <div className="bg-white border-0 md:border-4 border-emerald-500 rounded-[2rem] overflow-hidden shadow-2xl flex flex-col relative z-10 ring-1 ring-black/5">
-          {/* Issued Badge Header - Always Visible */}
-          <div className="bg-gradient-to-r from-emerald-600 to-green-500 py-3 px-4 shadow-sm">
-            <div className="flex items-center justify-center gap-2 text-white">
-              <CheckCircle className="w-5 h-5 drop-shadow-sm" />
-              <span className="text-sm font-bold tracking-wider drop-shadow-sm">
-                {t("디지털 명찰 발급 완료", "DIGITAL BADGE ISSUED")}
-              </span>
+        {/* Digital Badge Card - Academic Excellence */}
+        <div className="bg-white/95 backdrop-blur-sm border-0 md:border-4 md:border-eregi-primary/20 rounded-2xl overflow-hidden shadow-2xl flex flex-col relative z-10 ring-4 ring-white/50">
+          {/* Premium Badge Header */}
+          <div className="bg-gradient-to-r from-eregi-primary via-blue-600 to-indigo-600 py-4 px-6 shadow-lg relative">
+            {/* Header decoration */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+            <div className="flex items-center justify-center gap-3 text-white relative z-10">
+              <div className="p-1.5 bg-white/20 rounded-full backdrop-blur-sm">
+                <CheckCircle className="w-6 h-6 text-white drop-shadow-lg" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-lg font-display font-semibold tracking-wider drop-shadow-lg">
+                  {t("디지털 명찰", "DIGITAL BADGE")}
+                </span>
+                <span className="text-sm font-body opacity-90 tracking-wide">
+                  {t("발급 완료", "CERTIFIED")}
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Badge Info - Main Content */}
-          <div className="p-6 flex flex-col items-center text-center">
-            {/* Affiliation */}
-            <p className="text-sm text-gray-500 font-bold mb-2 break-keep leading-tight px-4 max-w-xs">
-              {ui.aff || "-"}
-            </p>
+          {/* Badge Info - Premium Academic Design */}
+          <div className="p-8 flex flex-col items-center text-center relative bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30">
+            {/* Academic decoration */}
+            <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-eregi-primary/20 to-transparent"></div>
 
-            {/* Name */}
-            <h2 className="text-3xl font-black text-gray-900 mb-5 tracking-tight cursor-default">
+            {/* Affiliation with academic styling */}
+            <div className="mb-4 px-6 py-2 bg-gradient-to-r from-slate-100 to-blue-50 rounded-full border border-slate-200/50">
+              <p className="text-sm text-slate-600 font-body font-semibold break-keep leading-tight">
+                {ui.aff || "-"}
+              </p>
+            </div>
+
+            {/* Name with academic prominence */}
+            <h2 className="text-4xl font-display font-bold bg-gradient-to-r from-eregi-primary via-blue-700 to-indigo-700 bg-clip-text text-transparent mb-6 tracking-tight cursor-default leading-tight">
               {ui.name}
             </h2>
 
-            {/* License Number Chip */}
+            {/* License Number - Premium Design */}
             {ui.license && ui.license !== "-" && (
-              <div className="bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full py-1.5 px-4 mb-6 inline-flex items-center shadow-sm">
-                <span className="text-xs font-bold tracking-wide">
+              <div className="bg-gradient-to-r from-amber-50 to-yellow-50 text-amber-700 border-2 border-amber-200/50 rounded-xl py-2.5 px-6 mb-6 inline-flex items-center shadow-md backdrop-blur-sm">
+                <div className="w-2 h-2 bg-amber-400 rounded-full mr-2 animate-pulse"></div>
+                <span className="text-sm font-body font-bold tracking-wide">
                   {t("면허번호", "License No.")}: {ui.license}
                 </span>
               </div>
             )}
 
-            {/* QR Code Container - Enhanced Visibility */}
-            <div className="bg-white p-4 rounded-3xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] border border-gray-100 mb-3 flex flex-col items-center justify-center">
-              {showBadgeQr && (
-                <QRCodeSVG
-                  key={qrValue}
-                  value={qrValue}
-                  size={180}
-                  level="H"
-                  includeMargin={true}
-                  className="rounded-lg"
-                />
-              )}
-              <div className="h-px w-full bg-gray-100 my-3"></div>
-              <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">
-                {t("출입 QR", "Access Code")}
-              </p>
+            {/* QR Code Container - Premium Academic Design */}
+            <div className="relative mb-6">
+              <div className="bg-gradient-to-br from-white via-slate-50 to-blue-50/30 p-6 rounded-2xl shadow-xl border-2 border-blue-100/50 flex flex-col items-center justify-center backdrop-blur-sm">
+                {/* QR Code with premium styling */}
+                <div className="relative">
+                  {showBadgeQr && (
+                    <QRCodeSVG
+                      key={qrValue}
+                      value={qrValue}
+                      size={180}
+                      level="H"
+                      includeMargin={true}
+                      className="rounded-xl shadow-lg ring-4 ring-white"
+                    />
+                  )}
+                  {/* Academic corner accents */}
+                  <div className="absolute -top-2 -left-2 w-4 h-4 border-t-4 border-l-4 border-eregi-primary rounded-tl-lg"></div>
+                  <div className="absolute -top-2 -right-2 w-4 h-4 border-t-4 border-r-4 border-eregi-primary rounded-tr-lg"></div>
+                  <div className="absolute -bottom-2 -left-2 w-4 h-4 border-b-4 border-l-4 border-eregi-primary rounded-bl-lg"></div>
+                  <div className="absolute -bottom-2 -right-2 w-4 h-4 border-b-4 border-r-4 border-eregi-primary rounded-br-lg"></div>
+                </div>
+
+                <div className="mt-4 h-px w-full bg-gradient-to-r from-transparent via-blue-200 to-transparent"></div>
+
+                <div className="mt-3 px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-full border border-blue-200/50">
+                  <p className="text-sm uppercase font-body font-bold text-blue-700 tracking-widest flex items-center gap-2">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+                    {t("학술대회 출입 QR", "Conference Access Code")}
+                  </p>
+                </div>
+              </div>
+
+              {/* Academic instruction with visual emphasis */}
+              <div className="mt-4 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-eregi-primary/10 to-blue-100/50 rounded-full border border-eregi-primary/20 backdrop-blur-sm">
+                <div className="w-3 h-3 bg-eregi-primary rounded-full animate-pulse"></div>
+                <p className="text-sm font-body font-semibold text-eregi-primary text-center">
+                  {t(
+                    "학술대회 입장 및 출석 확인 시 제시",
+                    "Present for conference entry and attendance",
+                  )}
+                </p>
+              </div>
             </div>
-            <p className="text-xs font-medium text-emerald-600 animate-pulse">
-              {t(
-                "입장 및 출석 확인 시 이 QR을 제시해 주세요.",
-                "Please present this QR for entry and attendance check.",
-              )}
-            </p>
           </div>
 
-          {/* Tabbed Interface - Compact & Clean */}
-          <div className="bg-gray-50/80 border-t border-gray-100 p-2">
-            <Tabs defaultValue="status" className="w-full">
+          {/* Academic Tabbed Interface */}
+          <div className="bg-gradient-to-br from-slate-50/90 to-blue-50/40 border-t-2 border-blue-100 p-3">
+            <Tabs defaultValue={defaultTab} className="w-full">
               <TabsList
-                className={`grid w-full h-auto p-1 bg-white border border-gray-200 shadow-sm rounded-xl ${badgeConfig?.translationUrl === "HIDE" ? "grid-cols-5" : "grid-cols-6"}`}
+                className={`grid w-full h-auto p-1.5 bg-white/90 backdrop-blur-sm border-2 border-blue-100/50 shadow-lg rounded-2xl ${gridColsClass}`}
               >
-                <TabsTrigger
-                  value="status"
-                  className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 rounded-lg transition-all"
-                >
-                  <User className="w-4 h-4" />
-                  <span className="text-[10px] font-bold">
-                    {t("상태", "Status")}
-                  </span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="sessions"
-                  className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 rounded-lg transition-all"
-                >
-                  <TrendingUp className="w-4 h-4" />
-                  <span className="text-[10px] font-bold">
-                    {t("세션", "Sessions")}
-                  </span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="materials"
-                  className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 rounded-lg transition-all"
-                >
-                  <FileText className="w-4 h-4" />
-                  <span className="text-[10px] font-bold">
-                    {t("자료", "Materials")}
-                  </span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="program"
-                  className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 rounded-lg transition-all"
-                >
-                  <Calendar className="w-4 h-4" />
-                  <span className="text-[10px] font-bold">
-                    {t("일정", "Program")}
-                  </span>
-                </TabsTrigger>
-                {badgeConfig?.translationUrl !== "HIDE" && (
+                {effectiveMenuVisibility.status && (
                   <TabsTrigger
-                    value="translation"
-                    className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 rounded-lg transition-all"
+                    value="status"
+                    className="flex flex-col items-center justify-center py-3 px-1 gap-1.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-eregi-primary/15 data-[state=active]:to-blue-100/60 data-[state=active]:text-eregi-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-eregi-primary/20 rounded-xl transition-all duration-200 hover:bg-slate-50"
                   >
-                    <Languages className="w-4 h-4" />
-                    <span className="text-[10px] font-bold">
-                      {t("통역", "Translation")}
+                    <User className="w-4 h-4" />
+                    <span className="text-[11px] font-body font-semibold">
+                      {getMenuLabel("status", "상태", "Status")}
                     </span>
                   </TabsTrigger>
                 )}
-                <TabsTrigger
-                  value="stamp-tour"
-                  className="flex flex-col items-center justify-center py-2 px-0 gap-1 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 rounded-lg transition-all"
-                >
-                  <Gift className="w-4 h-4" />
-                  <span className="text-[10px] font-bold">
-                    {t("스탬프", "Stamp")}
-                  </span>
-                </TabsTrigger>
+                {effectiveMenuVisibility.sessions && (
+                  <TabsTrigger
+                    value="sessions"
+                    className="flex flex-col items-center justify-center py-3 px-1 gap-1.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-eregi-primary/15 data-[state=active]:to-blue-100/60 data-[state=active]:text-eregi-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-eregi-primary/20 rounded-xl transition-all duration-200 hover:bg-slate-50"
+                  >
+                    <TrendingUp className="w-4 h-4" />
+                    <span className="text-[11px] font-body font-semibold">
+                      {getMenuLabel("sessions", "수강", "Sessions")}
+                    </span>
+                  </TabsTrigger>
+                )}
+                {effectiveMenuVisibility.materials && (
+                  <TabsTrigger
+                    value="materials"
+                    className="flex flex-col items-center justify-center py-3 px-1 gap-1.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-eregi-primary/15 data-[state=active]:to-blue-100/60 data-[state=active]:text-eregi-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-eregi-primary/20 rounded-xl transition-all duration-200 hover:bg-slate-50"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span className="text-[11px] font-body font-semibold">
+                      {getMenuLabel("materials", "자료", "Materials")}
+                    </span>
+                  </TabsTrigger>
+                )}
+                {effectiveMenuVisibility.program && (
+                  <TabsTrigger
+                    value="program"
+                    className="flex flex-col items-center justify-center py-3 px-1 gap-1.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-eregi-primary/15 data-[state=active]:to-blue-100/60 data-[state=active]:text-eregi-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-eregi-primary/20 rounded-xl transition-all duration-200 hover:bg-slate-50"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span className="text-[11px] font-body font-semibold">
+                      {getMenuLabel("program", "일정", "Program")}
+                    </span>
+                  </TabsTrigger>
+                )}
+                {translationEnabled && (
+                  <TabsTrigger
+                    value="translation"
+                    className="flex flex-col items-center justify-center py-3 px-1 gap-1.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-eregi-primary/15 data-[state=active]:to-blue-100/60 data-[state=active]:text-eregi-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-eregi-primary/20 rounded-xl transition-all duration-200 hover:bg-slate-50"
+                  >
+                    <Languages className="w-4 h-4" />
+                    <span className="text-[11px] font-body font-semibold">
+                      {getMenuLabel("translation", "번역", "Translation")}
+                    </span>
+                  </TabsTrigger>
+                )}
+                {effectiveMenuVisibility.stampTour && (
+                  <TabsTrigger
+                    value="stamp-tour"
+                    className="flex flex-col items-center justify-center py-3 px-1 gap-1.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-eregi-primary/15 data-[state=active]:to-blue-100/60 data-[state=active]:text-eregi-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-eregi-primary/20 rounded-xl transition-all duration-200 hover:bg-slate-50"
+                  >
+                    <Gift className="w-4 h-4" />
+                    <span className="text-[11px] font-body font-semibold">
+                      {getMenuLabel("stampTour", "메뉴", "Menu")}
+                    </span>
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               {/* Status Tab */}
-              <TabsContent value="status" className="mt-2 p-1 space-y-2">
+              {effectiveMenuVisibility.status && (
+                <TabsContent value="status" className="mt-2 p-1 space-y-2">
                 <div
-                  className={`py-4 px-4 rounded-2xl font-bold text-center border shadow-sm transition-all ${
+                  className={`py-6 px-6 rounded-2xl font-body font-semibold text-center border-2 shadow-lg transition-all relative overflow-hidden ${
                     ui.status === "INSIDE"
-                      ? "bg-green-100 text-green-700 border-green-200 ring-4 ring-green-50"
-                      : "bg-white text-gray-500 border-gray-200"
+                      ? "bg-gradient-to-br from-emerald-50 via-green-50/80 to-teal-50/60 text-emerald-700 border-emerald-200/70 shadow-emerald-100/50"
+                      : "bg-gradient-to-br from-slate-50 to-gray-50/80 text-slate-600 border-slate-200/70 shadow-slate-100/50"
                   }`}
                 >
-                  <div className="flex items-center justify-center gap-2">
+                  {ui.status === "INSIDE" && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/10 via-transparent to-green-400/10 animate-pulse"></div>
+                  )}
+                  <div className="flex items-center justify-center gap-3 relative z-10">
                     {ui.status === "INSIDE" ? (
                       <>
-                        <span className="w-3 h-3 bg-green-500 rounded-full animate-ping" />
-                        <span>{t("입장 중 (INSIDE)", "Inside (INSIDE)")}</span>
+                        <div className="relative">
+                          <span className="w-4 h-4 bg-emerald-500 rounded-full flex animate-pulse shadow-lg" />
+                          <span className="absolute inset-0 w-4 h-4 bg-emerald-400 rounded-full animate-ping" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-lg font-display font-semibold">{t("학술대회 입장중", "Conference Active")}</span>
+                          <span className="text-sm opacity-80">{t("출석 인정 중", "Attendance Active")}</span>
+                        </div>
                       </>
                     ) : (
                       <>
-                        <span className="w-3 h-3 bg-gray-300 rounded-full" />
-                        <span>
-                          {t("퇴장 상태 (OUTSIDE)", "Outside (OUTSIDE)")}
-                        </span>
+                        <span className="w-4 h-4 bg-slate-400 rounded-full shadow-md" />
+                        <div className="flex flex-col">
+                          <span className="text-lg font-display font-semibold">{t("대기중", "Standby")}</span>
+                          <span className="text-sm opacity-80">{t("입장 전 상태", "Pre-entry")}</span>
+                        </div>
                       </>
                     )}
                   </div>
@@ -1154,7 +1355,7 @@ const StandAloneBadgePage: React.FC = () => {
                     </p>
                     <p className="text-sm font-black text-blue-800 flex items-center gap-1">
                       <MapPin className="w-3 h-3 text-blue-500" />
-                      {ui.zone}
+                      {zones.find((z) => z.id === ui.zone)?.name || ui.zone}
                     </p>
                   </div>
                 )}
@@ -1180,18 +1381,70 @@ const StandAloneBadgePage: React.FC = () => {
                     </p>
                   </div>
                 )}
-              </TabsContent>
+
+                {(attendanceMode === "CUMULATIVE" && attendanceGoalMinutes > 0) && (
+                  <div className="bg-eregi-primary/5 border border-eregi-primary/10 rounded-xl py-3 px-4">
+                    <div className="flex justify-between items-center">
+                      <p className="text-xs text-eregi-primary font-body font-semibold">
+                        {t("이수 목표 / 남은 시간", "Goal / Remaining")}
+                      </p>
+                      <p className="text-xs font-body font-bold text-eregi-primary">
+                        {progressPercent}%
+                      </p>
+                    </div>
+                    <div className="mt-2 h-2 rounded-full bg-eregi-primary/10 overflow-hidden">
+                      <div
+                        className="h-full bg-eregi-primary"
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 flex justify-between items-center text-sm font-body font-semibold">
+                      <span className="text-eregi-primary">
+                        {formatMinutes(attendanceGoalMinutes)}
+                      </span>
+                      <span className="text-gray-500">{t("남음", "Left")}</span>
+                      <span className="text-gray-900">
+                        {formatMinutes(remainingMinutes)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {(attendanceMode === "CUMULATIVE" && (attendanceGoalMinutes > 0 || todayAccumulated > 0)) && (
+                  <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl py-3 px-4 flex justify-between items-center">
+                    <div className="flex flex-col">
+                      <p className="text-xs text-indigo-700 font-bold">
+                        {t("오늘 인정 시간", "Today tracked time")}
+                      </p>
+                      {ui.status === "INSIDE" && (
+                        <p className="text-[10px] text-indigo-400">
+                          {t(
+                            "현재 세션 시간이 계속 반영됩니다.",
+                            "Current session time is updating live.",
+                          )}
+                        </p>
+                      )}
+                    </div>
+                    <p className="text-sm font-black text-indigo-900 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-indigo-500" />
+                      {formatMinutes(todayAccumulated)}
+                    </p>
+                  </div>
+                )}
+                </TabsContent>
+              )}
 
               {/* Sessions Tab */}
-              <TabsContent value="sessions" className="mt-2 p-1">
+              {effectiveMenuVisibility.sessions && (
+                <TabsContent value="sessions" className="mt-2 p-1">
                 <div className="bg-white rounded-2xl py-6 px-4 border border-gray-100 shadow-sm text-center">
                   <div
-                    className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${ui.isCompleted ? "bg-emerald-100 text-emerald-600" : "bg-gray-100 text-gray-600"}`}
+                    className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg border-3 transition-all ${ui.isCompleted ? "bg-gradient-to-br from-emerald-50 to-green-100/80 text-emerald-600 border-emerald-200 shadow-emerald-100/50" : "bg-gradient-to-br from-slate-50 to-gray-100/80 text-slate-500 border-slate-200 shadow-slate-100/50"}`}
                   >
                     {ui.isCompleted ? (
-                      <CheckCircle className="w-6 h-6 text-emerald-600" />
+                      <CheckCircle className="w-8 h-8 text-emerald-600 drop-shadow-sm" />
                     ) : (
-                      <TrendingUp className="w-6 h-6 text-gray-400" />
+                      <TrendingUp className="w-8 h-8 text-slate-500" />
                     )}
                   </div>
                   <p className="text-xs text-gray-500 font-bold mb-1 uppercase tracking-wider">
@@ -1206,7 +1459,7 @@ const StandAloneBadgePage: React.FC = () => {
 
                   <div className="flex flex-col items-center gap-1 mb-4">
                     <span
-                      className={`text-3xl font-black tracking-tight ${ui.isCompleted ? "text-emerald-600" : "text-gray-900"}`}
+                      className={`text-3xl font-display font-semibold tracking-tight ${ui.isCompleted ? "text-eregi-primary" : "text-foreground"}`}
                     >
                       {ui.isCompleted
                         ? t("이수 완료", "Completed")
@@ -1218,12 +1471,35 @@ const StandAloneBadgePage: React.FC = () => {
                         {formatMinutes(liveMinutes)}
                       </span>
                     </span>
+                    {(attendanceMode === "CUMULATIVE" &&
+                      attendanceGoalMinutes > 0) && (
+                      <div className="mt-3 w-full bg-eregi-primary/5 border border-eregi-primary/10 rounded-xl px-4 py-3">
+                        <div className="flex justify-between items-center text-xs font-body font-semibold text-eregi-primary">
+                          <span>
+                            {t("목표", "Goal")}:{" "}
+                            {formatMinutes(attendanceGoalMinutes)}
+                          </span>
+                          <span>
+                            {t("남은 시간", "Remaining")}:{" "}
+                            {formatMinutes(remainingMinutes)}
+                          </span>
+                        </div>
+                        <div className="mt-2 h-2 rounded-full bg-eregi-primary/10 overflow-hidden">
+                          <div
+                            className="h-full bg-eregi-primary"
+                            style={{ width: `${progressPercent}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </TabsContent>
+                </TabsContent>
+              )}
 
               {/* Materials Tab */}
-              <TabsContent value="materials" className="mt-2 p-1 space-y-2">
+              {effectiveMenuVisibility.materials && (
+                <TabsContent value="materials" className="mt-2 p-1 space-y-2">
                 {badgeConfig?.materialsUrls &&
                 badgeConfig.materialsUrls.length > 0 ? (
                   badgeConfig.materialsUrls.map((mat, idx: number) => (
@@ -1296,10 +1572,12 @@ const StandAloneBadgePage: React.FC = () => {
                     </a>
                   </>
                 )}
-              </TabsContent>
+                </TabsContent>
+              )}
 
               {/* Program Tab */}
-              <TabsContent value="program" className="mt-2 p-1">
+              {effectiveMenuVisibility.program && (
+                <TabsContent value="program" className="mt-2 p-1">
                 <a
                   href={`/${slug}/program`}
                   target="_blank"
@@ -1318,10 +1596,11 @@ const StandAloneBadgePage: React.FC = () => {
                     </p>
                   </div>
                 </a>
-              </TabsContent>
+                </TabsContent>
+              )}
 
               {/* Translation Tab */}
-              {badgeConfig?.translationUrl !== "HIDE" && (
+              {translationEnabled && (
                 <TabsContent value="translation" className="mt-2 p-1">
                   {badgeConfig?.translationUrl &&
                   badgeConfig.translationUrl.startsWith("http") ? (
@@ -1358,7 +1637,8 @@ const StandAloneBadgePage: React.FC = () => {
                 </TabsContent>
               )}
 
-              <TabsContent value="stamp-tour" className="mt-2 p-1 space-y-3">
+              {effectiveMenuVisibility.stampTour && (
+                <TabsContent value="stamp-tour" className="mt-2 p-1 space-y-3">
                 {!stampConfig?.enabled ? (
                   <div className="bg-white rounded-2xl border border-dashed border-gray-300 py-10 px-4 text-center">
                     <Gift className="w-10 h-10 text-gray-300 mx-auto mb-3" />
@@ -1416,7 +1696,7 @@ const StandAloneBadgePage: React.FC = () => {
                               )}
                         </p>
                         {currentRewardStatus === "REQUESTED" && (
-                          <div className="rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-700">
+                          <div className="rounded-xl bg-eregi-primary/10 px-3 py-2 text-xs font-body font-semibold text-eregi-primary">
                             {stampProgress.rewardName
                               ? t(
                                   `${stampProgress.rewardName} 상품 요청이 접수되었습니다.`,
@@ -1429,7 +1709,7 @@ const StandAloneBadgePage: React.FC = () => {
                           </div>
                         )}
                         {currentRewardStatus === "REDEEMED" && (
-                          <div className="rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-700">
+                          <div className="rounded-xl bg-eregi-primary/10 px-3 py-2 text-xs font-body font-semibold text-eregi-primary">
                             {t(
                               "상품 수령이 완료되었습니다.",
                               "Reward has been redeemed.",
@@ -1531,7 +1811,7 @@ const StandAloneBadgePage: React.FC = () => {
                                 {booth.name}
                               </span>
                               <span
-                                className={`rounded-full px-2 py-1 text-xs font-bold ${booth.isStamped ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-500"}`}
+                                className={`rounded-full px-2 py-1 text-xs font-body font-semibold ${booth.isStamped ? "bg-eregi-primary/10 text-eregi-primary" : "bg-muted text-muted-foreground"}`}
                               >
                                 {booth.isStamped
                                   ? t("스탬프 완료", "Stamped")
@@ -1576,20 +1856,23 @@ const StandAloneBadgePage: React.FC = () => {
                     </div>
                   </>
                 )}
-              </TabsContent>
+                </TabsContent>
+              )}
             </Tabs>
           </div>
         </div>
 
         {/* Home Button - Floating Bottom aesthetics */}
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => navigate(`/${publicSlug}`)}
-            className="inline-flex items-center justify-center py-3 px-8 bg-white/80 backdrop-blur-sm text-emerald-800 font-bold rounded-full hover:bg-white transition-colors border border-emerald-100 shadow-sm text-sm"
-          >
-            {t("행사 홈으로", "Back to event home")}
-          </button>
-        </div>
+        {effectiveMenuVisibility.home && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => navigate(`/${publicSlug}`)}
+              className="inline-flex items-center justify-center py-3 px-8 bg-white/80 backdrop-blur-sm text-eregi-primary font-body font-semibold rounded-full hover:bg-white transition-colors border border-eregi-primary/20 shadow-sm text-sm"
+            >
+              {getMenuLabel("home", "학술대회 홈페이지로 이동", "Conference Home")}
+            </button>
+          </div>
+        )}
       </div>
 
       {rewardAnimationOpen && (
