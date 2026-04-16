@@ -16,13 +16,10 @@ export const calculateStayTime = (
     let totalMinutes = 0;
     let entryTime: Date | null = null;
 
-    // Helper to parse "HH:MM" to Date on a specific day
+    // Helper to parse "HH:MM" to Date on a specific day in KST
     const getBreakDate = (timeStr: string, baseDate: Date): Date => {
-        const year = baseDate.getFullYear();
-        const month = String(baseDate.getMonth() + 1).padStart(2, '0');
-        const day = String(baseDate.getDate()).padStart(2, '0');
-        // Parse timeStr as KST to prevent offset bugs
-        return new Date(`${year}-${month}-${day}T${timeStr}:00+09:00`);
+        const kstDateStr = getKstToday(baseDate); // "YYYY-MM-DD"
+        return new Date(`${kstDateStr}T${timeStr}:00+09:00`);
     };
 
     // Helper to calculate overlap in minutes
@@ -105,10 +102,15 @@ export function calculateRecognizedMinutes(
     let recognizedMinutes = 0;
 
     if (zoneConfig?.start && zoneConfig?.end) {
-        const kstMs = lastCheckInDate.getTime() + 9 * 60 * 60 * 1000;
-        const dateStr = zoneConfig.ruleDate || new Date(kstMs).toISOString().split('T')[0];
+        const dateStr = zoneConfig.ruleDate || getKstToday(lastCheckInDate);
         const zoneStart = new Date(`${dateStr}T${zoneConfig.start}:00+09:00`);
         const zoneEnd = new Date(`${dateStr}T${zoneConfig.end}:00+09:00`);
+        
+        // Handle midnight crossover for zone
+        if (zoneEnd < zoneStart) {
+            zoneEnd.setDate(zoneEnd.getDate() + 1);
+        }
+
         boundedStart = new Date(Math.max(lastCheckInDate.getTime(), zoneStart.getTime()));
         boundedEnd = new Date(Math.min(exitTime.getTime(), zoneEnd.getTime()));
     }
@@ -119,10 +121,15 @@ export function calculateRecognizedMinutes(
         let deduction = 0;
         if (zoneConfig?.breaks && Array.isArray(zoneConfig.breaks)) {
             for (const brk of zoneConfig.breaks) {
-                const kstMs = lastCheckInDate.getTime() + 9 * 60 * 60 * 1000;
-                const dateStr = zoneConfig.ruleDate || new Date(kstMs).toISOString().split('T')[0];
+                const dateStr = zoneConfig.ruleDate || getKstToday(lastCheckInDate);
                 const breakStart = new Date(`${dateStr}T${brk.start}:00+09:00`);
                 const breakEnd = new Date(`${dateStr}T${brk.end}:00+09:00`);
+                
+                // Handle midnight crossover
+                if (breakEnd < breakStart) {
+                    breakEnd.setDate(breakEnd.getDate() + 1);
+                }
+
                 const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());
                 const overlapEnd = Math.min(boundedEnd.getTime(), breakEnd.getTime());
                 if (overlapEnd > overlapStart) {

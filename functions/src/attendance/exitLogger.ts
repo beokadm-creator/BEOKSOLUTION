@@ -205,6 +205,12 @@ export async function createExitLog(
           const dateStr = resolvedZoneConfig.ruleDate || getKstToday(lastCheckInDate);
           const zoneStart = new Date(`${dateStr}T${resolvedZoneConfig.start}:00+09:00`);
           const zoneEnd = new Date(`${dateStr}T${resolvedZoneConfig.end}:00+09:00`);
+          
+          // Handle midnight crossover
+          if (zoneEnd < zoneStart) {
+            zoneEnd.setDate(zoneEnd.getDate() + 1);
+          }
+
           boundedStart = new Date(Math.max(lastCheckInDate.getTime(), zoneStart.getTime()));
           boundedEnd = new Date(Math.min(exitTime.getTime(), zoneEnd.getTime()));
         }
@@ -218,6 +224,12 @@ export async function createExitLog(
               const dateStr = resolvedZoneConfig.ruleDate || getKstToday(lastCheckInDate);
               const breakStart = new Date(`${dateStr}T${brk.start}:00+09:00`);
               const breakEnd = new Date(`${dateStr}T${brk.end}:00+09:00`);
+              
+              // Handle midnight crossover
+              if (breakEnd < breakStart) {
+                breakEnd.setDate(breakEnd.getDate() + 1);
+              }
+
               const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());
               const overlapEnd = Math.min(boundedEnd.getTime(), breakEnd.getTime());
               if (overlapEnd > overlapStart) {

@@ -57,6 +57,7 @@ import {
   resolveConferenceIdFromRoute,
   resolvePublicSlugFromConferenceId,
 } from "../utils/conferenceRoute";
+import { getKstToday } from "../utils/dateUtils";
 
 type TimestampLike = {
   toDate: () => Date;
@@ -588,13 +589,16 @@ const StandAloneBadgePage: React.FC = () => {
       let boundedEnd = now;
 
       if (zoneRule && zoneRule.start && zoneRule.end) {
-        const kstMs = start.getTime() + 9 * 60 * 60 * 1000;
         const localDateStr =
-          zoneRule.ruleDate || new Date(kstMs).toISOString().split("T")[0];
+          zoneRule.ruleDate || getKstToday(start);
         const sessionStart = new Date(
           `${localDateStr}T${zoneRule.start}:00+09:00`,
         );
         const sessionEnd = new Date(`${localDateStr}T${zoneRule.end}:00+09:00`);
+
+        if (sessionEnd < sessionStart) {
+          sessionEnd.setDate(sessionEnd.getDate() + 1);
+        }
 
         boundedStart = new Date(
           Math.max(start.getTime(), sessionStart.getTime()),
@@ -609,13 +613,17 @@ const StandAloneBadgePage: React.FC = () => {
 
         if (zoneRule && zoneRule.breaks && Array.isArray(zoneRule.breaks)) {
           zoneRule.breaks.forEach((brk) => {
-            const kstMs = start.getTime() + 9 * 60 * 60 * 1000;
             const localDateStr =
-              zoneRule.ruleDate || new Date(kstMs).toISOString().split("T")[0];
+              zoneRule.ruleDate || getKstToday(start);
             const breakStart = new Date(
               `${localDateStr}T${brk.start}:00+09:00`,
             );
             const breakEnd = new Date(`${localDateStr}T${brk.end}:00+09:00`);
+            
+            if (breakEnd < breakStart) {
+              breakEnd.setDate(breakEnd.getDate() + 1);
+            }
+
             const overlapStart = Math.max(
               boundedStart.getTime(),
               breakStart.getTime(),

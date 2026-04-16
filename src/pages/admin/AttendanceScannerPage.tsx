@@ -182,20 +182,23 @@ const AttendanceScannerPage: React.FC = () => {
 
                 let bS = lastIn, bE = now;
                 if (rule && rule.start && rule.end) {
-                    // Fix: Extract KST date correctly
-                    const kstMs = bS.getTime() + 9 * 60 * 60 * 1000;
-                    const ds = new Date(kstMs).toISOString().split('T')[0];
-                    bS = new Date(Math.max(bS.getTime(), new Date(`${ds}T${rule.start}:00+09:00`).getTime()));
-                    bE = new Date(Math.min(now.getTime(), new Date(`${ds}T${rule.end}:00+09:00`).getTime()));
+                    // Fix: Extract KST date correctly using getKstToday
+                    const ds = rule.ruleDate || getKstToday(bS);
+                    const zs = new Date(`${ds}T${rule.start}:00+09:00`);
+                    const ze = new Date(`${ds}T${rule.end}:00+09:00`);
+                    if (ze < zs) ze.setDate(ze.getDate() + 1);
+                    bS = new Date(Math.max(bS.getTime(), zs.getTime()));
+                    bE = new Date(Math.min(now.getTime(), ze.getTime()));
                 }
                 if (bE > bS) {
                     const diff = Math.floor((bE.getTime() - bS.getTime()) / 60000);
                     let ded = 0;
                     if (rule?.breaks) {
                         rule.breaks.forEach((b: any) => {
-                            const kstMs = bS.getTime() + 9 * 60 * 60 * 1000;
-                            const ds = new Date(kstMs).toISOString().split('T')[0];
-                            const bsS = new Date(`${ds}T${b.start}:00+09:00`), bsE = new Date(`${ds}T${b.end}:00+09:00`);
+                            const ds = rule.ruleDate || getKstToday(bS);
+                            const bsS = new Date(`${ds}T${b.start}:00+09:00`);
+                            const bsE = new Date(`${ds}T${b.end}:00+09:00`);
+                            if (bsE < bsS) bsE.setDate(bsE.getDate() + 1);
                             const oS = Math.max(bS.getTime(), bsS.getTime()), oE = Math.min(bE.getTime(), bsE.getTime());
                             if (oE > oS) ded += Math.floor((oE - oS) / 60000);
                         });
