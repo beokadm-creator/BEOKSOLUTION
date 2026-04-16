@@ -510,37 +510,41 @@ const InfodeskPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Processing Indicator */}
+                {/* Processing Overlay */}
                 {scannerState.status === 'PROCESSING' && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-[50000] backdrop-blur-sm">
-                        <div className="bg-white p-8 rounded-2xl flex flex-col items-center">
-                            <Loader2 className="w-16 h-16 animate-spin text-blue-600 mb-4" />
-                            <p className="text-xl font-bold text-gray-800">처리중...</p>
+                    <div className="absolute inset-0 z-[60000] flex items-center justify-center bg-[#0A192F]/80 backdrop-blur-md">
+                        <div className="flex flex-col items-center rounded-[2rem] bg-white/10 p-12 shadow-2xl border border-white/20">
+                            <Loader2 className="w-24 h-24 animate-spin text-[#00E5FF] mb-6 drop-shadow-[0_0_15px_rgba(0,229,255,0.5)]" />
+                            <p className="text-3xl font-black text-white tracking-widest animate-pulse">PROCESSING</p>
                         </div>
                     </div>
                 )}
 
                 {/* Result Overlay (Success/Error) */}
                 {(scannerState.status === 'SUCCESS' || scannerState.status === 'ERROR') && (
-                    <div className={`absolute inset-0 z-[60000] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200 ${scannerState.status === 'SUCCESS' ? 'bg-[linear-gradient(180deg,_#059669_0%,_#16a34a_100%)]' : 'bg-[linear-gradient(180deg,_#dc2626_0%,_#b91c1c_100%)]'
-                        } text-white`}>
+                    <div className={`absolute inset-0 z-[60000] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-300 ${
+                        scannerState.status === 'SUCCESS' ? 'bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-emerald-900/90 via-[#0A192F]/95 to-[#0A192F]' : 'bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-rose-900/90 via-[#0A192F]/95 to-[#0A192F]'
+                    } backdrop-blur-lg`}>
+                        
                         {scannerState.status === 'SUCCESS' ? (
-                            <CheckCircle className="w-40 h-40 mb-8 drop-shadow-lg" />
+                            <CheckCircle className="w-48 h-48 mb-8 text-emerald-400 drop-shadow-[0_0_30px_rgba(52,211,153,0.6)] animate-[bounce_1s_ease-in-out]" />
                         ) : (
-                            <AlertCircle className="w-40 h-40 mb-8 drop-shadow-lg" />
+                            <AlertCircle className="w-48 h-48 mb-8 text-rose-500 drop-shadow-[0_0_30px_rgba(244,63,94,0.6)] animate-[shake_0.5s_ease-in-out]" />
                         )}
 
-                        <h2 className="text-6xl font-black mb-4 drop-shadow-md">{scannerState.message}</h2>
+                        <h2 className={`text-6xl font-black mb-8 drop-shadow-xl ${scannerState.status === 'SUCCESS' ? 'text-emerald-300' : 'text-rose-300'}`}>
+                            {scannerState.message}
+                        </h2>
 
                         {scannerState.userData && (
-                            <div className="mt-12 w-full max-w-4xl rounded-[2rem] border border-white/20 bg-white/10 p-12 text-center shadow-2xl backdrop-blur-md">
-                                <div className="mb-6 mt-4 text-7xl font-black tracking-tight">{scannerState.userData.name}</div>
-                                <div className="text-4xl font-light opacity-90">{scannerState.userData.affiliation}</div>
+                            <div className="mt-8 w-full max-w-5xl rounded-[2.5rem] border border-white/20 bg-white/10 p-16 text-center shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+                                <div className="mb-6 mt-4 text-7xl font-black tracking-tight text-white drop-shadow-md">{scannerState.userData.name}</div>
+                                <div className="text-4xl font-medium text-sky-200 opacity-90">{scannerState.userData.affiliation}</div>
                             </div>
                         )}
 
                         {scannerState.status === 'ERROR' && (
-                            <div className="mt-6 text-3xl opacity-90 font-medium bg-black/20 px-8 py-4 rounded-xl">
+                            <div className="mt-12 text-4xl font-medium bg-rose-950/50 border border-rose-500/30 text-rose-200 px-12 py-8 rounded-2xl shadow-[0_0_30px_rgba(244,63,94,0.2)]">
                                 {scannerState.message}
                             </div>
                         )}

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAdminStore } from '../../../store/adminStore';
 import { doc, getDoc, Timestamp, collection, runTransaction } from 'firebase/firestore';
 import { db } from '../../../firebase';
-import { Loader2, ArrowLeft, AlertCircle, CheckCircle, Palette, MapPin, LogIn, ScanLine } from 'lucide-react';
+import { Loader2, ArrowLeft, AlertCircle, CheckCircle, Palette, MapPin, ScanLine } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -510,82 +510,109 @@ const GatePage: React.FC = () => {
                     </div>
 
                     <div className="p-12 flex flex-col items-center">
-                        <div className="mb-8 p-8 rounded-full bg-white/5 border border-white/10 shadow-[inset_0_0_20px_rgba(255,255,255,0.05)]">
-                            {scannerState.status === 'IDLE' && <LogIn className="w-20 h-20 text-[#00E5FF]/70" />}
-                            {scannerState.status === 'PROCESSING' && <Loader2 className="w-20 h-20 animate-spin text-[#00E5FF]" />}
-                            {scannerState.status === 'SUCCESS' && <CheckCircle className="w-20 h-20 text-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)]" />}
-                            {scannerState.status === 'ERROR' && <AlertCircle className="w-20 h-20 text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]" />}
+                        <div className="relative group mb-8">
+                            {/* Scanning Laser Animation */}
+                            <div className="absolute inset-0 z-20 pointer-events-none rounded-[2rem] overflow-hidden">
+                                <div className="w-full h-1 bg-[#00E5FF] shadow-[0_0_15px_#00E5FF] animate-[scan_2s_ease-in-out_infinite]" />
+                            </div>
+                            
+                            <div className="relative z-10 flex flex-col items-center justify-center rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 border-2 border-[#00E5FF]/40 px-12 py-10 shadow-[0_0_40px_rgba(0,229,255,0.15)] group-hover:shadow-[0_0_60px_rgba(0,229,255,0.3)] transition-all duration-500">
+                                <ScanLine className="h-24 w-24 text-[#00E5FF] mb-4" />
+                                <p className="text-3xl font-black tracking-tight text-white drop-shadow-md">
+                                    QR SCAN
+                                </p>
+                                {/* Corner brackets */}
+                                <div className="absolute top-4 left-4 w-8 h-8 border-t-4 border-l-4 border-[#00E5FF] rounded-tl-xl" />
+                                <div className="absolute top-4 right-4 w-8 h-8 border-t-4 border-r-4 border-[#00E5FF] rounded-tr-xl" />
+                                <div className="absolute bottom-4 left-4 w-8 h-8 border-b-4 border-l-4 border-[#00E5FF] rounded-bl-xl" />
+                                <div className="absolute bottom-4 right-4 w-8 h-8 border-b-4 border-r-4 border-[#00E5FF] rounded-br-xl" />
+                            </div>
                         </div>
-
-                        {scannerState.status === 'IDLE' && (
-                            <div className="relative group mb-8">
-                                {/* Scanning Laser Animation */}
-                                <div className="absolute inset-0 z-20 pointer-events-none rounded-[2rem] overflow-hidden">
-                                    <div className="w-full h-1 bg-[#00E5FF] shadow-[0_0_15px_#00E5FF] animate-[scan_2s_ease-in-out_infinite]" />
-                                </div>
-                                
-                                <div className="relative z-10 flex flex-col items-center justify-center rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 border-2 border-[#00E5FF]/40 px-12 py-10 shadow-[0_0_40px_rgba(0,229,255,0.15)] group-hover:shadow-[0_0_60px_rgba(0,229,255,0.3)] transition-all duration-500">
-                                    <ScanLine className="h-24 w-24 text-[#00E5FF] mb-4" />
-                                    <p className="text-3xl font-black tracking-tight text-white drop-shadow-md">
-                                        QR SCAN
-                                    </p>
-                                    {/* Corner brackets */}
-                                    <div className="absolute top-4 left-4 w-8 h-8 border-t-4 border-l-4 border-[#00E5FF] rounded-tl-xl" />
-                                    <div className="absolute top-4 right-4 w-8 h-8 border-t-4 border-r-4 border-[#00E5FF] rounded-tr-xl" />
-                                    <div className="absolute bottom-4 left-4 w-8 h-8 border-b-4 border-l-4 border-[#00E5FF] rounded-bl-xl" />
-                                    <div className="absolute bottom-4 right-4 w-8 h-8 border-b-4 border-r-4 border-[#00E5FF] rounded-br-xl" />
-                                </div>
-                            </div>
-                        )}
-                        <h2 className={cn("text-5xl font-black mb-4 drop-shadow-lg", scannerState.status === 'ERROR' ? "text-red-400" : scannerState.status === 'SUCCESS' ? "text-emerald-400" : "text-white")}>
-                            {scannerState.message}
-                        </h2>
-                        {scannerState.status === 'SUCCESS' && scannerState.isCompleted && (
-                            <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-5 py-2.5 rounded-full font-black text-sm mb-4 backdrop-blur">
-                                <CheckCircle className="w-4 h-4" />
-                                수강완료
-                            </div>
-                        )}
-                        {scannerState.subMessage && <p className="text-3xl font-bold text-sky-200">{scannerState.subMessage}</p>}
-                        {scannerState.userData && <p className="mt-2 text-xl font-medium text-sky-400 opacity-80">{scannerState.userData.affiliation}</p>}
-                        {scannerState.status === 'SUCCESS' && typeof scannerState.totalMinutes === 'number' && (
-                            <div className="mt-10 w-full max-w-4xl">
-                                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                                    <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur px-6 py-5 text-left transition-transform hover:scale-105">
-                                        <div className="text-xs font-black uppercase tracking-wider text-sky-400 opacity-80">이번 체류 시간</div>
-                                        <div className="mt-2 text-3xl font-black text-white">{scannerState.rawSessionMinutes || 0}분</div>
-                                    </div>
-                                    <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur px-6 py-5 text-left transition-transform hover:scale-105">
-                                        <div className="text-xs font-black uppercase tracking-wider text-sky-400 opacity-80">휴식 차감</div>
-                                        <div className="mt-2 text-3xl font-black text-white">{scannerState.deductedMinutes || 0}분</div>
-                                    </div>
-                                    <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur px-6 py-5 text-left transition-transform hover:scale-105">
-                                        <div className="text-xs font-black uppercase tracking-wider text-sky-400 opacity-80">이번 스캔 인정</div>
-                                        <div className="mt-2 text-3xl font-black text-emerald-400 drop-shadow-md">{scannerState.recognizedMinutes || 0}분</div>
-                                    </div>
-                                    <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur px-6 py-5 text-left transition-transform hover:scale-105">
-                                        <div className="text-xs font-black uppercase tracking-wider text-sky-400 opacity-80">오늘 누적</div>
-                                        <div className="mt-2 text-3xl font-black text-white">{scannerState.todayMinutes || 0}분</div>
-                                    </div>
-                                    <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur px-6 py-5 text-left transition-transform hover:scale-105">
-                                        <div className="text-xs font-black uppercase tracking-wider text-sky-400 opacity-80">총 누적</div>
-                                        <div className="mt-2 text-3xl font-black text-[#00E5FF] drop-shadow-md">{scannerState.totalMinutes}분</div>
-                                    </div>
-                                    <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur px-6 py-5 text-left transition-transform hover:scale-105">
-                                        <div className="text-xs font-black uppercase tracking-wider text-sky-400 opacity-80">남은 시간</div>
-                                        <div className="mt-2 text-3xl font-black text-white">
-                                            {scannerState.goalMinutes ? (scannerState.remainingMinutes || 0) : '-'}분
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
 
                 <div className="mt-12 flex items-center gap-3 text-[#00E5FF] font-black text-xl uppercase tracking-[0.3em] animate-pulse drop-shadow-[0_0_10px_rgba(0,229,255,0.5)]">
                     Ready to Scan
                 </div>
+
+                {/* Processing Overlay */}
+                {scannerState.status === 'PROCESSING' && (
+                    <div className="absolute inset-0 z-[60000] flex items-center justify-center bg-[#0A192F]/80 backdrop-blur-md">
+                        <div className="flex flex-col items-center rounded-[2rem] bg-white/10 p-12 shadow-2xl border border-white/20">
+                            <Loader2 className="w-24 h-24 animate-spin text-[#00E5FF] mb-6 drop-shadow-[0_0_15px_rgba(0,229,255,0.5)]" />
+                            <p className="text-3xl font-black text-white tracking-widest animate-pulse">PROCESSING</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Result Overlay (Success/Error) */}
+                {(scannerState.status === 'SUCCESS' || scannerState.status === 'ERROR') && (
+                    <div className={`absolute inset-0 z-[60000] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-300 ${
+                        scannerState.status === 'SUCCESS' ? 'bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-emerald-900/90 via-[#0A192F]/95 to-[#0A192F]' : 'bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-rose-900/90 via-[#0A192F]/95 to-[#0A192F]'
+                    } backdrop-blur-lg`}>
+                        
+                        {scannerState.status === 'SUCCESS' ? (
+                            <CheckCircle className="w-48 h-48 mb-8 text-emerald-400 drop-shadow-[0_0_30px_rgba(52,211,153,0.6)] animate-[bounce_1s_ease-in-out]" />
+                        ) : (
+                            <AlertCircle className="w-48 h-48 mb-8 text-rose-500 drop-shadow-[0_0_30px_rgba(244,63,94,0.6)] animate-[shake_0.5s_ease-in-out]" />
+                        )}
+
+                        <h2 className={`text-6xl font-black mb-4 drop-shadow-xl ${scannerState.status === 'SUCCESS' ? 'text-emerald-300' : 'text-rose-300'}`}>
+                            {scannerState.message}
+                        </h2>
+
+                        {scannerState.status === 'SUCCESS' && scannerState.isCompleted && (
+                            <div className="inline-flex items-center gap-3 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-6 py-3 rounded-full font-black text-xl mb-6 backdrop-blur shadow-[0_0_20px_rgba(52,211,153,0.2)]">
+                                <CheckCircle className="w-6 h-6" />
+                                수강완료
+                            </div>
+                        )}
+
+                        {scannerState.subMessage && <p className="text-4xl font-bold text-white drop-shadow-md mb-2">{scannerState.subMessage}</p>}
+                        {scannerState.userData && <p className="text-2xl font-medium text-sky-200 opacity-90 mb-10">{scannerState.userData.affiliation}</p>}
+
+                        {scannerState.status === 'SUCCESS' && typeof scannerState.totalMinutes === 'number' && (
+                            <div className="w-full max-w-5xl rounded-[2.5rem] border border-white/20 bg-white/10 p-10 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+                                <div className="grid gap-6 md:grid-cols-3">
+                                    <div className="rounded-3xl border border-white/10 bg-black/20 p-6 text-center shadow-inner">
+                                        <div className="text-sm font-black uppercase tracking-widest text-sky-300 opacity-80 mb-2">이번 체류 시간</div>
+                                        <div className="text-4xl font-black text-white">{scannerState.rawSessionMinutes || 0}<span className="text-2xl text-white/50 ml-1">분</span></div>
+                                    </div>
+                                    <div className="rounded-3xl border border-white/10 bg-black/20 p-6 text-center shadow-inner">
+                                        <div className="text-sm font-black uppercase tracking-widest text-sky-300 opacity-80 mb-2">휴식 차감</div>
+                                        <div className="text-4xl font-black text-white">{scannerState.deductedMinutes || 0}<span className="text-2xl text-white/50 ml-1">분</span></div>
+                                    </div>
+                                    <div className="rounded-3xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-center shadow-[inset_0_0_20px_rgba(52,211,153,0.1)] relative overflow-hidden">
+                                        <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/20 to-transparent opacity-50" />
+                                        <div className="relative z-10 text-sm font-black uppercase tracking-widest text-emerald-300 opacity-90 mb-2">이번 스캔 인정</div>
+                                        <div className="relative z-10 text-5xl font-black text-emerald-400 drop-shadow-[0_0_10px_rgba(52,211,153,0.5)]">{scannerState.recognizedMinutes || 0}<span className="text-2xl text-emerald-400/50 ml-1">분</span></div>
+                                    </div>
+                                    <div className="rounded-3xl border border-white/10 bg-black/20 p-6 text-center shadow-inner">
+                                        <div className="text-sm font-black uppercase tracking-widest text-sky-300 opacity-80 mb-2">오늘 누적</div>
+                                        <div className="text-4xl font-black text-white">{scannerState.todayMinutes || 0}<span className="text-2xl text-white/50 ml-1">분</span></div>
+                                    </div>
+                                    <div className="rounded-3xl border border-[#00E5FF]/30 bg-[#00E5FF]/10 p-6 text-center shadow-[inset_0_0_20px_rgba(0,229,255,0.1)] relative overflow-hidden">
+                                        <div className="absolute inset-0 bg-gradient-to-t from-[#00E5FF]/20 to-transparent opacity-50" />
+                                        <div className="relative z-10 text-sm font-black uppercase tracking-widest text-[#00E5FF] opacity-90 mb-2">총 누적</div>
+                                        <div className="relative z-10 text-5xl font-black text-[#00E5FF] drop-shadow-[0_0_10px_rgba(0,229,255,0.5)]">{scannerState.totalMinutes}<span className="text-2xl text-[#00E5FF]/50 ml-1">분</span></div>
+                                    </div>
+                                    <div className="rounded-3xl border border-white/10 bg-black/20 p-6 text-center shadow-inner">
+                                        <div className="text-sm font-black uppercase tracking-widest text-sky-300 opacity-80 mb-2">남은 시간</div>
+                                        <div className="text-4xl font-black text-white">
+                                            {scannerState.goalMinutes ? (scannerState.remainingMinutes || 0) : '-'}<span className="text-2xl text-white/50 ml-1">분</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        
+                        {scannerState.status === 'ERROR' && (
+                            <div className="mt-8 text-3xl font-medium bg-rose-950/50 border border-rose-500/30 text-rose-200 px-10 py-6 rounded-2xl shadow-[0_0_30px_rgba(244,63,94,0.2)]">
+                                {scannerState.message}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <input ref={inputRef} value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={handleKeyDown} onBlur={handleBlur} className="absolute opacity-0 pointer-events-none" autoFocus />
             </div>
