@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, browserSessionPersistence } from "firebase/auth";
+import { getAuth, browserSessionPersistence, setPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getAnalytics } from "firebase/analytics";
@@ -35,7 +35,11 @@ if (missingFirebaseConfig.length > 0) {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-auth.setPersistence(browserSessionPersistence);
+export const authPersistenceReady = setPersistence(auth, browserSessionPersistence)
+  .catch((error) => {
+    console.error("[firebase] Failed to initialize auth persistence:", error);
+    throw error;
+  });
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const analytics = typeof window !== "undefined" ? getAnalytics(app) : null;
