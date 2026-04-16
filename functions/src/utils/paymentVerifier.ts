@@ -6,9 +6,7 @@ export interface VerificationResult {
     error?: string;
 }
 
-// KST is UTC+9. Cloud Functions run in UTC, so we need to add 9 hours
-// to get the current KST date when comparing registration periods.
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+// KST is UTC+9. Cloud Functions run in UTC.
 
 /**
  * Get a YYYY-MM-DD date string in KST from any Date object.
@@ -16,8 +14,12 @@ const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
  * regardless of where the server is running.
  */
 function toKSTDateString(date: Date): string {
-    const kstDate = new Date(date.getTime() + KST_OFFSET_MS);
-    return kstDate.toISOString().slice(0, 10); // "2026-03-06"
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(date);
 }
 
 export async function verifyPaymentAmount(

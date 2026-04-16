@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import { useAdminStore } from '../../store/adminStore';
 import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -89,7 +90,9 @@ const ensureMillis = (val: any): number | undefined => {
 };
 
 const StatisticsPage: React.FC = () => {
+    const { cid } = useParams<{ cid: string }>();
     const { selectedConferenceId } = useAdminStore();
+    const confId = cid || selectedConferenceId;
 
     // Raw data
     const [participants, setParticipants] = useState<ParticipantRecord[]>([]);
@@ -100,11 +103,14 @@ const StatisticsPage: React.FC = () => {
 
     // --- 1. Fetch Data ---
     const fetchData = useCallback(async () => {
-        if (!selectedConferenceId) return;
+        if (!confId) {
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         try {
             // A. Fetch Attendance Settings (rules)
-            const rulesRef = doc(db, `conferences/${selectedConferenceId}/settings/attendance`);
+            const rulesRef = doc(db, `conferences/${confId}/settings/attendance`);
             const rulesSnap = await getDoc(rulesRef);
             if (rulesSnap.exists()) {
                 const data = rulesSnap.data();
@@ -117,7 +123,7 @@ const StatisticsPage: React.FC = () => {
             }
 
             // Fetch Access Logs for first entry and last exit times
-            const accessLogsRef = collection(db, `conferences/${selectedConferenceId}/access_logs`);
+            const accessLogsRef = collection(db, `conferences/${confId}/access_logs`);
             const accessLogsSnap = await getDocs(accessLogsRef);
             const userTimes: Record<string, { firstEntryTime?: number, lastExitTime?: number }> = {};
 
@@ -149,7 +155,7 @@ const StatisticsPage: React.FC = () => {
             });
 
             // B. Fetch PAID registrations (결제 완료자만)
-            const regRef = collection(db, `conferences/${selectedConferenceId}/registrations`);
+            const regRef = collection(db, `conferences/${confId}/registrations`);
             const regQuery = query(regRef, where('paymentStatus', '==', 'PAID'));
             const regSnap = await getDocs(regQuery);
 
@@ -185,7 +191,7 @@ const StatisticsPage: React.FC = () => {
             });
 
             // C. Fetch External Attendees (not deleted)
-            const extRef = collection(db, `conferences/${selectedConferenceId}/external_attendees`);
+            const extRef = collection(db, `conferences/${confId}/external_attendees`);
             const extQuery = query(extRef, where('deleted', '==', false));
             const extSnap = await getDocs(extQuery);
 
@@ -227,7 +233,7 @@ const StatisticsPage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [selectedConferenceId, selectedDate]);
+    }, [confId, selectedDate]);
 
     useEffect(() => {
         fetchData();
@@ -239,9 +245,14 @@ const StatisticsPage: React.FC = () => {
     // 이 필드들은 AttendanceScannerPage / AttendanceLivePage의 performCheckOut 시
     // 실시간으로 업데이트됩니다.
     const stats = useMemo(() => {
-        if (!selectedDate || !rules[selectedDate] || participants.length === 0) return null;
+        if (!selectedDate || participants.length === 0) return null;
 
-        const currentRule = rules[selectedDate];
+        const currentRule = rules[selectedDate] || {
+            zones: [],
+            globalGoalMinutes: 0,
+            completionMode: 'DAILY_SEPARATE' as const,
+            cumulativeGoalMinutes: 0
+        };
         const dailyGoalMinutes = currentRule.globalGoalMinutes;
         const ruleEntries = Object.entries(rules || {});
         const cumulativeRule =
@@ -443,7 +454,8 @@ const StatisticsPage: React.FC = () => {
     }, [selectedDate, rules, participants]);
 
     const handleExportExcel = () => {
-        if (!stats) return;
+        if (!stats || !selectedDate) return;
+        const currentRule = rules[selectedDate] || { zones: [] };
 
         const formatTime = (ts?: number) => {
             if (!ts) return '';
@@ -468,7 +480,7 @@ const StatisticsPage: React.FC = () => {
                 '수강인정시간(분)': u.totalMinutes,
                 '남은시간(분)': u.remainingMinutes || 0,
                 '수강완료표기': u.isCompliant ? 'Y' : 'N',
-                ...rules[selectedDate].zones.reduce((acc, z) => ({
+                ...currentRule.zones.reduce((acc, z) => ({
                     ...acc,
                     [`${z.name} 수강인정(분)`]: u.zones[z.id] || 0,
                     [`${z.name} 수강완료`]: (u.zoneComp?.[z.id] || false) ? 'Y' : 'N',
@@ -485,14 +497,16 @@ const StatisticsPage: React.FC = () => {
         }
     };
 
-    if (loading) return <div className="flex h-screen justify-center items-center"><Loader2 className="animate-spin w-10 h-10 text-blue-500" /></div>;
+    if (loading) return <div className="flex h-[50vh] justify-center items-center"><Loader2 className="animate-spin w-10 h-10 text-blue-500" /></div>;
 
-    if (!selectedDate || !rules[selectedDate]) return (
+    if (!selectedDate) return (
         <div className="p-8 text-center">
             <h2 className="text-xl font-bold mb-2">No Attendance Rules Found</h2>
             <p className="text-gray-500">Please configure attendance settings for this conference first.</p>
         </div>
     );
+
+    const currentRuleForRender = rules[selectedDate] || { zones: [] };
 
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-8 pb-20">
@@ -749,7 +763,7 @@ const StatisticsPage: React.FC = () => {
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell>
-                                                        {rules[selectedDate]?.zones?.length <= 1 ? (
+                                                        {currentRuleForRender.zones.length <= 1 ? (
                                                             user.isCompliant ? (
                                                                 <Badge className="bg-green-500 hover:bg-green-600">
                                                                     <CheckCircle className="w-3 h-3 mr-1" /> 수강 완료
@@ -761,7 +775,7 @@ const StatisticsPage: React.FC = () => {
                                                             )
                                                         ) : (
                                                             <div className="flex flex-wrap gap-1">
-                                                                {rules[selectedDate].zones.map(z => {
+                                                                {currentRuleForRender.zones.map(z => {
                                                                     const done = user.zoneComp?.[z.id] || false;
                                                                     const mins = user.zones?.[z.id] || 0;
                                                                     return (

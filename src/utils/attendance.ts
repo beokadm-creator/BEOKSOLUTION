@@ -1,4 +1,5 @@
 import { AccessLog } from '../types/schema';
+import { getKstToday } from './dateUtils';
 
 // Helper to calculate duration in minutes
 export const calculateStayTime = (

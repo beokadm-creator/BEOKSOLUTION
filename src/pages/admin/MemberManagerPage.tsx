@@ -18,7 +18,7 @@ import {
 } from '../../components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Badge } from '../../components/ui/badge';
-import { safeFormatDate } from '../../utils/dateUtils';
+import { safeFormatDate, getKstToday } from '../../utils/dateUtils';
 import {
     Plus,
     Trash2,
@@ -526,7 +526,7 @@ const MemberManagerPage: React.FC = () => {
     );
 
     const isExpired = (dateStr: string) => {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getKstToday();
         return dateStr < today;
     };
 

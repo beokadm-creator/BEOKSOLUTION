@@ -5,7 +5,7 @@ import { db } from '../../firebase';
 import { Loader2, AlertCircle, CheckCircle, X, MapPin, LogIn } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import toast from 'react-hot-toast';
-import { cn } from '../../lib/utils';
+import { getKstToday } from '../../utils/dateUtils';
 
 interface ScannerState {
     status: 'IDLE' | 'PROCESSING' | 'SUCCESS' | 'ERROR';
@@ -208,7 +208,7 @@ const AttendanceScannerPage: React.FC = () => {
 
             const newTotal = totalMins + minsToAdd;
 
-            const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+            const todayStr = getKstToday();
             const dailyMinutes = { ...(data.dailyMinutes || {}) };
             dailyMinutes[todayStr] = (dailyMinutes[todayStr] || 0) + minsToAdd;
 

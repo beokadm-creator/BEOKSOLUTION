@@ -115,8 +115,12 @@ export const useSuperAdmin = () => {
                 throw new Error("Conference ID already exists");
             }
 
-            const startTs = Timestamp.fromDate(new Date(startDate));
-            const endTs = Timestamp.fromDate(new Date(endDate));
+            // Convert YYYY-MM-DD strings (which default to UTC midnight) into KST local times
+            const kstStartMs = new Date(startDate).getTime() - (9 * 60 * 60 * 1000);
+            const kstEndMs = new Date(endDate).getTime() - (9 * 60 * 60 * 1000);
+            
+            const startTs = Timestamp.fromDate(new Date(kstStartMs));
+            const endTs = Timestamp.fromDate(new Date(kstEndMs));
 
             // Root Doc (Summary for listing)
             await setDoc(confRef, {

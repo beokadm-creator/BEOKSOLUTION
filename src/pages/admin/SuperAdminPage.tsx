@@ -14,7 +14,7 @@ import { doc, updateDoc, getDocs, collection, getDoc, setDoc, deleteDoc, addDoc,
 import { db } from '../../firebase';
 
 import { Badge } from '../../components/ui/badge';
-import { Textarea } from '../../components/ui/textarea';
+import { getKstToday } from '../../utils/dateUtils';
 
 const SuperAdminPage: React.FC = () => {
     const { societies, createSociety, createConference, refreshSocieties, loading } = useSuperAdmin();
@@ -90,7 +90,7 @@ const SuperAdminPage: React.FC = () => {
     const [loadingVendorRequests, setLoadingVendorRequests] = useState(false);
 
     // Monitoring state
-    const today = new Date().toISOString().split('T')[0];
+    const today = getKstToday();
     const [monitoringDate, setMonitoringDate] = useState(today);
     const { errorLogs, performanceMetrics, dataIntegrityAlerts, loading: monitoringLoading, refetch: refetchMonitoring } = useMonitoringData(monitoringDate);
     const [resolvingAlertId, setResolvingAlertId] = useState<string | null>(null);

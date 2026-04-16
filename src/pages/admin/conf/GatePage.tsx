@@ -6,6 +6,8 @@ import { Loader2, ArrowLeft, AlertCircle, CheckCircle, Palette, MapPin, ScanLine
 import { Button } from '../../../components/ui/button';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { cn } from '../../../lib/utils';
+import { getKstToday } from '../../../utils/dateUtils';
 
 interface ScannerState {
     status: 'IDLE' | 'PROCESSING' | 'SUCCESS' | 'ERROR';
@@ -98,7 +100,7 @@ const GatePage: React.FC = () => {
                     });
                     allZonesRef.current = allZones;
 
-                    const kstToday = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+                    const kstToday = getKstToday();
                     const zonesToUse = allZones.some(z => z.ruleDate === kstToday)
                         ? allZones.filter(z => z.ruleDate === kstToday)
                         : allZones;
@@ -294,7 +296,8 @@ const GatePage: React.FC = () => {
             const ruleForEnterDate =
                 allZonesRef.current.find(z => z.id === targetZoneId) ||
                 zones.find(z => z.id === targetZoneId);
-            const fallbackDateStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+            const fallbackDateStr = getKstToday();
+
             const exitDateStr = ruleForExitDate?.ruleDate || fallbackDateStr;
             const enterDateStr = ruleForEnterDate?.ruleDate || fallbackDateStr;
             if (minsToAdd > 0) {
@@ -342,9 +345,7 @@ const GatePage: React.FC = () => {
                 ? (ruleForCumulative?.cumulativeGoalMinutes || 0)
                 : (ruleForCumulative?.globalGoalMinutes || 0);
             const remainingMinutes = goalMinutes > 0 ? Math.max(0, goalMinutes - newTotal) : 0;
-            const statsDateStr = (action === 'EXIT' || isZoneSwitch)
-                ? exitDateStr
-                : enterDateStr;
+            const statsDateStr = (action === 'EXIT' || isZoneSwitch) ? exitDateStr : enterDateStr;
 
             if (isZoneSwitch) {
                 tx.update(regRef, {

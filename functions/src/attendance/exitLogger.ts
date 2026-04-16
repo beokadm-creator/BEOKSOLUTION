@@ -21,6 +21,15 @@ function getDb(): admin.firestore.Firestore {
     return admin.firestore();
 }
 
+function getKstToday(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(now);
+}
+
 /**
  * Result of an exit log creation attempt
  */
@@ -133,8 +142,7 @@ export async function createExitLog(
   const logsRef = getDb().collection(`conferences/${confId}/${collectionName}/${registrationId}/logs`);
   const accessLogsRef = getDb().collection(`conferences/${confId}/access_logs`);
   // Extract KST date from real UTC time
-  const kstMs = exitTime.getTime() + 9 * 60 * 60 * 1000;
-  const today = new Date(kstMs).toISOString().split('T')[0];
+  const today = getKstToday(exitTime);
 
   const resolvedZoneConfig = zoneConfig || await fetchZoneConfig(confId, zoneId);
 
@@ -194,8 +202,7 @@ export async function createExitLog(
         let boundedEnd = exitTime;
 
         if (resolvedZoneConfig?.start && resolvedZoneConfig?.end) {
-          const kstMs = lastCheckInDate.getTime() + 9 * 60 * 60 * 1000;
-          const dateStr = resolvedZoneConfig.ruleDate || new Date(kstMs).toISOString().split('T')[0];
+          const dateStr = resolvedZoneConfig.ruleDate || getKstToday(lastCheckInDate);
           const zoneStart = new Date(`${dateStr}T${resolvedZoneConfig.start}:00+09:00`);
           const zoneEnd = new Date(`${dateStr}T${resolvedZoneConfig.end}:00+09:00`);
           boundedStart = new Date(Math.max(lastCheckInDate.getTime(), zoneStart.getTime()));
@@ -208,8 +215,7 @@ export async function createExitLog(
           let deduction = 0;
           if (resolvedZoneConfig?.breaks && Array.isArray(resolvedZoneConfig.breaks)) {
             for (const brk of resolvedZoneConfig.breaks) {
-              const kstMs = lastCheckInDate.getTime() + 9 * 60 * 60 * 1000;
-              const dateStr = resolvedZoneConfig.ruleDate || new Date(kstMs).toISOString().split('T')[0];
+              const dateStr = resolvedZoneConfig.ruleDate || getKstToday(lastCheckInDate);
               const breakStart = new Date(`${dateStr}T${brk.start}:00+09:00`);
               const breakEnd = new Date(`${dateStr}T${brk.end}:00+09:00`);
               const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());
@@ -228,8 +234,7 @@ export async function createExitLog(
       const newTotalMinutes = previousTotalMinutes + recognizedMinutes;
 
       // KST date from real UTC time
-      const kstMs = exitTime.getTime() + 9 * 60 * 60 * 1000;
-      const todayStr = resolvedZoneConfig?.ruleDate || new Date(kstMs).toISOString().split('T')[0];
+      const todayStr = resolvedZoneConfig?.ruleDate || getKstToday(exitTime);
 
       const dailyMinutes = { ...(registration.dailyMinutes || {}) };
       dailyMinutes[todayStr] = (dailyMinutes[todayStr] || 0) + recognizedMinutes;

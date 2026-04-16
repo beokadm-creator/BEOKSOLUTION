@@ -9,6 +9,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Loader2, LogIn, LogOut, RefreshCw, CheckCircle, FileText, X, Search, Clock, MapPin, Calendar, AlertCircle, Settings } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../../lib/utils';
+import { getKstToday } from '../../utils/dateUtils';
 
 interface BreakTime {
     label: string;
@@ -72,7 +73,7 @@ const AttendanceLivePage: React.FC = () => {
     const [zones, setZones] = useState<ZoneRule[]>([]);
 
     const [availableDates, setAvailableDates] = useState<string[]>([]);
-    const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().slice(0, 10));
+    const [selectedDate, setSelectedDate] = useState<string>(getKstToday());
     const [searchTerm, setSearchTerm] = useState<string>('');
 
     const [showLogModal, setShowLogModal] = useState(false);
@@ -113,14 +114,14 @@ const AttendanceLivePage: React.FC = () => {
                     const list = [];
                     const curr = new Date(start);
                     while (curr <= end) {
-                        const kstMs = curr.getTime() + 9 * 60 * 60 * 1000;
-                        list.push(new Date(kstMs).toISOString().split('T')[0]);
+                        list.push(getKstToday(curr));
                         curr.setDate(curr.getDate() + 1);
                     }
                     setAvailableDates(list);
-                    const todayKstMs = new Date().getTime() + 9 * 60 * 60 * 1000;
-                    const today = new Date(todayKstMs).toISOString().slice(0, 10);
-                    if (!list.includes(today) && list.length > 0) {
+                    const today = getKstToday();
+                    if (list.includes(today)) {
+                        setSelectedDate(today);
+                    } else if (list.length > 0) {
                         setSelectedDate(list[0]);
                     }
                 }

@@ -1,6 +1,14 @@
 import { Timestamp } from 'firebase/firestore';
 
 /**
+ * Returns today's date string in KST (YYYY-MM-DD).
+ * This safely calculates KST without using error-prone UTC manipulation.
+ */
+export const getKstToday = (date: Date = new Date()): string => {
+    return date.toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+};
+
+/**
  * Safely formats various date types into a locale date string.
  * Handles Date objects, Firestore Timestamps, objects with seconds, and string dates.
  */

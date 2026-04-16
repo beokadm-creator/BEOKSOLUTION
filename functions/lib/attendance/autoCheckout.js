@@ -152,9 +152,12 @@ function getConferenceEndDateStr(confData) {
  * Returns today's date in KST as YYYY-MM-DD string.
  */
 function getKstToday(now = new Date()) {
-    const kstOffset = 9 * 60 * 60 * 1000;
-    const kstTime = new Date(now.getTime() + kstOffset);
-    return kstTime.toISOString().split('T')[0];
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(now);
 }
 /**
  * Checks if a zone has ended (current time >= zone end time)

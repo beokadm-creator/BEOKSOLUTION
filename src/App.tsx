@@ -194,10 +194,9 @@ const App: React.FC = () => {
                     <Route path="badge-management" element={<BadgeManagementPage />} />
                     <Route path="refund" element={<AdminRefundPage />} />
                     <Route path="external-attendees" element={<ExternalAttendeePage />} />
+                    <Route path="attendance-live" element={<AttendanceLivePage />} />
+                    <Route path="attendance-live/zone/:zoneId" element={<AttendanceLivePage />} />
                   </Route>
-                  {/* Standalone Conference Pages (No Sidebar) */}
-                  <Route path="/admin/conf/:cid/attendance-live" element={<AttendanceLivePage />} />
-                  <Route path="/admin/conf/:cid/attendance-live/zone/:zoneId" element={<AttendanceLivePage />} />
                   <Route path="/admin/conf/:cid/gate" element={<GatePage />} />
                   <Route path="/admin/conf/:cid/gate/zone/:zoneId" element={<GatePage />} />
                   <Route path="/admin/conf/:cid/infodesk" element={<InfodeskPage />} />
@@ -286,11 +285,10 @@ const App: React.FC = () => {
                     <Route path="badge-management" element={<BadgeManagementPage />} />
                     <Route path="refund" element={<AdminRefundPage />} />
                     <Route path="external-attendees" element={<ExternalAttendeePage />} />
+                    <Route path="attendance-live" element={<AttendanceLivePage />} />
+                    <Route path="attendance-live/zone/:zoneId" element={<AttendanceLivePage />} />
                   </Route>
 
-                  {/* Standalone Conference Pages (No Sidebar) */}
-                  <Route path="/admin/conf/:cid/attendance-live" element={<AttendanceLivePage />} />
-                  <Route path="/admin/conf/:cid/attendance-live/zone/:zoneId" element={<AttendanceLivePage />} />
                   <Route path="/admin/conf/:cid/gate" element={<GatePage />} />
                   <Route path="/admin/conf/:cid/gate/zone/:zoneId" element={<GatePage />} />
                   <Route path="/admin/conf/:cid/infodesk" element={<InfodeskPage />} />

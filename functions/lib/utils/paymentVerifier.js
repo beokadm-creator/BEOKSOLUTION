@@ -35,17 +35,19 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.verifyPaymentAmount = verifyPaymentAmount;
 const admin = __importStar(require("firebase-admin"));
-// KST is UTC+9. Cloud Functions run in UTC, so we need to add 9 hours
-// to get the current KST date when comparing registration periods.
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+// KST is UTC+9. Cloud Functions run in UTC.
 /**
  * Get a YYYY-MM-DD date string in KST from any Date object.
  * This is the simplest and most reliable way to do KST date comparisons
  * regardless of where the server is running.
  */
 function toKSTDateString(date) {
-    const kstDate = new Date(date.getTime() + KST_OFFSET_MS);
-    return kstDate.toISOString().slice(0, 10); // "2026-03-06"
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(date);
 }
 async function verifyPaymentAmount(confId, tierId, selectedOptions, claimedAmount) {
     var _a;

@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Registration } from '../types/schema';
+import { getKstToday } from '../utils/dateUtils';
 
 export interface DashboardStats {
     totalRegistrants: number;
     totalRevenue: number;
-    recentRegistrations: Registration[];
+    recentRegistrations: any[]; // Using any to avoid circular import or define it inline
     dailyTrend: { date: string; count: number }[];
 }
 
@@ -94,7 +94,8 @@ export const useConferenceAdmin = (conferenceId: string, userEmail?: string) => 
                 }
                 
                 // Daily Trend (count only successful registrations)
-                const date = new Date(reg.createdAt.seconds * 1000).toISOString().split('T')[0];
+                const dateObj = new Date(reg.createdAt.seconds * 1000);
+                const date = getKstToday(dateObj);
                 dailyCounts[date] = (dailyCounts[date] || 0) + 1;
             });
 
