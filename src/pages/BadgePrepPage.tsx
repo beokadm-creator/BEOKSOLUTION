@@ -35,6 +35,7 @@ import {
   resolveConferenceIdFromRoute,
   resolvePublicSlugFromConferenceId,
 } from "../utils/conferenceRoute";
+import { TranslationPanel } from "../components/translation/TranslationPanel";
 
 interface TokenValidationResult {
   valid: boolean;
@@ -123,11 +124,6 @@ const BadgePrepPage: React.FC = () => {
     // Use regId directly for InfoDesk scanning (no CONF- prefix)
     const value =
       result.registration.confirmationQr || result.registration.id || "";
-    console.log("[BadgePrepPage] Voucher QR Value:", {
-      regId: result.registration.id,
-      confirmationQr: result.registration.confirmationQr,
-      finalValue: value,
-    });
     return value;
   }, [result?.registration]);
 
