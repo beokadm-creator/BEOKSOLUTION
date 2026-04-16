@@ -70,7 +70,7 @@ const InfodeskPage: React.FC = () => {
         lastScanned: ''
     });
 
-    const [badgeLayout, setBadgeLayout] = useState<{ width: number; height: number; elements: BadgeElement[]; enableCutting?: boolean } | null>(null);
+    const [badgeLayout, setBadgeLayout] = useState<any | null>(null);
     const [attendeeCache, setAttendeeCache] = useState<Map<string, any>>(new Map());
     const inputRef = useRef<HTMLInputElement>(null);
     const [inputValue, setInputValue] = useState('');
@@ -101,8 +101,9 @@ const InfodeskPage: React.FC = () => {
                     const data = layoutSnap.data();
                     if (data.badgeLayoutEnabled) {
                         setBadgeLayout({
-                            width: data.badgeLayout?.width || 800,
-                            height: data.badgeLayout?.height || 1200,
+                            ...data.badgeLayout,
+                            width: data.badgeLayout?.width || 100,
+                            height: data.badgeLayout?.height || 240,
                             elements: data.badgeLayout?.elements || [],
                             enableCutting: data.badgeLayout?.enableCutting || false
                         });
