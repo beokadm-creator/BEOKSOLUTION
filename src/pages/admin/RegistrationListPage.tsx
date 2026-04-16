@@ -1,6 +1,6 @@
 import { useBixolon } from '../../hooks/useBixolon';
 // import { BadgeElement } from '../../types/schema';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useExcel } from '../../hooks/useExcel';
 import { useRegistrationsPagination } from '../../hooks/useRegistrationsPagination';
