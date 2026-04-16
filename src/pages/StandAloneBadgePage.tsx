@@ -951,139 +951,132 @@ const StandAloneBadgePage: React.FC = () => {
   // VOUCHER STATE (not issued yet)
   if (!ui.issued) {
     return (
-      <div className="min-h-screen bg-eregi-neutral-50 flex flex-col items-center justify-center p-4 font-body">
+      <div className="min-h-[100dvh] bg-[radial-gradient(circle_at_top,_rgba(15,23,42,0.06),_transparent_40%),linear-gradient(180deg,_#f8fafc_0%,_#eef4ff_52%,_#f8fafc_100%)] flex flex-col items-center justify-center p-4 font-body">
         <div className="w-full max-w-sm">
           <div className="mb-4 flex justify-end gap-2">
             <button
               type="button"
               onClick={() => setBadgeLang("ko")}
-              className={`rounded-full px-4 py-2 text-sm font-body font-semibold transition-colors ${badgeLang === "ko" ? "bg-eregi-primary text-eregi-primary-foreground" : "bg-card text-muted-foreground border border-eregi-neutral-200 hover:bg-eregi-neutral-50"}`}
+              className={`rounded-full px-4 py-2 text-sm font-body font-semibold transition-all ${badgeLang === "ko" ? "bg-slate-900 text-white shadow-lg shadow-slate-900/15" : "border border-white/70 bg-white/80 text-slate-600 backdrop-blur hover:bg-white"}`}
             >
               한국어
             </button>
             <button
               type="button"
               onClick={() => setBadgeLang("en")}
-              className={`rounded-full px-4 py-2 text-sm font-body font-semibold transition-colors ${badgeLang === "en" ? "bg-eregi-primary text-eregi-primary-foreground" : "bg-card text-muted-foreground border border-eregi-neutral-200 hover:bg-eregi-neutral-50"}`}
+              className={`rounded-full px-4 py-2 text-sm font-body font-semibold transition-all ${badgeLang === "en" ? "bg-slate-900 text-white shadow-lg shadow-slate-900/15" : "border border-white/70 bg-white/80 text-slate-600 backdrop-blur hover:bg-white"}`}
             >
               English
             </button>
           </div>
-          {/* Temporary Voucher Card - Academic Elegance Design */}
-          <div className="bg-card border-2 border-eregi-primary/20 rounded-xl p-6 text-center shadow-lg relative overflow-hidden">
+          <div className="relative overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white/85 text-center shadow-[0_24px_80px_-32px_rgba(15,23,42,0.45)] backdrop-blur">
+            <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-r from-slate-900 via-eregi-primary to-sky-700" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.22),_transparent_28%),linear-gradient(180deg,_transparent_0%,_rgba(248,250,252,0.95)_34%,_rgba(255,255,255,1)_100%)]" />
             {refreshing && (
               <div className="absolute top-4 right-4 z-10">
-                <RefreshCw className="w-5 h-5 text-eregi-primary animate-spin" />
+                <RefreshCw className="w-5 h-5 text-white animate-spin" />
               </div>
             )}
+            <div className="absolute right-[-12%] top-24 h-48 w-48 rounded-full border border-slate-200/60 bg-slate-100/40" />
+            <div className="absolute left-[-18%] bottom-16 h-40 w-40 rounded-full border border-sky-100 bg-sky-50/60" />
 
-            {/* Pending Badge Indicator - Top Banner */}
-            <div className="absolute top-0 left-0 right-0 bg-eregi-primary/10 border-b border-eregi-primary/20 py-3 px-4">
-              <div className="flex items-center justify-center gap-2 text-eregi-primary">
-                <Clock className="w-4 h-4 animate-pulse" />
-                <span className="text-sm font-body font-semibold tracking-wide">
-                  {t("명찰 발급 대기 중", "Badge Pending")}
-                </span>
-              </div>
-            </div>
-
-            {/* Watermark Background */}
-            <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none mt-12">
-              <div className="text-6xl font-display font-semibold text-muted-foreground/50 transform -rotate-12">
-                {t("VOUCHER", "VOUCHER")}
-              </div>
-            </div>
-
-            {/* Content Container - Relative to sit above watermark */}
-            <div className="relative z-10 mt-12">
-              {/* Header with Icon */}
-              <div className="mb-6">
-                <div className="w-16 h-16 bg-eregi-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <FileText className="w-8 h-8 text-eregi-primary" />
+            <div className="relative z-10 px-6 pb-7 pt-6">
+              <div className="mb-8 flex items-start justify-between gap-4 text-white">
+                <div className="text-left">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.34em] text-white/70">
+                    Conference Pass
+                  </p>
+                  <h1 className="mt-2 text-2xl font-display font-semibold tracking-tight">
+                    {t("등록 확인 바우처", "Registration Voucher")}
+                  </h1>
+                  <p className="mt-2 max-w-[15rem] text-sm text-white/80">
+                    {t(
+                      "현장 등록 데스크에서 확인 후 디지털 명찰로 전환됩니다.",
+                      "Present this at the on-site desk to activate your digital badge.",
+                    )}
+                  </p>
                 </div>
-                <h1 className="text-xl font-display font-semibold mb-2 tracking-wide text-eregi-primary">
-                  {t("등록 확인 바우처", "Registration Voucher")}
-                </h1>
-                <p className="text-sm font-body font-medium text-muted-foreground tracking-wide">
-                  {t("현장에서 디지털 명찰을 발급받으세요", "Get your digital badge on-site")}
-                </p>
+                <div className="mt-1 rounded-full border border-white/20 bg-white/10 p-3 backdrop-blur">
+                  <Clock className="h-5 w-5 animate-pulse" />
+                </div>
               </div>
+              <div className="rounded-[1.6rem] border border-slate-200/70 bg-white/92 p-6 shadow-[0_20px_60px_-36px_rgba(15,23,42,0.35)]">
+                <div className="mb-5 flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-left">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-700">
+                      Pending
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-amber-950">
+                      {t("명찰 발급 대기 중", "Badge issuance pending")}
+                    </p>
+                  </div>
+                  <FileText className="h-5 w-5 text-amber-600" />
+                </div>
 
-              {/* Warning Notice */}
-              <div className="bg-eregi-primary/5 border border-eregi-primary/20 rounded-xl py-3 px-4 mb-6">
-                <p className="text-sm font-body font-medium text-eregi-primary leading-relaxed">
-                  {t(
-                    "💡 현장 등록 데스크에서 아래 QR코드를 제시하여 디지털 명찰을 발급받으세요",
-                    "💡 Show this QR code at the registration desk to receive your digital badge"
+                <p className="text-sm font-semibold uppercase tracking-[0.26em] text-slate-400">
+                  {ui.aff}
+                </p>
+                <h2 className="mt-3 text-3xl font-display font-semibold tracking-tight text-slate-950">
+                  {ui.name}
+                </h2>
+
+                <div className="mt-5 grid grid-cols-1 gap-3 text-left">
+                  {ui.license && ui.license !== "-" && (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-400">
+                        {t("면허번호", "License No.")}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-slate-800">
+                        {ui.license}
+                      </p>
+                    </div>
                   )}
-                </p>
-              </div>
+                </div>
 
-              {/* Organization */}
-              <p className="text-base font-body font-medium text-muted-foreground mb-2">{ui.aff}</p>
+                <div className="mt-6 rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-5 shadow-inner">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="text-left">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">
+                        Desk QR
+                      </p>
+                      <p className="mt-1 text-sm font-medium text-slate-500">
+                        {t("등록 확인 QR", "Show this QR at the desk")}
+                      </p>
+                    </div>
+                    <div className="rounded-full bg-slate-900 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-white">
+                      Voucher
+                    </div>
+                  </div>
+                  <div className="rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm">
+                    <QRCodeSVG
+                      key={qrValue}
+                      value={qrValue}
+                      size={176}
+                      level="M"
+                      includeMargin={false}
+                    />
+                  </div>
+                </div>
 
-              {/* Name */}
-              <h2 className="text-3xl font-display font-semibold text-foreground mb-6 tracking-tight">
-                {ui.name}
-              </h2>
-
-              {/* Receipt Number - Prominent */}
-              {ui.receiptNumber && (
-                <div className="bg-eregi-primary/5 border border-eregi-primary/20 rounded-xl py-4 px-5 mb-6">
-                  <p className="text-sm font-body font-medium text-eregi-primary mb-1">
-                    {t("등록 번호", "Registration Number")}
+                <div className="mt-5 rounded-2xl border border-sky-100 bg-sky-50/80 px-4 py-4 text-left">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-sky-900">
+                    <User className="h-4 w-4" />
+                    {t("등록 데스크에 QR 제시", "Present QR at check-in")}
                   </p>
-                  <p className="text-xl font-display font-semibold text-eregi-primary tracking-wider">
-                    {ui.receiptNumber}
+                  <p className="mt-2 text-sm leading-6 text-sky-800">
+                    {t(
+                      "확인 후 디지털 명찰이 발급됩니다.",
+                      "Your digital badge will be issued after verification.",
+                    )}
                   </p>
                 </div>
-              )}
-
-              {/* License Number */}
-              {ui.license && ui.license !== "-" && (
-                <div className="bg-eregi-neutral-50 border border-eregi-neutral-200 rounded-lg py-3 px-4 mb-6">
-                  <p className="text-sm font-body font-medium text-muted-foreground mb-1">
-                    {t("면허번호", "License No.")}
-                  </p>
-                  <p className="text-base font-body font-semibold text-foreground">
-                    {ui.license}
-                  </p>
-                </div>
-              )}
-
-              {/* QR Code - The Main Element */}
-              <div className="bg-white p-3 inline-block rounded-2xl shadow-lg border-2 border-amber-200 mb-4">
-                <div className="text-xs font-semibold text-gray-500 mb-2">
-                  {t("등록 확인 QR", "Voucher QR")}
-                </div>
-                <QRCodeSVG
-                  key={qrValue}
-                  value={qrValue}
-                  size={160}
-                  level="M"
-                  includeMargin={false}
-                />
-              </div>
-
-              {/* Instruction */}
-              <div className="bg-amber-100 border border-amber-300 rounded-xl py-3 px-4">
-                <p className="text-sm font-bold text-amber-900 flex items-center justify-center gap-2">
-                  <User className="w-4 h-4" />
-                  {t("등록 데스크에 QR 제시", "Present QR at check-in")}
-                </p>
-                <p className="text-xs text-amber-700 mt-1">
-                  {t(
-                    "확인 후 디지털 명찰이 발급됩니다.",
-                    "Your digital badge will be issued after verification.",
-                  )}
-                </p>
               </div>
             </div>
           </div>
 
           {/* Refresh Indicator */}
           {refreshing && (
-            <div className="mt-4 text-center text-sm text-amber-700 font-medium flex items-center justify-center gap-2 bg-white/80 rounded-lg py-2 px-4">
+            <div className="mt-4 flex items-center justify-center gap-2 rounded-full border border-sky-100 bg-white/80 px-5 py-3 text-center text-sm font-medium text-sky-800 shadow-sm backdrop-blur">
               <RefreshCw className="w-4 h-4 animate-spin" />
               {t(
                 "명찰 발급 상태를 새로고침 중입니다...",
@@ -1096,7 +1089,7 @@ const StandAloneBadgePage: React.FC = () => {
           {effectiveMenuVisibility.home && (
             <button
               onClick={() => navigate(`/${publicSlug}`)}
-              className="block w-full mt-4 py-3 px-6 bg-white text-amber-700 font-bold rounded-xl hover:bg-amber-50 transition-colors text-center border-2 border-amber-200 shadow-md"
+              className="mt-6 block w-full rounded-full border border-slate-200 bg-white/85 px-6 py-4 text-center font-body font-semibold text-slate-700 shadow-sm backdrop-blur transition-colors hover:bg-white"
             >
               {getMenuLabel("home", "학술대회 홈페이지로 이동", "Conference Home")}
             </button>
@@ -1123,7 +1116,7 @@ const StandAloneBadgePage: React.FC = () => {
       : 0;
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex flex-col p-4 font-body relative">
+    <div className="min-h-[100dvh] bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.16),_transparent_36%),linear-gradient(180deg,_#eff6ff_0%,_#f8fafc_48%,_#eef2ff_100%)] flex flex-col p-4 font-body relative">
       {/* Elegant background pattern */}
       <div className="absolute inset-0 opacity-30" style={{backgroundImage: "url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"30\" fill=\"%23e2e8f0\" fill-opacity=\"0.15\"/></svg>')"}} />
 
@@ -1132,71 +1125,67 @@ const StandAloneBadgePage: React.FC = () => {
           <button
             type="button"
             onClick={() => setBadgeLang("ko")}
-            className={`rounded-full px-5 py-2.5 text-sm font-body font-semibold shadow-sm transition-all duration-200 ${badgeLang === "ko" ? "bg-gradient-to-r from-eregi-primary to-blue-600 text-white shadow-lg scale-105" : "bg-white/90 text-eregi-primary border-2 border-eregi-primary/30 hover:border-eregi-primary/50 backdrop-blur-sm"}`}
+            className={`rounded-full px-5 py-2.5 text-sm font-body font-semibold shadow-sm transition-all duration-200 ${badgeLang === "ko" ? "bg-slate-900 text-white shadow-lg shadow-slate-900/15" : "border border-white/70 bg-white/80 text-slate-600 backdrop-blur hover:bg-white"}`}
           >
             한국어
           </button>
           <button
             type="button"
             onClick={() => setBadgeLang("en")}
-            className={`rounded-full px-5 py-2.5 text-sm font-body font-semibold shadow-sm transition-all duration-200 ${badgeLang === "en" ? "bg-gradient-to-r from-eregi-primary to-blue-600 text-white shadow-lg scale-105" : "bg-white/90 text-eregi-primary border-2 border-eregi-primary/30 hover:border-eregi-primary/50 backdrop-blur-sm"}`}
+            className={`rounded-full px-5 py-2.5 text-sm font-body font-semibold shadow-sm transition-all duration-200 ${badgeLang === "en" ? "bg-slate-900 text-white shadow-lg shadow-slate-900/15" : "border border-white/70 bg-white/80 text-slate-600 backdrop-blur hover:bg-white"}`}
           >
             English
           </button>
         </div>
-        {/* Digital Badge Card - Academic Excellence */}
-        <div className="bg-white/95 backdrop-blur-sm border-0 md:border-4 md:border-eregi-primary/20 rounded-2xl overflow-hidden shadow-2xl flex flex-col relative z-10 ring-4 ring-white/50">
-          {/* Premium Badge Header */}
-          <div className="bg-gradient-to-r from-eregi-primary via-blue-600 to-indigo-600 py-4 px-6 shadow-lg relative">
-            {/* Header decoration */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
-            <div className="flex items-center justify-center gap-3 text-white relative z-10">
-              <div className="p-1.5 bg-white/20 rounded-full backdrop-blur-sm">
-                <CheckCircle className="w-6 h-6 text-white drop-shadow-lg" />
+        <div className="overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white/90 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.45)] backdrop-blur flex flex-col relative z-10">
+          <div className="relative overflow-hidden bg-gradient-to-r from-slate-950 via-eregi-primary to-sky-700 px-6 pb-6 pt-5 text-white">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.2),_transparent_28%),linear-gradient(90deg,_transparent,_rgba(255,255,255,0.08),_transparent)]" />
+            <div className="relative flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.34em] text-white/70">
+                  Conference Badge
+                </p>
+                <h2 className="mt-2 text-[1.75rem] font-display font-semibold tracking-tight">
+                  {t("디지털 명찰", "Digital Badge")}
+                </h2>
+                <p className="mt-2 text-sm text-white/80">
+                  {t("학술대회 입장과 출석, 부스 프로그램 참여에 사용하는 모바일 패스", "Mobile pass for entry, attendance, and event participation")}
+                </p>
               </div>
-              <div className="flex flex-col">
-                <span className="text-lg font-display font-semibold tracking-wider drop-shadow-lg">
-                  {t("디지털 명찰", "DIGITAL BADGE")}
-                </span>
-                <span className="text-sm font-body opacity-90 tracking-wide">
-                  {t("발급 완료", "CERTIFIED")}
-                </span>
+              <div className="rounded-full border border-white/20 bg-white/10 p-3 backdrop-blur">
+                <CheckCircle className="h-5 w-5" />
               </div>
             </div>
           </div>
 
-          {/* Badge Info - Premium Academic Design */}
-          <div className="p-8 flex flex-col items-center text-center relative bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30">
-            {/* Academic decoration */}
-            <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-eregi-primary/20 to-transparent"></div>
+          <div className="relative p-8 flex flex-col items-center text-center bg-[linear-gradient(180deg,_rgba(248,250,252,0.92)_0%,_white_100%)]">
+            <div className="absolute right-[-18%] top-5 h-36 w-36 rounded-full bg-sky-100/60 blur-2xl" />
+            <div className="absolute left-[-20%] bottom-10 h-32 w-32 rounded-full bg-indigo-100/60 blur-2xl" />
 
-            {/* Affiliation with academic styling */}
-            <div className="mb-4 px-6 py-2 bg-gradient-to-r from-slate-100 to-blue-50 rounded-full border border-slate-200/50">
-              <p className="text-sm text-slate-600 font-body font-semibold break-keep leading-tight">
+            <div className="relative z-10 w-full">
+              <p className="text-sm font-semibold uppercase tracking-[0.28em] text-slate-400 break-keep">
                 {ui.aff || "-"}
               </p>
-            </div>
+              <h2 className="mt-3 text-4xl font-display font-semibold tracking-tight text-slate-950 leading-tight">
+                {ui.name}
+              </h2>
 
-            {/* Name with academic prominence */}
-            <h2 className="text-4xl font-display font-bold bg-gradient-to-r from-eregi-primary via-blue-700 to-indigo-700 bg-clip-text text-transparent mb-6 tracking-tight cursor-default leading-tight">
-              {ui.name}
-            </h2>
-
-            {/* License Number - Premium Design */}
-            {ui.license && ui.license !== "-" && (
-              <div className="bg-gradient-to-r from-amber-50 to-yellow-50 text-amber-700 border-2 border-amber-200/50 rounded-xl py-2.5 px-6 mb-6 inline-flex items-center shadow-md backdrop-blur-sm">
-                <div className="w-2 h-2 bg-amber-400 rounded-full mr-2 animate-pulse"></div>
-                <span className="text-sm font-body font-bold tracking-wide">
+              {ui.license && ui.license !== "-" && (
+                <div className="mx-auto mt-5 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800">
                   {t("면허번호", "License No.")}: {ui.license}
-                </span>
-              </div>
-            )}
+                </div>
+              )}
 
-            {/* QR Code Container - Premium Academic Design */}
-            <div className="relative mb-6">
-              <div className="bg-gradient-to-br from-white via-slate-50 to-blue-50/30 p-6 rounded-2xl shadow-xl border-2 border-blue-100/50 flex flex-col items-center justify-center backdrop-blur-sm">
-                {/* QR Code with premium styling */}
-                <div className="relative">
+              <div className="relative mx-auto mt-6 max-w-[18rem] rounded-[1.8rem] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-5 shadow-[0_16px_40px_-28px_rgba(15,23,42,0.5)]">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-slate-400">
+                    Access QR
+                  </p>
+                  <div className="rounded-full bg-slate-900 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-white">
+                    Active
+                  </div>
+                </div>
+                <div className="mt-4 rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm">
                   {showBadgeQr && (
                     <QRCodeSVG
                       key={qrValue}
@@ -1204,49 +1193,29 @@ const StandAloneBadgePage: React.FC = () => {
                       size={180}
                       level="H"
                       includeMargin={true}
-                      className="rounded-xl shadow-lg ring-4 ring-white"
+                      className="rounded-xl"
                     />
                   )}
-                  {/* Academic corner accents */}
-                  <div className="absolute -top-2 -left-2 w-4 h-4 border-t-4 border-l-4 border-eregi-primary rounded-tl-lg"></div>
-                  <div className="absolute -top-2 -right-2 w-4 h-4 border-t-4 border-r-4 border-eregi-primary rounded-tr-lg"></div>
-                  <div className="absolute -bottom-2 -left-2 w-4 h-4 border-b-4 border-l-4 border-eregi-primary rounded-bl-lg"></div>
-                  <div className="absolute -bottom-2 -right-2 w-4 h-4 border-b-4 border-r-4 border-eregi-primary rounded-br-lg"></div>
                 </div>
-
-                <div className="mt-4 h-px w-full bg-gradient-to-r from-transparent via-blue-200 to-transparent"></div>
-
-                <div className="mt-3 px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-full border border-blue-200/50">
-                  <p className="text-sm uppercase font-body font-bold text-blue-700 tracking-widest flex items-center gap-2">
-                    <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
-                    {t("학술대회 출입 QR", "Conference Access Code")}
-                  </p>
-                </div>
-              </div>
-
-              {/* Academic instruction with visual emphasis */}
-              <div className="mt-4 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-eregi-primary/10 to-blue-100/50 rounded-full border border-eregi-primary/20 backdrop-blur-sm">
-                <div className="w-3 h-3 bg-eregi-primary rounded-full animate-pulse"></div>
-                <p className="text-sm font-body font-semibold text-eregi-primary text-center">
+                <p className="mt-4 text-sm font-medium text-slate-600">
                   {t(
-                    "학술대회 입장 및 출석 확인 시 제시",
-                    "Present for conference entry and attendance",
+                    "입장, 출석 확인 및 부스 프로그램 참여 시 제시하세요.",
+                    "Present this code for entry, attendance, and booth programs.",
                   )}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Academic Tabbed Interface */}
-          <div className="bg-gradient-to-br from-slate-50/90 to-blue-50/40 border-t-2 border-blue-100 p-3">
+          <div className="border-t border-slate-200/80 bg-[linear-gradient(180deg,_rgba(248,250,252,0.78)_0%,_rgba(255,255,255,0.98)_100%)] p-3">
             <Tabs defaultValue={defaultTab} className="w-full">
               <TabsList
-                className={`grid w-full h-auto p-1.5 bg-white/90 backdrop-blur-sm border-2 border-blue-100/50 shadow-lg rounded-2xl ${gridColsClass}`}
+                className={`grid w-full h-auto rounded-2xl border border-slate-200 bg-white/90 p-1.5 shadow-sm ${gridColsClass}`}
               >
                 {effectiveMenuVisibility.status && (
                   <TabsTrigger
                     value="status"
-                    className="flex flex-col items-center justify-center py-3 px-1 gap-1.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-eregi-primary/15 data-[state=active]:to-blue-100/60 data-[state=active]:text-eregi-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-eregi-primary/20 rounded-xl transition-all duration-200 hover:bg-slate-50"
+                    className="flex flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 hover:bg-slate-50"
                   >
                     <User className="w-4 h-4" />
                     <span className="text-[11px] font-body font-semibold">
@@ -1257,7 +1226,7 @@ const StandAloneBadgePage: React.FC = () => {
                 {effectiveMenuVisibility.sessions && (
                   <TabsTrigger
                     value="sessions"
-                    className="flex flex-col items-center justify-center py-3 px-1 gap-1.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-eregi-primary/15 data-[state=active]:to-blue-100/60 data-[state=active]:text-eregi-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-eregi-primary/20 rounded-xl transition-all duration-200 hover:bg-slate-50"
+                    className="flex flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 hover:bg-slate-50"
                   >
                     <TrendingUp className="w-4 h-4" />
                     <span className="text-[11px] font-body font-semibold">
@@ -1268,7 +1237,7 @@ const StandAloneBadgePage: React.FC = () => {
                 {effectiveMenuVisibility.materials && (
                   <TabsTrigger
                     value="materials"
-                    className="flex flex-col items-center justify-center py-3 px-1 gap-1.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-eregi-primary/15 data-[state=active]:to-blue-100/60 data-[state=active]:text-eregi-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-eregi-primary/20 rounded-xl transition-all duration-200 hover:bg-slate-50"
+                    className="flex flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 hover:bg-slate-50"
                   >
                     <FileText className="w-4 h-4" />
                     <span className="text-[11px] font-body font-semibold">
@@ -1279,7 +1248,7 @@ const StandAloneBadgePage: React.FC = () => {
                 {effectiveMenuVisibility.program && (
                   <TabsTrigger
                     value="program"
-                    className="flex flex-col items-center justify-center py-3 px-1 gap-1.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-eregi-primary/15 data-[state=active]:to-blue-100/60 data-[state=active]:text-eregi-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-eregi-primary/20 rounded-xl transition-all duration-200 hover:bg-slate-50"
+                    className="flex flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 hover:bg-slate-50"
                   >
                     <Calendar className="w-4 h-4" />
                     <span className="text-[11px] font-body font-semibold">
@@ -1290,7 +1259,7 @@ const StandAloneBadgePage: React.FC = () => {
                 {translationEnabled && (
                   <TabsTrigger
                     value="translation"
-                    className="flex flex-col items-center justify-center py-3 px-1 gap-1.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-eregi-primary/15 data-[state=active]:to-blue-100/60 data-[state=active]:text-eregi-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-eregi-primary/20 rounded-xl transition-all duration-200 hover:bg-slate-50"
+                    className="flex flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 hover:bg-slate-50"
                   >
                     <Languages className="w-4 h-4" />
                     <span className="text-[11px] font-body font-semibold">
@@ -1301,7 +1270,7 @@ const StandAloneBadgePage: React.FC = () => {
                 {effectiveMenuVisibility.stampTour && (
                   <TabsTrigger
                     value="stamp-tour"
-                    className="flex flex-col items-center justify-center py-3 px-1 gap-1.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-eregi-primary/15 data-[state=active]:to-blue-100/60 data-[state=active]:text-eregi-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-eregi-primary/20 rounded-xl transition-all duration-200 hover:bg-slate-50"
+                    className="flex flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 hover:bg-slate-50"
                   >
                     <Gift className="w-4 h-4" />
                     <span className="text-[11px] font-body font-semibold">
@@ -1867,7 +1836,7 @@ const StandAloneBadgePage: React.FC = () => {
           <div className="mt-6 text-center">
             <button
               onClick={() => navigate(`/${publicSlug}`)}
-              className="inline-flex items-center justify-center py-3 px-8 bg-white/80 backdrop-blur-sm text-eregi-primary font-body font-semibold rounded-full hover:bg-white transition-colors border border-eregi-primary/20 shadow-sm text-sm"
+              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white/85 px-8 py-3 text-sm font-body font-semibold text-slate-700 shadow-sm backdrop-blur transition-colors hover:bg-white"
             >
               {getMenuLabel("home", "학술대회 홈페이지로 이동", "Conference Home")}
             </button>
