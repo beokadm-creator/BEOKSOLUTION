@@ -691,33 +691,44 @@ const BadgePrepPage: React.FC = () => {
 
     // ISSUED BADGE STATE
     return (
-      <div className="min-h-[100dvh] bg-eregi-neutral-50 flex flex-col p-4 font-body">
-        <div className="w-full max-w-sm mx-auto flex-1 flex flex-col justify-center py-6">
+      <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex flex-col p-4 font-body relative">
+        {/* Elegant background pattern */}
+        <div className="absolute inset-0 opacity-30" style={{backgroundImage: "url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"30\" fill=\"%23e2e8f0\" fill-opacity=\"0.15\"/></svg>')"}} />
+        <div className="w-full max-w-sm mx-auto flex-1 flex flex-col justify-center py-6 relative z-10">
           <div className="mb-4 flex justify-end gap-2">
             <button
               type="button"
               onClick={() => setBadgeLang("ko")}
-              className={`rounded-full px-4 py-2 text-sm font-body font-semibold transition-colors ${badgeLang === "ko" ? "bg-eregi-primary text-eregi-primary-foreground" : "bg-card text-muted-foreground border border-eregi-neutral-200 hover:bg-eregi-neutral-50"}`}
+              className={`rounded-full px-5 py-2.5 text-sm font-body font-semibold shadow-sm transition-all duration-200 ${badgeLang === "ko" ? "bg-gradient-to-r from-eregi-primary to-blue-600 text-white shadow-lg scale-105" : "bg-white/90 text-eregi-primary border-2 border-eregi-primary/30 hover:border-eregi-primary/50 backdrop-blur-sm"}`}
             >
               한국어
             </button>
             <button
               type="button"
               onClick={() => setBadgeLang("en")}
-              className={`rounded-full px-4 py-2 text-sm font-body font-semibold transition-colors ${badgeLang === "en" ? "bg-eregi-primary text-eregi-primary-foreground" : "bg-card text-muted-foreground border border-eregi-neutral-200 hover:bg-eregi-neutral-50"}`}
+              className={`rounded-full px-5 py-2.5 text-sm font-body font-semibold shadow-sm transition-all duration-200 ${badgeLang === "en" ? "bg-gradient-to-r from-eregi-primary to-blue-600 text-white shadow-lg scale-105" : "bg-white/90 text-eregi-primary border-2 border-eregi-primary/30 hover:border-eregi-primary/50 backdrop-blur-sm"}`}
             >
               English
             </button>
           </div>
-          {/* Digital Badge Card - Academic Elegance Design */}
-          <div className="bg-card border border-eregi-primary/30 rounded-xl overflow-hidden shadow-lg flex flex-col relative z-10">
-            {/* Issued Badge Header - Always Visible */}
-            <div className="bg-eregi-primary py-4 px-5 shadow-sm">
-              <div className="flex items-center justify-center gap-2 text-eregi-primary-foreground">
-                <CheckCircle className="w-5 h-5" />
-                <span className="text-base font-body font-semibold tracking-wide">
-                  디지털 명찰 발급 완료
-                </span>
+          {/* Digital Badge Card - Premium Academic Design */}
+          <div className="bg-white/95 backdrop-blur-sm border-0 md:border-4 md:border-eregi-primary/20 rounded-2xl overflow-hidden shadow-2xl flex flex-col relative z-10 ring-4 ring-white/50">
+            {/* Premium Badge Header */}
+            <div className="bg-gradient-to-r from-eregi-primary via-blue-600 to-indigo-600 py-4 px-6 shadow-lg relative">
+              {/* Header decoration */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+              <div className="flex items-center justify-center gap-3 text-white relative z-10">
+                <div className="p-1.5 bg-white/20 rounded-full backdrop-blur-sm">
+                  <CheckCircle className="w-6 h-6 text-white drop-shadow-lg" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-lg font-display font-semibold tracking-wider drop-shadow-lg">
+                    디지털 명찰
+                  </span>
+                  <span className="text-sm font-body opacity-90 tracking-wide">
+                    발급 완료
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -832,7 +843,7 @@ const BadgePrepPage: React.FC = () => {
                     className={`py-4 px-5 rounded-lg font-body font-semibold text-center border shadow-sm transition-all ${
                       (liveAttendance?.status || reg.attendanceStatus) ===
                       "INSIDE"
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        ? "bg-gradient-to-br from-emerald-50 via-green-50/80 to-teal-50/60 text-emerald-700 border-emerald-200/70 shadow-emerald-100/50"
                         : "bg-card text-muted-foreground border-eregi-neutral-200"
                     }`}
                   >
@@ -893,7 +904,7 @@ const BadgePrepPage: React.FC = () => {
                   <TabsContent value="sessions" className="mt-2 p-1">
                   <div className="bg-white rounded-2xl py-6 px-4 border border-gray-100 shadow-sm text-center">
                     <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${isCompleted ? "bg-emerald-100 text-emerald-600" : "bg-gray-100 text-gray-600"}`}
+                      className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${isCompleted ? "bg-gradient-to-br from-emerald-50 to-green-100/80 text-emerald-600 border-emerald-200 shadow-emerald-100/50" : "bg-gray-100 text-gray-600"}`}
                     >
                       {isCompleted ? (
                         <CheckCircle className="w-6 h-6 text-emerald-600" />
@@ -1057,7 +1068,7 @@ const BadgePrepPage: React.FC = () => {
             <div className="mt-6 text-center">
               <button
                 onClick={() => navigate(`/${publicSlug}`)}
-                className="inline-flex items-center justify-center py-3 px-8 bg-white/80 backdrop-blur-sm text-emerald-800 font-bold rounded-full hover:bg-white transition-colors border border-emerald-100 shadow-sm text-sm"
+                className="inline-flex items-center justify-center py-3 px-8 bg-white/80 backdrop-blur-sm text-eregi-primary font-body font-semibold rounded-full hover:bg-white transition-colors border border-eregi-primary/20 shadow-sm text-sm"
               >
                 {getMenuLabel("home", "학술대회 홈페이지로 이동", "Conference Home")}
               </button>
