@@ -18,7 +18,6 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeSessionInfo, setActiveSessionInfo] = useState<any | null>(null);
-  const [lastFlushTime, setLastFlushTime] = useState<number>(0);
   const [activeLang, setActiveLang] = useState<string>('ko');
 
   // Viewer Settings
@@ -113,15 +112,8 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
       }
     });
 
-    // Subscribe to state/lastFlushTime to handle "Clear Screen" from admin
-    const flushTimeRef = ref(rtdb, `projects/${selectedProjectId}/state/lastFlushTime`);
-    const unsubscribeFlushTime = onValue(flushTimeRef, (snap) => {
-      setLastFlushTime(snap.val() || 0);
-    });
-
     return () => {
       unsubscribeActive();
-      unsubscribeFlushTime();
     };
   }, [selectedProjectId]);
 
@@ -133,8 +125,13 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   const segmentsMap = streamData || {};
 
   const segmentsOrder = Object.keys(segmentsMap)
-    .filter(k => !activeSessionId || segmentsMap[k]?.sessionId === activeSessionId)
-    .filter(k => (segmentsMap[k]?.timestamp || 0) >= lastFlushTime)
+    .filter(k => {
+      const seg = segmentsMap[k];
+      if (!seg) return false;
+      if (!activeSessionId) return true;
+      if (!seg.sessionId) return true;
+      return seg.sessionId === activeSessionId;
+    })
     .sort((a, b) => (segmentsMap[a]?.timestamp || 0) - (segmentsMap[b]?.timestamp || 0));
 
   // Scroll to bottom when a new segment is added
@@ -224,8 +221,9 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
             ))}
             <button
               onClick={() => window.open(`https://translation-comm.web.app/audience/${selectedProjectId}`, '_blank')}
-              className="px-3 py-1 text-xs rounded-full font-bold bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors hidden sm:block"
+              className="px-3 py-1 text-xs rounded-full font-bold bg-blue-600 text-white hover:bg-blue-500 transition-colors hidden sm:inline-flex items-center gap-1 shadow-sm"
             >
+              <span aria-hidden>↗</span>
               {activeLang === 'en' ? 'Open in New Tab' : '새 창에서 열기'}
             </button>
           </div>
@@ -246,8 +244,9 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
         </div>
         <button
           onClick={() => window.open(`https://translation-comm.web.app/audience/${selectedProjectId}`, '_blank')}
-          className="shrink-0 px-3 py-1 text-[10px] rounded-full font-bold bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors whitespace-nowrap"
+          className="shrink-0 px-3 py-1 text-[10px] rounded-full font-bold bg-blue-600 text-white hover:bg-blue-500 transition-colors whitespace-nowrap inline-flex items-center gap-1 shadow-sm"
         >
+          <span aria-hidden>↗</span>
           {activeLang === 'en' ? 'New Tab' : '새 창'}
         </button>
       </div>
