@@ -691,93 +691,79 @@ const BadgePrepPage: React.FC = () => {
 
     // ISSUED BADGE STATE
     return (
-      <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex flex-col p-4 font-body relative">
-        {/* Elegant background pattern */}
-        <div className="absolute inset-0 opacity-30" style={{backgroundImage: "url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"30\" fill=\"%23e2e8f0\" fill-opacity=\"0.15\"/></svg>')"}} />
-        <div className="w-full max-w-sm mx-auto flex-1 flex flex-col justify-center py-6 relative z-10">
-          <div className="mb-4 flex justify-end gap-2">
+      <div className="min-h-[100dvh] bg-slate-50 flex flex-col p-4 font-body">
+        <div className="w-full max-w-sm mx-auto flex-1 flex flex-col justify-start sm:justify-center py-4 sm:py-6">
+          <div className="mb-3 flex justify-end gap-2">
             <button
               type="button"
               onClick={() => setBadgeLang("ko")}
-              className={`rounded-full px-5 py-2.5 text-sm font-body font-semibold shadow-sm transition-all duration-200 ${badgeLang === "ko" ? "bg-gradient-to-r from-eregi-primary to-blue-600 text-white shadow-lg scale-105" : "bg-white/90 text-eregi-primary border-2 border-eregi-primary/30 hover:border-eregi-primary/50 backdrop-blur-sm"}`}
+              className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-all duration-200 ${badgeLang === "ko" ? "bg-slate-800 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300"}`}
             >
               한국어
             </button>
             <button
               type="button"
               onClick={() => setBadgeLang("en")}
-              className={`rounded-full px-5 py-2.5 text-sm font-body font-semibold shadow-sm transition-all duration-200 ${badgeLang === "en" ? "bg-gradient-to-r from-eregi-primary to-blue-600 text-white shadow-lg scale-105" : "bg-white/90 text-eregi-primary border-2 border-eregi-primary/30 hover:border-eregi-primary/50 backdrop-blur-sm"}`}
+              className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-all duration-200 ${badgeLang === "en" ? "bg-slate-800 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300"}`}
             >
               English
             </button>
           </div>
-          {/* Digital Badge Card - Premium Academic Design */}
-          <div className="bg-white/95 backdrop-blur-sm border-0 md:border-4 md:border-eregi-primary/20 rounded-2xl overflow-hidden shadow-2xl flex flex-col relative z-10 ring-4 ring-white/50">
-            {/* Premium Badge Header */}
-            <div className="bg-gradient-to-r from-eregi-primary via-blue-600 to-indigo-600 py-4 px-6 shadow-lg relative">
-              {/* Header decoration */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
-              <div className="flex items-center justify-center gap-3 text-white relative z-10">
-                <div className="p-1.5 bg-white/20 rounded-full backdrop-blur-sm">
-                  <CheckCircle className="w-6 h-6 text-white drop-shadow-lg" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-lg font-display font-semibold tracking-wider drop-shadow-lg">
-                    디지털 명찰
-                  </span>
-                  <span className="text-sm font-body opacity-90 tracking-wide">
-                    발급 완료
-                  </span>
-                </div>
-              </div>
+          
+          {/* Digital Badge Card - Clean Modern Design */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+            {/* Clean Badge Header */}
+            <div className="bg-slate-800 py-4 px-6 text-center">
+              <span className="text-base font-semibold text-white tracking-wide">
+                {badgeLang === "en" ? "Digital Badge" : "디지털 명찰"}
+              </span>
             </div>
 
             {/* Badge Info - Main Content */}
             <div className="p-6 flex flex-col items-center text-center">
               {/* Affiliation */}
-              <p className="text-base font-body font-medium text-muted-foreground mb-3 break-keep leading-tight px-4 max-w-xs">
+              <p className="text-sm font-medium text-slate-500 mb-2 break-keep leading-tight px-4 max-w-xs">
                 {reg.affiliation || "-"}
               </p>
 
               {/* Name */}
-              <h2 className="text-3xl font-display font-semibold text-foreground mb-6 tracking-tight cursor-default">
+              <h2 className="text-2xl font-bold text-slate-900 mb-5 tracking-tight">
                 {reg.name}
               </h2>
 
               {/* License Number Chip */}
               {reg.licenseNumber && reg.licenseNumber !== "-" && (
-                <div className="bg-eregi-primary/10 text-eregi-primary border border-eregi-primary/20 rounded-full py-2 px-5 mb-6 inline-flex items-center shadow-sm">
-                  <span className="text-sm font-body font-medium tracking-wide">
-                    면허번호: {reg.licenseNumber}
+                <div className="bg-slate-100 text-slate-700 rounded-md py-1.5 px-4 mb-6 inline-flex items-center">
+                  <span className="text-xs font-semibold">
+                    {badgeLang === "en" ? "License:" : "면허번호:"} {reg.licenseNumber}
                   </span>
                 </div>
               )}
 
-              {/* QR Code Container - Enhanced Visibility */}
-              <div className="bg-card p-5 rounded-xl shadow-md border border-eregi-neutral-200 mb-4 flex flex-col items-center justify-center">
+              {/* QR Code Container */}
+              <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm mb-4 flex flex-col items-center justify-center">
                 <QRCodeSVG
                   key={reg.badgeQr || `BADGE-${reg.id}`}
                   value={reg.badgeQr || `BADGE-${reg.id}`}
-                  size={180}
+                  size={160}
                   level="H"
                   includeMargin={true}
-                  className="rounded-lg"
                 />
-                <div className="h-px w-full bg-eregi-neutral-200 my-4"></div>
-                <p className="text-sm font-body font-medium text-muted-foreground tracking-wide">
+                <div className="h-px w-full bg-slate-100 my-4"></div>
+                <p className="text-xs font-bold text-slate-400 tracking-widest">
                   ACCESS CODE
                 </p>
               </div>
-              <p className="text-sm font-body font-medium text-eregi-primary animate-pulse">
-                출입 시 위 QR코드를 스캔하세요
+              <p className="text-sm font-medium text-slate-600">
+                {badgeLang === "en" ? "Scan this QR code at the kiosk" : "출입 시 위 QR코드를 스캔하세요"}
               </p>
             </div>
 
-            {/* Tabbed Interface - Academic Elegance Design */}
-            <div className="bg-eregi-neutral-50 border-t border-eregi-neutral-200 p-3">
+            {/* Tabbed Interface */}
+            <div className="bg-slate-50 border-t border-slate-100 p-3">
               <Tabs defaultValue={defaultTab} className="w-full">
                 <TabsList
-                  className={`grid w-full h-auto p-1 bg-card border border-eregi-neutral-200 shadow-sm rounded-lg ${gridColsClass}`}
+                  className={`grid w-full h-auto p-1 bg-white border border-slate-200 shadow-sm rounded-lg ${gridColsClass}`}
                 >
                   {effectiveMenuVisibility.status && (
                     <TabsTrigger
