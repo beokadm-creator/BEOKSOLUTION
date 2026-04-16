@@ -122,17 +122,17 @@ const LandingPage: React.FC = () => {
             <section className="pt-32 pb-16 px-4 sm:px-6">
                 <div className="max-w-7xl mx-auto grid lg:grid-cols-[1.2fr_.8fr] gap-8 lg:gap-10 items-center">
                     <div className="space-y-6 animate-in slide-in-from-left duration-700">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-xs font-bold tracking-wider">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-overline font-bold">
                             <ShieldCheck size={14} /> TRUSTED CONFERENCE PLATFORM
                         </div>
-                        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 leading-[1.12] tracking-tight">
+                        <h1 className="text-display-lg font-display text-slate-900 leading-[1.12] tracking-tight">
                             학술대회 운영을
                             <br />
                             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-cyan-600">
                                 한 화면에서 단순하게
                             </span>
                         </h1>
-                        <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-2xl">
+                        <p className="text-body-xl text-slate-600 leading-relaxed max-w-2xl">
                             학회별 독립 도메인, 등록/결제, 명찰, 방명록 동의 관리, 실시간 운영 대시보드까지
                             eRegi에서 통합 제공합니다.
                         </p>
@@ -153,16 +153,16 @@ const LandingPage: React.FC = () => {
                         </div>
                         <div className="flex flex-wrap gap-6 pt-2">
                             <div>
-                                <div className="text-2xl font-black text-slate-900">500+</div>
-                                <div className="text-xs text-slate-400 font-bold uppercase tracking-widest">Annual Events</div>
+                                <div className="text-heading-3 font-display text-slate-900">500+</div>
+                                <div className="text-overline text-slate-400 font-bold">Annual Events</div>
                             </div>
                             <div>
-                                <div className="text-2xl font-black text-slate-900">100k+</div>
-                                <div className="text-xs text-slate-400 font-bold uppercase tracking-widest">Participants</div>
+                                <div className="text-heading-3 font-display text-slate-900">100k+</div>
+                                <div className="text-overline text-slate-400 font-bold">Participants</div>
                             </div>
                             <div>
-                                <div className="text-2xl font-black text-slate-900">99.9%</div>
-                                <div className="text-xs text-slate-400 font-bold uppercase tracking-widest">Service Uptime</div>
+                                <div className="text-heading-3 font-display text-slate-900">99.9%</div>
+                                <div className="text-overline text-slate-400 font-bold">Service Uptime</div>
                             </div>
                         </div>
                     </div>
@@ -203,8 +203,8 @@ const LandingPage: React.FC = () => {
             <section className="py-16 bg-slate-50/80 border-y border-slate-100">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6">
                     <div className="text-center mb-12">
-                        <p className="text-blue-700 font-black text-xs uppercase tracking-widest mb-2">Partner Organizations</p>
-                        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">협력 학회</h2>
+                        <p className="text-blue-700 text-overline font-bold mb-2">Partner Organizations</p>
+                        <h2 className="text-heading-2 font-display text-slate-900">협력 학회</h2>
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-5">
@@ -229,9 +229,9 @@ const LandingPage: React.FC = () => {
                 <div className="max-w-7xl mx-auto">
                     <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-10">
                         <div className="space-y-2">
-                            <span className="text-blue-700 font-black text-xs uppercase tracking-widest">{UI_TEXT.upcomingEvents.subtitle.ko}</span>
-                            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">{UI_TEXT.upcomingEvents.title.ko}</h2>
-                            <p className="text-slate-500 font-medium">{UI_TEXT.upcomingEvents.description.ko}</p>
+                            <span className="text-blue-700 text-overline font-bold">{UI_TEXT.upcomingEvents.subtitle.ko}</span>
+                            <h2 className="text-heading-1 font-display text-slate-900 tracking-tight">{UI_TEXT.upcomingEvents.title.ko}</h2>
+                            <p className="text-body text-slate-500 font-medium">{UI_TEXT.upcomingEvents.description.ko}</p>
                         </div>
                         <button
                             onClick={() => navigate('/auth')}
