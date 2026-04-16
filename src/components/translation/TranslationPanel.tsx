@@ -126,14 +126,14 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   }, [selectedProjectId]);
 
   // Subscribe to stream
-  const streamOptions = useMemo(() => ({ subscribe: !!selectedProjectId && !!activeSessionId }), [selectedProjectId, activeSessionId]);
+  const streamOptions = useMemo(() => ({ subscribe: !!selectedProjectId }), [selectedProjectId]);
   const { streamData } = useProjectStream(selectedProjectId, activeSessionId, streamOptions);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const segmentsMap = streamData || {};
 
   const segmentsOrder = Object.keys(segmentsMap)
-    .filter(k => segmentsMap[k]?.sessionId === activeSessionId)
+    .filter(k => !activeSessionId || segmentsMap[k]?.sessionId === activeSessionId)
     .filter(k => (segmentsMap[k]?.timestamp || 0) >= lastFlushTime)
     .sort((a, b) => (segmentsMap[a]?.timestamp || 0) - (segmentsMap[b]?.timestamp || 0));
 
@@ -291,14 +291,11 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
         className="flex-1 overflow-y-auto p-4 space-y-4 relative"
         style={{ letterSpacing: `${letterSpacing}px`, lineHeight }}
       >
-        {!activeSessionId ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500 space-y-2">
-            <div>{project?.parkingMessage || (activeLang === 'en' ? 'No active session.' : '진행 중인 세션이 없습니다.')}</div>
-            {project?.parkingMessage && <div className="text-sm opacity-70">{activeLang === 'en' ? 'Waiting for the next session to start...' : '다음 세션 시작을 대기 중입니다...'}</div>}
-          </div>
-        ) : segmentsOrder.length === 0 ? (
+        {segmentsOrder.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-500">
-            {activeLang === 'en' ? 'Waiting for translation...' : '번역을 대기 중입니다...'}
+            {!activeSessionId
+              ? (project?.parkingMessage || (activeLang === 'en' ? 'No active session.' : '진행 중인 세션이 없습니다.'))
+              : (activeLang === 'en' ? 'Waiting for translation...' : '번역을 대기 중입니다...')}
           </div>
         ) : (
           segmentsOrder.map(id => {
