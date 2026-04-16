@@ -434,6 +434,22 @@ const GatePage: React.FC = () => {
                 color: design.textColor || '#ffffff'
             }}
         >
+            <style>{`
+                @keyframes scan {
+                    0% { transform: translateY(-110%); opacity: 0; }
+                    15% { opacity: 1; }
+                    50% { transform: translateY(0%); opacity: 1; }
+                    85% { opacity: 1; }
+                    100% { transform: translateY(110%); opacity: 0; }
+                }
+                @keyframes shake {
+                    0%, 100% { transform: translateX(0); }
+                    20% { transform: translateX(-10px); }
+                    40% { transform: translateX(10px); }
+                    60% { transform: translateX(-6px); }
+                    80% { transform: translateX(6px); }
+                }
+            `}</style>
             {/* Minimal Background Effects for Professional Kiosk Look */}
             {!(design as any).bgImage && (
                 <>
@@ -454,7 +470,13 @@ const GatePage: React.FC = () => {
                     </div>
                     <div className="flex gap-1 bg-slate-800 p-1 rounded">
                         {(['ENTER_ONLY', 'EXIT_ONLY', 'AUTO'] as const).map(m => (
-                            <button key={m} onClick={() => setMode(m)} className={`px-3 py-1 rounded text-[10px] font-bold ${mode === m ? 'bg-blue-600' : 'text-slate-500'}`}>{m}</button>
+                            <button
+                                key={m}
+                                onClick={() => setMode(m)}
+                                className={`px-3 py-1 rounded text-[10px] font-bold ${mode === m ? 'bg-blue-600' : 'text-slate-500'}`}
+                            >
+                                {m === 'ENTER_ONLY' ? '입장' : m === 'EXIT_ONLY' ? '퇴장' : '자동'}
+                            </button>
                         ))}
                     </div>
                 </div>
@@ -482,14 +504,8 @@ const GatePage: React.FC = () => {
                             </p>
                         )}
                         <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-                            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-5 py-2.5 font-bold text-white backdrop-blur">
-                                <MapPin className="w-5 h-5 text-[#00E5FF]" /> {activeZone?.name}
-                            </div>
-                            <div className={cn("inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-black uppercase tracking-[0.2em] text-white shadow-lg", modeLabel.tone)}>
-                                {modeLabel.en}
-                            </div>
-                            <div className="inline-flex items-center gap-2 rounded-full border border-[#00E5FF]/50 bg-[#00E5FF]/10 px-5 py-2.5 text-sm font-bold text-[#00E5FF] shadow-[0_0_15px_rgba(0,229,255,0.2)]">
-                                {modeLabel.ko}
+                            <div className="inline-flex items-center gap-3 rounded-full bg-white/10 border border-white/20 px-7 py-3 text-xl font-black text-white backdrop-blur shadow-[0_0_25px_rgba(0,229,255,0.12)]">
+                                <MapPin className="w-6 h-6 text-[#00E5FF]" /> {activeZone?.name}
                             </div>
                         </div>
                     </div>
@@ -499,24 +515,19 @@ const GatePage: React.FC = () => {
                     <div className="border-b border-white/10 bg-gradient-to-r from-white/5 to-transparent px-8 py-5 text-white">
                         <div className="flex items-center justify-between gap-4">
                             <div>
-                                <p className="mt-1 text-2xl font-black text-white drop-shadow-md">
-                                    {modeLabel.ko} 모드
-                                </p>
-                            </div>
-                            <div className={cn("rounded-full px-4 py-2 text-sm font-black uppercase tracking-[0.2em] text-white", modeLabel.tone)}>
-                                {mode}
+                                <p className="mt-1 text-2xl font-black text-white drop-shadow-md">{activeZone?.name}</p>
                             </div>
                         </div>
                     </div>
 
                     <div className="p-12 flex flex-col items-center">
-                        <div className="relative group mb-8">
+                        <div className="relative mb-8">
                             {/* Scanning Laser Animation */}
                             <div className="absolute inset-0 z-20 pointer-events-none rounded-[2rem] overflow-hidden">
                                 <div className="w-full h-1 bg-[#00E5FF] shadow-[0_0_15px_#00E5FF] animate-[scan_2s_ease-in-out_infinite]" />
                             </div>
                             
-                            <div className="relative z-10 flex flex-col items-center justify-center rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 border-2 border-[#00E5FF]/40 px-12 py-10 shadow-[0_0_40px_rgba(0,229,255,0.15)] group-hover:shadow-[0_0_60px_rgba(0,229,255,0.3)] transition-all duration-500">
+                            <div className="relative z-10 flex flex-col items-center justify-center rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 border-2 border-[#00E5FF]/50 px-12 py-10 shadow-[0_0_55px_rgba(0,229,255,0.18)] animate-pulse">
                                 <ScanLine className="h-24 w-24 text-[#00E5FF] mb-4" />
                                 <p className="text-3xl font-black tracking-tight text-white drop-shadow-md">
                                     QR SCAN

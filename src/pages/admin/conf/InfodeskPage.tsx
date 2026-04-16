@@ -371,6 +371,22 @@ const InfodeskPage: React.FC = () => {
                 color: design.textColor || '#ffffff'
             }}
         >
+            <style>{`
+                @keyframes scan {
+                    0% { transform: translateY(-110%); opacity: 0; }
+                    15% { opacity: 1; }
+                    50% { transform: translateY(0%); opacity: 1; }
+                    85% { opacity: 1; }
+                    100% { transform: translateY(110%); opacity: 0; }
+                }
+                @keyframes shake {
+                    0%, 100% { transform: translateX(0); }
+                    20% { transform: translateX(-10px); }
+                    40% { transform: translateX(10px); }
+                    60% { transform: translateX(-6px); }
+                    80% { transform: translateX(6px); }
+                }
+            `}</style>
             {/* Minimal Background Effects for Professional Kiosk Look */}
             {!design.bgImage && (
                 <>
@@ -478,13 +494,13 @@ const InfodeskPage: React.FC = () => {
                     <div className="flex flex-col items-center justify-center gap-10 md:flex-row md:items-center md:gap-16">
                         
                         {/* Huge QR Scan Visual Cue */}
-                        <div className="relative group">
+                            <div className="relative">
                             {/* Scanning Laser Animation */}
                             <div className="absolute inset-0 z-20 pointer-events-none rounded-[2rem] overflow-hidden">
                                 <div className="w-full h-1 bg-[#00E5FF] shadow-[0_0_15px_#00E5FF] animate-[scan_2s_ease-in-out_infinite]" />
                             </div>
                             
-                            <div className="relative z-10 flex h-64 w-64 items-center justify-center rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 border-2 border-[#00E5FF]/40 shadow-[0_0_40px_rgba(0,229,255,0.15)] group-hover:shadow-[0_0_60px_rgba(0,229,255,0.3)] transition-all duration-500">
+                                <div className="relative z-10 flex h-64 w-64 items-center justify-center rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 border-2 border-[#00E5FF]/50 shadow-[0_0_55px_rgba(0,229,255,0.18)] animate-pulse">
                                 <ScanLine className="h-32 w-32 text-[#00E5FF]" />
                                 {/* Corner brackets for QR feel */}
                                 <div className="absolute top-4 left-4 w-8 h-8 border-t-4 border-l-4 border-[#00E5FF] rounded-tl-xl" />
