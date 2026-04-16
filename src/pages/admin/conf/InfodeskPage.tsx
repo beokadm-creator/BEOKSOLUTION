@@ -3,7 +3,7 @@ import { useAdminStore } from '../../../store/adminStore';
 import { doc, getDoc, getDocs, collection } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { httpsCallable, getFunctions } from 'firebase/functions';
-import { CheckCircle, AlertCircle, Printer, X, Settings, Palette, Loader2 } from 'lucide-react';
+import { CheckCircle, AlertCircle, Printer, X, Settings, Palette, Loader2, ScanLine } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -28,6 +28,12 @@ interface DesignConfig {
     fontSize: 'normal' | 'large';
 }
 
+type ConferenceNameState = {
+    ko: string;
+    en: string;
+    subtitle: string;
+};
+
 interface IssueOption {
     label: string;
     value: 'DIGITAL_ONLY' | 'DIGITAL_PRINT' | 'PRINT_ONLY';
@@ -41,8 +47,11 @@ const InfodeskPage: React.FC = () => {
     const { printBadge, error: printError } = useBixolon();
 
     // Config
-    const [conferenceTitle, setConferenceTitle] = useState('');
-    const [conferenceSubtitle, setConferenceSubtitle] = useState('');
+    const [conferenceName, setConferenceName] = useState<ConferenceNameState>({
+        ko: '',
+        en: '',
+        subtitle: ''
+    });
 
     // Info Desk Settings
     const [issueOption, setIssueOption] = useState<IssueOption['value']>('DIGITAL_PRINT');
@@ -77,8 +86,12 @@ const InfodeskPage: React.FC = () => {
                 const confRef = doc(db, 'conferences', targetId);
                 const confSnap = await getDoc(confRef);
                 if (confSnap.exists()) {
-                    setConferenceTitle(confSnap.data().title?.ko || 'Conference');
-                    setConferenceSubtitle(confSnap.data().subtitle || '');
+                    const confData = confSnap.data();
+                    setConferenceName({
+                        ko: confData.title?.ko || 'Conference',
+                        en: confData.title?.en || '',
+                        subtitle: confData.subtitle || ''
+                    });
                 }
 
                 // 2. Load Badge Layout from Settings [v356]
@@ -349,7 +362,7 @@ const InfodeskPage: React.FC = () => {
 
     return (
         <div
-            className="fixed inset-0 z-[99999] flex flex-col font-sans transition-colors duration-500 bg-white"
+            className="fixed inset-0 z-[99999] flex flex-col overflow-hidden font-sans transition-colors duration-500 bg-[radial-gradient(circle_at_top,_rgba(14,116,144,0.14),_transparent_30%),linear-gradient(180deg,_#f3fbfd_0%,_#f8fafc_45%,_#eef7fb_100%)]"
             style={{
                 backgroundImage: design.bgImage ? `url(${design.bgImage})` : 'none',
                 backgroundSize: 'cover',
@@ -358,7 +371,7 @@ const InfodeskPage: React.FC = () => {
             }}
         >
             {/* Top Admin Console */}
-            <div className="fixed top-0 left-0 right-0 bg-black/80 text-white p-3 z-[10000] flex justify-between items-center backdrop-blur-md shadow-lg">
+            <div className="fixed top-0 left-0 right-0 z-[10000] flex items-center justify-between border-b border-white/10 bg-slate-950/88 p-3 text-white shadow-lg backdrop-blur-md">
                 <div className="flex items-center gap-4">
                     <span className="font-bold text-yellow-400 flex items-center gap-2">
                         <Printer className="w-4 h-4" /> INFO DESK
@@ -430,31 +443,72 @@ const InfodeskPage: React.FC = () => {
             )}
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative mt-16">
+            <div className="relative mt-16 flex flex-1 flex-col items-center justify-center p-8 text-center">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(15,23,42,0.06),_transparent_28%)]" />
 
-                {/* Header */}
-                <div className="mb-12 drop-shadow-lg">
-                    <h1 className="text-5xl md:text-7xl font-bold mb-4 tracking-tight" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
-                        {conferenceTitle}
-                    </h1>
-                    <p className="text-2xl md:text-3xl opacity-90 font-light">{conferenceSubtitle}</p>
+                <div className="relative z-10 mb-8 w-full max-w-6xl">
+                    <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white/80 px-4 py-2 text-xs font-black uppercase tracking-[0.28em] text-sky-700 shadow-sm backdrop-blur">
+                        <Printer className="h-4 w-4" /> Info Desk
+                    </div>
+                    <div className="mt-6 rounded-[2rem] border border-white/70 bg-white/82 px-8 py-8 shadow-[0_32px_100px_-40px_rgba(15,23,42,0.45)] backdrop-blur">
+                        <h1
+                            className="text-4xl font-black tracking-tight text-slate-950 md:text-6xl"
+                            style={{ textShadow: '0 2px 10px rgba(0,0,0,0.05)' }}
+                        >
+                            {conferenceName.ko}
+                        </h1>
+                        {conferenceName.en && (
+                            <p className="mt-3 text-xl font-semibold tracking-wide text-slate-500 md:text-3xl">
+                                {conferenceName.en}
+                            </p>
+                        )}
+                        {conferenceName.subtitle && (
+                            <p className="mt-4 text-lg font-medium text-slate-400 md:text-2xl">
+                                {conferenceName.subtitle}
+                            </p>
+                        )}
+                    </div>
                 </div>
 
-                {/* Main Instruction Card */}
-                <div className={`p-10 rounded-3xl w-full max-w-3xl shadow-2xl backdrop-blur-sm border transition-all duration-500 ${design.bgImage ? 'bg-black/40 border-white/20 text-white' :
-                    'bg-green-50 border-green-200 text-green-900'
-                    }`}>
-                    <h2 className="text-5xl font-black mb-6">
-                        등록 확인 및 명찰 발급
-                    </h2>
+                <div
+                    className={`relative z-10 w-full max-w-5xl overflow-hidden rounded-[2.25rem] border p-10 shadow-[0_40px_120px_-48px_rgba(15,23,42,0.45)] backdrop-blur-sm transition-all duration-500 ${
+                        design.bgImage
+                            ? 'border-white/15 bg-slate-950/45 text-white'
+                            : 'border-sky-100 bg-white/90 text-slate-900'
+                    }`}
+                >
+                    <div className="absolute inset-x-0 top-0 h-2 bg-gradient-to-r from-sky-600 via-cyan-500 to-sky-400" />
+                    <div className="grid gap-8 md:grid-cols-[1.05fr_0.95fr] md:items-center">
+                        <div className="text-left">
+                            <h2 className="text-4xl font-black leading-tight md:text-6xl">
+                                QR 스캔 후
+                                <br />
+                                명찰 전환 · 수령
+                            </h2>
+                            <p className="mt-6 text-xl font-semibold leading-9 text-slate-600 md:text-2xl">
+                                등록 교환권 QR을 인식해 주세요
+                            </p>
+                        </div>
 
-                    <p className="opacity-80 mb-8 text-2xl font-medium">
-                        등록 교환권(QR)을 스캐너에 인식시켜주세요.
-                        <br />(Please scan your Registration Voucher)
-                    </p>
-
-                    <div className="animate-pulse mt-8">
-                        <Printer className="w-16 h-16 mx-auto opacity-50" />
+                        <div className={`rounded-[1.75rem] border p-8 ${design.bgImage ? 'border-white/15 bg-white/10' : 'border-sky-100 bg-sky-50/70'}`}>
+                            <div className="mb-6 flex items-center justify-between">
+                                <div className="rounded-full bg-slate-950 px-4 py-1.5 text-xs font-black uppercase tracking-[0.24em] text-white">
+                                    {issueOption.replace('_', ' ')}
+                                </div>
+                                <ScanLine className="h-6 w-6 text-sky-600" />
+                            </div>
+                            <div className="rounded-[1.5rem] border border-dashed border-sky-300 bg-white/90 px-6 py-8 text-center shadow-sm">
+                                <div className="mx-auto flex h-28 w-28 items-center justify-center rounded-[1.5rem] bg-[linear-gradient(135deg,_#0f172a_0%,_#0369a1_100%)] text-white shadow-xl">
+                                    <ScanLine className="h-12 w-12" />
+                                </div>
+                                <p className="mt-6 text-2xl font-black tracking-tight text-slate-900">
+                                    QR SCAN
+                                </p>
+                                <p className="mt-2 text-lg font-semibold text-slate-500">
+                                    명찰 전환 / Badge Pickup
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -463,14 +517,14 @@ const InfodeskPage: React.FC = () => {
                     <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-[50000] backdrop-blur-sm">
                         <div className="bg-white p-8 rounded-2xl flex flex-col items-center">
                             <Loader2 className="w-16 h-16 animate-spin text-blue-600 mb-4" />
-                            <p className="text-xl font-bold text-gray-800">발급 처리중...</p>
+                            <p className="text-xl font-bold text-gray-800">처리중...</p>
                         </div>
                     </div>
                 )}
 
                 {/* Result Overlay (Success/Error) */}
                 {(scannerState.status === 'SUCCESS' || scannerState.status === 'ERROR') && (
-                    <div className={`absolute inset-0 z-[60000] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200 ${scannerState.status === 'SUCCESS' ? 'bg-green-600' : 'bg-red-600'
+                    <div className={`absolute inset-0 z-[60000] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200 ${scannerState.status === 'SUCCESS' ? 'bg-[linear-gradient(180deg,_#059669_0%,_#16a34a_100%)]' : 'bg-[linear-gradient(180deg,_#dc2626_0%,_#b91c1c_100%)]'
                         } text-white`}>
                         {scannerState.status === 'SUCCESS' ? (
                             <CheckCircle className="w-40 h-40 mb-8 drop-shadow-lg" />
@@ -481,9 +535,9 @@ const InfodeskPage: React.FC = () => {
                         <h2 className="text-6xl font-black mb-4 drop-shadow-md">{scannerState.message}</h2>
 
                         {scannerState.userData && (
-                            <div className="mt-12 text-center bg-white/10 p-12 rounded-3xl backdrop-blur-md border border-white/20 w-full max-w-4xl shadow-2xl">
-                                <div className="text-7xl font-black mb-6 tracking-tight">{scannerState.userData.name}</div>
-                                <div className="text-4xl opacity-90 font-light">{scannerState.userData.affiliation}</div>
+                            <div className="mt-12 w-full max-w-4xl rounded-[2rem] border border-white/20 bg-white/10 p-12 text-center shadow-2xl backdrop-blur-md">
+                                <div className="mb-6 mt-4 text-7xl font-black tracking-tight">{scannerState.userData.name}</div>
+                                <div className="text-4xl font-light opacity-90">{scannerState.userData.affiliation}</div>
                             </div>
                         )}
 
