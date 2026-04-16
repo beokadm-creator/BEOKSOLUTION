@@ -424,7 +424,24 @@ const GatePage: React.FC = () => {
                 : { ko: '퇴장', en: 'Exit', tone: 'bg-indigo-700' };
 
     return (
-        <div className="fixed inset-0 z-[9999] flex flex-col overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(3,105,161,0.16),_transparent_34%),linear-gradient(180deg,_#f3fbfd_0%,_#f8fafc_46%,_#eef6fb_100%)] font-sans">
+        <div
+            className="fixed inset-0 z-[99999] flex flex-col overflow-hidden font-sans transition-colors duration-500 bg-[#0A192F]"
+            style={{
+                backgroundImage: (design as any).bgImage ? `url(${(design as any).bgImage})` : 'none',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundColor: (design as any).bgColor || '#0A192F',
+                color: design.textColor || '#ffffff'
+            }}
+        >
+            {/* Minimal Background Effects for Professional Kiosk Look */}
+            {!(design as any).bgImage && (
+                <>
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#0A192F] via-[#0D2A4A] to-[#044B7F] opacity-90" />
+                    <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-[#00E5FF]/10 to-transparent" />
+                    <div className="absolute bottom-0 right-0 w-[800px] h-[800px] bg-[#00E5FF]/5 rounded-full blur-3xl" />
+                </>
+            )}
             <div className="z-[100] flex items-center justify-between border-b border-white/10 bg-slate-950/90 px-6 py-3 text-white backdrop-blur">
                 <div className="flex items-center gap-6">
                     <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="text-slate-400">
@@ -444,109 +461,119 @@ const GatePage: React.FC = () => {
                 <Button variant="ghost" size="sm" onClick={() => setShowSettings(!showSettings)} className="text-slate-400"><Palette className="w-4 h-4" /></Button>
             </div>
 
-            <div className="relative flex flex-1 flex-col items-center justify-center p-8">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(15,23,42,0.06),_transparent_28%)]" />
-
-                <div className="z-10 mb-8 w-full max-w-6xl text-center">
-                    <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white/85 px-4 py-2 text-xs font-black uppercase tracking-[0.28em] text-sky-700 shadow-sm backdrop-blur">
-                        <MapPin className="h-4 w-4" /> Gate Scanner
+            <div className="relative flex flex-1 flex-col items-center justify-center p-8 z-10 w-full max-w-7xl mx-auto">
+                
+                <div className="z-10 mb-12 w-full text-center">
+                    <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#00E5FF]/30 bg-[#00E5FF]/10 px-5 py-2.5 text-sm font-black uppercase tracking-[0.2em] text-[#00E5FF] shadow-[0_0_20px_rgba(0,229,255,0.2)] backdrop-blur">
+                        <MapPin className="h-5 w-5" /> KIOSK - GATE SCANNER
                     </div>
-                    <div className="mt-6 rounded-[2rem] border border-white/70 bg-white/82 px-8 py-8 shadow-[0_32px_100px_-40px_rgba(15,23,42,0.45)] backdrop-blur">
-                        <h1 className="text-4xl font-black tracking-tight text-slate-950 md:text-6xl">
+                    <div className="mt-8 px-4">
+                        <h1 className="text-5xl font-black tracking-tight text-white md:text-7xl drop-shadow-xl" style={{ wordBreak: 'keep-all' }}>
                             {conferenceName.ko}
                         </h1>
                         {conferenceName.en && (
-                            <p className="mt-3 text-xl font-semibold tracking-wide text-slate-500 md:text-3xl">
+                            <p className="mt-4 text-2xl font-bold tracking-wide text-sky-200 md:text-4xl opacity-90">
                                 {conferenceName.en}
                             </p>
                         )}
                         {conferenceName.subtitle && (
-                            <p className="mt-4 text-lg font-medium text-slate-400 md:text-2xl">
+                            <p className="mt-5 text-xl font-medium text-sky-400 md:text-3xl opacity-80">
                                 {conferenceName.subtitle}
                             </p>
                         )}
-                        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 font-bold text-slate-600">
-                                <MapPin className="w-4 h-4" /> {activeZone?.name}
+                        <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+                            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-5 py-2.5 font-bold text-white backdrop-blur">
+                                <MapPin className="w-5 h-5 text-[#00E5FF]" /> {activeZone?.name}
                             </div>
-                            <div className={cn("inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-black uppercase tracking-[0.22em] text-white shadow-lg", modeLabel.tone)}>
+                            <div className={cn("inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-black uppercase tracking-[0.2em] text-white shadow-lg", modeLabel.tone)}>
                                 {modeLabel.en}
                             </div>
-                            <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 shadow-sm">
+                            <div className="inline-flex items-center gap-2 rounded-full border border-[#00E5FF]/50 bg-[#00E5FF]/10 px-5 py-2.5 text-sm font-bold text-[#00E5FF] shadow-[0_0_15px_rgba(0,229,255,0.2)]">
                                 {modeLabel.ko}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="z-10 w-full max-w-5xl overflow-hidden rounded-[2.25rem] border border-white/70 bg-white/90 shadow-[0_40px_120px_-48px_rgba(15,23,42,0.45)] backdrop-blur">
-                    <div className="border-b border-slate-200 bg-[linear-gradient(90deg,_#0f172a_0%,_#075985_52%,_#0ea5e9_100%)] px-8 py-5 text-white">
+                <div className="z-10 w-full max-w-4xl overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/5 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all duration-500">
+                    <div className="border-b border-white/10 bg-gradient-to-r from-white/5 to-transparent px-8 py-5 text-white">
                         <div className="flex items-center justify-between gap-4">
                             <div>
-                                <p className="mt-1 text-2xl font-black">
+                                <p className="mt-1 text-2xl font-black text-white drop-shadow-md">
                                     {modeLabel.ko} 모드
                                 </p>
                             </div>
-                            <div className={cn("rounded-full px-4 py-2 text-sm font-black uppercase tracking-[0.24em] text-white", modeLabel.tone)}>
+                            <div className={cn("rounded-full px-4 py-2 text-sm font-black uppercase tracking-[0.2em] text-white", modeLabel.tone)}>
                                 {mode}
                             </div>
                         </div>
                     </div>
 
                     <div className="p-12 flex flex-col items-center">
-                        <div className="mb-8 p-8 rounded-full bg-slate-50">
-                            {scannerState.status === 'IDLE' && <LogIn className="w-16 h-16 text-slate-200" />}
-                            {scannerState.status === 'PROCESSING' && <Loader2 className="w-16 h-16 animate-spin text-blue-500" />}
-                            {scannerState.status === 'SUCCESS' && <CheckCircle className="w-16 h-16 text-green-500" />}
-                            {scannerState.status === 'ERROR' && <AlertCircle className="w-16 h-16 text-red-500" />}
+                        <div className="mb-8 p-8 rounded-full bg-white/5 border border-white/10 shadow-[inset_0_0_20px_rgba(255,255,255,0.05)]">
+                            {scannerState.status === 'IDLE' && <LogIn className="w-20 h-20 text-[#00E5FF]/70" />}
+                            {scannerState.status === 'PROCESSING' && <Loader2 className="w-20 h-20 animate-spin text-[#00E5FF]" />}
+                            {scannerState.status === 'SUCCESS' && <CheckCircle className="w-20 h-20 text-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)]" />}
+                            {scannerState.status === 'ERROR' && <AlertCircle className="w-20 h-20 text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]" />}
                         </div>
+
                         {scannerState.status === 'IDLE' && (
-                            <div className="mb-8 rounded-[1.75rem] border border-dashed border-sky-300 bg-sky-50 px-8 py-8 text-center">
-                                <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-[1.5rem] bg-[linear-gradient(135deg,_#0f172a_0%,_#0369a1_100%)] text-white shadow-xl">
-                                    <ScanLine className="h-10 w-10" />
+                            <div className="relative group mb-8">
+                                {/* Scanning Laser Animation */}
+                                <div className="absolute inset-0 z-20 pointer-events-none rounded-[2rem] overflow-hidden">
+                                    <div className="w-full h-1 bg-[#00E5FF] shadow-[0_0_15px_#00E5FF] animate-[scan_2s_ease-in-out_infinite]" />
                                 </div>
-                                <p className="mt-5 text-3xl font-black tracking-tight text-slate-900">
-                                    QR SCAN
-                                </p>
+                                
+                                <div className="relative z-10 flex flex-col items-center justify-center rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 border-2 border-[#00E5FF]/40 px-12 py-10 shadow-[0_0_40px_rgba(0,229,255,0.15)] group-hover:shadow-[0_0_60px_rgba(0,229,255,0.3)] transition-all duration-500">
+                                    <ScanLine className="h-24 w-24 text-[#00E5FF] mb-4" />
+                                    <p className="text-3xl font-black tracking-tight text-white drop-shadow-md">
+                                        QR SCAN
+                                    </p>
+                                    {/* Corner brackets */}
+                                    <div className="absolute top-4 left-4 w-8 h-8 border-t-4 border-l-4 border-[#00E5FF] rounded-tl-xl" />
+                                    <div className="absolute top-4 right-4 w-8 h-8 border-t-4 border-r-4 border-[#00E5FF] rounded-tr-xl" />
+                                    <div className="absolute bottom-4 left-4 w-8 h-8 border-b-4 border-l-4 border-[#00E5FF] rounded-bl-xl" />
+                                    <div className="absolute bottom-4 right-4 w-8 h-8 border-b-4 border-r-4 border-[#00E5FF] rounded-br-xl" />
+                                </div>
                             </div>
                         )}
-                        <h2 className={cn("text-5xl font-black mb-4", scannerState.status === 'ERROR' ? "text-red-600" : scannerState.status === 'SUCCESS' ? "text-green-600" : "text-slate-900")}>
+                        <h2 className={cn("text-5xl font-black mb-4 drop-shadow-lg", scannerState.status === 'ERROR' ? "text-red-400" : scannerState.status === 'SUCCESS' ? "text-emerald-400" : "text-white")}>
                             {scannerState.message}
                         </h2>
                         {scannerState.status === 'SUCCESS' && scannerState.isCompleted && (
-                            <div className="inline-flex items-center gap-2 bg-emerald-100 text-emerald-800 px-4 py-2 rounded-full font-black text-sm mb-4">
+                            <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-5 py-2.5 rounded-full font-black text-sm mb-4 backdrop-blur">
                                 <CheckCircle className="w-4 h-4" />
                                 수강완료
                             </div>
                         )}
-                        {scannerState.subMessage && <p className="text-3xl font-bold text-slate-700">{scannerState.subMessage}</p>}
-                        {scannerState.userData && <p className="mt-2 text-xl font-medium text-slate-400">{scannerState.userData.affiliation}</p>}
+                        {scannerState.subMessage && <p className="text-3xl font-bold text-sky-200">{scannerState.subMessage}</p>}
+                        {scannerState.userData && <p className="mt-2 text-xl font-medium text-sky-400 opacity-80">{scannerState.userData.affiliation}</p>}
                         {scannerState.status === 'SUCCESS' && typeof scannerState.totalMinutes === 'number' && (
-                            <div className="mt-8 w-full max-w-4xl">
-                                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                                    <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 text-left">
-                                        <div className="text-xs font-black uppercase tracking-wider text-slate-400">이번 체류 시간</div>
-                                        <div className="mt-1 text-2xl font-black text-slate-900">{scannerState.rawSessionMinutes || 0}분</div>
+                            <div className="mt-10 w-full max-w-4xl">
+                                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                    <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur px-6 py-5 text-left transition-transform hover:scale-105">
+                                        <div className="text-xs font-black uppercase tracking-wider text-sky-400 opacity-80">이번 체류 시간</div>
+                                        <div className="mt-2 text-3xl font-black text-white">{scannerState.rawSessionMinutes || 0}분</div>
                                     </div>
-                                    <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 text-left">
-                                        <div className="text-xs font-black uppercase tracking-wider text-slate-400">휴식 차감</div>
-                                        <div className="mt-1 text-2xl font-black text-slate-900">{scannerState.deductedMinutes || 0}분</div>
+                                    <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur px-6 py-5 text-left transition-transform hover:scale-105">
+                                        <div className="text-xs font-black uppercase tracking-wider text-sky-400 opacity-80">휴식 차감</div>
+                                        <div className="mt-2 text-3xl font-black text-white">{scannerState.deductedMinutes || 0}분</div>
                                     </div>
-                                    <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 text-left">
-                                        <div className="text-xs font-black uppercase tracking-wider text-slate-400">이번 스캔 인정</div>
-                                        <div className="mt-1 text-2xl font-black text-slate-900">{scannerState.recognizedMinutes || 0}분</div>
+                                    <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur px-6 py-5 text-left transition-transform hover:scale-105">
+                                        <div className="text-xs font-black uppercase tracking-wider text-sky-400 opacity-80">이번 스캔 인정</div>
+                                        <div className="mt-2 text-3xl font-black text-emerald-400 drop-shadow-md">{scannerState.recognizedMinutes || 0}분</div>
                                     </div>
-                                    <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 text-left">
-                                        <div className="text-xs font-black uppercase tracking-wider text-slate-400">오늘 누적</div>
-                                        <div className="mt-1 text-2xl font-black text-slate-900">{scannerState.todayMinutes || 0}분</div>
+                                    <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur px-6 py-5 text-left transition-transform hover:scale-105">
+                                        <div className="text-xs font-black uppercase tracking-wider text-sky-400 opacity-80">오늘 누적</div>
+                                        <div className="mt-2 text-3xl font-black text-white">{scannerState.todayMinutes || 0}분</div>
                                     </div>
-                                    <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 text-left">
-                                        <div className="text-xs font-black uppercase tracking-wider text-slate-400">총 누적</div>
-                                        <div className="mt-1 text-2xl font-black text-slate-900">{scannerState.totalMinutes}분</div>
+                                    <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur px-6 py-5 text-left transition-transform hover:scale-105">
+                                        <div className="text-xs font-black uppercase tracking-wider text-sky-400 opacity-80">총 누적</div>
+                                        <div className="mt-2 text-3xl font-black text-[#00E5FF] drop-shadow-md">{scannerState.totalMinutes}분</div>
                                     </div>
-                                    <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 text-left">
-                                        <div className="text-xs font-black uppercase tracking-wider text-slate-400">남은 시간</div>
-                                        <div className="mt-1 text-2xl font-black text-slate-900">
+                                    <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur px-6 py-5 text-left transition-transform hover:scale-105">
+                                        <div className="text-xs font-black uppercase tracking-wider text-sky-400 opacity-80">남은 시간</div>
+                                        <div className="mt-2 text-3xl font-black text-white">
                                             {scannerState.goalMinutes ? (scannerState.remainingMinutes || 0) : '-'}분
                                         </div>
                                     </div>
@@ -556,8 +583,8 @@ const GatePage: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="mt-10 flex items-center gap-2 text-slate-300 font-bold uppercase tracking-widest animate-pulse">
-                    Scan QR
+                <div className="mt-12 flex items-center gap-3 text-[#00E5FF] font-black text-xl uppercase tracking-[0.3em] animate-pulse drop-shadow-[0_0_10px_rgba(0,229,255,0.5)]">
+                    Ready to Scan
                 </div>
 
                 <input ref={inputRef} value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={handleKeyDown} onBlur={handleBlur} className="absolute opacity-0 pointer-events-none" autoFocus />

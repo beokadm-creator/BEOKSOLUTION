@@ -362,14 +362,23 @@ const InfodeskPage: React.FC = () => {
 
     return (
         <div
-            className="fixed inset-0 z-[99999] flex flex-col overflow-hidden font-sans transition-colors duration-500 bg-[radial-gradient(circle_at_top,_rgba(14,116,144,0.14),_transparent_30%),linear-gradient(180deg,_#f3fbfd_0%,_#f8fafc_45%,_#eef7fb_100%)]"
+            className="fixed inset-0 z-[99999] flex flex-col overflow-hidden font-sans transition-colors duration-500 bg-[#0A192F]"
             style={{
                 backgroundImage: design.bgImage ? `url(${design.bgImage})` : 'none',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
-                color: design.textColor
+                backgroundColor: (design as any).bgColor || '#0A192F',
+                color: design.textColor || '#ffffff'
             }}
         >
+            {/* Minimal Background Effects for Professional Kiosk Look */}
+            {!design.bgImage && (
+                <>
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#0A192F] via-[#0D2A4A] to-[#044B7F] opacity-90" />
+                    <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-[#00E5FF]/10 to-transparent" />
+                    <div className="absolute bottom-0 right-0 w-[800px] h-[800px] bg-[#00E5FF]/5 rounded-full blur-3xl" />
+                </>
+            )}
             {/* Top Admin Console */}
             <div className="fixed top-0 left-0 right-0 z-[10000] flex items-center justify-between border-b border-white/10 bg-slate-950/88 p-3 text-white shadow-lg backdrop-blur-md">
                 <div className="flex items-center gap-4">
@@ -443,72 +452,61 @@ const InfodeskPage: React.FC = () => {
             )}
 
             {/* Main Content Area */}
-            <div className="relative mt-16 flex flex-1 flex-col items-center justify-center p-8 text-center">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(15,23,42,0.06),_transparent_28%)]" />
-
-                <div className="relative z-10 mb-8 w-full max-w-6xl">
-                    <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white/80 px-4 py-2 text-xs font-black uppercase tracking-[0.28em] text-sky-700 shadow-sm backdrop-blur">
-                        <Printer className="h-4 w-4" /> Info Desk
+            <div className="relative mt-20 flex flex-1 flex-col items-center justify-center p-8 text-center z-10 w-full max-w-7xl mx-auto">
+                <div className="mb-12 w-full">
+                    <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#00E5FF]/30 bg-[#00E5FF]/10 px-5 py-2.5 text-sm font-black uppercase tracking-[0.2em] text-[#00E5FF] shadow-[0_0_20px_rgba(0,229,255,0.2)] backdrop-blur">
+                        <Printer className="h-5 w-5" /> KIOSK - INFO DESK
                     </div>
-                    <div className="mt-6 rounded-[2rem] border border-white/70 bg-white/82 px-8 py-8 shadow-[0_32px_100px_-40px_rgba(15,23,42,0.45)] backdrop-blur">
-                        <h1
-                            className="text-4xl font-black tracking-tight text-slate-950 md:text-6xl"
-                            style={{ textShadow: '0 2px 10px rgba(0,0,0,0.05)' }}
-                        >
+                    <div className="mt-8 px-4">
+                        <h1 className="text-5xl font-black tracking-tight text-white md:text-7xl drop-shadow-xl" style={{ wordBreak: 'keep-all' }}>
                             {conferenceName.ko}
                         </h1>
                         {conferenceName.en && (
-                            <p className="mt-3 text-xl font-semibold tracking-wide text-slate-500 md:text-3xl">
+                            <p className="mt-4 text-2xl font-bold tracking-wide text-sky-200 md:text-4xl opacity-90">
                                 {conferenceName.en}
                             </p>
                         )}
                         {conferenceName.subtitle && (
-                            <p className="mt-4 text-lg font-medium text-slate-400 md:text-2xl">
+                            <p className="mt-5 text-xl font-medium text-sky-400 md:text-3xl opacity-80">
                                 {conferenceName.subtitle}
                             </p>
                         )}
                     </div>
                 </div>
 
-                <div
-                    className={`relative z-10 w-full max-w-5xl overflow-hidden rounded-[2.25rem] border p-10 shadow-[0_40px_120px_-48px_rgba(15,23,42,0.45)] backdrop-blur-sm transition-all duration-500 ${
-                        design.bgImage
-                            ? 'border-white/15 bg-slate-950/45 text-white'
-                            : 'border-sky-100 bg-white/90 text-slate-900'
-                    }`}
-                >
-                    <div className="absolute inset-x-0 top-0 h-2 bg-gradient-to-r from-sky-600 via-cyan-500 to-sky-400" />
-                    <div className="grid gap-8 md:grid-cols-[1.05fr_0.95fr] md:items-center">
-                        <div className="text-left">
-                            <h2 className="text-4xl font-black leading-tight md:text-6xl">
-                                QR 스캔 후
-                                <br />
-                                명찰 전환 · 수령
+                <div className="w-full max-w-4xl overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/5 p-12 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all duration-500">
+                    <div className="flex flex-col items-center justify-center gap-10 md:flex-row md:items-center md:gap-16">
+                        
+                        {/* Huge QR Scan Visual Cue */}
+                        <div className="relative group">
+                            {/* Scanning Laser Animation */}
+                            <div className="absolute inset-0 z-20 pointer-events-none rounded-[2rem] overflow-hidden">
+                                <div className="w-full h-1 bg-[#00E5FF] shadow-[0_0_15px_#00E5FF] animate-[scan_2s_ease-in-out_infinite]" />
+                            </div>
+                            
+                            <div className="relative z-10 flex h-64 w-64 items-center justify-center rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 border-2 border-[#00E5FF]/40 shadow-[0_0_40px_rgba(0,229,255,0.15)] group-hover:shadow-[0_0_60px_rgba(0,229,255,0.3)] transition-all duration-500">
+                                <ScanLine className="h-32 w-32 text-[#00E5FF]" />
+                                {/* Corner brackets for QR feel */}
+                                <div className="absolute top-4 left-4 w-8 h-8 border-t-4 border-l-4 border-[#00E5FF] rounded-tl-xl" />
+                                <div className="absolute top-4 right-4 w-8 h-8 border-t-4 border-r-4 border-[#00E5FF] rounded-tr-xl" />
+                                <div className="absolute bottom-4 left-4 w-8 h-8 border-b-4 border-l-4 border-[#00E5FF] rounded-bl-xl" />
+                                <div className="absolute bottom-4 right-4 w-8 h-8 border-b-4 border-r-4 border-[#00E5FF] rounded-br-xl" />
+                            </div>
+                        </div>
+
+                        <div className="text-center md:text-left flex-1">
+                            <div className="inline-flex rounded-full bg-[#00E5FF]/20 px-5 py-2 text-sm font-black uppercase tracking-[0.2em] text-[#00E5FF] mb-6">
+                                {issueOption.replace('_', ' ')}
+                            </div>
+                            <h2 className="text-5xl font-black leading-tight text-white md:text-6xl drop-shadow-md">
+                                명찰 발급
                             </h2>
-                            <p className="mt-6 text-xl font-semibold leading-9 text-slate-600 md:text-2xl">
-                                등록 교환권 QR을 인식해 주세요
+                            <p className="mt-6 text-2xl font-medium leading-relaxed text-sky-200 opacity-90">
+                                발급받은 <span className="font-bold text-[#00E5FF]">QR코드</span>를<br/>
+                                스캐너에 인식해 주세요.
                             </p>
                         </div>
 
-                        <div className={`rounded-[1.75rem] border p-8 ${design.bgImage ? 'border-white/15 bg-white/10' : 'border-sky-100 bg-sky-50/70'}`}>
-                            <div className="mb-6 flex items-center justify-between">
-                                <div className="rounded-full bg-slate-950 px-4 py-1.5 text-xs font-black uppercase tracking-[0.24em] text-white">
-                                    {issueOption.replace('_', ' ')}
-                                </div>
-                                <ScanLine className="h-6 w-6 text-sky-600" />
-                            </div>
-                            <div className="rounded-[1.5rem] border border-dashed border-sky-300 bg-white/90 px-6 py-8 text-center shadow-sm">
-                                <div className="mx-auto flex h-28 w-28 items-center justify-center rounded-[1.5rem] bg-[linear-gradient(135deg,_#0f172a_0%,_#0369a1_100%)] text-white shadow-xl">
-                                    <ScanLine className="h-12 w-12" />
-                                </div>
-                                <p className="mt-6 text-2xl font-black tracking-tight text-slate-900">
-                                    QR SCAN
-                                </p>
-                                <p className="mt-2 text-lg font-semibold text-slate-500">
-                                    명찰 전환 / Badge Pickup
-                                </p>
-                            </div>
-                        </div>
                     </div>
                 </div>
 

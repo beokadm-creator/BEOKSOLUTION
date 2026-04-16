@@ -194,13 +194,14 @@ const App: React.FC = () => {
                     <Route path="badge-management" element={<BadgeManagementPage />} />
                     <Route path="refund" element={<AdminRefundPage />} />
                     <Route path="external-attendees" element={<ExternalAttendeePage />} />
-                    <Route path="attendance-live" element={<AttendanceLivePage />} />
-                    <Route path="attendance-live/zone/:zoneId" element={<AttendanceLivePage />} />
-                    <Route path="gate" element={<GatePage />} />
-                    <Route path="gate/zone/:zoneId" element={<GatePage />} />
-                    <Route path="infodesk" element={<InfodeskPage />} />
-                    <Route path="stamp-tour-draw" element={<StampTourDrawPage />} />
                   </Route>
+                  {/* Standalone Conference Pages (No Sidebar) */}
+                  <Route path="/admin/conf/:cid/attendance-live" element={<AttendanceLivePage />} />
+                  <Route path="/admin/conf/:cid/attendance-live/zone/:zoneId" element={<AttendanceLivePage />} />
+                  <Route path="/admin/conf/:cid/gate" element={<GatePage />} />
+                  <Route path="/admin/conf/:cid/gate/zone/:zoneId" element={<GatePage />} />
+                  <Route path="/admin/conf/:cid/infodesk" element={<InfodeskPage />} />
+                  <Route path="/admin/conf/:cid/stamp-tour-draw" element={<StampTourDrawPage />} />
                   <Route path="*" element={<Navigate to={activeSocietyId ? `/admin/society` : "/super"} />} />
                 </Route>
                 <Route path="*" element={<Navigate to="/login" />} />
@@ -285,15 +286,15 @@ const App: React.FC = () => {
                     <Route path="badge-management" element={<BadgeManagementPage />} />
                     <Route path="refund" element={<AdminRefundPage />} />
                     <Route path="external-attendees" element={<ExternalAttendeePage />} />
-                    {/* Attendance Routes */}
-                    <Route path="attendance-live" element={<AttendanceLivePage />} />
-                    <Route path="attendance-live/zone/:zoneId" element={<AttendanceLivePage />} />
-                    {/* Attendance/Kiosk Routes (No Admin Guard - Device Access) */}
-                    <Route path="gate" element={<GatePage />} />
-                    <Route path="gate/zone/:zoneId" element={<GatePage />} />
-                    <Route path="infodesk" element={<InfodeskPage />} />
-                    <Route path="stamp-tour-draw" element={<StampTourDrawPage />} />
                   </Route>
+
+                  {/* Standalone Conference Pages (No Sidebar) */}
+                  <Route path="/admin/conf/:cid/attendance-live" element={<AttendanceLivePage />} />
+                  <Route path="/admin/conf/:cid/attendance-live/zone/:zoneId" element={<AttendanceLivePage />} />
+                  <Route path="/admin/conf/:cid/gate" element={<GatePage />} />
+                  <Route path="/admin/conf/:cid/gate/zone/:zoneId" element={<GatePage />} />
+                  <Route path="/admin/conf/:cid/infodesk" element={<InfodeskPage />} />
+                  <Route path="/admin/conf/:cid/stamp-tour-draw" element={<StampTourDrawPage />} />
 
                   {/* L3: Vendor Layout */}
                   <Route path="/admin/vendor/:vid" element={<VendorLayout />}>
