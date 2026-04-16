@@ -278,12 +278,13 @@ const InfodeskPage: React.FC = () => {
 
                     // Fallback to default layout if not configured
                     const activeLayout = badgeLayout || {
-                        width: 800,
-                        height: 1200,
+                        width: 100,
+                        height: 240,
+                        unit: 'mm',
                         elements: [
-                            { x: 400, y: 150, fontSize: 6, isVisible: true, type: 'QR' } as BadgeElement,
-                            { x: 400, y: 450, fontSize: 4, isVisible: true, type: 'NAME' } as BadgeElement,
-                            { x: 400, y: 600, fontSize: 2, isVisible: true, type: 'ORG' } as BadgeElement
+                            { x: 50, y: 20, fontSize: 25, isVisible: true, type: 'QR' } as BadgeElement,
+                            { x: 50, y: 60, fontSize: 6, isVisible: true, type: 'NAME' } as BadgeElement,
+                            { x: 50, y: 80, fontSize: 4, isVisible: true, type: 'ORG' } as BadgeElement
                         ]
                     };
 
