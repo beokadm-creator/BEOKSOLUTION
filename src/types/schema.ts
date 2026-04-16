@@ -379,6 +379,19 @@ export interface Registration {
   isCheckedIn: boolean; // Default: false
   checkInTime: Timestamp | null;
 
+  badgeIssued?: boolean;
+  badgeIssuedAt?: Timestamp;
+
+  attendanceStatus?: 'INSIDE' | 'OUTSIDE';
+  currentZone?: string | null;
+  lastCheckIn?: Timestamp;
+  lastCheckOut?: Timestamp;
+  totalMinutes?: number;
+  dailyMinutes?: Record<string, number>;
+  zoneMinutes?: Record<string, number>;
+  zoneCompleted?: Record<string, boolean>;
+  isCompleted?: boolean;
+
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -714,6 +727,16 @@ export interface ExternalAttendee {
   badgeIssued?: boolean;
   badgeIssuedAt?: Timestamp;
   authCreated?: boolean; // Flag to indicate if Firebase Auth user has been created
+
+  attendanceStatus?: 'INSIDE' | 'OUTSIDE';
+  currentZone?: string | null;
+  lastCheckIn?: Timestamp;
+  lastCheckOut?: Timestamp;
+  totalMinutes?: number;
+  dailyMinutes?: Record<string, number>;
+  zoneMinutes?: Record<string, number>;
+  zoneCompleted?: Record<string, boolean>;
+  isCompleted?: boolean;
 
   // Deletion status
   deleted?: boolean;

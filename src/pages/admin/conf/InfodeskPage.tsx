@@ -3,7 +3,7 @@ import { useAdminStore } from '../../../store/adminStore';
 import { doc, getDoc, getDocs, collection } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { httpsCallable, getFunctions } from 'firebase/functions';
-import { CheckCircle, AlertCircle, Printer, X, Settings, Palette, Loader2 } from 'lucide-react';
+import { CheckCircle, AlertCircle, Printer, X, Settings, Palette, Loader2, ScanLine } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -28,6 +28,12 @@ interface DesignConfig {
     fontSize: 'normal' | 'large';
 }
 
+type ConferenceNameState = {
+    ko: string;
+    en: string;
+    subtitle: string;
+};
+
 interface IssueOption {
     label: string;
     value: 'DIGITAL_ONLY' | 'DIGITAL_PRINT' | 'PRINT_ONLY';
@@ -41,8 +47,11 @@ const InfodeskPage: React.FC = () => {
     const { printBadge, error: printError } = useBixolon();
 
     // Config
-    const [conferenceTitle, setConferenceTitle] = useState('');
-    const [conferenceSubtitle, setConferenceSubtitle] = useState('');
+    const [conferenceName, setConferenceName] = useState<ConferenceNameState>({
+        ko: '',
+        en: '',
+        subtitle: ''
+    });
 
     // Info Desk Settings
     const [issueOption, setIssueOption] = useState<IssueOption['value']>('DIGITAL_PRINT');
@@ -77,8 +86,12 @@ const InfodeskPage: React.FC = () => {
                 const confRef = doc(db, 'conferences', targetId);
                 const confSnap = await getDoc(confRef);
                 if (confSnap.exists()) {
-                    setConferenceTitle(confSnap.data().title?.ko || 'Conference');
-                    setConferenceSubtitle(confSnap.data().subtitle || '');
+                    const confData = confSnap.data();
+                    setConferenceName({
+                        ko: confData.title?.ko || 'Conference',
+                        en: confData.title?.en || '',
+                        subtitle: confData.subtitle || ''
+                    });
                 }
 
                 // 2. Load Badge Layout from Settings [v356]
@@ -265,12 +278,13 @@ const InfodeskPage: React.FC = () => {
 
                     // Fallback to default layout if not configured
                     const activeLayout = badgeLayout || {
-                        width: 800,
-                        height: 1200,
+                        width: 100,
+                        height: 240,
+                        unit: 'mm',
                         elements: [
-                            { x: 400, y: 150, fontSize: 6, isVisible: true, type: 'QR' } as BadgeElement,
-                            { x: 400, y: 450, fontSize: 4, isVisible: true, type: 'NAME' } as BadgeElement,
-                            { x: 400, y: 600, fontSize: 2, isVisible: true, type: 'ORG' } as BadgeElement
+                            { x: 50, y: 20, fontSize: 25, isVisible: true, type: 'QR' } as BadgeElement,
+                            { x: 50, y: 60, fontSize: 6, isVisible: true, type: 'NAME' } as BadgeElement,
+                            { x: 50, y: 80, fontSize: 4, isVisible: true, type: 'ORG' } as BadgeElement
                         ]
                     };
 
@@ -349,16 +363,41 @@ const InfodeskPage: React.FC = () => {
 
     return (
         <div
-            className="fixed inset-0 z-[99999] flex flex-col font-sans transition-colors duration-500 bg-white"
+            className="fixed inset-0 z-[99999] flex flex-col overflow-hidden font-sans transition-colors duration-500 bg-[#0A192F]"
             style={{
                 backgroundImage: design.bgImage ? `url(${design.bgImage})` : 'none',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
-                color: design.textColor
+                backgroundColor: (design as any).bgColor || '#0A192F',
+                color: design.textColor || '#ffffff'
             }}
         >
+            <style>{`
+                @keyframes scan {
+                    0% { transform: translateY(-110%); opacity: 0; }
+                    15% { opacity: 1; }
+                    50% { transform: translateY(0%); opacity: 1; }
+                    85% { opacity: 1; }
+                    100% { transform: translateY(110%); opacity: 0; }
+                }
+                @keyframes shake {
+                    0%, 100% { transform: translateX(0); }
+                    20% { transform: translateX(-10px); }
+                    40% { transform: translateX(10px); }
+                    60% { transform: translateX(-6px); }
+                    80% { transform: translateX(6px); }
+                }
+            `}</style>
+            {/* Minimal Background Effects for Professional Kiosk Look */}
+            {!design.bgImage && (
+                <>
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#0A192F] via-[#0D2A4A] to-[#044B7F] opacity-90" />
+                    <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-[#00E5FF]/10 to-transparent" />
+                    <div className="absolute bottom-0 right-0 w-[800px] h-[800px] bg-[#00E5FF]/5 rounded-full blur-3xl" />
+                </>
+            )}
             {/* Top Admin Console */}
-            <div className="fixed top-0 left-0 right-0 bg-black/80 text-white p-3 z-[10000] flex justify-between items-center backdrop-blur-md shadow-lg">
+            <div className="fixed top-0 left-0 right-0 z-[10000] flex items-center justify-between border-b border-white/10 bg-slate-950/88 p-3 text-white shadow-lg backdrop-blur-md">
                 <div className="flex items-center gap-4">
                     <span className="font-bold text-yellow-400 flex items-center gap-2">
                         <Printer className="w-4 h-4" /> INFO DESK
@@ -430,65 +469,99 @@ const InfodeskPage: React.FC = () => {
             )}
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative mt-16">
-
-                {/* Header */}
-                <div className="mb-12 drop-shadow-lg">
-                    <h1 className="text-5xl md:text-7xl font-bold mb-4 tracking-tight" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
-                        {conferenceTitle}
-                    </h1>
-                    <p className="text-2xl md:text-3xl opacity-90 font-light">{conferenceSubtitle}</p>
-                </div>
-
-                {/* Main Instruction Card */}
-                <div className={`p-10 rounded-3xl w-full max-w-3xl shadow-2xl backdrop-blur-sm border transition-all duration-500 ${design.bgImage ? 'bg-black/40 border-white/20 text-white' :
-                    'bg-green-50 border-green-200 text-green-900'
-                    }`}>
-                    <h2 className="text-5xl font-black mb-6">
-                        등록 확인 및 명찰 발급
-                    </h2>
-
-                    <p className="opacity-80 mb-8 text-2xl font-medium">
-                        등록 교환권(QR)을 스캐너에 인식시켜주세요.
-                        <br />(Please scan your Registration Voucher)
-                    </p>
-
-                    <div className="animate-pulse mt-8">
-                        <Printer className="w-16 h-16 mx-auto opacity-50" />
+            <div className="relative mt-20 flex flex-1 flex-col items-center justify-center p-8 text-center z-10 w-full max-w-7xl mx-auto">
+                <div className="mb-12 w-full">
+                    <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#00E5FF]/30 bg-[#00E5FF]/10 px-5 py-2.5 text-sm font-black uppercase tracking-[0.2em] text-[#00E5FF] shadow-[0_0_20px_rgba(0,229,255,0.2)] backdrop-blur">
+                        <Printer className="h-5 w-5" /> KIOSK - INFO DESK
+                    </div>
+                    <div className="mt-8 px-4">
+                        <h1 className="text-5xl font-black tracking-tight text-white md:text-7xl drop-shadow-xl" style={{ wordBreak: 'keep-all' }}>
+                            {conferenceName.ko}
+                        </h1>
+                        {conferenceName.en && (
+                            <p className="mt-4 text-2xl font-bold tracking-wide text-sky-200 md:text-4xl opacity-90">
+                                {conferenceName.en}
+                            </p>
+                        )}
+                        {conferenceName.subtitle && (
+                            <p className="mt-5 text-xl font-medium text-sky-400 md:text-3xl opacity-80">
+                                {conferenceName.subtitle}
+                            </p>
+                        )}
                     </div>
                 </div>
 
-                {/* Processing Indicator */}
+                <div className="w-full max-w-4xl overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/5 p-12 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all duration-500">
+                    <div className="flex flex-col items-center justify-center gap-10 md:flex-row md:items-center md:gap-16">
+                        
+                        {/* Huge QR Scan Visual Cue */}
+                            <div className="relative">
+                            {/* Scanning Laser Animation */}
+                            <div className="absolute inset-0 z-20 pointer-events-none rounded-[2rem] overflow-hidden">
+                                <div className="w-full h-1 bg-[#00E5FF] shadow-[0_0_15px_#00E5FF] animate-[scan_2s_ease-in-out_infinite]" />
+                            </div>
+                            
+                                <div className="relative z-10 flex h-64 w-64 items-center justify-center rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 border-2 border-[#00E5FF]/50 shadow-[0_0_55px_rgba(0,229,255,0.18)] animate-pulse">
+                                <ScanLine className="h-32 w-32 text-[#00E5FF]" />
+                                {/* Corner brackets for QR feel */}
+                                <div className="absolute top-4 left-4 w-8 h-8 border-t-4 border-l-4 border-[#00E5FF] rounded-tl-xl" />
+                                <div className="absolute top-4 right-4 w-8 h-8 border-t-4 border-r-4 border-[#00E5FF] rounded-tr-xl" />
+                                <div className="absolute bottom-4 left-4 w-8 h-8 border-b-4 border-l-4 border-[#00E5FF] rounded-bl-xl" />
+                                <div className="absolute bottom-4 right-4 w-8 h-8 border-b-4 border-r-4 border-[#00E5FF] rounded-br-xl" />
+                            </div>
+                        </div>
+
+                        <div className="text-center md:text-left flex-1">
+                            <div className="inline-flex rounded-full bg-[#00E5FF]/20 px-5 py-2 text-sm font-black uppercase tracking-[0.2em] text-[#00E5FF] mb-6">
+                                {issueOption.replace('_', ' ')}
+                            </div>
+                            <h2 className="text-5xl font-black leading-tight text-white md:text-6xl drop-shadow-md">
+                                명찰 발급
+                            </h2>
+                            <p className="mt-6 text-2xl font-medium leading-relaxed text-sky-200 opacity-90">
+                                발급받은 <span className="font-bold text-[#00E5FF]">QR코드</span>를<br/>
+                                스캐너에 인식해 주세요.
+                            </p>
+                        </div>
+
+                    </div>
+                </div>
+
+                {/* Processing Overlay */}
                 {scannerState.status === 'PROCESSING' && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-[50000] backdrop-blur-sm">
-                        <div className="bg-white p-8 rounded-2xl flex flex-col items-center">
-                            <Loader2 className="w-16 h-16 animate-spin text-blue-600 mb-4" />
-                            <p className="text-xl font-bold text-gray-800">발급 처리중...</p>
+                    <div className="absolute inset-0 z-[60000] flex items-center justify-center bg-[#0A192F]/80 backdrop-blur-md">
+                        <div className="flex flex-col items-center rounded-[2rem] bg-white/10 p-12 shadow-2xl border border-white/20">
+                            <Loader2 className="w-24 h-24 animate-spin text-[#00E5FF] mb-6 drop-shadow-[0_0_15px_rgba(0,229,255,0.5)]" />
+                            <p className="text-3xl font-black text-white tracking-widest animate-pulse">PROCESSING</p>
                         </div>
                     </div>
                 )}
 
                 {/* Result Overlay (Success/Error) */}
                 {(scannerState.status === 'SUCCESS' || scannerState.status === 'ERROR') && (
-                    <div className={`absolute inset-0 z-[60000] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200 ${scannerState.status === 'SUCCESS' ? 'bg-green-600' : 'bg-red-600'
-                        } text-white`}>
+                    <div className={`absolute inset-0 z-[60000] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-300 ${
+                        scannerState.status === 'SUCCESS' ? 'bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-emerald-900/90 via-[#0A192F]/95 to-[#0A192F]' : 'bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-rose-900/90 via-[#0A192F]/95 to-[#0A192F]'
+                    } backdrop-blur-lg`}>
+                        
                         {scannerState.status === 'SUCCESS' ? (
-                            <CheckCircle className="w-40 h-40 mb-8 drop-shadow-lg" />
+                            <CheckCircle className="w-48 h-48 mb-8 text-emerald-400 drop-shadow-[0_0_30px_rgba(52,211,153,0.6)] animate-[bounce_1s_ease-in-out]" />
                         ) : (
-                            <AlertCircle className="w-40 h-40 mb-8 drop-shadow-lg" />
+                            <AlertCircle className="w-48 h-48 mb-8 text-rose-500 drop-shadow-[0_0_30px_rgba(244,63,94,0.6)] animate-[shake_0.5s_ease-in-out]" />
                         )}
 
-                        <h2 className="text-6xl font-black mb-4 drop-shadow-md">{scannerState.message}</h2>
+                        <h2 className={`text-6xl font-black mb-8 drop-shadow-xl ${scannerState.status === 'SUCCESS' ? 'text-emerald-300' : 'text-rose-300'}`}>
+                            {scannerState.message}
+                        </h2>
 
                         {scannerState.userData && (
-                            <div className="mt-12 text-center bg-white/10 p-12 rounded-3xl backdrop-blur-md border border-white/20 w-full max-w-4xl shadow-2xl">
-                                <div className="text-7xl font-black mb-6 tracking-tight">{scannerState.userData.name}</div>
-                                <div className="text-4xl opacity-90 font-light">{scannerState.userData.affiliation}</div>
+                            <div className="mt-8 w-full max-w-5xl rounded-[2.5rem] border border-white/20 bg-white/10 p-16 text-center shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+                                <div className="mb-6 mt-4 text-7xl font-black tracking-tight text-white drop-shadow-md">{scannerState.userData.name}</div>
+                                <div className="text-4xl font-medium text-sky-200 opacity-90">{scannerState.userData.affiliation}</div>
                             </div>
                         )}
 
                         {scannerState.status === 'ERROR' && (
-                            <div className="mt-6 text-3xl opacity-90 font-medium bg-black/20 px-8 py-4 rounded-xl">
+                            <div className="mt-12 text-4xl font-medium bg-rose-950/50 border border-rose-500/30 text-rose-200 px-12 py-8 rounded-2xl shadow-[0_0_30px_rgba(244,63,94,0.2)]">
                                 {scannerState.message}
                             </div>
                         )}

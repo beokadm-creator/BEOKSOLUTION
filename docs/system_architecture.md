@@ -75,7 +75,7 @@ The React Router is configured with explicit Route Guards (`AdminGuard`) and Lay
 ## 5. Security & Deployment Strategy
 - **Layered Checks**: Relies heavily on GitHub Branch protection, CI/CD pipelines (`.github/workflows/ci.yml`), and Husky pre-commit hooks containing strict rules (TypeScript compiler + ESLint).
 - **Firestore Integrity**: Requires exact indexing. Collection Group Queries are utilized and strictly rely on `firestore.indexes.json`.
-- **Safe Deployment**: Custom deployment scripts (`scripts/safe-deploy.js`, `scripts/pre-deploy-check.js`) wrap the Firebase CLI deployment steps `firebase deploy --only hosting,functions` to prevent regressions.
+- **Deployment**: Firebase CLI deployments are supported with optional pre-deploy checks via `scripts/pre-deploy-check.js`.
 
 ---
 *Generated via automated research script for codebase documentation maintainability.*

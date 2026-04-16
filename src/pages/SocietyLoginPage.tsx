@@ -7,7 +7,7 @@ import { toast } from 'react-hot-toast';
 import { Lock } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { SUPER_ADMINS } from '../constants/defaults';
-import { auth, db } from '../firebase';
+import { auth, authPersistenceReady, db } from '../firebase';
 
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -33,7 +33,9 @@ const SocietyLoginPage: React.FC<SocietyLoginPageProps> = ({ societyId }) => {
         setLoading(true);
 
         try {
-            await signInWithEmailAndPassword(auth, email, password);
+            await authPersistenceReady;
+            const credential = await signInWithEmailAndPassword(auth, email, password);
+            await credential.user.getIdToken();
 
             const isSuperAdmin = SUPER_ADMINS.includes(email);
 

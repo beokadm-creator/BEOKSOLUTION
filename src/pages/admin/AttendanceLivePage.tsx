@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, updateDoc, getDoc, Timestamp, addDoc, increment, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent } from '../../components/ui/card';
-import { Loader2, LogIn, LogOut, RefreshCw, CheckCircle, FileText, X, Search, Clock, MapPin, Calendar, AlertCircle } from 'lucide-react';
+import { Loader2, LogIn, LogOut, RefreshCw, CheckCircle, FileText, X, Search, Clock, MapPin, Calendar, AlertCircle, Settings } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../../lib/utils';
 
@@ -52,12 +52,13 @@ interface Registration {
 
 interface LogEntry {
     id: string;
-    type: 'ENTER' | 'EXIT';
+    type: 'ENTER' | 'EXIT' | 'ADJUST';
     timestamp: Timestamp;
     zoneId: string;
     rawDuration?: number;
     deduction?: number;
     recognizedMinutes?: number;
+    accumulatedTotal?: number;
     method?: string;
 }
 
@@ -77,6 +78,16 @@ const AttendanceLivePage: React.FC = () => {
     const [showLogModal, setShowLogModal] = useState(false);
     const [selectedRegForLog, setSelectedRegForLog] = useState<Registration | null>(null);
     const [logs, setLogs] = useState<LogEntry[]>([]);
+    const logsUnsubRef = useRef<null | (() => void)>(null);
+
+    const [showAdjustModal, setShowAdjustModal] = useState(false);
+    const [selectedRegForAdjust, setSelectedRegForAdjust] = useState<Registration | null>(null);
+    const [adjustMode, setAdjustMode] = useState<'CHECKIN' | 'CHECKOUT' | 'ADJUST_MINUTES'>('ADJUST_MINUTES');
+    const [adjustZoneId, setAdjustZoneId] = useState<string>('');
+    const [adjustCheckInTime, setAdjustCheckInTime] = useState<string>('');
+    const [adjustCheckOutTime, setAdjustCheckOutTime] = useState<string>('');
+    const [adjustRecognizedMinutes, setAdjustRecognizedMinutes] = useState<string>('');
+    const [adjustTodayMinutes, setAdjustTodayMinutes] = useState<string>('');
 
     // For live tracking
     const [currentTime, setCurrentTime] = useState(new Date());
@@ -118,6 +129,9 @@ const AttendanceLivePage: React.FC = () => {
         fetchDates();
     }, [cid]);
 
+    // Keep allZones globally to safely check rules for zones spanning across days
+    const allZonesRef = useRef<ZoneRule[]>([]);
+
     useEffect(() => {
         if (!cid) return;
 
@@ -130,6 +144,24 @@ const AttendanceLivePage: React.FC = () => {
         const unsubscribeRules = onSnapshot(rulesRef, (snap) => {
             if (snap.exists()) {
                 const allRules = snap.data().rules || {};
+                
+                // Extract all zones into allZonesRef
+                const allZones: any[] = [];
+                Object.entries(allRules).forEach(([dateStr, rule]: [string, any]) => {
+                    if (rule?.zones) {
+                        rule.zones.forEach((z: any) => {
+                            allZones.push({
+                                ...z,
+                                ruleDate: dateStr,
+                                globalGoalMinutes: rule.globalGoalMinutes || 0,
+                                completionMode: rule.completionMode || 'DAILY_SEPARATE',
+                                cumulativeGoalMinutes: rule.cumulativeGoalMinutes || 0
+                            });
+                        });
+                    }
+                });
+                allZonesRef.current = allZones;
+                
                 const targetRule = allRules[selectedDate];
                 setRules(targetRule || null);
                 if (targetRule) setZones(targetRule.zones || []);
@@ -237,7 +269,29 @@ const AttendanceLivePage: React.FC = () => {
         console.log('[AttendanceLive] Manual refresh requested (handled by onSnapshot)');
     }, []);
 
-    const handleCheckIn = async (regId: string, zoneId: string) => {
+    const getDateTimeKst = (dateStr: string, timeStr: string): Date | null => {
+        const t = timeStr.trim();
+        if (!/^\d{2}:\d{2}$/.test(t)) return null;
+        const dt = new Date(`${dateStr}T${t}:00+09:00`);
+        return isNaN(dt.getTime()) ? null : dt;
+    };
+
+    const getGoalMinutes = () => {
+        if (!rules) return 0;
+        return rules.completionMode === 'CUMULATIVE'
+            ? (rules.cumulativeGoalMinutes || 0)
+            : (rules.globalGoalMinutes || 0);
+    };
+
+    const recomputeIsCompleted = (newTotalMinutes: number, zoneMinutes: Record<string, number>, zoneCompleted: Record<string, boolean>) => {
+        if (!rules) return false;
+        const anyZoneCompleted = Object.values(zoneCompleted).some(v => v === true);
+        const goalMinutes = getGoalMinutes();
+        const cumulativeCompleted = rules.completionMode === 'CUMULATIVE' && goalMinutes > 0 && newTotalMinutes >= goalMinutes;
+        return anyZoneCompleted || cumulativeCompleted;
+    };
+
+    const handleCheckIn = async (regId: string, zoneId: string, checkInAt?: Date) => {
         try {
             const reg = registrations.find(r => r.id === regId);
 
@@ -251,8 +305,12 @@ const AttendanceLivePage: React.FC = () => {
 
             const collectionName = reg?.isExternal ? 'external_attendees' : 'registrations';
             const regRef = doc(db, 'conferences', cid!, collectionName, regId);
-            const now = Timestamp.now();
-            const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+            const nowDate = checkInAt || new Date();
+            const now = Timestamp.fromDate(nowDate);
+            
+            // Use the actual ruleDate of the zone being checked into
+            const zoneRule = (allZonesRef.current.find(z => z.id === zoneId) as any) || zones.find(z => z.id === zoneId);
+            const todayStr = zoneRule?.ruleDate || selectedDate;
 
             await updateDoc(regRef, {
                 attendanceStatus: 'INSIDE',
@@ -266,7 +324,7 @@ const AttendanceLivePage: React.FC = () => {
                 zoneId,
                 timestamp: now,
                 date: todayStr,
-                method: 'MANUAL_ADMIN'
+                method: checkInAt ? 'MANUAL_ADMIN_OVERRIDE' : 'MANUAL_ADMIN'
             });
 
             // [2] 루트 access_logs (통계용)
@@ -279,7 +337,7 @@ const AttendanceLivePage: React.FC = () => {
                     locationId: zoneId,
                     timestamp: now,
                     date: todayStr,
-                    method: 'MANUAL_ADMIN',
+                    method: checkInAt ? 'MANUAL_ADMIN_OVERRIDE' : 'MANUAL_ADMIN',
                     registrationId: regId,
                     isExternal: reg?.isExternal || false,
                 });
@@ -294,14 +352,14 @@ const AttendanceLivePage: React.FC = () => {
         }
     };
 
-    const handleCheckOut = async (regId: string, currentZoneId: string | null, lastCheckIn: Timestamp | undefined, isSwitching = false, isBulk = false) => {
+    const handleCheckOut = async (regId: string, currentZoneId: string | null, lastCheckIn: Timestamp | undefined, isSwitching = false, isBulk = false, checkOutAt?: Date, recognizedOverride?: number) => {
         if (!lastCheckIn || !rules) {
             if (!isBulk) toast.error("체크인 정보가 없거나 규칙이 로드되지 않았습니다.");
             return;
         }
 
         try {
-            const now = new Date();
+            const now = checkOutAt || new Date();
             const checkInTime = lastCheckIn.toDate();
 
             let durationMinutes = 0;
@@ -309,11 +367,13 @@ const AttendanceLivePage: React.FC = () => {
             let boundedStart = checkInTime;
             let boundedEnd = now;
 
-            const zoneRule = zones.find(z => z.id === currentZoneId);
+            // Safe cross-day zone lookup
+            const zoneRule = (allZonesRef.current.find(z => z.id === currentZoneId) as any) || zones.find(z => z.id === currentZoneId);
+            const zoneDateStr = zoneRule?.ruleDate || selectedDate;
 
             if (zoneRule && zoneRule.start && zoneRule.end) {
-                const sessionStart = new Date(`${selectedDate}T${zoneRule.start}:00`);
-                const sessionEnd = new Date(`${selectedDate}T${zoneRule.end}:00`);
+                const sessionStart = new Date(`${zoneDateStr}T${zoneRule.start}:00+09:00`);
+                const sessionEnd = new Date(`${zoneDateStr}T${zoneRule.end}:00+09:00`);
 
                 boundedStart = new Date(Math.max(checkInTime.getTime(), sessionStart.getTime()));
                 boundedEnd = new Date(Math.min(now.getTime(), sessionEnd.getTime()));
@@ -323,9 +383,9 @@ const AttendanceLivePage: React.FC = () => {
                 durationMinutes = Math.floor((boundedEnd.getTime() - boundedStart.getTime()) / 60000);
 
                 if (zoneRule && zoneRule.breaks) {
-                    zoneRule.breaks.forEach(brk => {
-                        const breakStart = new Date(`${selectedDate}T${brk.start}:00`);
-                        const breakEnd = new Date(`${selectedDate}T${brk.end}:00`);
+                    zoneRule.breaks.forEach((brk: any) => {
+                        const breakStart = new Date(`${zoneDateStr}T${brk.start}:00+09:00`);
+                        const breakEnd = new Date(`${zoneDateStr}T${brk.end}:00+09:00`);
                         const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());
                         const overlapEnd = Math.min(boundedEnd.getTime(), breakEnd.getTime());
                         if (overlapEnd > overlapStart) {
@@ -336,12 +396,13 @@ const AttendanceLivePage: React.FC = () => {
                 }
             }
 
-            const finalMinutes = Math.max(0, durationMinutes - deduction);
+            const computedMinutes = Math.max(0, durationMinutes - deduction);
+            const finalMinutes = typeof recognizedOverride === 'number' && !isNaN(recognizedOverride) ? Math.max(0, Math.floor(recognizedOverride)) : computedMinutes;
             const reg = registrations.find(r => r.id === regId);
             const collectionName = reg?.isExternal ? 'external_attendees' : 'registrations';
             const regRef = doc(db, 'conferences', cid!, collectionName, regId);
 
-            const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+            const todayStr = zoneDateStr;
             const currentTotal = reg?.totalMinutes || 0;
             const newTotal = currentTotal + finalMinutes;
 
@@ -374,7 +435,7 @@ const AttendanceLivePage: React.FC = () => {
                 && newTotal >= rules.cumulativeGoalMinutes;
             const isCompleted = anyZoneCompleted || !!cumulativeCompleted;
 
-            const exitNow = Timestamp.now();
+            const exitNow = Timestamp.fromDate(now);
 
             await updateDoc(regRef, {
                 attendanceStatus: 'OUTSIDE',
@@ -393,7 +454,7 @@ const AttendanceLivePage: React.FC = () => {
                 zoneId: currentZoneId,
                 timestamp: exitNow,
                 date: todayStr,
-                method: 'MANUAL_ADMIN',
+                method: checkOutAt || typeof recognizedOverride === 'number' ? 'MANUAL_ADMIN_OVERRIDE' : 'MANUAL_ADMIN',
                 rawDuration: durationMinutes,
                 deduction,
                 recognizedMinutes: finalMinutes
@@ -409,7 +470,7 @@ const AttendanceLivePage: React.FC = () => {
                     locationId: currentZoneId,
                     timestamp: exitNow,
                     date: todayStr,
-                    method: 'MANUAL_ADMIN',
+                    method: checkOutAt || typeof recognizedOverride === 'number' ? 'MANUAL_ADMIN_OVERRIDE' : 'MANUAL_ADMIN',
                     registrationId: regId,
                     isExternal: reg?.isExternal || false,
                     recognizedMinutes: finalMinutes,
@@ -466,18 +527,137 @@ const AttendanceLivePage: React.FC = () => {
         toast.success(`일괄 퇴장 완료: 성공 ${successCount}명, 실패 ${failCount}명`);
     };
 
-    const openLogs = async (reg: Registration) => {
+    const openLogs = (reg: Registration) => {
+        if (logsUnsubRef.current) {
+            logsUnsubRef.current();
+            logsUnsubRef.current = null;
+        }
+
         setSelectedRegForLog(reg);
         setShowLogModal(true);
         setLogs([]);
+
         const collectionName = reg.isExternal ? 'external_attendees' : 'registrations';
-        try {
-            const q = query(collection(db, 'conferences', cid!, collectionName, reg.id, 'logs'), orderBy('timestamp', 'desc'));
-            const snap = await getDocs(q);
+        const q = query(collection(db, 'conferences', cid!, collectionName, reg.id, 'logs'), orderBy('timestamp', 'desc'));
+        logsUnsubRef.current = onSnapshot(q, (snap) => {
             const loadedLogs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as LogEntry[];
             setLogs(loadedLogs);
-        } catch {
+        }, () => {
             toast.error("기록을 불러오지 못했습니다.");
+        });
+    };
+
+    useEffect(() => {
+        if (!showLogModal && logsUnsubRef.current) {
+            logsUnsubRef.current();
+            logsUnsubRef.current = null;
+        }
+    }, [showLogModal]);
+
+    const openAdjust = (reg: Registration) => {
+        setSelectedRegForAdjust(reg);
+        setAdjustMode('ADJUST_MINUTES');
+        setAdjustZoneId(reg.currentZone || zones[0]?.id || '');
+        setAdjustCheckInTime('');
+        setAdjustCheckOutTime('');
+        setAdjustRecognizedMinutes('');
+        setAdjustTodayMinutes(String(reg.dailyMinutes?.[selectedDate] ?? ''));
+        setShowAdjustModal(true);
+    };
+
+    const applyAdjust = async () => {
+        if (!selectedRegForAdjust || !cid || !rules) return;
+        const reg = selectedRegForAdjust;
+        const collectionName = reg.isExternal ? 'external_attendees' : 'registrations';
+        const regRef = doc(db, 'conferences', cid, collectionName, reg.id);
+        const zoneId = adjustZoneId || reg.currentZone || zones[0]?.id || null;
+        const goalMinutes = getGoalMinutes();
+
+        try {
+            if (adjustMode === 'CHECKIN') {
+                if (!zoneId) {
+                    toast.error('Zone이 없습니다.');
+                    return;
+                }
+                const dt = getDateTimeKst(selectedDate, adjustCheckInTime);
+                if (!dt) {
+                    toast.error('입장 시간을 HH:MM 형식으로 입력하세요.');
+                    return;
+                }
+                await handleCheckIn(reg.id, zoneId, dt);
+                setShowAdjustModal(false);
+                return;
+            }
+
+            if (adjustMode === 'CHECKOUT') {
+                const zoneRule = (allZonesRef.current.find(z => z.id === reg.currentZone) as any) || zones.find(z => z.id === reg.currentZone);
+                const zoneDateStr = zoneRule?.ruleDate || selectedDate;
+                const dt = getDateTimeKst(zoneDateStr, adjustCheckOutTime);
+                if (!dt) {
+                    toast.error('퇴장 시간을 HH:MM 형식으로 입력하세요.');
+                    return;
+                }
+                const override = adjustRecognizedMinutes.trim() === '' ? undefined : Number(adjustRecognizedMinutes);
+                await handleCheckOut(reg.id, reg.currentZone, reg.lastCheckIn, false, false, dt, override);
+                setShowAdjustModal(false);
+                return;
+            }
+
+            const inputToday = adjustTodayMinutes.trim();
+            if (inputToday === '' || isNaN(Number(inputToday))) {
+                toast.error('오늘 인정시간(분)을 숫자로 입력하세요.');
+                return;
+            }
+
+            const newTodayMinutes = Math.max(0, Math.floor(Number(inputToday)));
+            const oldDailyMinutes = reg.dailyMinutes?.[selectedDate] || 0;
+            const delta = newTodayMinutes - oldDailyMinutes;
+
+            const currentTotal = reg.totalMinutes || 0;
+            const newTotalMinutes = Math.max(0, currentTotal + delta);
+
+            const dailyMinutes = { ...(reg.dailyMinutes || {}) };
+            dailyMinutes[selectedDate] = newTodayMinutes;
+
+            const zoneMinutes = { ...(reg.zoneMinutes || {}) };
+            if (zoneId) {
+                zoneMinutes[zoneId] = Math.max(0, (zoneMinutes[zoneId] || 0) + delta);
+            }
+
+            const zoneCompleted = { ...(reg.zoneCompleted || {}) };
+            if (zoneId && rules.completionMode !== 'CUMULATIVE') {
+                const zRule = zones.find(z => z.id === zoneId);
+                const zGoal = zRule?.goalMinutes || rules.globalGoalMinutes || 0;
+                zoneCompleted[zoneId] = zGoal > 0 ? (zoneMinutes[zoneId] || 0) >= zGoal : (zoneCompleted[zoneId] || false);
+            }
+
+            const isCompleted = rules.completionMode === 'CUMULATIVE'
+                ? (goalMinutes > 0 ? newTotalMinutes >= goalMinutes : reg.isCompleted)
+                : recomputeIsCompleted(newTotalMinutes, zoneMinutes, zoneCompleted);
+
+            await updateDoc(regRef, {
+                totalMinutes: newTotalMinutes,
+                dailyMinutes,
+                zoneMinutes,
+                zoneCompleted,
+                isCompleted,
+            });
+
+            await addDoc(collection(db, 'conferences', cid, collectionName, reg.id, 'logs'), {
+                type: 'ADJUST',
+                zoneId,
+                timestamp: Timestamp.now(),
+                date: selectedDate,
+                method: 'MANUAL_ADMIN_OVERRIDE',
+                recognizedMinutes: delta,
+                accumulatedTotal: newTotalMinutes,
+            });
+
+            toast.success('수정되었습니다.');
+            setShowAdjustModal(false);
+        } catch (e) {
+            console.error(e);
+            toast.error('수정 실패');
         }
     };
 
@@ -490,6 +670,11 @@ const AttendanceLivePage: React.FC = () => {
             r.affiliation?.toLowerCase().includes(lower)
         );
     }, [registrations, searchTerm]);
+
+    const goalMinutes = rules?.completionMode === 'CUMULATIVE'
+        ? (rules?.cumulativeGoalMinutes || 0)
+        : (rules?.globalGoalMinutes || 0);
+    const goalLabel = rules?.completionMode === 'CUMULATIVE' ? '누적 목표 시간' : '일일 목표 시간';
 
     if (loading) return (
         <div className="flex h-[50vh] items-center justify-center text-slate-400 gap-2">
@@ -550,10 +735,10 @@ const AttendanceLivePage: React.FC = () => {
                             <div className="space-y-1">
                                 <span className="text-sm font-medium text-slate-500 flex items-center gap-1.5">
                                     <Clock className="w-4 h-4" />
-                                    일일 목표 시간
+                                    {goalLabel}
                                 </span>
                                 <div className="text-2xl font-bold text-slate-900">
-                                    {rules?.globalGoalMinutes || 0} <span className="text-sm font-normal text-slate-400">분</span>
+                                    {goalMinutes} <span className="text-sm font-normal text-slate-400">분</span>
                                 </div>
                             </div>
                             <div className="h-10 w-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -612,7 +797,7 @@ const AttendanceLivePage: React.FC = () => {
                         <div className="col-span-3">참가자 정보</div>
                         <div className="col-span-2 text-center">출결 상태</div>
                         <div className="col-span-2">현재 위치 (Zone)</div>
-                        <div className="col-span-2 text-right px-4">누적 시간</div>
+                        <div className="col-span-2 text-right px-4">오늘 / 누적</div>
                         <div className="col-span-3 text-right">관리 작업</div>
                     </div>
 
@@ -667,6 +852,10 @@ const AttendanceLivePage: React.FC = () => {
                                         displayTotal = r.totalMinutes + Math.max(0, diffMins - liveDeduction);
                                         isLive = true;
                                     }
+
+                                    const liveSessionMinutes = isLive ? Math.max(0, displayTotal - r.totalMinutes) : 0;
+                                    const todayMinutes = Number(r.dailyMinutes?.[selectedDate] || 0) + liveSessionMinutes;
+                                    const remainingMinutes = goalMinutes > 0 ? Math.max(0, goalMinutes - displayTotal) : 0;
 
                                     return (
                                         <div key={r.id} className={cn(
@@ -734,30 +923,15 @@ const AttendanceLivePage: React.FC = () => {
                                                         "h-auto p-1 font-mono text-lg font-bold leading-none hover:bg-blue-50 transition-colors",
                                                         isLive ? "text-purple-600" : "text-slate-800"
                                                     )}
-                                                    onClick={async () => {
-                                                        const newVal = prompt(`${r.userName}님의 누적 시간을 수정하시겠습니까? (단위: 분)`, String(r.totalMinutes));
-                                                        if (newVal !== null) {
-                                                            const mins = parseInt(newVal);
-                                                            if (!isNaN(mins)) {
-                                                                const collectionName = r.isExternal ? 'external_attendees' : 'registrations';
-                                                                const updatedDailyMinutes = { ...(r.dailyMinutes || {}) };
-                                                                updatedDailyMinutes[selectedDate] = mins;
-                                                                const updatedZoneMinutes = { ...(r.zoneMinutes || {}) };
-                                                                if (r.currentZone) {
-                                                                    updatedZoneMinutes[r.currentZone] = mins;
-                                                                }
-                                                                await updateDoc(doc(db, 'conferences', cid!, collectionName, r.id), {
-                                                                    totalMinutes: mins,
-                                                                    dailyMinutes: updatedDailyMinutes,
-                                                                    zoneMinutes: updatedZoneMinutes,
-                                                                });
-                                                                toast.success('수정되었습니다.');
-                                                            }
-                                                        }
-                                                    }}
+                                                    onClick={() => openAdjust(r)}
                                                 >
                                                     {displayTotal}
                                                 </Button>
+                                                <div className="mt-1 text-[10px] font-bold text-slate-500 flex items-center gap-2">
+                                                    <span className="text-indigo-600">{todayMinutes}m</span>
+                                                    <span className="text-slate-300">|</span>
+                                                    <span className="text-emerald-700">{remainingMinutes}m</span>
+                                                </div>
                                                 <div className={cn(
                                                     "text-[10px] mt-0.5 font-bold px-1 rounded",
                                                     isLive ? "text-purple-400 bg-purple-50 animate-pulse" : "text-slate-400"
@@ -797,6 +971,14 @@ const AttendanceLivePage: React.FC = () => {
                                                     variant="ghost"
                                                     size="sm"
                                                     className="h-8 w-8 text-slate-400 hover:text-slate-600 rounded-full"
+                                                    onClick={() => openAdjust(r)}
+                                                >
+                                                    <Settings className="w-4 h-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 w-8 text-slate-400 hover:text-slate-600 rounded-full"
                                                     onClick={() => openLogs(r)}
                                                 >
                                                     <FileText className="w-4 h-4" />
@@ -810,6 +992,88 @@ const AttendanceLivePage: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Adjust Modal */}
+            {showAdjustModal && selectedRegForAdjust && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh]">
+                        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <div>
+                                <h3 className="font-bold text-lg text-slate-900">{selectedRegForAdjust.userName}</h3>
+                                <p className="text-xs text-slate-500 mt-0.5 font-mono">{selectedRegForAdjust.userEmail}</p>
+                            </div>
+                            <Button variant="ghost" size="icon" onClick={() => setShowAdjustModal(false)} className="rounded-full hover:bg-slate-200/50">
+                                <X className="w-5 h-5 text-slate-500" />
+                            </Button>
+                        </div>
+
+                        <div className="p-6 space-y-4 overflow-y-auto">
+                            <div className="flex gap-2">
+                                {(['ADJUST_MINUTES', 'CHECKIN', 'CHECKOUT'] as const).map((m) => (
+                                    <button
+                                        key={m}
+                                        type="button"
+                                        onClick={() => setAdjustMode(m)}
+                                        className={cn(
+                                            "flex-1 px-3 py-2 rounded-lg border text-xs font-bold transition-colors",
+                                            adjustMode === m ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                                        )}
+                                    >
+                                        {m === 'ADJUST_MINUTES' ? '인정시간' : m === 'CHECKIN' ? '수기 입장' : '수기 퇴장'}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="col-span-2">
+                                    <div className="text-xs font-bold text-slate-500 mb-1">Zone</div>
+                                    <select
+                                        value={adjustZoneId}
+                                        onChange={(e) => setAdjustZoneId(e.target.value)}
+                                        className="w-full h-10 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700"
+                                    >
+                                        {zones.map((z) => (
+                                            <option key={z.id} value={z.id}>{z.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {adjustMode === 'CHECKIN' && (
+                                    <div className="col-span-2">
+                                        <div className="text-xs font-bold text-slate-500 mb-1">입장 시간 (HH:MM)</div>
+                                        <Input value={adjustCheckInTime} onChange={(e) => setAdjustCheckInTime(e.target.value)} placeholder="예: 09:00" className="h-10" />
+                                    </div>
+                                )}
+
+                                {adjustMode === 'CHECKOUT' && (
+                                    <>
+                                        <div className="col-span-2">
+                                            <div className="text-xs font-bold text-slate-500 mb-1">퇴장 시간 (HH:MM)</div>
+                                            <Input value={adjustCheckOutTime} onChange={(e) => setAdjustCheckOutTime(e.target.value)} placeholder="예: 18:00" className="h-10" />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <div className="text-xs font-bold text-slate-500 mb-1">인정시간 직접 입력 (선택)</div>
+                                            <Input value={adjustRecognizedMinutes} onChange={(e) => setAdjustRecognizedMinutes(e.target.value)} placeholder="비우면 자동 계산" className="h-10" />
+                                        </div>
+                                    </>
+                                )}
+
+                                {adjustMode === 'ADJUST_MINUTES' && (
+                                    <div className="col-span-2">
+                                        <div className="text-xs font-bold text-slate-500 mb-1">오늘 인정시간(분) (선택한 날짜 기준)</div>
+                                        <Input value={adjustTodayMinutes} onChange={(e) => setAdjustTodayMinutes(e.target.value)} placeholder="예: 240" className="h-10" />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="p-4 border-t border-slate-100 bg-white flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setShowAdjustModal(false)}>취소</Button>
+                            <Button onClick={applyAdjust}>적용</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Log Modal */}
             {showLogModal && selectedRegForLog && (
@@ -848,33 +1112,46 @@ const AttendanceLivePage: React.FC = () => {
                                                     <div>
                                                         <span className={cn(
                                                             "text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border mb-1 inline-block",
-                                                            log.type === 'ENTER' ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-slate-50 text-slate-500 border-slate-100"
+                                                            log.type === 'ENTER' ? "bg-blue-50 text-blue-600 border-blue-100" : log.type === 'EXIT' ? "bg-slate-50 text-slate-500 border-slate-100" : "bg-amber-50 text-amber-700 border-amber-100"
                                                         )}>
                                                             {log.type}
                                                         </span>
                                                         <div className="font-semibold text-slate-800 text-sm mt-0.5">
                                                             {zones.find(z => z.id === log.zoneId)?.name || log.zoneId || 'Unknown Zone'}
                                                         </div>
+                                                        {log.method && (
+                                                            <div className="text-[10px] text-slate-400 font-mono mt-1">{log.method}</div>
+                                                        )}
                                                     </div>
                                                     <span className="text-xs text-slate-400 font-mono">
-                                                        {log.timestamp?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        {log.timestamp?.toDate().toLocaleString([], { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                                                     </span>
                                                 </div>
 
-                                                {log.type === 'EXIT' && (
+                                                {(log.type === 'EXIT' || log.type === 'ADJUST') && (
                                                     <div className="mt-3 bg-slate-50 rounded-lg p-3 border border-slate-100 text-xs space-y-2">
-                                                        <div className="flex justify-between text-slate-500">
-                                                            <span>체류 시간 (Raw)</span>
-                                                            <span className="font-mono">{log.rawDuration}분</span>
-                                                        </div>
-                                                        <div className="flex justify-between text-red-400">
-                                                            <span className="flex items-center gap-1"><AlertCircle className="w-3 h-3" /> 휴게 차감</span>
-                                                            <span className="font-mono">-{log.deduction}분</span>
-                                                        </div>
+                                                        {typeof log.rawDuration === 'number' && (
+                                                            <div className="flex justify-between text-slate-500">
+                                                                <span>체류 시간 (Raw)</span>
+                                                                <span className="font-mono">{log.rawDuration}분</span>
+                                                            </div>
+                                                        )}
+                                                        {typeof log.deduction === 'number' && (
+                                                            <div className="flex justify-between text-red-400">
+                                                                <span className="flex items-center gap-1"><AlertCircle className="w-3 h-3" /> 휴게 차감</span>
+                                                                <span className="font-mono">-{log.deduction}분</span>
+                                                            </div>
+                                                        )}
                                                         <div className="flex justify-between items-center pt-2 border-t border-slate-200 font-bold text-blue-600 text-sm">
-                                                            <span>최종 인정</span>
-                                                            <span className="font-mono text-base">{log.recognizedMinutes}m</span>
+                                                            <span>{log.type === 'ADJUST' ? '조정' : '최종 인정'}</span>
+                                                            <span className="font-mono text-base">{log.recognizedMinutes ?? 0}m</span>
                                                         </div>
+                                                        {typeof log.accumulatedTotal === 'number' && (
+                                                            <div className="flex justify-between text-slate-500">
+                                                                <span>누적</span>
+                                                                <span className="font-mono">{log.accumulatedTotal}m</span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>

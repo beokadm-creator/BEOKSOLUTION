@@ -61,4 +61,18 @@ describe('Kiosk AUTO Mode & Time Calculation Verification', () => {
         // Zone 시작이 09:00 이므로 0분 인정
         expect(recognizedMinutes).toBe(0);
     });
+
+    test('시나리오 7: 반복 입장/퇴장 시 시간 누적이 과도하게 증가하지 않는다 (KST/UTC 9시간 버그 회귀 방지)', () => {
+        const checkIn1 = new Date('2026-04-12T09:00:00+09:00');
+        const exit1 = new Date('2026-04-12T09:01:00+09:00');
+        const m1 = calculateRecognizedMinutes(checkIn1, exit1, testZoneConfig);
+        expect(m1).toBe(1);
+
+        const checkIn2 = new Date('2026-04-12T09:02:00+09:00');
+        const exit2 = new Date('2026-04-12T09:03:00+09:00');
+        const m2 = calculateRecognizedMinutes(checkIn2, exit2, testZoneConfig);
+        expect(m2).toBe(1);
+
+        expect(m1 + m2).toBe(2);
+    });
 });
