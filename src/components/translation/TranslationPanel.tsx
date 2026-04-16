@@ -338,7 +338,18 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
             const showAsRaw = !isFinal && !isTimeOut && !isFallback;
 
             if (activeLang === 'en' && /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(text)) {
-              return null;
+              return (
+                <TextItem
+                  key={id}
+                  id={id}
+                  text={text}
+                  isRaw={true}
+                  targetLang={activeLang}
+                  fontSize={`${fontSize}px`}
+                  color="#9ca3af"
+                  opacity={0.6}
+                />
+              );
             }
 
             return (
