@@ -18,6 +18,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeSessionInfo, setActiveSessionInfo] = useState<any | null>(null);
+  const [lastFlushTime, setLastFlushTime] = useState<number>(0);
   const [activeLang, setActiveLang] = useState<string>('ko');
 
   // Viewer Settings
@@ -112,8 +113,15 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
       }
     });
 
+    // Subscribe to state/lastFlushTime to handle "Clear Screen" from admin
+    const flushTimeRef = ref(rtdb, `projects/${selectedProjectId}/state/lastFlushTime`);
+    const unsubscribeFlushTime = onValue(flushTimeRef, (snap) => {
+      setLastFlushTime(snap.val() || 0);
+    });
+
     return () => {
       unsubscribeActive();
+      unsubscribeFlushTime();
     };
   }, [selectedProjectId]);
 
@@ -126,6 +134,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
 
   const segmentsOrder = Object.keys(segmentsMap)
     .filter(k => segmentsMap[k]?.sessionId === activeSessionId)
+    .filter(k => (segmentsMap[k]?.timestamp || 0) >= lastFlushTime)
     .sort((a, b) => (segmentsMap[a]?.timestamp || 0) - (segmentsMap[b]?.timestamp || 0));
 
   // Scroll to bottom when a new segment is added
@@ -214,7 +223,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
               </button>
             ))}
             <button
-              onClick={() => window.open(`/audience/${selectedProjectId}`, '_blank')}
+              onClick={() => window.open(`https://translation-comm.web.app/audience/${selectedProjectId}`, '_blank')}
               className="px-3 py-1 text-xs rounded-full font-bold bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors hidden sm:block"
             >
               {activeLang === 'en' ? 'Open in New Tab' : '새 창에서 열기'}
@@ -236,7 +245,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
           <button onClick={() => setLineHeight(v => Math.min(4.0, parseFloat((v + 0.1).toFixed(1))))} className="p-1.5 hover:bg-white/10 rounded text-xs font-medium text-gray-400 hover:text-white">↕+</button>
         </div>
         <button
-          onClick={() => window.open(`/audience/${selectedProjectId}`, '_blank')}
+          onClick={() => window.open(`https://translation-comm.web.app/audience/${selectedProjectId}`, '_blank')}
           className="shrink-0 px-3 py-1 text-[10px] rounded-full font-bold bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors whitespace-nowrap"
         >
           {activeLang === 'en' ? 'New Tab' : '새 창'}
@@ -329,18 +338,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
             const showAsRaw = !isFinal && !isTimeOut && !isFallback;
 
             if (activeLang === 'en' && /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(text)) {
-              return (
-                <TextItem
-                  key={id}
-                  id={id}
-                  text={text}
-                  isRaw={true}
-                  targetLang={activeLang}
-                  fontSize={`${fontSize}px`}
-                  color="#9ca3af"
-                  opacity={0.6}
-                />
-              );
+              return null;
             }
 
             return (
