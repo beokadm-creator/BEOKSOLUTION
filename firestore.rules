@@ -15,6 +15,19 @@ service cloud.firestore {
       );
     }
 
+    function isSocietyAdmin(societyId) {
+      let societyDoc = get(/databases/$(database)/documents/societies/$(societyId));
+      return isAuthenticated() &&
+        societyDoc.data != null &&
+        societyDoc.data.adminEmails != null &&
+        request.auth.token.email in societyDoc.data.adminEmails;
+    }
+
+    function isConferenceAdmin(confId) {
+      let conf = get(/databases/$(database)/documents/conferences/$(confId)).data;
+      return conf != null && isSocietyAdmin(conf.societyId);
+    }
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
@@ -44,7 +57,7 @@ service cloud.firestore {
       // Public conference mapping under society namespace
       match /conferences/{confDocId} {
         allow read: if true;
-        allow write: if isSuperAdmin();
+        allow write: if isSuperAdmin() || isSocietyAdmin(societyId);
       }
 
       // Public settings required by landing/registration flows
@@ -72,7 +85,7 @@ service cloud.firestore {
 
       // Notification templates are admin resources
       match /notification-templates/{templateId} {
-        allow read, write: if isSuperAdmin();
+        allow read, write: if isSuperAdmin() || isSocietyAdmin(societyId);
       }
 
       // Default deny for unlisted society subcollections
@@ -90,7 +103,9 @@ service cloud.firestore {
     // Conferences
     match /conferences/{confId} {
       allow read: if true;
-      allow write: if isSuperAdmin();
+      allow write: if isSuperAdmin() || 
+                   (resource != null && isSocietyAdmin(resource.data.societyId)) ||
+                   (request.resource != null && isSocietyAdmin(request.resource.data.societyId));
 
       // Public conference subcollections except explicitly restricted collections.
       // Restricted collections are handled by dedicated rules below.
@@ -124,18 +139,18 @@ service cloud.firestore {
 
       // Registrations: Restricted read/write
       match /registrations/{userId} {
-        allow read: if isOwner(userId) || isSuperAdmin();
-        allow write: if isOwner(userId) || isSuperAdmin() || 
+        allow read: if isOwner(userId) || isSuperAdmin() || isConferenceAdmin(confId);
+        allow write: if isOwner(userId) || isSuperAdmin() || isConferenceAdmin(confId) || 
                      (isAuthenticated() && request.resource.data.userId == request.auth.uid);
         
          match /logs/{logId} {
-           allow read, write: if isOwner(userId); 
+           allow read, write: if isOwner(userId) || isConferenceAdmin(confId); 
          }
       }
 
       // External Attendees: Admin only
       match /external_attendees/{attendeeId} {
-        allow read, write: if isSuperAdmin();
+        allow read, write: if isSuperAdmin() || isConferenceAdmin(confId);
       }
 
       // Stamps: Stamp Tour
@@ -172,14 +187,17 @@ service cloud.firestore {
 
       // Vendor sponsorship requests
       match /vendor_requests/{requestId} {
-        allow read: if isSuperAdmin() || isVendorMember(resource.data.vendorId);
-        allow create, update: if isSuperAdmin() ||
+        allow read: if isSuperAdmin() || isVendorMember(resource.data.vendorId) || isConferenceAdmin(confId);
+        allow create, update: if isSuperAdmin() || isConferenceAdmin(confId) ||
           (isVendorMember(request.resource.data.vendorId) && request.resource.data.vendorId == requestId);
-        allow delete: if isSuperAdmin();
+        allow delete: if isSuperAdmin() || isConferenceAdmin(confId);
       }
     }
 
     // Collection Group Query Rules
+    match /{path=**}/vendor_requests/{requestId} {
+      allow read: if isSuperAdmin() || isVendorMember(resource.data.vendorId);
+    }
     match /{path=**}/sponsors/{sponsorId} {
       allow read: if true;
     }

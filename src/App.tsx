@@ -115,7 +115,7 @@ const App: React.FC = () => {
       }
     }
 
-    const activeSocietyId = params.get('society') || effectiveSubdomain;
+    const activeSocietyId = params.get('society') || sessionStorage.getItem('societyId') || effectiveSubdomain;
 
     return (
       <GlobalErrorBoundary>
