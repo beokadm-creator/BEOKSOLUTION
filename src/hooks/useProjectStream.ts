@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { translationDb as rtdb } from '../lib/translationFirebase';
 import { ref, onValue, off, get, query, limitToLast, orderByChild, endBefore } from 'firebase/database';
 
-export const useProjectStream = (projectIdOrSlug: string | undefined, options: { subscribe?: boolean } = { subscribe: true }) => {
+export const useProjectStream = (projectIdOrSlug: string | undefined, activeSessionId?: string | null, options: { subscribe?: boolean } = { subscribe: true }) => {
   const [realProjectId, setRealProjectId] = useState<string | null>(null);
-  const [streamData, setStreamData] = useState<Record<string, { original: string; refined?: string; ko?: string; en?: string; ja?: string; status: 'raw' | 'translating' | 'final' | 'merged'; timestamp: number; seq?: number; mergedIds?: string[] } | null> | null>(null);
+  const [streamData, setStreamData] = useState<Record<string, { original: string; refined?: string; ko?: string; en?: string; status: 'raw' | 'translating' | 'final' | 'merged'; timestamp: number; seq?: number; mergedIds?: string[], sessionId?: string }> | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
@@ -53,8 +53,7 @@ export const useProjectStream = (projectIdOrSlug: string | undefined, options: {
     }
 
     let mounted = true;
-    let streamRef: any = null;
-    let streamListener: any = null;
+    let unsubscribeStream: (() => void) | null = null;
 
     const resolveAndSubscribe = async () => {
       try {
@@ -68,9 +67,8 @@ export const useProjectStream = (projectIdOrSlug: string | undefined, options: {
             orderByChild('timestamp'),
             limitToLast(50)
           );
-          streamRef = streamQuery;
 
-          streamListener = (snapshot: any) => {
+          unsubscribeStream = onValue(streamQuery, (snapshot: any) => {
             if (!mounted) return;
             const data = snapshot.val() || {};
             
@@ -83,9 +81,9 @@ export const useProjectStream = (projectIdOrSlug: string | undefined, options: {
               ...prev,
               ...data
             }));
+            
             setLoading(false);
-          };
-          onValue(streamQuery, streamListener, (err) => {
+          }, (err) => {
             console.error("Stream subscription error:", err);
             if (mounted) {
               setError(err instanceof Error ? err.message : String(err));
@@ -105,8 +103,8 @@ export const useProjectStream = (projectIdOrSlug: string | undefined, options: {
 
     return () => {
       mounted = false;
-      if (streamRef && streamListener) {
-        off(streamRef, 'value', streamListener);
+      if (unsubscribeStream) {
+        unsubscribeStream();
       }
     };
   }, [projectIdOrSlug, options.subscribe]);
