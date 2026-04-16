@@ -69,6 +69,8 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
     return () => unsubscribe();
   }, [defaultConferenceId]);
 
+  const lastProcessedSessIdRef = useRef<string | null>(null);
+
   // Subscribe to active session for selected project
   useEffect(() => {
     if (!selectedProjectId) {
@@ -90,13 +92,15 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
             const sessData = sessSnap.val();
             setActiveSessionInfo(sessData);
             
-            // Set default language based on sourceLanguage
-            // If source is Korean (ko), default to English (en)
-            // If source is English (en), default to Korean (ko)
-            if (sessData.sourceLanguage === 'ko') {
-              setActiveLang('en');
-            } else if (sessData.sourceLanguage === 'en') {
-              setActiveLang('ko');
+            // Set default language based on sourceLanguage ONLY when the session ID actually changes
+            if (sessId !== lastProcessedSessIdRef.current) {
+              lastProcessedSessIdRef.current = sessId;
+              
+              if (sessData.sourceLanguage === 'ko') {
+                setActiveLang('en');
+              } else if (sessData.sourceLanguage === 'en') {
+                setActiveLang('ko');
+              }
             }
           } else {
             setActiveSessionInfo(null);
@@ -104,6 +108,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
         });
       } else {
         setActiveSessionInfo(null);
+        lastProcessedSessIdRef.current = null;
       }
     });
 
@@ -170,7 +175,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   const project = projects.find(p => p.slug === selectedProjectId);
 
   return (
-    <div className="relative bg-gray-900 text-white rounded-2xl flex flex-col h-[400px] sm:h-[500px] overflow-hidden shadow-xl mt-4">
+    <div className="relative bg-gray-900 text-white rounded-2xl flex flex-col h-[800px] sm:h-[1000px] lg:h-[1200px] overflow-hidden shadow-xl mt-4">
       <style>{`
         @keyframes blink-cursor {
             0%, 100% { opacity: 1; }
@@ -208,13 +213,19 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
                 {lang === 'ko' ? 'KR' : 'EN'}
               </button>
             ))}
+            <button
+              onClick={() => window.open(`/audience/${selectedProjectId}`, '_blank')}
+              className="px-3 py-1 text-xs rounded-full font-bold bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors hidden sm:block"
+            >
+              {activeLang === 'en' ? 'Open in New Tab' : '새 창에서 열기'}
+            </button>
           </div>
         </div>
       </div>
       
       {/* Mobile Settings Bar */}
-      <div className="sm:hidden bg-gray-800 border-b border-gray-700 px-4 py-2 flex justify-between items-center overflow-x-auto">
-        <div className="flex items-center gap-1">
+      <div className="sm:hidden bg-gray-800 border-b border-gray-700 px-4 py-2 flex justify-between items-center overflow-x-auto gap-2">
+        <div className="flex items-center gap-1 shrink-0">
           <button onClick={() => setFontSize(v => Math.max(12, v - 2))} className="p-1.5 hover:bg-white/10 rounded text-xs font-medium text-gray-400 hover:text-white">A−</button>
           <button onClick={() => setFontSize(v => Math.min(48, v + 2))} className="p-1.5 hover:bg-white/10 rounded text-sm font-bold text-gray-400 hover:text-white">A+</button>
           <div className="w-px h-3 bg-gray-700 mx-1"></div>
@@ -224,6 +235,12 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
           <button onClick={() => setLineHeight(v => Math.max(1.0, parseFloat((v - 0.1).toFixed(1))))} className="p-1.5 hover:bg-white/10 rounded text-xs font-medium text-gray-400 hover:text-white">↕−</button>
           <button onClick={() => setLineHeight(v => Math.min(4.0, parseFloat((v + 0.1).toFixed(1))))} className="p-1.5 hover:bg-white/10 rounded text-xs font-medium text-gray-400 hover:text-white">↕+</button>
         </div>
+        <button
+          onClick={() => window.open(`/audience/${selectedProjectId}`, '_blank')}
+          className="shrink-0 px-3 py-1 text-[10px] rounded-full font-bold bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors whitespace-nowrap"
+        >
+          {activeLang === 'en' ? 'New Tab' : '새 창'}
+        </button>
       </div>
 
       {activeSessionInfo && (
@@ -316,7 +333,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
                 <TextItem
                   key={id}
                   id={id}
-                  text=""
+                  text={text}
                   isRaw={true}
                   targetLang={activeLang}
                   fontSize={`${fontSize}px`}
