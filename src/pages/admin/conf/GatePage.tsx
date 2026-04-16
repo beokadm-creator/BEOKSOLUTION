@@ -6,7 +6,6 @@ import { Loader2, ArrowLeft, AlertCircle, CheckCircle, Palette, MapPin, ScanLine
 import { Button } from '../../../components/ui/button';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { cn } from '../../../lib/utils';
 
 interface ScannerState {
     status: 'IDLE' | 'PROCESSING' | 'SUCCESS' | 'ERROR';
@@ -416,12 +415,6 @@ const GatePage: React.FC = () => {
     if (loading) return <div className="p-10 text-center font-bold">Loading...</div>;
 
     const activeZone = zones.find(z => z.id === selectedZoneId);
-    const modeLabel =
-        mode === 'AUTO'
-            ? { ko: '자동', en: 'Auto', tone: 'bg-cyan-600' }
-            : mode === 'ENTER_ONLY'
-                ? { ko: '입장', en: 'Entry', tone: 'bg-sky-600' }
-                : { ko: '퇴장', en: 'Exit', tone: 'bg-indigo-700' };
 
     return (
         <div
@@ -512,15 +505,12 @@ const GatePage: React.FC = () => {
                 </div>
 
                 <div className="z-10 w-full max-w-4xl overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/5 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all duration-500">
-                    <div className="border-b border-white/10 bg-gradient-to-r from-white/5 to-transparent px-8 py-5 text-white">
-                        <div className="flex items-center justify-between gap-4">
-                            <div>
-                                <p className="mt-1 text-2xl font-black text-white drop-shadow-md">{activeZone?.name}</p>
+                    <div className="p-12 flex flex-col items-center">
+                        <div className="mb-8 flex items-center justify-center">
+                            <div className="inline-flex items-center justify-center rounded-full border border-[#00E5FF]/35 bg-[#00E5FF]/10 px-8 py-2.5 text-2xl font-black uppercase tracking-[0.28em] text-[#00E5FF] shadow-[0_0_30px_rgba(0,229,255,0.18)] backdrop-blur">
+                                {mode === 'AUTO' ? 'AUTO' : mode === 'ENTER_ONLY' ? 'ENTER' : 'EXIT'}
                             </div>
                         </div>
-                    </div>
-
-                    <div className="p-12 flex flex-col items-center">
                         <div className="relative mb-8">
                             {/* Scanning Laser Animation */}
                             <div className="absolute inset-0 z-20 pointer-events-none rounded-[2rem] overflow-hidden">
