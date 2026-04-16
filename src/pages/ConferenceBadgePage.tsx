@@ -1,4 +1,4 @@
-﻿import React, { useLayoutEffect, useMemo, useState } from "react";
+import React, { useLayoutEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, Timestamp, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -52,6 +52,7 @@ type BadgeUiData = {
     receiptNumber: string;
     lastCheckIn?: TimestampLike;
     baseMinutes: number;
+    isCompleted?: boolean;
 };
 
 type StampTourConfig = {
@@ -257,7 +258,8 @@ const ConferenceBadgePage: React.FC = () => {
                 qrValue,
                 receiptNumber: String(registration.receiptNumber || registration.orderId || "-"),
                 lastCheckIn: registration.lastCheckIn,
-                baseMinutes
+                baseMinutes,
+                isCompleted: !!registration.isCompleted
             });
             setLiveMinutes(baseMinutes);
             setMsg("");
@@ -320,8 +322,8 @@ const ConferenceBadgePage: React.FC = () => {
 
             if (zoneRule?.start && zoneRule.end) {
                 const localDateStr = zoneRule.ruleDate || `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
-                const sessionStart = new Date(`${localDateStr}T${zoneRule.start}:00`);
-                const sessionEnd = new Date(`${localDateStr}T${zoneRule.end}:00`);
+                const sessionStart = new Date(`${localDateStr}T${zoneRule.start}:00+09:00`);
+                const sessionEnd = new Date(`${localDateStr}T${zoneRule.end}:00+09:00`);
                 boundedStart = new Date(Math.max(start.getTime(), sessionStart.getTime()));
                 boundedEnd = new Date(Math.min(now.getTime(), sessionEnd.getTime()));
             }
@@ -334,8 +336,8 @@ const ConferenceBadgePage: React.FC = () => {
             let deduction = 0;
             zoneRule?.breaks?.forEach((breakTime) => {
                 const localDateStr = zoneRule.ruleDate || `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
-                const breakStart = new Date(`${localDateStr}T${breakTime.start}:00`);
-                const breakEnd = new Date(`${localDateStr}T${breakTime.end}:00`);
+                const breakStart = new Date(`${localDateStr}T${breakTime.start}:00+09:00`);
+                const breakEnd = new Date(`${localDateStr}T${breakTime.end}:00+09:00`);
                 const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());
                 const overlapEnd = Math.min(boundedEnd.getTime(), breakEnd.getTime());
                 if (overlapEnd > overlapStart) {
@@ -519,83 +521,90 @@ const ConferenceBadgePage: React.FC = () => {
     }
 
     return (
-        <div className="flex min-h-screen flex-col items-center bg-white p-4 font-sans">
-            <div className="mb-3 flex w-full max-w-sm justify-end gap-2">
+        <div className="flex min-h-screen flex-col items-center bg-eregi-neutral-50 p-4 font-body">
+            <div className="mb-4 flex w-full max-w-sm justify-end gap-2">
                 <button
                     type="button"
                     onClick={() => setBadgeLang("ko")}
-                    className={`rounded-full px-3 py-1 text-xs font-bold ${badgeLang === "ko" ? "bg-blue-600 text-white" : "border border-blue-200 bg-white text-blue-700"}`}
+                    className={`rounded-full px-4 py-2 text-sm font-body font-semibold transition-colors ${badgeLang === "ko" ? "bg-eregi-primary text-eregi-primary-foreground" : "border border-eregi-neutral-200 bg-card text-muted-foreground hover:bg-eregi-neutral-50"}`}
                 >
-                    KO
+                    한국어
                 </button>
                 <button
                     type="button"
                     onClick={() => setBadgeLang("en")}
-                    className={`rounded-full px-3 py-1 text-xs font-bold ${badgeLang === "en" ? "bg-blue-600 text-white" : "border border-blue-200 bg-white text-blue-700"}`}
+                    className={`rounded-full px-4 py-2 text-sm font-body font-semibold transition-colors ${badgeLang === "en" ? "bg-eregi-primary text-eregi-primary-foreground" : "border border-eregi-neutral-200 bg-card text-muted-foreground hover:bg-eregi-neutral-50"}`}
                 >
-                    EN
+                    English
                 </button>
             </div>
-            <div className={`w-full max-w-sm rounded-3xl border-4 p-8 text-center shadow-2xl transition-all ${uiData.issued ? "border-blue-600" : "border-gray-300"}`}>
-                <h1 className="mb-6 text-xl font-bold uppercase tracking-wide text-gray-800">
+            <div className={`w-full max-w-sm rounded-xl border-2 p-6 text-center shadow-lg transition-all ${uiData.issued ? "border-eregi-primary/30 bg-card" : "border-eregi-primary/20 bg-card"}`}>
+                <h1 className="mb-6 text-xl font-display font-semibold tracking-wide text-eregi-primary">
                     {uiData.issued ? t("디지털 명찰", "Digital Badge") : t("등록 확인 바우처", "Registration Voucher")}
                 </h1>
 
-                <div className="mb-6 inline-block rounded-2xl border border-gray-100 bg-white p-4 shadow-inner">
+                <div className="mb-6 inline-block rounded-xl border border-eregi-neutral-200 bg-card p-5 shadow-md">
                     <QRCode key={uiData.qrValue} value={uiData.qrValue || "ERROR"} size={180} />
                 </div>
 
-                <h2 className="mb-2 text-3xl font-black tracking-tight text-gray-900">{uiData.name}</h2>
-                <p className="mb-6 text-lg font-medium text-gray-600">{uiData.aff}</p>
+                <h2 className="mb-3 text-3xl font-display font-semibold tracking-tight text-foreground">{uiData.name}</h2>
+                <p className="mb-6 text-lg font-body font-medium text-muted-foreground">{uiData.aff}</p>
 
                 {uiData.issued ? (
                     <>
-                        <div className={`mt-6 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-lg font-bold ${uiData.status === "INSIDE" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                            {uiData.status === "INSIDE" ? t("입장 중 (INSIDE)", "Inside (INSIDE)") : t("퇴장 상태 (OUTSIDE)", "Outside (OUTSIDE)")}
+                        <div className={`mt-6 flex items-center justify-center gap-2 rounded-lg px-5 py-4 text-lg font-body font-semibold ${uiData.status === "INSIDE" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-eregi-neutral-100 text-muted-foreground border border-eregi-neutral-200"}`}>
+                            {uiData.status === "INSIDE" ? t("입장 완료", "Checked In") : t("퇴장 상태", "Checked Out")}
                         </div>
                         {liveMinutes > 0 && (
-                            <div className="mt-3 flex items-center justify-between rounded-xl border border-purple-100 bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700">
-                                <span>{t("총 체류 시간", "Total stay")}</span>
-                                <span>{formatMinutes(liveMinutes)}</span>
+                            <div className="mt-4 flex flex-col gap-2">
+                                <div className="flex items-center justify-between rounded-lg border border-eregi-primary/20 bg-eregi-primary/5 px-5 py-3 text-base font-body font-medium text-eregi-primary">
+                                    <span>{t("총 체류 시간", "Total stay")}</span>
+                                    <span className="font-semibold">{formatMinutes(liveMinutes)}</span>
+                                </div>
+                                {uiData.isCompleted && (
+                                    <div className="flex items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-2 text-sm font-body font-semibold text-emerald-700">
+                                        {t("✅ 수강 인정 시간 달성", "✅ Attendance Goal Met")}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </>
                 ) : (
-                    <div className="mt-6 rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-500">
-                        {t("현장 데스크에서 QR 코드를 보여 주세요.", "Please show this QR code at the registration desk.")}
+                    <div className="mt-6 rounded-lg bg-eregi-primary/5 border border-eregi-primary/20 px-5 py-4 text-base font-body font-medium text-eregi-primary">
+                        {t("현장 인포데스크에서 위 QR 코드를 제시하세요", "Please show this QR code at the registration desk")}
                     </div>
                 )}
             </div>
 
             {uiData.issued && stampConfig?.enabled && (
                 <div className="mt-6 w-full max-w-sm space-y-4">
-                    <div className="rounded-3xl border-2 border-dashed border-indigo-400 bg-indigo-50 p-6 text-center shadow-md">
-                        <h3 className="mb-2 text-xl font-bold text-indigo-900">{t("스탬프 투어", "Stamp Tour")}</h3>
-                        <p className="mb-4 text-sm text-indigo-700">{t("참여 부스를 방문하고 스탬프를 모아보세요.", "Visit participating booths and collect stamps.")}</p>
+                    <div className="rounded-xl border border-eregi-primary/20 bg-eregi-primary/5 p-6 text-center shadow-sm">
+                        <h3 className="mb-3 text-xl font-display font-semibold text-eregi-primary">{t("스탬프 투어", "Stamp Tour")}</h3>
+                        <p className="mb-6 text-base font-body text-eregi-primary/80 leading-relaxed">{t("참여 부스를 방문하고 스탬프를 모아보세요", "Visit participating booths and collect stamps")}</p>
 
-                        <div className="mb-2 flex items-center justify-between text-sm font-bold text-indigo-800">
+                        <div className="mb-3 flex items-center justify-between text-base font-body font-medium text-eregi-primary">
                             <span>{t("현재 진행 현황", "Current progress")}</span>
-                            <span className="rounded-full bg-white px-3 py-1 text-indigo-600 shadow-sm">
+                            <span className="rounded-full bg-card px-4 py-2 text-eregi-primary font-semibold border border-eregi-primary/20">
                                 {myStamps.length} / {requiredCount || totalVendors}
                             </span>
                         </div>
 
-                        <div className="mb-4 h-3 w-full overflow-hidden rounded-full bg-indigo-200">
+                        <div className="mb-6 h-3 w-full overflow-hidden rounded-full bg-eregi-neutral-200">
                             <div
-                                className="h-3 rounded-full bg-indigo-600 transition-all duration-1000 ease-out"
+                                className="h-3 rounded-full bg-eregi-primary transition-all duration-1000 ease-out"
                                 style={{ width: `${Math.min(100, requiredCount > 0 ? (myStamps.length / requiredCount) * 100 : 0)}%` }}
                             />
                         </div>
 
                         {isCompleted && (
-                            <div className="mt-4 space-y-2">
-                                <div className="text-sm font-semibold text-indigo-900">
-                                    {stampConfig.completionMessage || t("스탬프 투어를 완료했습니다.", "Stamp tour completed.")}
+                            <div className="mt-6 space-y-3">
+                                <div className="text-base font-body font-semibold text-eregi-primary">
+                                    {stampConfig.completionMessage || t("스탬프 투어를 완료했습니다!", "Stamp tour completed!")}
                                 </div>
                                 {rewardStatus === "NONE" && canParticipantDraw && (
                                     <button
                                         type="button"
-                                        className="w-full rounded-xl bg-indigo-600 py-2 text-sm font-bold text-white disabled:opacity-50"
+                                        className="w-full rounded-lg bg-eregi-primary py-3 text-base font-body font-semibold text-eregi-primary-foreground disabled:opacity-50 transition-colors hover:bg-eregi-primary/90"
                                         onClick={handleRewardRequest}
                                         disabled={rewardRequesting}
                                     >
@@ -603,58 +612,58 @@ const ConferenceBadgePage: React.FC = () => {
                                     </button>
                                 )}
                                 {rewardStatus === "NONE" && !canParticipantDraw && isInstantReward && (
-                                    <div className="rounded-xl bg-sky-100 py-2 text-sm font-semibold text-sky-700">
+                                    <div className="rounded-lg bg-eregi-primary/10 border border-eregi-primary/20 py-3 px-4 text-base font-body font-medium text-eregi-primary">
                                         {t("관리자 추첨 대기 중", "Waiting for admin draw")}
                                     </div>
                                 )}
                                 {!isInstantReward && lotteryStatus === "PENDING" && (
-                                    <div className="rounded-xl bg-sky-100 py-2 text-sm font-semibold text-sky-700">
+                                    <div className="rounded-lg bg-eregi-primary/10 border border-eregi-primary/20 py-3 px-4 text-base font-body font-medium text-eregi-primary">
                                         {t("예약 추첨 대기 중", "Scheduled draw pending")}
                                     </div>
                                 )}
                                 {!isInstantReward && lotteryStatus === "PENDING" && stampConfig.lotteryScheduledAt && (
-                                    <div className="text-xs text-indigo-700">
+                                    <div className="text-sm font-body text-eregi-primary/70">
                                         {t("추첨 예정", "Scheduled draw")}: {stampConfig.lotteryScheduledAt.toDate().toLocaleString(badgeLang === "ko" ? "ko-KR" : "en-US")}
                                     </div>
                                 )}
                                 {missedLotteryCutoff && (
-                                    <div className="rounded-xl bg-slate-100 py-2 text-sm font-semibold text-slate-600">
-                                        {t("예약 추첨 마감 이후 완료되어 이번 추첨 대상에서 제외되었습니다.", "Completed after the draw cutoff, so excluded from this round.")}
+                                    <div className="rounded-lg bg-eregi-neutral-100 border border-eregi-neutral-200 py-3 px-4 text-base font-body font-medium text-muted-foreground">
+                                        {t("예약 추첨 마감 이후 완료되어 이번 추첨 대상에서 제외되었습니다", "Completed after the draw cutoff, excluded from this round")}
                                     </div>
                                 )}
                                 {rewardStatus === "REQUESTED" && (
-                                    <div className="rounded-xl bg-amber-100 py-2 text-sm font-semibold text-amber-700">
+                                    <div className="rounded-lg bg-amber-50 border border-amber-200 py-3 px-4 text-base font-body font-medium text-amber-700">
                                         {t("상품 요청 완료", "Reward request submitted")}
                                     </div>
                                 )}
                                 {rewardStatus === "REDEEMED" && (
-                                    <div className="rounded-xl bg-emerald-100 py-2 text-sm font-semibold text-emerald-700">
+                                    <div className="rounded-lg bg-emerald-50 border border-emerald-200 py-3 px-4 text-base font-body font-medium text-emerald-700">
                                         {t("상품 수령 완료", "Reward redeemed")}
                                     </div>
                                 )}
                                 {!isInstantReward && lotteryStatus === "NOT_SELECTED" && (
-                                    <div className="rounded-xl bg-slate-100 py-2 text-sm font-semibold text-slate-600">
-                                        {t("이번 추첨에서는 미당첨입니다.", "Not selected in this draw.")}
+                                    <div className="rounded-lg bg-eregi-neutral-100 border border-eregi-neutral-200 py-3 px-4 text-base font-body font-medium text-muted-foreground">
+                                        {t("이번 추첨에서는 미당첨입니다", "Not selected in this draw")}
                                     </div>
                                 )}
                                 {rewardMessage && (
-                                    <div className="text-xs text-indigo-700">{rewardMessage}</div>
+                                    <div className="text-sm font-body text-eregi-primary/70">{rewardMessage}</div>
                                 )}
                             </div>
                         )}
                     </div>
 
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <h4 className="mb-3 text-sm font-bold text-slate-800">{t("참여 부스 안내", "Participating booths")}</h4>
+                    <div className="rounded-lg border border-eregi-neutral-200 bg-card p-5 shadow-sm">
+                        <h4 className="mb-4 text-base font-display font-semibold text-foreground">{t("참여 부스 안내", "Participating booths")}</h4>
                         {stampBooths.length === 0 ? (
-                            <div className="text-xs text-slate-400">{t("참여 부스가 없습니다.", "No participating booths.")}</div>
+                            <div className="text-sm font-body text-muted-foreground">{t("참여 부스가 없습니다", "No participating booths")}</div>
                         ) : (
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                                 {stampBooths.map((booth) => (
-                                    <div key={booth.id} className="flex items-center justify-between text-sm">
-                                        <span className="font-medium text-slate-700">{booth.name}</span>
-                                        <span className={`rounded-full px-2 py-1 text-xs ${booth.isStamped ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500"}`}>
-                                            {booth.isStamped ? t("스탬프 완료", "Stamped") : t("미완료", "Pending")}
+                                    <div key={booth.id} className="flex items-center justify-between text-base">
+                                        <span className="font-body font-medium text-foreground">{booth.name}</span>
+                                        <span className={`rounded-full px-3 py-1 text-sm font-body font-medium ${booth.isStamped ? "bg-eregi-primary/10 text-eregi-primary border border-eregi-primary/20" : "bg-eregi-neutral-100 text-muted-foreground border border-eregi-neutral-200"}`}>
+                                            {booth.isStamped ? t("완료", "Completed") : t("대기", "Pending")}
                                         </span>
                                     </div>
                                 ))}

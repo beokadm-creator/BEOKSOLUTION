@@ -136,7 +136,8 @@ async function getActiveConferences() {
  * Returns null if no valid end date found.
  */
 function getConferenceEndDateStr(confData) {
-    const endDate = confData.endDate;
+    var _a;
+    const endDate = ((_a = confData.dates) === null || _a === void 0 ? void 0 : _a.end) || confData.endDate;
     if (!endDate)
         return null;
     if (endDate && typeof endDate === 'object' && 'toDate' in endDate) {
@@ -234,7 +235,7 @@ async function processConferenceAutoCheckout(confId, config) {
     }
 }
 /**
- * Scheduled function that runs every 5 minutes
+ * Scheduled function that runs every 60 minutes
  * Checks for zones that have ended and auto-checks out participants
  */
 exports.scheduledAutoCheckout = functions.pubsub
@@ -267,15 +268,8 @@ exports.scheduledAutoCheckout = functions.pubsub
                 continue;
             }
             const endDateStr = getConferenceEndDateStr(conf.data());
-            if (!endDateStr)
-                continue;
-            if (kstToday >= endDateStr) {
-                conferencesToProcess.push(conf.id);
-                logger.info(`[AutoCheckout] ${conf.id}: ending on ${endDateStr}, will process.`);
-            }
-            else {
-                logger.info(`[AutoCheckout] ${conf.id}: ends on ${endDateStr}, skipping (today: ${kstToday}).`);
-            }
+            conferencesToProcess.push(conf.id);
+            logger.info(`[AutoCheckout] ${conf.id}: added to processing queue (today: ${kstToday}, ends: ${endDateStr}).`);
         }
         if (conferencesToProcess.length === 0) {
             logger.info('[AutoCheckout] No conferences ending today. Skipping.');
@@ -353,14 +347,9 @@ exports.manualAutoCheckout = functions.https.onCall(async (data, context) => {
     if (!confSnap.exists) {
         throw new functions.https.HttpsError('not-found', `Conference ${confId} not found.`);
     }
-    const endDateStr = getConferenceEndDateStr(confSnap.data());
-    if (!endDateStr) {
-        throw new functions.https.HttpsError('failed-precondition', `Conference ${confId} has no end date configured.`);
-    }
     const kstToday = getKstToday();
-    if (kstToday < endDateStr) {
-        throw new functions.https.HttpsError('failed-precondition', `Auto checkout is only available on the conference last day (${endDateStr}). Today is ${kstToday}.`);
-    }
+    const endDateStr = getConferenceEndDateStr(confSnap.data());
+    logger.info(`[ManualAutoCheckout] Started for ${confId} on ${kstToday} (Ends: ${endDateStr})`);
     try {
         const config = {
             enabled: true,

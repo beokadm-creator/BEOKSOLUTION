@@ -59,6 +59,7 @@ interface ParticipantRecord {
     badgeIssued: boolean;
     paymentStatus: string;
     totalMinutes: number;
+    dailyMinutes?: Record<string, number>;
     isCompleted: boolean;
     attendanceStatus: string;
     isExternal: boolean;
@@ -169,6 +170,7 @@ const StatisticsPage: React.FC = () => {
                     badgeIssued: !!data.badgeIssued,
                     paymentStatus: data.paymentStatus || '',
                     totalMinutes: typeof data.totalMinutes === 'number' ? data.totalMinutes : 0,
+                    dailyMinutes: data.dailyMinutes || {},
                     isCompleted: !!data.isCompleted,
                     attendanceStatus: data.attendanceStatus || 'OUTSIDE',
                     isExternal: false,
@@ -204,6 +206,7 @@ const StatisticsPage: React.FC = () => {
                     badgeIssued: !!data.badgeIssued,
                     paymentStatus: data.paymentStatus || 'PAID', // external은 admin 등록이므로 PAID 처리
                     totalMinutes: typeof data.totalMinutes === 'number' ? data.totalMinutes : 0,
+                    dailyMinutes: data.dailyMinutes || {},
                     isCompleted: !!data.isCompleted,
                     attendanceStatus: data.attendanceStatus || 'OUTSIDE',
                     isExternal: true,
@@ -239,7 +242,15 @@ const StatisticsPage: React.FC = () => {
         if (!selectedDate || !rules[selectedDate] || participants.length === 0) return null;
 
         const currentRule = rules[selectedDate];
-        const globalGoal = currentRule.globalGoalMinutes;
+        const dailyGoalMinutes = currentRule.globalGoalMinutes;
+        const ruleEntries = Object.entries(rules || {});
+        const cumulativeRule =
+            ruleEntries.find(([, r]) => r?.completionMode === 'CUMULATIVE' && Number(r.cumulativeGoalMinutes || 0) > 0) ||
+            ruleEntries.find(([, r]) => r?.completionMode === 'CUMULATIVE');
+        const completionMode = (cumulativeRule?.[1]?.completionMode || currentRule.completionMode || 'DAILY_SEPARATE') as 'DAILY_SEPARATE' | 'CUMULATIVE';
+        const goalMinutes = completionMode === 'CUMULATIVE'
+            ? Number(cumulativeRule?.[1]?.cumulativeGoalMinutes || currentRule.cumulativeGoalMinutes || 0)
+            : Number(dailyGoalMinutes || 0);
 
         // userStats는 badgeQr이 있는 사람만 (명찰 발급된 참가자)
         const badgedParticipants = participants.filter(p => !!p.badgeQr && p.badgeIssued);
@@ -261,6 +272,7 @@ const StatisticsPage: React.FC = () => {
         const userStatsList = badgedParticipants.map(p => {
             // Live time calculation for INSIDE users
             let liveTotalMinutes = p.totalMinutes;
+            let liveSessionMinutes = 0;
             if (p.attendanceStatus === 'INSIDE' && p.lastCheckIn) {
                 const checkInTimeMillis = ensureMillis(p.lastCheckIn);
                 const checkInTime = checkInTimeMillis ? new Date(checkInTimeMillis) : new Date();
@@ -297,17 +309,21 @@ const StatisticsPage: React.FC = () => {
                     }
                 }
 
-                liveTotalMinutes = p.totalMinutes + Math.max(0, diffMins - liveDeduction);
+                liveSessionMinutes = Math.max(0, diffMins - liveDeduction);
+                liveTotalMinutes = p.totalMinutes + liveSessionMinutes;
             }
 
             const anyZoneDone = Object.values(p.zoneCompleted || {}).some(v => v === true);
 
             let isCompliant: boolean;
-            if (currentRule.completionMode === 'CUMULATIVE') {
-                isCompliant = p.isCompleted || (liveTotalMinutes >= globalGoal);
+            if (completionMode === 'CUMULATIVE') {
+                isCompliant = p.isCompleted || (goalMinutes > 0 && liveTotalMinutes >= goalMinutes);
             } else {
-                isCompliant = anyZoneDone || (liveTotalMinutes >= globalGoal);
+                isCompliant = anyZoneDone || (goalMinutes > 0 && liveTotalMinutes >= goalMinutes);
             }
+
+            const todayMinutes = Number(p.dailyMinutes?.[selectedDate] || 0) + (p.attendanceStatus === 'INSIDE' ? liveSessionMinutes : 0);
+            const remainingMinutes = goalMinutes > 0 ? Math.max(0, goalMinutes - liveTotalMinutes) : 0;
 
             // Fallback for missing firstEntryTime and lastExitTime
             let entryTime = p.firstEntryTime;
@@ -370,6 +386,8 @@ const StatisticsPage: React.FC = () => {
                 badgeQr: p.badgeQr,
                 isExternal: p.isExternal,
                 totalMinutes: liveTotalMinutes,
+                todayMinutes,
+                remainingMinutes,
                 attendanceStatus: p.attendanceStatus,
                 firstEntryTime: entryTime,
                 lastExitTime: exitTime,
@@ -417,7 +435,9 @@ const StatisticsPage: React.FC = () => {
             complianceRate,
             avgStayTime,
             zoneStats,
-            globalGoal,
+            completionMode,
+            dailyGoalMinutes,
+            goalMinutes,
         };
 
     }, [selectedDate, rules, participants]);
@@ -444,7 +464,9 @@ const StatisticsPage: React.FC = () => {
                 '최초입장시간': formatTime(u.firstEntryTime),
                 '마지막 퇴장시간': formatTime(u.lastExitTime),
                 '현재 상태': u.attendanceStatus === 'INSIDE' ? '입장 중' : '퇴장',
+                '오늘인정시간(분)': u.todayMinutes || 0,
                 '수강인정시간(분)': u.totalMinutes,
+                '남은시간(분)': u.remainingMinutes || 0,
                 '수강완료표기': u.isCompliant ? 'Y' : 'N',
                 ...rules[selectedDate].zones.reduce((acc, z) => ({
                     ...acc,
@@ -556,7 +578,9 @@ const StatisticsPage: React.FC = () => {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="text-2xl font-bold">{Math.round(stats.avgStayTime)} min</div>
-                                    <p className="text-xs text-gray-400 mt-1">Target: {stats.globalGoal} min</p>
+                                    <p className="text-xs text-gray-400 mt-1">
+                                        Target: {stats.goalMinutes} min ({stats.completionMode === 'CUMULATIVE' ? '누적' : '일일'})
+                                    </p>
                                 </CardContent>
                             </Card>
                         </div>
@@ -648,7 +672,7 @@ const StatisticsPage: React.FC = () => {
                                         <div className="flex justify-between items-center">
                                             <span className="text-sm text-gray-500">목표</span>
                                             <span className="text-xs bg-gray-100 px-2 py-1 rounded">
-                                                {zone.goalMinutes > 0 ? `${zone.goalMinutes}분` : `${stats.globalGoal}분 (전체)`}
+                                                {zone.goalMinutes > 0 ? `${zone.goalMinutes}분` : `${stats.goalMinutes}분 (${stats.completionMode === 'CUMULATIVE' ? '누적' : '일일'})`}
                                             </span>
                                         </div>
                                         <div className="flex justify-between items-center">
@@ -699,7 +723,9 @@ const StatisticsPage: React.FC = () => {
                                             <TableHead>구분</TableHead>
                                             <TableHead>입장 상태</TableHead>
                                             <TableHead>수강 상태</TableHead>
+                                            <TableHead className="text-right">오늘</TableHead>
                                             <TableHead className="text-right">누적 시간</TableHead>
+                                            <TableHead className="text-right">남은</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -750,8 +776,14 @@ const StatisticsPage: React.FC = () => {
                                                             </div>
                                                         )}
                                                     </TableCell>
+                                                    <TableCell className="text-right font-bold">
+                                                        {Math.floor(user.todayMinutes || 0)}m
+                                                    </TableCell>
                                                     <TableCell className="text-right font-bold text-lg">
                                                         {Math.floor(user.totalMinutes)}m
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-bold">
+                                                        {Math.floor(user.remainingMinutes || 0)}m
                                                     </TableCell>
                                                 </TableRow>
                                             ))}

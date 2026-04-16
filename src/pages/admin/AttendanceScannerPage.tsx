@@ -153,6 +153,8 @@ const AttendanceScannerPage: React.FC = () => {
             let action: 'ENTER' | 'EXIT' = 'ENTER';
             let actionText = '';
             let minsToAdd = 0;
+            let rawDuration = 0;
+            let deduction = 0;
             const tsNow = Timestamp.now();
             const now = new Date();
 
@@ -169,7 +171,8 @@ const AttendanceScannerPage: React.FC = () => {
                 } else { action = 'ENTER'; actionText = '입장 완료'; }
             }
 
-            if (status === 'INSIDE' && (action === 'EXIT' || actionText === 'Zone Switch')) {
+            const isZoneSwitch = status === 'INSIDE' && actionText === 'Zone Switch' && curZoneId && curZoneId !== targetZoneId;
+            if (status === 'INSIDE' && (action === 'EXIT' || isZoneSwitch)) {
                 const rule = zones.find(z => z.id === curZoneId);
 
                 // M7 Fix: Missing lastCheckIn fallback handling
@@ -197,6 +200,8 @@ const AttendanceScannerPage: React.FC = () => {
                             if (oE > oS) ded += Math.floor((oE - oS) / 60000);
                         });
                     }
+                    rawDuration = diff;
+                    deduction = ded;
                     minsToAdd = Math.max(0, diff - ded);
                 }
             }
@@ -234,22 +239,50 @@ const AttendanceScannerPage: React.FC = () => {
                 && newTotal >= ruleForCumulative.cumulativeGoalMinutes;
             isComp = anyZoneCompleted || !!cumulativeCompleted || isComp;
 
-            tx.update(regRef, {
-                attendanceStatus: action === 'ENTER' ? 'INSIDE' : 'OUTSIDE',
-                currentZone: action === 'ENTER' ? targetZoneId : null,
-                totalMinutes: newTotal,
-                dailyMinutes: dailyMinutes,
-                zoneMinutes: zoneMinutes,
-                zoneCompleted: zoneCompleted,
-                isCompleted: isComp,
-                [action === 'ENTER' ? 'lastCheckIn' : 'lastCheckOut']: tsNow
-            });
+            if (isZoneSwitch) {
+                tx.update(regRef, {
+                    attendanceStatus: 'INSIDE',
+                    currentZone: targetZoneId,
+                    totalMinutes: newTotal,
+                    dailyMinutes: dailyMinutes,
+                    zoneMinutes: zoneMinutes,
+                    zoneCompleted: zoneCompleted,
+                    isCompleted: isComp,
+                    lastCheckOut: tsNow,
+                    lastCheckIn: tsNow
+                });
+            } else {
+                tx.update(regRef, {
+                    attendanceStatus: action === 'ENTER' ? 'INSIDE' : 'OUTSIDE',
+                    currentZone: action === 'ENTER' ? targetZoneId : null,
+                    totalMinutes: newTotal,
+                    dailyMinutes: dailyMinutes,
+                    zoneMinutes: zoneMinutes,
+                    zoneCompleted: zoneCompleted,
+                    isCompleted: isComp,
+                    [action === 'ENTER' ? 'lastCheckIn' : 'lastCheckOut']: tsNow
+                });
+            }
 
-            const logRef = doc(collection(db, `conferences/${cid}/${col}/${id}/logs`));
-            tx.set(logRef, { type: action, zoneId: action === 'ENTER' ? targetZoneId : curZoneId, timestamp: tsNow, date: todayStr, method: 'KIOSK', recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
+            if (isZoneSwitch) {
+                const logExitRef = doc(collection(db, `conferences/${cid}/${col}/${id}/logs`));
+                tx.set(logExitRef, { type: 'EXIT', zoneId: curZoneId, timestamp: tsNow, date: todayStr, method: 'KIOSK_DESK', rawDuration, deduction, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
 
-            const accRef = doc(collection(db, `conferences/${cid}/access_logs`));
-            tx.set(accRef, { action: action === 'ENTER' ? 'ENTRY' : 'EXIT', scannedQr: data.badgeQr || id, locationId: action === 'ENTER' ? targetZoneId : curZoneId, timestamp: tsNow, date: todayStr, method: 'KIOSK_DESK', registrationId: id, isExternal: isExt, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
+                const logEnterRef = doc(collection(db, `conferences/${cid}/${col}/${id}/logs`));
+                tx.set(logEnterRef, { type: 'ENTER', zoneId: targetZoneId, timestamp: tsNow, date: todayStr, method: 'KIOSK_DESK', recognizedMinutes: 0, accumulatedTotal: newTotal });
+
+                const accExitRef = doc(collection(db, `conferences/${cid}/access_logs`));
+                tx.set(accExitRef, { action: 'EXIT', scannedQr: data.badgeQr || id, locationId: curZoneId, timestamp: tsNow, date: todayStr, method: 'KIOSK_DESK', registrationId: id, isExternal: isExt, rawDuration, deduction, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
+
+                const accEnterRef = doc(collection(db, `conferences/${cid}/access_logs`));
+                tx.set(accEnterRef, { action: 'ENTRY', scannedQr: data.badgeQr || id, locationId: targetZoneId, timestamp: tsNow, date: todayStr, method: 'KIOSK_DESK', registrationId: id, isExternal: isExt, recognizedMinutes: 0, accumulatedTotal: newTotal });
+            } else {
+                const logRef = doc(collection(db, `conferences/${cid}/${col}/${id}/logs`));
+                tx.set(logRef, { type: action, zoneId: action === 'ENTER' ? targetZoneId : curZoneId, timestamp: tsNow, date: todayStr, method: 'KIOSK_DESK', rawDuration: action === 'EXIT' ? rawDuration : 0, deduction: action === 'EXIT' ? deduction : 0, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
+
+                const accRef = doc(collection(db, `conferences/${cid}/access_logs`));
+                tx.set(accRef, { action: action === 'ENTER' ? 'ENTRY' : 'EXIT', scannedQr: data.badgeQr || id, locationId: action === 'ENTER' ? targetZoneId : curZoneId, timestamp: tsNow, date: todayStr, method: 'KIOSK_DESK', registrationId: id, isExternal: isExt, rawDuration: action === 'EXIT' ? rawDuration : 0, deduction: action === 'EXIT' ? deduction : 0, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
+            }
 
             return { actionText, actionType: action, userName: name, affiliation: aff };
         });

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { updateDoc, doc, getDoc, Timestamp } from 'firebase/firestore';
+import { updateDoc, doc, getDoc, Timestamp, query, where, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Registration, ConferenceUser, ConferenceInfo } from '../types/schema';
 import { generateBadgeQr } from '../utils/transaction';
@@ -47,7 +47,6 @@ export const useCheckIn = (conferenceId: string) => {
             // If not found by document ID, try to find by confirmationQr field
             if (!regSnap.exists()) {
                 console.log('[useCheckIn] Not found by doc ID, searching by confirmationQr field');
-                const { query, where, collection, getDocs } = await import('firebase/firestore');
                 const q = query(
                     collection(db, `conferences/${conferenceId}/registrations`),
                     where('confirmationQr', '==', targetRegId)

@@ -229,7 +229,7 @@ export async function createExitLog(
 
       // KST date from real UTC time
       const kstMs = exitTime.getTime() + 9 * 60 * 60 * 1000;
-      const todayStr = new Date(kstMs).toISOString().split('T')[0];
+      const todayStr = resolvedZoneConfig?.ruleDate || new Date(kstMs).toISOString().split('T')[0];
 
       const dailyMinutes = { ...(registration.dailyMinutes || {}) };
       dailyMinutes[todayStr] = (dailyMinutes[todayStr] || 0) + recognizedMinutes;

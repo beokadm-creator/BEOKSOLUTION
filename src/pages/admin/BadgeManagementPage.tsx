@@ -55,6 +55,31 @@ type StampTourPreviewConfig = {
   completionMessage?: string;
 };
 
+type BadgeMenuVisibility = {
+  status?: boolean;
+  sessions?: boolean;
+  materials?: boolean;
+  program?: boolean;
+  translation?: boolean;
+  stampTour?: boolean;
+  home?: boolean;
+};
+
+type BadgeMenuLabel = {
+  ko?: string;
+  en?: string;
+};
+
+type BadgeMenuLabels = {
+  status?: BadgeMenuLabel;
+  sessions?: BadgeMenuLabel;
+  materials?: BadgeMenuLabel;
+  program?: BadgeMenuLabel;
+  translation?: BadgeMenuLabel;
+  stampTour?: BadgeMenuLabel;
+  home?: BadgeMenuLabel;
+};
+
 const BadgeManagementPage: React.FC = () => {
   const navigate = useNavigate();
   const { cid } = useParams<{ cid: string }>();
@@ -66,6 +91,24 @@ const BadgeManagementPage: React.FC = () => {
     { name: string; url: string }[]
   >([]);
   const [translationUrl, setTranslationUrl] = useState("");
+  const [menuVisibility, setMenuVisibility] = useState<Required<BadgeMenuVisibility>>({
+    status: true,
+    sessions: true,
+    materials: true,
+    program: true,
+    translation: true,
+    stampTour: true,
+    home: true,
+  });
+  const [menuLabels, setMenuLabels] = useState<Required<BadgeMenuLabels>>({
+    status: { ko: "상태", en: "Status" },
+    sessions: { ko: "수강", en: "Sessions" },
+    materials: { ko: "자료", en: "Materials" },
+    program: { ko: "일정", en: "Program" },
+    translation: { ko: "번역", en: "Translation" },
+    stampTour: { ko: "메뉴", en: "Menu" },
+    home: { ko: "학술대회 홈페이지로 이동", en: "Conference Home" },
+  });
   const [badgeLayoutEnabled, setBadgeLayoutEnabled] = useState(false);
   const [stampTourConfig, setStampTourConfig] =
     useState<StampTourPreviewConfig | null>(null);
@@ -101,10 +144,53 @@ const BadgeManagementPage: React.FC = () => {
           const data = badgeConfigSnap.data() as {
             materialsUrls?: { name: string; url: string }[];
             translationUrl?: string;
+            menuVisibility?: BadgeMenuVisibility;
+            menuLabels?: BadgeMenuLabels;
             badgeLayoutEnabled?: boolean;
           };
           setMaterialsUrls(data.materialsUrls || []);
           setTranslationUrl(data.translationUrl || "");
+          setMenuVisibility({
+            status: data.menuVisibility?.status ?? true,
+            sessions: data.menuVisibility?.sessions ?? true,
+            materials: data.menuVisibility?.materials ?? true,
+            program: data.menuVisibility?.program ?? true,
+            translation:
+              data.menuVisibility?.translation ??
+              (data.translationUrl ? data.translationUrl !== "HIDE" : true),
+            stampTour: data.menuVisibility?.stampTour ?? true,
+            home: data.menuVisibility?.home ?? true,
+          });
+          setMenuLabels({
+            status: {
+              ko: data.menuLabels?.status?.ko ?? "상태",
+              en: data.menuLabels?.status?.en ?? "Status",
+            },
+            sessions: {
+              ko: data.menuLabels?.sessions?.ko ?? "수강",
+              en: data.menuLabels?.sessions?.en ?? "Sessions",
+            },
+            materials: {
+              ko: data.menuLabels?.materials?.ko ?? "자료",
+              en: data.menuLabels?.materials?.en ?? "Materials",
+            },
+            program: {
+              ko: data.menuLabels?.program?.ko ?? "일정",
+              en: data.menuLabels?.program?.en ?? "Program",
+            },
+            translation: {
+              ko: data.menuLabels?.translation?.ko ?? "번역",
+              en: data.menuLabels?.translation?.en ?? "Translation",
+            },
+            stampTour: {
+              ko: data.menuLabels?.stampTour?.ko ?? "메뉴",
+              en: data.menuLabels?.stampTour?.en ?? "Menu",
+            },
+            home: {
+              ko: data.menuLabels?.home?.ko ?? "학술대회 홈페이지로 이동",
+              en: data.menuLabels?.home?.en ?? "Conference Home",
+            },
+          });
           setBadgeLayoutEnabled(data.badgeLayoutEnabled || false);
         }
 
@@ -135,6 +221,8 @@ const BadgeManagementPage: React.FC = () => {
         {
           materialsUrls,
           translationUrl,
+          menuVisibility,
+          menuLabels,
           badgeLayoutEnabled,
           updatedAt: Timestamp.now(),
         },
@@ -186,6 +274,33 @@ const BadgeManagementPage: React.FC = () => {
     }
     return ["스타벅스 카드", "브랜드 굿즈", "커피 쿠폰"];
   }, [stampTourConfig]);
+
+  const digitalMenuTabs = useMemo(() => {
+    const translationEnabled = translationUrl !== "HIDE" && !!menuVisibility.translation;
+    const tabs = [
+      menuVisibility.status ? menuLabels.status.ko || "상태" : null,
+      menuVisibility.sessions ? menuLabels.sessions.ko || "수강" : null,
+      menuVisibility.materials ? menuLabels.materials.ko || "자료" : null,
+      menuVisibility.program ? menuLabels.program.ko || "일정" : null,
+      translationEnabled ? menuLabels.translation.ko || "번역" : null,
+      menuVisibility.stampTour ? menuLabels.stampTour.ko || "메뉴" : null,
+    ].filter(Boolean) as string[];
+
+    return tabs.length ? tabs : ["상태"];
+  }, [menuLabels, menuVisibility, translationUrl]);
+
+  const digitalMenuGridColsClass =
+    digitalMenuTabs.length === 1
+      ? "grid-cols-1"
+      : digitalMenuTabs.length === 2
+        ? "grid-cols-2"
+        : digitalMenuTabs.length === 3
+          ? "grid-cols-3"
+          : digitalMenuTabs.length === 4
+            ? "grid-cols-4"
+            : digitalMenuTabs.length === 5
+              ? "grid-cols-5"
+              : "grid-cols-6";
 
   const runDemoScan = () => {
     setDemoStep("scanned");
@@ -351,6 +466,81 @@ const BadgeManagementPage: React.FC = () => {
                     </div>
                   )}
                 </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-semibold">
+                      디지털 명찰 메뉴 노출
+                    </Label>
+                    <p className="text-sm text-gray-500">
+                      디지털 명찰(토큰 URL / 마이페이지)에서 각 메뉴를 노출 또는
+                      숨김으로 제어합니다.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 md:grid-cols-2">
+                    {(
+                      [
+                        { key: "status", label: "상태" },
+                        { key: "sessions", label: "수강" },
+                        { key: "materials", label: "자료" },
+                        { key: "program", label: "일정" },
+                        { key: "translation", label: "번역" },
+                        { key: "stampTour", label: "메뉴" },
+                        { key: "home", label: "학술대회 홈페이지로 이동" },
+                      ] as const
+                    ).map((item) => (
+                      <div
+                        key={item.key}
+                        className="rounded-lg bg-white px-3 py-2 shadow-sm space-y-2"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-semibold text-gray-700">
+                            {item.label}
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={!!menuVisibility[item.key]}
+                            onChange={(event) =>
+                              setMenuVisibility((prev) => ({
+                                ...prev,
+                                [item.key]: event.target.checked,
+                              }))
+                            }
+                            className="h-5 w-5 rounded text-blue-600"
+                          />
+                        </div>
+                        <div className="grid gap-2 md:grid-cols-2">
+                          <Input
+                            value={menuLabels[item.key]?.ko || ""}
+                            onChange={(event) =>
+                              setMenuLabels((prev) => ({
+                                ...prev,
+                                [item.key]: {
+                                  ...prev[item.key],
+                                  ko: event.target.value,
+                                },
+                              }))
+                            }
+                            placeholder="KR"
+                          />
+                          <Input
+                            value={menuLabels[item.key]?.en || ""}
+                            onChange={(event) =>
+                              setMenuLabels((prev) => ({
+                                ...prev,
+                                [item.key]: {
+                                  ...prev[item.key],
+                                  en: event.target.value,
+                                },
+                              }))
+                            }
+                            placeholder="EN"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -427,21 +617,16 @@ const BadgeManagementPage: React.FC = () => {
                           <QrCode className="h-28 w-28 text-emerald-500" />
                         </div>
                         <div
-                          className={`grid ${translationUrl === "HIDE" ? "grid-cols-5" : "grid-cols-6"} gap-1 text-[10px]`}
+                          className={`grid ${digitalMenuGridColsClass} gap-1 text-[10px]`}
                         >
-                          {["상태", "체류", "자료", "일정", "번역", "스탬프"]
-                            .filter(
-                              (tab) =>
-                                tab !== "번역" || translationUrl !== "HIDE",
-                            )
-                            .map((tab) => (
-                              <div
-                                key={tab}
-                                className="rounded bg-gray-100 px-1 py-1 text-center text-gray-600"
-                              >
-                                {tab}
-                              </div>
-                            ))}
+                          {digitalMenuTabs.map((tab) => (
+                            <div
+                              key={tab}
+                              className="rounded bg-gray-100 px-1 py-1 text-center text-gray-600"
+                            >
+                              {tab}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>

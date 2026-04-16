@@ -10,6 +10,7 @@ interface ProjectSettings {
   sourceLanguage: string;
   targetLanguages: string[];
   slug: string;
+  parkingMessage?: string;
 }
 
 export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ defaultConferenceId }) => {
@@ -135,7 +136,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
 
   if (!selectedProjectId) {
     return (
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 mt-6">
+      <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200 mt-4">
         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
           <span className="relative flex h-3 w-3">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
@@ -169,7 +170,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   const project = projects.find(p => p.slug === selectedProjectId);
 
   return (
-    <div className="relative bg-gray-900 text-white rounded-2xl flex flex-col h-[500px] overflow-hidden shadow-xl mt-6">
+    <div className="relative bg-gray-900 text-white rounded-2xl flex flex-col h-[400px] sm:h-[500px] overflow-hidden shadow-xl mt-4">
       <style>{`
         @keyframes blink-cursor {
             0%, 100% { opacity: 1; }
@@ -265,8 +266,9 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
         style={{ letterSpacing: `${letterSpacing}px`, lineHeight }}
       >
         {!activeSessionId ? (
-          <div className="flex items-center justify-center h-full text-gray-500">
-            {activeLang === 'en' ? 'No active session.' : '진행 중인 세션이 없습니다.'}
+          <div className="flex flex-col items-center justify-center h-full text-gray-500 space-y-2">
+            <div>{project?.parkingMessage || (activeLang === 'en' ? 'No active session.' : '진행 중인 세션이 없습니다.')}</div>
+            {project?.parkingMessage && <div className="text-sm opacity-70">{activeLang === 'en' ? 'Waiting for the next session to start...' : '다음 세션 시작을 대기 중입니다...'}</div>}
           </div>
         ) : segmentsOrder.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-500">

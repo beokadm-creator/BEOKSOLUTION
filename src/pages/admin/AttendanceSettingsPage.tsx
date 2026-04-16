@@ -67,7 +67,7 @@ const AttendanceSettingsPage: React.FC = () => {
                         const dateList = [];
                         const current = new Date(start);
                         while (current <= end) {
-                            dateList.push(current.toISOString().split('T')[0]);
+                            dateList.push(current.toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }));
                             current.setDate(current.getDate() + 1);
                         }
                         setDates(dateList);
@@ -117,8 +117,38 @@ const AttendanceSettingsPage: React.FC = () => {
         if (!cid) return;
         setSaving(true);
         try {
+            const normalizedRules: Record<string, DailyRule> = { ...rules };
+            const sortedEntries = Object.entries(normalizedRules).sort(([a], [b]) => a.localeCompare(b));
+            const firstZoneCandidate = sortedEntries.find(([, r]) => (r?.zones || []).length > 0)?.[1]?.zones?.[0];
+            const canonicalZoneId = firstZoneCandidate?.id;
+            const canonicalZoneName = firstZoneCandidate?.name?.trim();
+
+            if (canonicalZoneId) {
+                sortedEntries.forEach(([dateStr, rule]) => {
+                    if (!rule) return;
+                    if (rule.zones?.length !== 1) return;
+                    const z0 = rule.zones[0];
+                    if (canonicalZoneName && z0.name?.trim() !== canonicalZoneName) return;
+                    normalizedRules[dateStr] = {
+                        ...rule,
+                        zones: [{ ...z0, id: canonicalZoneId, name: canonicalZoneName || z0.name }],
+                    };
+                });
+            }
+
+            Object.entries(normalizedRules).forEach(([dateStr, rule]) => {
+                if (!rule) return;
+                if (rule.completionMode !== 'CUMULATIVE') return;
+                if (rule.cumulativeGoalMinutes && rule.cumulativeGoalMinutes > 0) return;
+                normalizedRules[dateStr] = {
+                    ...rule,
+                    cumulativeGoalMinutes: rule.globalGoalMinutes || 240,
+                };
+            });
+
             const rulesRef = doc(db, `conferences/${cid}/settings/attendance`);
-            await setDoc(rulesRef, { rules }, { merge: true });
+            await setDoc(rulesRef, { rules: normalizedRules }, { merge: true });
+            setRules(normalizedRules);
             toast.success("Attendance rules saved!");
         } catch (error) {
             console.error("Save failed:", error);
@@ -343,7 +373,11 @@ const AttendanceSettingsPage: React.FC = () => {
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        onClick={() => updateRule({ ...currentRule, completionMode: 'CUMULATIVE' })}
+                                                        onClick={() => updateRule({
+                                                            ...currentRule,
+                                                            completionMode: 'CUMULATIVE',
+                                                            cumulativeGoalMinutes: currentRule.cumulativeGoalMinutes || currentRule.globalGoalMinutes || 240
+                                                        })}
                                                         className={cn(
                                                             "flex-1 px-4 py-3 rounded-lg border-2 font-medium text-sm transition-all",
                                                             currentRule.completionMode === 'CUMULATIVE'
@@ -372,7 +406,7 @@ const AttendanceSettingsPage: React.FC = () => {
                                                             value={currentRule.cumulativeGoalMinutes || 0}
                                                             onChange={(e) => updateRule({ ...currentRule, cumulativeGoalMinutes: Number(e.target.value) })}
                                                             className="pl-4 pr-16 h-12 text-lg font-medium border-slate-200 focus:border-purple-500 focus:ring-purple-500"
-                                                            placeholder="예: 720 (3일 × 240분)"
+                                                            placeholder="예: 240"
                                                         />
                                                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">Minutes</span>
                                                     </div>

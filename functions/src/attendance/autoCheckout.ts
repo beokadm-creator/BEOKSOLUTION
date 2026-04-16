@@ -135,7 +135,7 @@ async function getActiveConferences(): Promise<admin.firestore.QueryDocumentSnap
 function getConferenceEndDateStr(
   confData: admin.firestore.DocumentData
 ): string | null {
-  const endDate = confData.endDate;
+  const endDate = confData.dates?.end || confData.endDate;
   if (!endDate) return null;
 
   if (endDate && typeof endDate === 'object' && 'toDate' in endDate) {
@@ -274,7 +274,7 @@ async function processConferenceAutoCheckout(
 }
 
 /**
- * Scheduled function that runs every 5 minutes
+ * Scheduled function that runs every 60 minutes
  * Checks for zones that have ended and auto-checks out participants
  */
 export const scheduledAutoCheckout = functions.pubsub
@@ -312,13 +312,8 @@ export const scheduledAutoCheckout = functions.pubsub
           continue;
         }
         const endDateStr = getConferenceEndDateStr(conf.data());
-        if (!endDateStr) continue;
-        if (kstToday >= endDateStr) {
-          conferencesToProcess.push(conf.id);
-          logger.info(`[AutoCheckout] ${conf.id}: ending on ${endDateStr}, will process.`);
-        } else {
-          logger.info(`[AutoCheckout] ${conf.id}: ends on ${endDateStr}, skipping (today: ${kstToday}).`);
-        }
+        conferencesToProcess.push(conf.id);
+        logger.info(`[AutoCheckout] ${conf.id}: added to processing queue (today: ${kstToday}, ends: ${endDateStr}).`);
       }
 
       if (conferencesToProcess.length === 0) {
@@ -417,21 +412,9 @@ export const manualAutoCheckout = functions.https.onCall(
       throw new functions.https.HttpsError('not-found', `Conference ${confId} not found.`);
     }
 
-    const endDateStr = getConferenceEndDateStr(confSnap.data()!);
-    if (!endDateStr) {
-      throw new functions.https.HttpsError(
-        'failed-precondition',
-        `Conference ${confId} has no end date configured.`
-      );
-    }
-
     const kstToday = getKstToday();
-    if (kstToday < endDateStr) {
-      throw new functions.https.HttpsError(
-        'failed-precondition',
-        `Auto checkout is only available on the conference last day (${endDateStr}). Today is ${kstToday}.`
-      );
-    }
+    const endDateStr = getConferenceEndDateStr(confSnap.data()!);
+    logger.info(`[ManualAutoCheckout] Started for ${confId} on ${kstToday} (Ends: ${endDateStr})`);
 
     try {
       const config: AutoCheckoutConfig = {
