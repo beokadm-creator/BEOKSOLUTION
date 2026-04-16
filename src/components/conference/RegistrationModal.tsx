@@ -87,10 +87,13 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         const now = new Date();
         const start = period.startDate.toDate();
         const end = period.endDate.toDate();
-        // Extend end to end-of-day (23:59:59.999) to include the full last day
-        const endOfDay = new Date(end);
-        endOfDay.setHours(23, 59, 59, 999);
-        return now >= start && now <= endOfDay;
+        // Convert to string and append KST explicitly to avoid timezone bugs
+        // Extract YYYY-MM-DD from the Firestore timestamp (which was stored correctly)
+        const year = end.getFullYear();
+        const month = String(end.getMonth() + 1).padStart(2, '0');
+        const day = String(end.getDate()).padStart(2, '0');
+        const endOfDayKst = new Date(`${year}-${month}-${day}T23:59:59.999+09:00`);
+        return now >= start && now <= endOfDayKst;
     });
 
     // Determine registration type label based on active period type

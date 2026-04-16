@@ -181,7 +181,8 @@ const RegistrationSettingsPage: React.FC = () => {
 
     const dateStringToTimestamp = (dateStr: string) => {
         const [year, month, day] = dateStr.split('-').map(Number);
-        return Timestamp.fromDate(new Date(year, month - 1, day));
+        // Force KST midnight
+        return Timestamp.fromDate(new Date(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00+09:00`));
     };
 
     if (loading) return <LoadingSpinner />;

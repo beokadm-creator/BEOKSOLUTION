@@ -50,10 +50,10 @@ export const useMyPage = (conferenceId: string, userId: string) => {
                 const logs = logSnap.docs.map(d => d.data() as AccessLog);
 
                 // 4. Calculate Stay Time
-                // Assuming session end is today 18:00 for simplicity or fetch from info
-                const todayEnd = new Date();
-                todayEnd.setHours(18, 0, 0, 0);
-                const minutes = calculateStayTime(logs, [], todayEnd);
+                // Assuming session end is today 18:00 KST safely
+                const todayKst = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+                const todayEndKst = new Date(`${todayKst}T18:00:00+09:00`);
+                const minutes = calculateStayTime(logs, [], todayEndKst);
 
                 // 5. Criteria (Mock: > 60 mins)
                 const canPrint = minutes >= 60;

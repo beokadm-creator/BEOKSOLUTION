@@ -141,10 +141,11 @@ function getConferenceEndDateStr(confData) {
     if (!endDate)
         return null;
     if (endDate && typeof endDate === 'object' && 'toDate' in endDate) {
-        return endDate.toDate().toISOString().split('T')[0];
+        const date = endDate.toDate();
+        return getKstToday(date);
     }
     if (typeof endDate === 'string') {
-        return endDate;
+        return endDate.includes('T') ? endDate.split('T')[0] : endDate;
     }
     return null;
 }
@@ -183,10 +184,13 @@ async function processConferenceAutoCheckout(confId, config) {
     try {
         // Get today's date in YYYY-MM-DD format (KST)
         const now = new Date();
+        const today = getKstToday(now);
+        // Convert current KST time to a new Date object correctly representing KST
+        // (This is needed because isZoneEnded relies on Date.getUTCHours() which is tricky)
+        // To cleanly pass current KST hour/minute to isZoneEnded, we create a synthetic date
+        // where the UTC hours/minutes match the KST hours/minutes.
         const kstOffset = 9 * 60; // KST is UTC+9
-        const kstTime = new Date(now.getTime() + kstOffset * 60 * 1000);
-        const today = kstTime.toISOString().split('T')[0];
-        const currentTime = kstTime;
+        const currentTime = new Date(now.getTime() + kstOffset * 60 * 1000);
         // Get attendance rules for today
         const rules = await getAttendanceRules(confId, today);
         if (!rules || !rules.zones || rules.zones.length === 0) {

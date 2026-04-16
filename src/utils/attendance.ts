@@ -18,10 +18,11 @@ export const calculateStayTime = (
 
     // Helper to parse "HH:MM" to Date on a specific day
     const getBreakDate = (timeStr: string, baseDate: Date): Date => {
-        const [h, m] = timeStr.split(':').map(Number);
-        const d = new Date(baseDate);
-        d.setHours(h, m, 0, 0);
-        return d;
+        const year = baseDate.getFullYear();
+        const month = String(baseDate.getMonth() + 1).padStart(2, '0');
+        const day = String(baseDate.getDate()).padStart(2, '0');
+        // Parse timeStr as KST to prevent offset bugs
+        return new Date(`${year}-${month}-${day}T${timeStr}:00+09:00`);
     };
 
     // Helper to calculate overlap in minutes
