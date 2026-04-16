@@ -721,7 +721,7 @@ const BadgePrepPage: React.FC = () => {
                     {badgeLang === "en" ? "Digital Badge" : "디지털 명찰"}
                   </h2>
                   <p className="mt-2 text-sm text-white/80">
-                    {t("학술대회 입장과 출석 확인에 사용하는 모바일 패스", "Mobile pass for conference entry and attendance")}
+                    {badgeLang === "en" ? "You can enter/exit with the QR code." : "QR로 입장/퇴장 하실 수 있습니다."}
                   </p>
                 </div>
                 <div className="rounded-full border border-white/20 bg-white/10 p-3 backdrop-blur">
@@ -757,7 +757,7 @@ const BadgePrepPage: React.FC = () => {
                       Active
                     </div>
                   </div>
-                  <div className="mt-4 rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="mt-4 rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm flex justify-center items-center">
                     <QRCodeSVG
                       key={reg.badgeQr || `BADGE-${reg.id}`}
                       value={reg.badgeQr || `BADGE-${reg.id}`}
@@ -766,8 +766,8 @@ const BadgePrepPage: React.FC = () => {
                       includeMargin={true}
                     />
                   </div>
-                  <p className="mt-4 text-sm font-medium text-slate-600">
-                    {badgeLang === "en" ? "Scan this code for entry and attendance confirmation." : "입장 및 출석 확인 시 위 QR코드를 제시하세요."}
+                  <p className="mt-4 text-sm font-medium text-slate-600 text-center">
+                    {badgeLang === "en" ? "You can enter/exit with the QR code." : "QR로 입장/퇴장 하실 수 있습니다."}
                   </p>
                 </div>
               </div>
