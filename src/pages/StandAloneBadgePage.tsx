@@ -1149,7 +1149,7 @@ const StandAloneBadgePage: React.FC = () => {
                   {t("디지털 명찰", "Digital Badge")}
                 </h2>
                 <p className="mt-2 text-sm text-white/80">
-                  {t("학술대회 입장과 출석, 부스 프로그램 참여에 사용하는 모바일 패스", "Mobile pass for entry, attendance, and event participation")}
+                  {t("QR로 입장/퇴장 하실 수 있습니다.", "You can enter/exit with the QR code.")}
                 </p>
               </div>
               <div className="rounded-full border border-white/20 bg-white/10 p-3 backdrop-blur">
@@ -1185,7 +1185,7 @@ const StandAloneBadgePage: React.FC = () => {
                     Active
                   </div>
                 </div>
-                <div className="mt-4 rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="mt-4 rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm flex justify-center items-center">
                   {showBadgeQr && (
                     <QRCodeSVG
                       key={qrValue}
@@ -1197,11 +1197,8 @@ const StandAloneBadgePage: React.FC = () => {
                     />
                   )}
                 </div>
-                <p className="mt-4 text-sm font-medium text-slate-600">
-                  {t(
-                    "입장, 출석 확인 및 부스 프로그램 참여 시 제시하세요.",
-                    "Present this code for entry, attendance, and booth programs.",
-                  )}
+                <p className="mt-4 text-sm font-medium text-slate-600 text-center">
+                  {t("QR로 입장/퇴장 하실 수 있습니다.", "You can enter/exit with the QR code.")}
                 </p>
               </div>
             </div>
