@@ -556,86 +556,79 @@ const BadgePrepPage: React.FC = () => {
               English
             </button>
           </div>
-          <div className="relative overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white/85 text-center shadow-[0_24px_80px_-32px_rgba(15,23,42,0.45)] backdrop-blur">
-            <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-r from-slate-900 via-eregi-primary to-sky-700" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.22),_transparent_28%),linear-gradient(180deg,_transparent_0%,_rgba(248,250,252,0.95)_34%,_rgba(255,255,255,1)_100%)]" />
-            {refreshing && (
-              <div className="absolute top-4 right-4 z-10">
-                <RefreshCw className="w-5 h-5 text-white animate-spin" />
-              </div>
-            )}
-            <div className="absolute right-[-12%] top-24 h-48 w-48 rounded-full border border-slate-200/60 bg-slate-100/40" />
-            <div className="absolute left-[-18%] bottom-16 h-40 w-40 rounded-full border border-sky-100 bg-sky-50/60" />
-
-            <div className="relative z-10 px-6 pb-7 pt-6">
-              <div className="mb-8 flex items-start justify-between gap-4 text-white">
-                <div className="text-left">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.34em] text-white/70">
+          <div className="relative overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white shadow-[0_24px_80px_-32px_rgba(15,23,42,0.45)] flex flex-col">
+            {/* Header Area */}
+            <div className="relative bg-gradient-to-r from-amber-600 via-orange-500 to-amber-500 px-6 pt-6 pb-12 text-white">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.2),_transparent_28%),linear-gradient(90deg,_transparent,_rgba(255,255,255,0.08),_transparent)]" />
+              {refreshing && (
+                <div className="absolute top-4 right-4 z-10">
+                  <RefreshCw className="w-5 h-5 text-white animate-spin" />
+                </div>
+              )}
+              <div className="relative flex items-start justify-between gap-4">
+                <div className="text-left flex-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.34em] text-white/80">
                     Conference Pass
                   </p>
-                  <h1 className="mt-2 text-2xl font-display font-semibold tracking-tight">
+                  <h1 className="mt-2 text-2xl font-display font-semibold tracking-tight break-keep">
                     {t("등록 확인 바우처", "Registration Voucher")}
                   </h1>
-                  <p className="mt-2 max-w-[15rem] text-sm text-white/80">
+                  <p className="mt-2 text-sm text-white/90 break-keep">
                     {t(
                       "현장 등록 데스크에서 확인 후 디지털 명찰로 전환됩니다.",
                       "Present this at the on-site desk to activate your digital badge.",
                     )}
                   </p>
                 </div>
-                <div className="mt-1 rounded-full border border-white/20 bg-white/10 p-3 backdrop-blur">
+                <div className="rounded-full border border-white/20 bg-white/20 p-3 backdrop-blur shrink-0 mt-1">
                   <Clock className="h-5 w-5 animate-pulse" />
                 </div>
               </div>
+            </div>
 
-              <div className="rounded-[1.6rem] border border-slate-200/70 bg-white/92 p-6 shadow-[0_20px_60px_-36px_rgba(15,23,42,0.35)]">
-                <div className="mb-5 flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-left">
+            {/* Body Area */}
+            <div className="relative px-6 pb-6 -mt-6">
+              <div className="rounded-[1.6rem] border border-slate-200/70 bg-white p-6 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.12)] relative z-20">
+                <div className="mb-6 flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-700">
-                      Pending
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
+                      Status
                     </p>
-                    <p className="mt-1 text-sm font-semibold text-amber-950">
+                    <p className="mt-1 text-sm font-semibold text-slate-800">
                       {t("명찰 발급 대기 중", "Badge issuance pending")}
                     </p>
                   </div>
-                  <FileText className="h-5 w-5 text-amber-600" />
+                  <FileText className="h-5 w-5 text-slate-400" />
                 </div>
 
-                <p className="text-sm font-semibold uppercase tracking-[0.26em] text-slate-400">
-                  {reg.affiliation || "-"}
-                </p>
-                <h2 className="mt-3 text-3xl font-display font-semibold tracking-tight text-slate-950">
-                  {reg.name}
-                </h2>
+                <div className="flex flex-col items-center justify-center text-center">
+                  <p className="text-sm font-semibold uppercase tracking-[0.26em] text-slate-400 break-keep">
+                    {reg.affiliation || "-"}
+                  </p>
+                  <h2 className="mt-3 text-3xl font-display font-semibold tracking-tight text-slate-950">
+                    {reg.name}
+                  </h2>
 
-                <div className="mt-5 grid grid-cols-1 gap-3 text-left">
                   {reg.licenseNumber && reg.licenseNumber !== "-" && (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-400">
-                        {t("면허번호", "License No.")}
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-slate-800">
-                        {reg.licenseNumber}
-                      </p>
+                    <div className="mt-4 inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">
+                      {t("면허번호", "License No.")}: {reg.licenseNumber}
                     </div>
                   )}
                 </div>
 
-                <div className="mt-6 rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-5 shadow-inner">
-                  <div className="mb-4 flex items-center justify-between">
-                    <div className="text-left">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">
-                        Desk QR
-                      </p>
-                      <p className="mt-1 text-sm font-medium text-slate-500">
-                        {t("인포데스크 제시용 QR 코드", "Show this QR at the info desk")}
-                      </p>
-                    </div>
-                    <div className="rounded-full bg-slate-900 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-white">
+                <div className="mt-8 rounded-[1.75rem] border border-slate-200 bg-slate-50/50 p-5">
+                  <div className="mb-5 flex flex-col items-center justify-center text-center">
+                    <div className="rounded-full bg-slate-900 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-white mb-3">
                       Voucher
                     </div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
+                      Desk QR
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-slate-600 break-keep">
+                      {t("인포데스크 제시용 QR 코드", "Show this QR at the info desk")}
+                    </p>
                   </div>
-                  <div className="rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="mx-auto flex justify-center rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm w-fit">
                     <QRCodeSVG
                       key={voucherQrValue}
                       value={voucherQrValue}
@@ -646,12 +639,12 @@ const BadgePrepPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-2xl border border-sky-100 bg-sky-50/80 px-4 py-4 text-left">
-                  <p className="flex items-center gap-2 text-sm font-semibold text-sky-900">
+                <div className="mt-6 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-4 text-center">
+                  <p className="flex items-center justify-center gap-2 text-sm font-semibold text-amber-900">
                     <User className="h-4 w-4" />
                     {t("현장 안내", "On-site guidance")}
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-sky-800">
+                  <p className="mt-2 text-sm leading-6 text-amber-800 break-keep">
                     {t(
                       "위 QR 코드를 현장 인포데스크에 제시하면 디지털 명찰이 발급됩니다.",
                       "Present the QR code above at the desk to receive your digital badge.",
