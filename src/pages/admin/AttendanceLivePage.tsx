@@ -593,7 +593,8 @@ const AttendanceLivePage: React.FC = () => {
             }
 
             if (adjustMode === 'CHECKOUT') {
-                const zoneRule = (allZonesRef.current.find(z => z.id === reg.currentZone) as any) || zones.find(z => z.id === reg.currentZone);
+                const todayStrKst = getKstToday();
+                const zoneRule = zones.find(z => z.id === reg.currentZone) || allZonesRef.current.find(z => z.id === reg.currentZone && z.ruleDate === todayStrKst) || allZonesRef.current.find(z => z.id === reg.currentZone);
                 const zoneDateStr = zoneRule?.ruleDate || selectedDate;
                 const dt = getDateTimeKst(zoneDateStr, adjustCheckOutTime);
                 if (!dt) {
