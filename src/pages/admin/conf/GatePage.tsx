@@ -203,7 +203,7 @@ const GatePage: React.FC = () => {
             console.error(e);
             setScannerState({ status: 'ERROR', message: e.message || 'Scan Failed', lastScanned: parsedIdForDebounce });
         } finally {
-            setTimeout(() => setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE' }), 1200);
+            setTimeout(() => setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE' }), 2000);
         }
     };
 
@@ -224,6 +224,7 @@ const GatePage: React.FC = () => {
             const status = data.attendanceStatus || 'OUTSIDE';
             const curZoneId = data.currentZone;
             const lastIn = data.lastCheckIn?.toDate();
+            const lastOut = data.lastCheckOut?.toDate();
             const totalMins = data.totalMinutes || 0;
 
             let action: 'ENTER' | 'EXIT' = 'ENTER';
@@ -233,6 +234,14 @@ const GatePage: React.FC = () => {
             let deduction = 0;
             const tsNow = Timestamp.now();
             const now = new Date();
+
+            // 1분(60초) 이내 중복 스캔 방지 (더블 스캔 원천 차단)
+            if (lastIn && status === 'INSIDE' && (now.getTime() - lastIn.getTime() < 60000)) {
+                throw new Error('방금 입장하셨습니다. (1분 대기)');
+            }
+            if (lastOut && status === 'OUTSIDE' && (now.getTime() - lastOut.getTime() < 60000)) {
+                throw new Error('방금 퇴장하셨습니다. (1분 대기)');
+            }
 
             if (currentMode === 'ENTER_ONLY') {
                 if (status === 'INSIDE' && curZoneId === targetZoneId) throw new Error('이미 입장 상태');

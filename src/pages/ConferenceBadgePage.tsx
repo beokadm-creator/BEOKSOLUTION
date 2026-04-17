@@ -318,7 +318,8 @@ const ConferenceBadgePage: React.FC = () => {
             const start = uiData.lastCheckIn.toDate();
             let boundedStart = start;
             let boundedEnd = now;
-            const zoneRule = zones.find((zone) => zone.id === uiData.zone);
+            const todayStr = getKstToday();
+            const zoneRule = zones.find(z => z.id === uiData.zone && z.ruleDate === todayStr) || zones.find((zone) => zone.id === uiData.zone);
 
             if (zoneRule?.start && zoneRule.end) {
                 const localDateStr = zoneRule.ruleDate || `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;

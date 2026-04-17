@@ -827,7 +827,8 @@ const AttendanceLivePage: React.FC = () => {
                                         let boundedStart = checkInTime;
                                         let boundedEnd = currentTime;
 
-                                        const rZoneRule = zones.find(z => z.id === r.currentZone);
+                                        const todayStrKst = getKstToday();
+                                        const rZoneRule = zones.find(z => z.id === r.currentZone && z.ruleDate === todayStrKst) || zones.find(z => z.id === r.currentZone);
 
                                         if (rZoneRule && rZoneRule.start && rZoneRule.end) {
                                             const sessionStart = new Date(`${selectedDate}T${rZoneRule.start}:00+09:00`);

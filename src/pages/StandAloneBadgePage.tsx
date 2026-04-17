@@ -583,7 +583,7 @@ const StandAloneBadgePage: React.FC = () => {
       let durationMinutes = 0;
       const currentZoneId = ui.zone;
       const todayStr = getKstToday();
-      const zoneRule = zones.find((z) => z.id === currentZoneId) || zones.find(z => z.id === currentZoneId && z.ruleDate === todayStr);
+      const zoneRule = zones.find(z => z.id === currentZoneId && z.ruleDate === todayStr) || zones.find((z) => z.id === currentZoneId);
       let deduction = 0;
 
       let boundedStart = start;
