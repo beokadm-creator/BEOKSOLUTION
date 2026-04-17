@@ -128,7 +128,7 @@ const AttendanceScannerPage: React.FC = () => {
             console.error(e);
             setScannerState({ status: 'ERROR', message: e.message || 'Error', lastScanned: code });
         } finally {
-            setTimeout(() => setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE' }), 1200);
+            setTimeout(() => setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE' }), 2000);
         }
     };
 
@@ -148,6 +148,7 @@ const AttendanceScannerPage: React.FC = () => {
             const status = data.attendanceStatus || 'OUTSIDE';
             const curZoneId = data.currentZone;
             const lastIn = data.lastCheckIn?.toDate();
+            const lastOut = data.lastCheckOut?.toDate();
             const totalMins = data.totalMinutes || 0;
 
             let action: 'ENTER' | 'EXIT' = 'ENTER';
@@ -157,6 +158,14 @@ const AttendanceScannerPage: React.FC = () => {
             let deduction = 0;
             const tsNow = Timestamp.now();
             const now = new Date();
+
+            // 1분(60초) 이내 중복 스캔 방지 (더블 스캔 원천 차단)
+            if (lastIn && status === 'INSIDE' && (now.getTime() - lastIn.getTime() < 60000)) {
+                throw new Error('방금 입장하셨습니다. (1분 대기)');
+            }
+            if (lastOut && status === 'OUTSIDE' && (now.getTime() - lastOut.getTime() < 60000)) {
+                throw new Error('방금 퇴장하셨습니다. (1분 대기)');
+            }
 
             if (curMode === 'ENTER_ONLY') {
                 if (status === 'INSIDE' && curZoneId === targetZoneId) throw new Error('이미 입장 상태');
@@ -173,7 +182,8 @@ const AttendanceScannerPage: React.FC = () => {
 
             const isZoneSwitch = status === 'INSIDE' && actionText === 'Zone Switch' && curZoneId && curZoneId !== targetZoneId;
             if (status === 'INSIDE' && (action === 'EXIT' || isZoneSwitch)) {
-                const rule = zones.find(z => z.id === curZoneId);
+                const todayStr = getKstToday();
+                const rule = zones.find(z => z.id === curZoneId) || allZones.find(z => z.id === curZoneId && z.ruleDate === todayStr) || allZones.find(z => z.id === curZoneId);
 
                 // M7 Fix: Missing lastCheckIn fallback handling
                 if (!lastIn) {
@@ -332,6 +342,11 @@ const AttendanceScannerPage: React.FC = () => {
                     <h2 className={cn("text-6xl font-black mb-6 transition-all", scannerState.status === 'ERROR' ? 'text-red-600' : scannerState.status === 'SUCCESS' ? 'text-green-600' : 'text-slate-900')}>
                         {scannerState.message}
                     </h2>
+                    {scannerState.status === 'SUCCESS' && (
+                        <div className="text-2xl font-bold text-slate-500 mb-8 bg-slate-100 px-6 py-2 rounded-full border border-slate-200">
+                            {scannerState.actionType === 'ENTER' ? '입장 시간' : '퇴장 시간'}: {new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </div>
+                    )}
                     {scannerState.subMessage && <p className="text-3xl font-bold text-slate-700">{scannerState.subMessage}</p>}
                     {scannerState.userData && <p className="text-xl text-slate-400 mt-4 font-bold">{scannerState.userData.affiliation}</p>}
                 </div>

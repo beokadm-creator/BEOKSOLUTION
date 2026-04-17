@@ -400,7 +400,8 @@ const BadgePrepPage: React.FC = () => {
         ? currentCheckIn.toDate()
         : new Date();
       let sessionDuration = 0;
-      const zoneRule = zones.find((z) => z.id === currentZoneId);
+      const todayStr = getKstToday();
+      const zoneRule = zones.find(z => z.id === currentZoneId && z.ruleDate === todayStr) || zones.find((z) => z.id === currentZoneId);
       let deduction = 0;
 
       let boundedStart = start;

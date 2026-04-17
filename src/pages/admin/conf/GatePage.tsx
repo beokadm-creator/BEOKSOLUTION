@@ -203,7 +203,7 @@ const GatePage: React.FC = () => {
             console.error(e);
             setScannerState({ status: 'ERROR', message: e.message || 'Scan Failed', lastScanned: parsedIdForDebounce });
         } finally {
-            setTimeout(() => setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE' }), 1200);
+            setTimeout(() => setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE' }), 2000);
         }
     };
 
@@ -224,6 +224,7 @@ const GatePage: React.FC = () => {
             const status = data.attendanceStatus || 'OUTSIDE';
             const curZoneId = data.currentZone;
             const lastIn = data.lastCheckIn?.toDate();
+            const lastOut = data.lastCheckOut?.toDate();
             const totalMins = data.totalMinutes || 0;
 
             let action: 'ENTER' | 'EXIT' = 'ENTER';
@@ -233,6 +234,14 @@ const GatePage: React.FC = () => {
             let deduction = 0;
             const tsNow = Timestamp.now();
             const now = new Date();
+
+            // 1분(60초) 이내 중복 스캔 방지 (더블 스캔 원천 차단)
+            if (lastIn && status === 'INSIDE' && (now.getTime() - lastIn.getTime() < 60000)) {
+                throw new Error('방금 입장하셨습니다. (1분 대기)');
+            }
+            if (lastOut && status === 'OUTSIDE' && (now.getTime() - lastOut.getTime() < 60000)) {
+                throw new Error('방금 퇴장하셨습니다. (1분 대기)');
+            }
 
             if (currentMode === 'ENTER_ONLY') {
                 if (status === 'INSIDE' && curZoneId === targetZoneId) throw new Error('이미 입장 상태');
@@ -249,9 +258,11 @@ const GatePage: React.FC = () => {
 
             const isZoneSwitch = status === 'INSIDE' && text === 'Zone Switch' && curZoneId && curZoneId !== targetZoneId;
             if (status === 'INSIDE' && (action === 'EXIT' || isZoneSwitch)) {
+                const todayStr = getKstToday();
                 const rule =
-                    allZonesRef.current.find(z => z.id === curZoneId) ||
-                    zones.find(z => z.id === curZoneId);
+                    allZonesRef.current.find(z => z.id === curZoneId && z.ruleDate === todayStr) ||
+                    zones.find(z => z.id === curZoneId) ||
+                    allZonesRef.current.find(z => z.id === curZoneId);
                 
                 // Fallback for missing lastCheckIn
                 let safeLastIn = lastIn;
@@ -291,13 +302,15 @@ const GatePage: React.FC = () => {
             const newTotal = totalMins + minsToAdd;
 
             const dailyMinutes = { ...(data.dailyMinutes || {}) };
-            const ruleForExitDate =
-                allZonesRef.current.find(z => z.id === curZoneId) ||
-                zones.find(z => z.id === curZoneId);
-            const ruleForEnterDate =
-                allZonesRef.current.find(z => z.id === targetZoneId) ||
-                zones.find(z => z.id === targetZoneId);
             const fallbackDateStr = getKstToday();
+            const ruleForExitDate =
+                allZonesRef.current.find(z => z.id === curZoneId && z.ruleDate === fallbackDateStr) ||
+                zones.find(z => z.id === curZoneId) ||
+                allZonesRef.current.find(z => z.id === curZoneId);
+            const ruleForEnterDate =
+                allZonesRef.current.find(z => z.id === targetZoneId && z.ruleDate === fallbackDateStr) ||
+                zones.find(z => z.id === targetZoneId) ||
+                allZonesRef.current.find(z => z.id === targetZoneId);
 
             const exitDateStr = ruleForExitDate?.ruleDate || fallbackDateStr;
             const enterDateStr = ruleForEnterDate?.ruleDate || fallbackDateStr;
@@ -318,8 +331,9 @@ const GatePage: React.FC = () => {
             // In CUMULATIVE mode, completion is determined solely by cumulativeGoalMinutes
             if (curZoneId && minsToAdd > 0) {
                 const ruleForZone =
-                    allZonesRef.current.find(z => z.id === curZoneId) ||
-                    zones.find(z => z.id === curZoneId);
+                    allZonesRef.current.find(z => z.id === curZoneId && z.ruleDate === fallbackDateStr) ||
+                    zones.find(z => z.id === curZoneId) ||
+                    allZonesRef.current.find(z => z.id === curZoneId);
                 if (ruleForZone && ruleForZone.completionMode !== 'CUMULATIVE') {
                     const zoneGoal = ruleForZone.goalMinutes || ruleForZone.globalGoalMinutes || 0;
                     if (zoneGoal > 0 && (zoneMinutes[curZoneId] || 0) >= zoneGoal) {
@@ -332,9 +346,10 @@ const GatePage: React.FC = () => {
             let isComp = data.isCompleted || false;
             const anyZoneCompleted = Object.values(zoneCompleted).some(v => v === true);
             const ruleForCumulative =
-                allZonesRef.current.find(z => z.completionMode === 'CUMULATIVE') ||
-                allZonesRef.current.find(z => z.id === targetZoneId) ||
+                allZonesRef.current.find(z => z.completionMode === 'CUMULATIVE' && z.ruleDate === fallbackDateStr) ||
+                allZonesRef.current.find(z => z.id === targetZoneId && z.ruleDate === fallbackDateStr) ||
                 zones.find(z => z.id === targetZoneId) ||
+                allZonesRef.current.find(z => z.id === targetZoneId) ||
                 zones[0] ||
                 null;
             const cumulativeCompleted = ruleForCumulative?.completionMode === 'CUMULATIVE'
@@ -568,6 +583,12 @@ const GatePage: React.FC = () => {
                             <div className="inline-flex items-center gap-3 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-6 py-3 rounded-full font-black text-xl mb-6 backdrop-blur shadow-[0_0_20px_rgba(52,211,153,0.2)]">
                                 <CheckCircle className="w-6 h-6" />
                                 수강완료
+                            </div>
+                        )}
+
+                        {scannerState.status === 'SUCCESS' && (
+                            <div className="text-xl font-bold text-emerald-200/80 mb-6 bg-emerald-950/30 px-6 py-2 rounded-full border border-emerald-500/20">
+                                {scannerState.actionType === 'ENTER' ? '입장 시간' : '퇴장 시간'}: {new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                             </div>
                         )}
 

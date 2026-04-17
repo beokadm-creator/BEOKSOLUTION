@@ -310,8 +310,9 @@ const AttendanceLivePage: React.FC = () => {
             const now = Timestamp.fromDate(nowDate);
             
             // Use the actual ruleDate of the zone being checked into
-            const zoneRule = (allZonesRef.current.find(z => z.id === zoneId) as any) || zones.find(z => z.id === zoneId);
-            const todayStr = zoneRule?.ruleDate || selectedDate;
+            const todayStr = getKstToday();
+            const zoneRule = zones.find(z => z.id === zoneId) || allZonesRef.current.find(z => z.id === zoneId && z.ruleDate === todayStr) || allZonesRef.current.find(z => z.id === zoneId);
+            const actualDateStr = zoneRule?.ruleDate || selectedDate;
 
             await updateDoc(regRef, {
                 attendanceStatus: 'INSIDE',
@@ -324,7 +325,7 @@ const AttendanceLivePage: React.FC = () => {
                 type: 'ENTER',
                 zoneId,
                 timestamp: now,
-                date: todayStr,
+                date: actualDateStr,
                 method: checkInAt ? 'MANUAL_ADMIN_OVERRIDE' : 'MANUAL_ADMIN'
             });
 
@@ -337,7 +338,7 @@ const AttendanceLivePage: React.FC = () => {
                     scannedQr: badgeQr,
                     locationId: zoneId,
                     timestamp: now,
-                    date: todayStr,
+                    date: actualDateStr,
                     method: checkInAt ? 'MANUAL_ADMIN_OVERRIDE' : 'MANUAL_ADMIN',
                     registrationId: regId,
                     isExternal: reg?.isExternal || false,
@@ -369,7 +370,8 @@ const AttendanceLivePage: React.FC = () => {
             let boundedEnd = now;
 
             // Safe cross-day zone lookup
-            const zoneRule = (allZonesRef.current.find(z => z.id === currentZoneId) as any) || zones.find(z => z.id === currentZoneId);
+            const todayStrKst = getKstToday();
+            const zoneRule = zones.find(z => z.id === currentZoneId) || allZonesRef.current.find(z => z.id === currentZoneId && z.ruleDate === todayStrKst) || allZonesRef.current.find(z => z.id === currentZoneId);
             const zoneDateStr = zoneRule?.ruleDate || selectedDate;
 
             if (zoneRule && zoneRule.start && zoneRule.end) {
@@ -591,7 +593,8 @@ const AttendanceLivePage: React.FC = () => {
             }
 
             if (adjustMode === 'CHECKOUT') {
-                const zoneRule = (allZonesRef.current.find(z => z.id === reg.currentZone) as any) || zones.find(z => z.id === reg.currentZone);
+                const todayStrKst = getKstToday();
+                const zoneRule = zones.find(z => z.id === reg.currentZone) || allZonesRef.current.find(z => z.id === reg.currentZone && z.ruleDate === todayStrKst) || allZonesRef.current.find(z => z.id === reg.currentZone);
                 const zoneDateStr = zoneRule?.ruleDate || selectedDate;
                 const dt = getDateTimeKst(zoneDateStr, adjustCheckOutTime);
                 if (!dt) {
@@ -824,7 +827,8 @@ const AttendanceLivePage: React.FC = () => {
                                         let boundedStart = checkInTime;
                                         let boundedEnd = currentTime;
 
-                                        const rZoneRule = zones.find(z => z.id === r.currentZone);
+                                        const todayStrKst = getKstToday();
+                                        const rZoneRule = zones.find(z => z.id === r.currentZone && z.ruleDate === todayStrKst) || zones.find(z => z.id === r.currentZone);
 
                                         if (rZoneRule && rZoneRule.start && rZoneRule.end) {
                                             const sessionStart = new Date(`${selectedDate}T${rZoneRule.start}:00+09:00`);
