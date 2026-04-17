@@ -18,7 +18,6 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeSessionInfo, setActiveSessionInfo] = useState<any | null>(null);
-  const [lastFlushTime, setLastFlushTime] = useState<number>(0);
   const [activeLang, setActiveLang] = useState<string>('ko');
 
   // Viewer Settings
@@ -113,15 +112,8 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
       }
     });
 
-    // Subscribe to state/lastFlushTime to handle "Clear Screen" from admin
-    const flushTimeRef = ref(rtdb, `projects/${selectedProjectId}/state/lastFlushTime`);
-    const unsubscribeFlushTime = onValue(flushTimeRef, (snap) => {
-      setLastFlushTime(snap.val() || 0);
-    });
-
     return () => {
       unsubscribeActive();
-      unsubscribeFlushTime();
     };
   }, [selectedProjectId]);
 
@@ -132,9 +124,12 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
 
   const segmentsMap = streamData || {};
 
+  // sessionId 기반 필터 제거 — 오리지널 translation-comm.web.app/audience/{id} 동작과 정합.
+  // RTDB 쿼리의 limitToLast(50) 가 자연스러운 스크롤백 윈도우를 제공하고,
+  // status === 'merged' 는 렌더 단계에서 숨긴다. sessionId 불일치 케이스에서
+  // 전체 세그먼트가 잘리는 증상(=빈 화면 + "Waiting for translation...") 방지.
   const segmentsOrder = Object.keys(segmentsMap)
-    .filter(k => !activeSessionId || segmentsMap[k]?.sessionId === activeSessionId)
-    .filter(k => (segmentsMap[k]?.timestamp || 0) >= lastFlushTime)
+    .filter(k => !!segmentsMap[k])
     .sort((a, b) => (segmentsMap[a]?.timestamp || 0) - (segmentsMap[b]?.timestamp || 0));
 
   // Scroll to bottom when a new segment is added
@@ -224,8 +219,9 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
             ))}
             <button
               onClick={() => window.open(`https://translation-comm.web.app/audience/${selectedProjectId}`, '_blank')}
-              className="px-3 py-1 text-xs rounded-full font-bold bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors hidden sm:block"
+              className="px-3 py-1 text-xs rounded-full font-bold bg-blue-600 text-white hover:bg-blue-500 transition-colors hidden sm:inline-flex items-center gap-1 shadow-sm"
             >
+              <span aria-hidden>↗</span>
               {activeLang === 'en' ? 'Open in New Tab' : '새 창에서 열기'}
             </button>
           </div>
@@ -246,8 +242,9 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
         </div>
         <button
           onClick={() => window.open(`https://translation-comm.web.app/audience/${selectedProjectId}`, '_blank')}
-          className="shrink-0 px-3 py-1 text-[10px] rounded-full font-bold bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors whitespace-nowrap"
+          className="shrink-0 px-3 py-1 text-[10px] rounded-full font-bold bg-blue-600 text-white hover:bg-blue-500 transition-colors whitespace-nowrap inline-flex items-center gap-1 shadow-sm"
         >
+          <span aria-hidden>↗</span>
           {activeLang === 'en' ? 'New Tab' : '새 창'}
         </button>
       </div>
