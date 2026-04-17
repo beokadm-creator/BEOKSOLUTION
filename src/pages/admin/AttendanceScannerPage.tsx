@@ -342,6 +342,11 @@ const AttendanceScannerPage: React.FC = () => {
                     <h2 className={cn("text-6xl font-black mb-6 transition-all", scannerState.status === 'ERROR' ? 'text-red-600' : scannerState.status === 'SUCCESS' ? 'text-green-600' : 'text-slate-900')}>
                         {scannerState.message}
                     </h2>
+                    {scannerState.status === 'SUCCESS' && (
+                        <div className="text-2xl font-bold text-slate-500 mb-8 bg-slate-100 px-6 py-2 rounded-full border border-slate-200">
+                            {scannerState.actionType === 'ENTER' ? '입장 시간' : '퇴장 시간'}: {new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </div>
+                    )}
                     {scannerState.subMessage && <p className="text-3xl font-bold text-slate-700">{scannerState.subMessage}</p>}
                     {scannerState.userData && <p className="text-xl text-slate-400 mt-4 font-bold">{scannerState.userData.affiliation}</p>}
                 </div>
