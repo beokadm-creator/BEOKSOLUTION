@@ -124,14 +124,12 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
 
   const segmentsMap = streamData || {};
 
+  // sessionId 기반 필터 제거 — 오리지널 translation-comm.web.app/audience/{id} 동작과 정합.
+  // RTDB 쿼리의 limitToLast(50) 가 자연스러운 스크롤백 윈도우를 제공하고,
+  // status === 'merged' 는 렌더 단계에서 숨긴다. sessionId 불일치 케이스에서
+  // 전체 세그먼트가 잘리는 증상(=빈 화면 + "Waiting for translation...") 방지.
   const segmentsOrder = Object.keys(segmentsMap)
-    .filter(k => {
-      const seg = segmentsMap[k];
-      if (!seg) return false;
-      if (!activeSessionId) return true;
-      if (!seg.sessionId) return true;
-      return seg.sessionId === activeSessionId;
-    })
+    .filter(k => !!segmentsMap[k])
     .sort((a, b) => (segmentsMap[a]?.timestamp || 0) - (segmentsMap[b]?.timestamp || 0));
 
   // Scroll to bottom when a new segment is added
