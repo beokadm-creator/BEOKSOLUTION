@@ -173,7 +173,8 @@ const AttendanceScannerPage: React.FC = () => {
 
             const isZoneSwitch = status === 'INSIDE' && actionText === 'Zone Switch' && curZoneId && curZoneId !== targetZoneId;
             if (status === 'INSIDE' && (action === 'EXIT' || isZoneSwitch)) {
-                const rule = zones.find(z => z.id === curZoneId);
+                const todayStr = getKstToday();
+                const rule = zones.find(z => z.id === curZoneId) || allZones.find(z => z.id === curZoneId && z.ruleDate === todayStr) || allZones.find(z => z.id === curZoneId);
 
                 // M7 Fix: Missing lastCheckIn fallback handling
                 if (!lastIn) {

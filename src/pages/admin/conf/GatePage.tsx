@@ -249,9 +249,11 @@ const GatePage: React.FC = () => {
 
             const isZoneSwitch = status === 'INSIDE' && text === 'Zone Switch' && curZoneId && curZoneId !== targetZoneId;
             if (status === 'INSIDE' && (action === 'EXIT' || isZoneSwitch)) {
+                const todayStr = getKstToday();
                 const rule =
-                    allZonesRef.current.find(z => z.id === curZoneId) ||
-                    zones.find(z => z.id === curZoneId);
+                    allZonesRef.current.find(z => z.id === curZoneId && z.ruleDate === todayStr) ||
+                    zones.find(z => z.id === curZoneId) ||
+                    allZonesRef.current.find(z => z.id === curZoneId);
                 
                 // Fallback for missing lastCheckIn
                 let safeLastIn = lastIn;
@@ -291,13 +293,15 @@ const GatePage: React.FC = () => {
             const newTotal = totalMins + minsToAdd;
 
             const dailyMinutes = { ...(data.dailyMinutes || {}) };
-            const ruleForExitDate =
-                allZonesRef.current.find(z => z.id === curZoneId) ||
-                zones.find(z => z.id === curZoneId);
-            const ruleForEnterDate =
-                allZonesRef.current.find(z => z.id === targetZoneId) ||
-                zones.find(z => z.id === targetZoneId);
             const fallbackDateStr = getKstToday();
+            const ruleForExitDate =
+                allZonesRef.current.find(z => z.id === curZoneId && z.ruleDate === fallbackDateStr) ||
+                zones.find(z => z.id === curZoneId) ||
+                allZonesRef.current.find(z => z.id === curZoneId);
+            const ruleForEnterDate =
+                allZonesRef.current.find(z => z.id === targetZoneId && z.ruleDate === fallbackDateStr) ||
+                zones.find(z => z.id === targetZoneId) ||
+                allZonesRef.current.find(z => z.id === targetZoneId);
 
             const exitDateStr = ruleForExitDate?.ruleDate || fallbackDateStr;
             const enterDateStr = ruleForEnterDate?.ruleDate || fallbackDateStr;
@@ -318,8 +322,9 @@ const GatePage: React.FC = () => {
             // In CUMULATIVE mode, completion is determined solely by cumulativeGoalMinutes
             if (curZoneId && minsToAdd > 0) {
                 const ruleForZone =
-                    allZonesRef.current.find(z => z.id === curZoneId) ||
-                    zones.find(z => z.id === curZoneId);
+                    allZonesRef.current.find(z => z.id === curZoneId && z.ruleDate === fallbackDateStr) ||
+                    zones.find(z => z.id === curZoneId) ||
+                    allZonesRef.current.find(z => z.id === curZoneId);
                 if (ruleForZone && ruleForZone.completionMode !== 'CUMULATIVE') {
                     const zoneGoal = ruleForZone.goalMinutes || ruleForZone.globalGoalMinutes || 0;
                     if (zoneGoal > 0 && (zoneMinutes[curZoneId] || 0) >= zoneGoal) {
@@ -332,9 +337,10 @@ const GatePage: React.FC = () => {
             let isComp = data.isCompleted || false;
             const anyZoneCompleted = Object.values(zoneCompleted).some(v => v === true);
             const ruleForCumulative =
-                allZonesRef.current.find(z => z.completionMode === 'CUMULATIVE') ||
-                allZonesRef.current.find(z => z.id === targetZoneId) ||
+                allZonesRef.current.find(z => z.completionMode === 'CUMULATIVE' && z.ruleDate === fallbackDateStr) ||
+                allZonesRef.current.find(z => z.id === targetZoneId && z.ruleDate === fallbackDateStr) ||
                 zones.find(z => z.id === targetZoneId) ||
+                allZonesRef.current.find(z => z.id === targetZoneId) ||
                 zones[0] ||
                 null;
             const cumulativeCompleted = ruleForCumulative?.completionMode === 'CUMULATIVE'
