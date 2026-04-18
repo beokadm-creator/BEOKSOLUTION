@@ -27,6 +27,12 @@ changelog:
 - **Baseline**: v1.0.0 at commit `35aaeed` (immutable)
 - **NEVER** delete, move, or modify tags
 
+## 🚨 [NEW] LIVE EVENT PROTECTION (DAY 2-3) 🚨
+**NO BACKEND (FUNCTIONS) DEPLOYMENTS DURING LIVE EVENTS.**
+- NEVER run `firebase deploy --only functions` or `npm run deploy:prod`.
+- If a function MUST be deployed, use targeted deployments ONLY: `firebase deploy --only functions:<functionName>`
+- If you see commented-out `export` statements in `functions/src/index.ts`, DO NOT deploy functions as they will be deleted from the live environment.
+
 ## Rollback Prevention System (ENFORCED)
 This codebase has **multi-layer protection** against accidental rollbacks:
 
