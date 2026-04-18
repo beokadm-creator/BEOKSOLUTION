@@ -405,12 +405,11 @@ const AttendanceLivePage: React.FC = () => {
             const collectionName = reg?.isExternal ? 'external_attendees' : 'registrations';
             const regRef = doc(db, 'conferences', cid!, collectionName, regId);
 
-            const todayStr = zoneDateStr;
             const currentTotal = reg?.totalMinutes || 0;
             const newTotal = currentTotal + finalMinutes;
 
             const dailyMinutes = { ...(reg?.dailyMinutes || {}) };
-            dailyMinutes[todayStr] = (dailyMinutes[todayStr] || 0) + finalMinutes;
+            dailyMinutes[checkInDateStr] = (dailyMinutes[checkInDateStr] || 0) + finalMinutes;
 
             // Per-zone tracking
             const zoneMinutes = { ...(reg?.zoneMinutes || {}) };
@@ -456,7 +455,7 @@ const AttendanceLivePage: React.FC = () => {
                 type: 'EXIT',
                 zoneId: currentZoneId,
                 timestamp: exitNow,
-                date: todayStr,
+                date: checkInDateStr,
                 method: checkOutAt || typeof recognizedOverride === 'number' ? 'MANUAL_ADMIN_OVERRIDE' : 'MANUAL_ADMIN',
                 rawDuration: durationMinutes,
                 deduction,
@@ -472,7 +471,7 @@ const AttendanceLivePage: React.FC = () => {
                     scannedQr: badgeQr,
                     locationId: currentZoneId,
                     timestamp: exitNow,
-                    date: todayStr,
+                    date: checkInDateStr,
                     method: checkOutAt || typeof recognizedOverride === 'number' ? 'MANUAL_ADMIN_OVERRIDE' : 'MANUAL_ADMIN',
                     registrationId: regId,
                     isExternal: reg?.isExternal || false,

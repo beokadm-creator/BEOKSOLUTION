@@ -220,9 +220,10 @@ const AttendanceScannerPage: React.FC = () => {
 
             const newTotal = totalMins + minsToAdd;
 
-            const todayStr = getKstToday();
+            const fallbackDateStr = getKstToday();
+            const dailyDateStr = (action === 'EXIT' || isZoneSwitch) && lastIn ? getKstToday(lastIn) : fallbackDateStr;
             const dailyMinutes = { ...(data.dailyMinutes || {}) };
-            dailyMinutes[todayStr] = (dailyMinutes[todayStr] || 0) + minsToAdd;
+            dailyMinutes[dailyDateStr] = (dailyMinutes[dailyDateStr] || 0) + minsToAdd;
 
             const zoneMinutes: Record<string, number> = { ...(data.zoneMinutes || {}) };
             const zoneCompleted: Record<string, boolean> = { ...(data.zoneCompleted || {}) };

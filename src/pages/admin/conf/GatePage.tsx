@@ -303,8 +303,9 @@ const GatePage: React.FC = () => {
 
             const dailyMinutes = { ...(data.dailyMinutes || {}) };
             const fallbackDateStr = getKstToday();
+            const safeLastInDateStr = lastIn ? getKstToday(lastIn) : fallbackDateStr;
             const ruleForExitDate =
-                allZonesRef.current.find(z => z.id === curZoneId && z.ruleDate === fallbackDateStr) ||
+                allZonesRef.current.find(z => z.id === curZoneId && z.ruleDate === safeLastInDateStr) ||
                 zones.find(z => z.id === curZoneId) ||
                 allZonesRef.current.find(z => z.id === curZoneId);
             const ruleForEnterDate =
@@ -312,7 +313,7 @@ const GatePage: React.FC = () => {
                 zones.find(z => z.id === targetZoneId) ||
                 allZonesRef.current.find(z => z.id === targetZoneId);
 
-            const exitDateStr = ruleForExitDate?.ruleDate || fallbackDateStr;
+            const exitDateStr = ruleForExitDate?.ruleDate || safeLastInDateStr;
             const enterDateStr = ruleForEnterDate?.ruleDate || fallbackDateStr;
             if (minsToAdd > 0) {
                 dailyMinutes[exitDateStr] = (dailyMinutes[exitDateStr] || 0) + minsToAdd;
