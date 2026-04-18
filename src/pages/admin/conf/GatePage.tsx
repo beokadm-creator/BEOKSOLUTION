@@ -258,18 +258,18 @@ const GatePage: React.FC = () => {
 
             const isZoneSwitch = status === 'INSIDE' && text === 'Zone Switch' && curZoneId && curZoneId !== targetZoneId;
             if (status === 'INSIDE' && (action === 'EXIT' || isZoneSwitch)) {
-                const todayStr = getKstToday();
-                const rule =
-                    allZonesRef.current.find(z => z.id === curZoneId && z.ruleDate === todayStr) ||
-                    zones.find(z => z.id === curZoneId) ||
-                    allZonesRef.current.find(z => z.id === curZoneId);
-                
                 // Fallback for missing lastCheckIn
                 let safeLastIn = lastIn;
                 if (!safeLastIn) {
                     console.warn(`[GatePage] Missing lastCheckIn for ${id}, falling back to now. Duration will be 0.`);
                     safeLastIn = now;
                 }
+                const checkInDateStr = getKstToday(safeLastIn);
+                
+                const rule =
+                    allZonesRef.current.find(z => z.id === curZoneId && z.ruleDate === checkInDateStr) ||
+                    zones.find(z => z.id === curZoneId) ||
+                    allZonesRef.current.find(z => z.id === curZoneId);
                 
                 let bS = safeLastIn, bE = now;
                 if (rule && rule.start && rule.end) {

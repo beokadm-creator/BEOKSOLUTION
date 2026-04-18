@@ -369,10 +369,10 @@ const AttendanceLivePage: React.FC = () => {
             let boundedStart = checkInTime;
             let boundedEnd = now;
 
-            // Safe cross-day zone lookup
-            const todayStrKst = getKstToday();
-            const zoneRule = zones.find(z => z.id === currentZoneId) || allZonesRef.current.find(z => z.id === currentZoneId && z.ruleDate === todayStrKst) || allZonesRef.current.find(z => z.id === currentZoneId);
-            const zoneDateStr = zoneRule?.ruleDate || selectedDate;
+            // Safe cross-day zone lookup based on CHECK-IN time
+            const checkInDateStr = getKstToday(checkInTime);
+            const zoneRule = allZonesRef.current.find(z => z.id === currentZoneId && z.ruleDate === checkInDateStr) || zones.find(z => z.id === currentZoneId) || allZonesRef.current.find(z => z.id === currentZoneId);
+            const zoneDateStr = zoneRule?.ruleDate || checkInDateStr;
 
             if (zoneRule && zoneRule.start && zoneRule.end) {
                 const sessionStart = new Date(`${zoneDateStr}T${zoneRule.start}:00+09:00`);
@@ -593,9 +593,10 @@ const AttendanceLivePage: React.FC = () => {
             }
 
             if (adjustMode === 'CHECKOUT') {
-                const todayStrKst = getKstToday();
-                const zoneRule = zones.find(z => z.id === reg.currentZone) || allZonesRef.current.find(z => z.id === reg.currentZone && z.ruleDate === todayStrKst) || allZonesRef.current.find(z => z.id === reg.currentZone);
-                const zoneDateStr = zoneRule?.ruleDate || selectedDate;
+                const checkInDate = reg.lastCheckIn?.toDate() || new Date();
+                const checkInDateStr = getKstToday(checkInDate);
+                const zoneRule = allZonesRef.current.find(z => z.id === reg.currentZone && z.ruleDate === checkInDateStr) || zones.find(z => z.id === reg.currentZone) || allZonesRef.current.find(z => z.id === reg.currentZone);
+                const zoneDateStr = zoneRule?.ruleDate || checkInDateStr;
                 const dt = getDateTimeKst(zoneDateStr, adjustCheckOutTime);
                 if (!dt) {
                     toast.error('퇴장 시간을 HH:MM 형식으로 입력하세요.');
@@ -827,12 +828,13 @@ const AttendanceLivePage: React.FC = () => {
                                         let boundedStart = checkInTime;
                                         let boundedEnd = currentTime;
 
-                                        const todayStrKst = getKstToday();
-                                        const rZoneRule = zones.find(z => z.id === r.currentZone && z.ruleDate === todayStrKst) || zones.find(z => z.id === r.currentZone);
+                                        const checkInDateStr = getKstToday(checkInTime);
+                                        const rZoneRule = zones.find(z => z.id === r.currentZone && z.ruleDate === checkInDateStr) || zones.find(z => z.id === r.currentZone);
+                                        const rZoneDateStr = rZoneRule?.ruleDate || checkInDateStr;
 
                                         if (rZoneRule && rZoneRule.start && rZoneRule.end) {
-                                            const sessionStart = new Date(`${selectedDate}T${rZoneRule.start}:00+09:00`);
-                                            const sessionEnd = new Date(`${selectedDate}T${rZoneRule.end}:00+09:00`);
+                                            const sessionStart = new Date(`${rZoneDateStr}T${rZoneRule.start}:00+09:00`);
+                                            const sessionEnd = new Date(`${rZoneDateStr}T${rZoneRule.end}:00+09:00`);
 
                                             boundedStart = new Date(Math.max(checkInTime.getTime(), sessionStart.getTime()));
                                             boundedEnd = new Date(Math.min(currentTime.getTime(), sessionEnd.getTime()));

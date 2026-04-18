@@ -182,13 +182,12 @@ const AttendanceScannerPage: React.FC = () => {
 
             const isZoneSwitch = status === 'INSIDE' && actionText === 'Zone Switch' && curZoneId && curZoneId !== targetZoneId;
             if (status === 'INSIDE' && (action === 'EXIT' || isZoneSwitch)) {
-                const todayStr = getKstToday();
-                const rule = zones.find(z => z.id === curZoneId) || allZones.find(z => z.id === curZoneId && z.ruleDate === todayStr) || allZones.find(z => z.id === curZoneId);
-
                 // M7 Fix: Missing lastCheckIn fallback handling
                 if (!lastIn) {
                     throw new Error('입장 시간 기록(lastCheckIn)이 누락되어 처리할 수 없습니다.');
                 }
+                const checkInDateStr = getKstToday(lastIn);
+                const rule = zones.find(z => z.id === curZoneId) || allZones.find(z => z.id === curZoneId && z.ruleDate === checkInDateStr) || allZones.find(z => z.id === curZoneId);
 
                 let bS = lastIn, bE = now;
                 if (rule && rule.start && rule.end) {
