@@ -14,6 +14,7 @@ import {
     type BadgeRecordSource
 } from "../utils/badgeRecord";
 import { resolveConferenceIdFromRoute } from "../utils/conferenceRoute";
+import { getKstToday } from "../utils/dateUtils";
 
 type TimestampLike = {
     toDate: () => Date;

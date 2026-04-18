@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { httpsCallable } from "firebase/functions";
 import { getFunctions } from "firebase/functions";
+import { getKstToday } from "../utils/dateUtils";
 import {
   getFirestore,
   doc,
