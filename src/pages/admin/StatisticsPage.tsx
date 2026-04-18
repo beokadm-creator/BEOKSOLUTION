@@ -13,6 +13,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Loader2, Download, CheckCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { cn } from '../../lib/utils';
+import { getKstToday } from '../../utils/dateUtils';
 
 // --- Types for Settings ---
 interface BreakTime {
@@ -275,11 +276,14 @@ const StatisticsPage: React.FC = () => {
         // 수강 완료자 판정
         // CUMULATIVE 모드: isCompleted 필드를 직접 사용 (서버/스캐너가 업데이트)
         // DAILY_SEPARATE 모드: todayMinutes >= globalGoalMinutes
+        const todayStr = getKstToday();
+        const isToday = selectedDate === todayStr;
+
         const userStatsList = badgedParticipants.map(p => {
             // Live time calculation for INSIDE users
             let liveTotalMinutes = p.totalMinutes;
             let liveSessionMinutes = 0;
-            if (p.attendanceStatus === 'INSIDE' && p.lastCheckIn) {
+            if (isToday && p.attendanceStatus === 'INSIDE' && p.lastCheckIn) {
                 const checkInTimeMillis = ensureMillis(p.lastCheckIn);
                 const checkInTime = checkInTimeMillis ? new Date(checkInTimeMillis) : new Date();
                 const currentTime = new Date();
@@ -320,7 +324,7 @@ const StatisticsPage: React.FC = () => {
             }
 
             const anyZoneDone = Object.values(p.zoneCompleted || {}).some(v => v === true);
-            const todayMinutes = Number(p.dailyMinutes?.[selectedDate] || 0) + (p.attendanceStatus === 'INSIDE' ? liveSessionMinutes : 0);
+            const todayMinutes = Number(p.dailyMinutes?.[selectedDate] || 0) + (isToday && p.attendanceStatus === 'INSIDE' ? liveSessionMinutes : 0);
 
             let isCompliant: boolean;
             if (completionMode === 'CUMULATIVE') {
@@ -404,9 +408,9 @@ const StatisticsPage: React.FC = () => {
             };
         });
 
-        const activeUsers = userStatsList.filter(u => u.todayMinutes > 0 || u.attendanceStatus === 'INSIDE').length;
+        const activeUsers = userStatsList.filter(u => u.todayMinutes > 0 || (isToday && u.attendanceStatus === 'INSIDE')).length;
         const compliantUsers = userStatsList.filter(u => u.isCompliant).length;
-        const noShowUsers = userStatsList.filter(u => u.todayMinutes === 0 && u.attendanceStatus !== 'INSIDE').length;
+        const noShowUsers = userStatsList.filter(u => u.todayMinutes === 0 && !(isToday && u.attendanceStatus === 'INSIDE')).length;
         const incompleteUsers = Math.max(0, activeUsers - compliantUsers);
 
         // complianceRate: 명찰 발급자 기준
@@ -420,7 +424,7 @@ const StatisticsPage: React.FC = () => {
 
         // Zone 통계
         const zoneStats = currentRule.zones.map(z => {
-            const visitedUsers = userStatsList.filter(u => (u.zones[z.id] || 0) > 0 || (u.attendanceStatus === 'INSIDE' && u.todayMinutes > 0)).length;
+            const visitedUsers = userStatsList.filter(u => (u.zones[z.id] || 0) > 0 || (isToday && u.attendanceStatus === 'INSIDE' && u.todayMinutes > 0)).length;
             const avgTime = visitedUsers > 0
                 ? userStatsList.reduce((acc, u) => acc + (u.zones[z.id] || 0), 0) / visitedUsers
                 : 0;
