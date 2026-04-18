@@ -272,14 +272,9 @@ const StatisticsPage: React.FC = () => {
         // 명찰 발급 완료자
         const totalBadgeIssued = participants.filter(p => p.badgeIssued).length;
 
-        // 수강 입장 경험이 있는 사람 (totalMinutes > 0 또는 attendanceStatus === INSIDE)
-        const activeUsers = badgedParticipants.filter(
-            p => p.totalMinutes > 0 || p.attendanceStatus === 'INSIDE'
-        ).length;
-
         // 수강 완료자 판정
         // CUMULATIVE 모드: isCompleted 필드를 직접 사용 (서버/스캐너가 업데이트)
-        // DAILY_SEPARATE 모드: totalMinutes >= globalGoalMinutes
+        // DAILY_SEPARATE 모드: todayMinutes >= globalGoalMinutes
         const userStatsList = badgedParticipants.map(p => {
             // Live time calculation for INSIDE users
             let liveTotalMinutes = p.totalMinutes;
@@ -325,16 +320,16 @@ const StatisticsPage: React.FC = () => {
             }
 
             const anyZoneDone = Object.values(p.zoneCompleted || {}).some(v => v === true);
+            const todayMinutes = Number(p.dailyMinutes?.[selectedDate] || 0) + (p.attendanceStatus === 'INSIDE' ? liveSessionMinutes : 0);
 
             let isCompliant: boolean;
             if (completionMode === 'CUMULATIVE') {
                 isCompliant = p.isCompleted || (goalMinutes > 0 && liveTotalMinutes >= goalMinutes);
             } else {
-                isCompliant = anyZoneDone || (goalMinutes > 0 && liveTotalMinutes >= goalMinutes);
+                isCompliant = anyZoneDone || (goalMinutes > 0 && todayMinutes >= goalMinutes);
             }
 
-            const todayMinutes = Number(p.dailyMinutes?.[selectedDate] || 0) + (p.attendanceStatus === 'INSIDE' ? liveSessionMinutes : 0);
-            const remainingMinutes = goalMinutes > 0 ? Math.max(0, goalMinutes - liveTotalMinutes) : 0;
+            const remainingMinutes = goalMinutes > 0 ? Math.max(0, goalMinutes - (completionMode === 'CUMULATIVE' ? liveTotalMinutes : todayMinutes)) : 0;
 
             // Fallback for missing firstEntryTime and lastExitTime
             let entryTime = p.firstEntryTime;
@@ -409,24 +404,25 @@ const StatisticsPage: React.FC = () => {
             };
         });
 
+        const activeUsers = userStatsList.filter(u => u.todayMinutes > 0 || u.attendanceStatus === 'INSIDE').length;
         const compliantUsers = userStatsList.filter(u => u.isCompliant).length;
-        const noShowUsers = badgedParticipants.filter(p => p.totalMinutes === 0 && p.attendanceStatus !== 'INSIDE').length;
+        const noShowUsers = userStatsList.filter(u => u.todayMinutes === 0 && u.attendanceStatus !== 'INSIDE').length;
         const incompleteUsers = Math.max(0, activeUsers - compliantUsers);
 
         // complianceRate: 명찰 발급자 기준
         const complianceRate = totalBadgeIssued > 0 ? (compliantUsers / totalBadgeIssued) * 100 : 0;
 
         const avgStayTime = activeUsers > 0
-            ? badgedParticipants
-                .filter(p => p.totalMinutes > 0)
-                .reduce((acc, p) => acc + p.totalMinutes, 0) / activeUsers
+            ? userStatsList
+                .filter(u => u.todayMinutes > 0)
+                .reduce((acc, u) => acc + u.todayMinutes, 0) / activeUsers
             : 0;
 
-        // Zone 통계 (전체 totalMinutes 기반 근사치)
+        // Zone 통계
         const zoneStats = currentRule.zones.map(z => {
-            const visitedUsers = badgedParticipants.filter(p => p.totalMinutes > 0).length;
+            const visitedUsers = userStatsList.filter(u => (u.zones[z.id] || 0) > 0 || (u.attendanceStatus === 'INSIDE' && u.todayMinutes > 0)).length;
             const avgTime = visitedUsers > 0
-                ? badgedParticipants.reduce((acc, p) => acc + Math.floor(p.totalMinutes / (currentRule.zones.length || 1)), 0) / (visitedUsers || 1)
+                ? userStatsList.reduce((acc, u) => acc + (u.zones[z.id] || 0), 0) / visitedUsers
                 : 0;
             return {
                 ...z,
