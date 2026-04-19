@@ -26,6 +26,7 @@ interface ZoneRule {
     end: string;
     goalMinutes: number;
     breaks: BreakTime[];
+    ruleDate?: string;
 }
 interface DailyRule {
     date: string;

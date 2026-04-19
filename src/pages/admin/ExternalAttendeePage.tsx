@@ -16,6 +16,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../componen
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { UserPlus, Upload, Download, FileText, Badge, CheckCircle2, Trash2, Loader2, Eye, EyeOff, Copy, MessageCircle, ExternalLink, AlertCircle, CheckSquare, Square } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { VoucherLinkSection } from '../../components/admin/external/VoucherLinkSection';
+import type { ExternalAttendee } from '../../types/schema';
+import { useBixolon } from '../../hooks/useBixolon';
 
 const ExternalAttendeePage: React.FC = () => {
     const navigate = useNavigate();

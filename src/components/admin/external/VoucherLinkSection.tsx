@@ -165,3 +165,4 @@ export const VoucherLinkSection: React.FC<VoucherLinkSectionProps> = ({
             )}
         </div>
     );
+};
