@@ -11,6 +11,9 @@ import toast from 'react-hot-toast';
 import { cn } from '../../lib/utils';
 import { getKstToday } from '../../utils/dateUtils';
 
+import { AdjustAttendanceModal } from '../../components/admin/attendance/AdjustAttendanceModal';
+import { AttendanceLogModal } from '../../components/admin/attendance/AttendanceLogModal';
+
 interface BreakTime {
     label: string;
     start: string;
@@ -1000,175 +1003,34 @@ const AttendanceLivePage: React.FC = () => {
             </div>
 
             {/* Adjust Modal */}
-            {showAdjustModal && selectedRegForAdjust && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh]">
-                        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                            <div>
-                                <h3 className="font-bold text-lg text-slate-900">{selectedRegForAdjust.userName}</h3>
-                                <p className="text-xs text-slate-500 mt-0.5 font-mono">{selectedRegForAdjust.userEmail}</p>
-                            </div>
-                            <Button variant="ghost" size="icon" onClick={() => setShowAdjustModal(false)} className="rounded-full hover:bg-slate-200/50">
-                                <X className="w-5 h-5 text-slate-500" />
-                            </Button>
-                        </div>
-
-                        <div className="p-6 space-y-4 overflow-y-auto">
-                            <div className="flex gap-2">
-                                {(['ADJUST_MINUTES', 'CHECKIN', 'CHECKOUT'] as const).map((m) => (
-                                    <button
-                                        key={m}
-                                        type="button"
-                                        onClick={() => setAdjustMode(m)}
-                                        className={cn(
-                                            "flex-1 px-3 py-2 rounded-lg border text-xs font-bold transition-colors",
-                                            adjustMode === m ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
-                                        )}
-                                    >
-                                        {m === 'ADJUST_MINUTES' ? '인정시간' : m === 'CHECKIN' ? '수기 입장' : '수기 퇴장'}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="col-span-2">
-                                    <div className="text-xs font-bold text-slate-500 mb-1">Zone</div>
-                                    <select
-                                        value={adjustZoneId}
-                                        onChange={(e) => setAdjustZoneId(e.target.value)}
-                                        className="w-full h-10 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700"
-                                    >
-                                        {zones.map((z) => (
-                                            <option key={z.id} value={z.id}>{z.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {adjustMode === 'CHECKIN' && (
-                                    <div className="col-span-2">
-                                        <div className="text-xs font-bold text-slate-500 mb-1">입장 시간 (HH:MM)</div>
-                                        <Input value={adjustCheckInTime} onChange={(e) => setAdjustCheckInTime(e.target.value)} placeholder="예: 09:00" className="h-10" />
-                                    </div>
-                                )}
-
-                                {adjustMode === 'CHECKOUT' && (
-                                    <>
-                                        <div className="col-span-2">
-                                            <div className="text-xs font-bold text-slate-500 mb-1">퇴장 시간 (HH:MM)</div>
-                                            <Input value={adjustCheckOutTime} onChange={(e) => setAdjustCheckOutTime(e.target.value)} placeholder="예: 18:00" className="h-10" />
-                                        </div>
-                                        <div className="col-span-2">
-                                            <div className="text-xs font-bold text-slate-500 mb-1">인정시간 직접 입력 (선택)</div>
-                                            <Input value={adjustRecognizedMinutes} onChange={(e) => setAdjustRecognizedMinutes(e.target.value)} placeholder="비우면 자동 계산" className="h-10" />
-                                        </div>
-                                    </>
-                                )}
-
-                                {adjustMode === 'ADJUST_MINUTES' && (
-                                    <div className="col-span-2">
-                                        <div className="text-xs font-bold text-slate-500 mb-1">오늘 인정시간(분) (선택한 날짜 기준)</div>
-                                        <Input value={adjustTodayMinutes} onChange={(e) => setAdjustTodayMinutes(e.target.value)} placeholder="예: 240" className="h-10" />
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="p-4 border-t border-slate-100 bg-white flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setShowAdjustModal(false)}>취소</Button>
-                            <Button onClick={applyAdjust}>적용</Button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <AdjustAttendanceModal
+                show={showAdjustModal}
+                onClose={() => setShowAdjustModal(false)}
+                reg={selectedRegForAdjust}
+                zones={zones}
+                adjustMode={adjustMode}
+                setAdjustMode={setAdjustMode}
+                adjustZoneId={adjustZoneId}
+                setAdjustZoneId={setAdjustZoneId}
+                adjustCheckInTime={adjustCheckInTime}
+                setAdjustCheckInTime={setAdjustCheckInTime}
+                adjustCheckOutTime={adjustCheckOutTime}
+                setAdjustCheckOutTime={setAdjustCheckOutTime}
+                adjustRecognizedMinutes={adjustRecognizedMinutes}
+                setAdjustRecognizedMinutes={setAdjustRecognizedMinutes}
+                adjustTodayMinutes={adjustTodayMinutes}
+                setAdjustTodayMinutes={setAdjustTodayMinutes}
+                applyAdjust={applyAdjust}
+            />
 
             {/* Log Modal */}
-            {showLogModal && selectedRegForLog && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh]">
-                        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                            <div>
-                                <h3 className="font-bold text-lg text-slate-900">{selectedRegForLog.userName}</h3>
-                                <p className="text-xs text-slate-500 mt-0.5 font-mono">{selectedRegForLog.userEmail}</p>
-                            </div>
-                            <Button variant="ghost" size="icon" onClick={() => setShowLogModal(false)} className="rounded-full hover:bg-slate-200/50">
-                                <X className="w-5 h-5 text-slate-500" />
-                            </Button>
-                        </div>
-
-                        <div className="p-0 overflow-y-auto flex-1 bg-white">
-                            {logs.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-3">
-                                    <Clock className="w-10 h-10 opacity-20" />
-                                    <p className="text-sm">출결 기록이 없습니다.</p>
-                                </div>
-                            ) : (
-                                <div className="relative p-6 space-y-8">
-                                    <div className="absolute left-[29px] top-6 bottom-6 w-0.5 bg-slate-100" />
-
-                                    {logs.map((log) => (
-                                        <div key={log.id} className="relative flex gap-5 group">
-                                            {/* Timeline Dot */}
-                                            <div className={cn(
-                                                "relative z-10 w-2.5 h-2.5 rounded-full mt-1.5 ring-4 ring-white flex-shrink-0",
-                                                log.type === 'ENTER' ? "bg-blue-500" : "bg-slate-400"
-                                            )} />
-
-                                            <div className="flex-1">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <span className={cn(
-                                                            "text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border mb-1 inline-block",
-                                                            log.type === 'ENTER' ? "bg-blue-50 text-blue-600 border-blue-100" : log.type === 'EXIT' ? "bg-slate-50 text-slate-500 border-slate-100" : "bg-amber-50 text-amber-700 border-amber-100"
-                                                        )}>
-                                                            {log.type}
-                                                        </span>
-                                                        <div className="font-semibold text-slate-800 text-sm mt-0.5">
-                                                            {zones.find(z => z.id === log.zoneId)?.name || log.zoneId || 'Unknown Zone'}
-                                                        </div>
-                                                        {log.method && (
-                                                            <div className="text-[10px] text-slate-400 font-mono mt-1">{log.method}</div>
-                                                        )}
-                                                    </div>
-                                                    <span className="text-xs text-slate-400 font-mono">
-                                                        {log.timestamp?.toDate().toLocaleString([], { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                                                    </span>
-                                                </div>
-
-                                                {(log.type === 'EXIT' || log.type === 'ADJUST') && (
-                                                    <div className="mt-3 bg-slate-50 rounded-lg p-3 border border-slate-100 text-xs space-y-2">
-                                                        {typeof log.rawDuration === 'number' && (
-                                                            <div className="flex justify-between text-slate-500">
-                                                                <span>체류 시간 (Raw)</span>
-                                                                <span className="font-mono">{log.rawDuration}분</span>
-                                                            </div>
-                                                        )}
-                                                        {typeof log.deduction === 'number' && (
-                                                            <div className="flex justify-between text-red-400">
-                                                                <span className="flex items-center gap-1"><AlertCircle className="w-3 h-3" /> 휴게 차감</span>
-                                                                <span className="font-mono">-{log.deduction}분</span>
-                                                            </div>
-                                                        )}
-                                                        <div className="flex justify-between items-center pt-2 border-t border-slate-200 font-bold text-blue-600 text-sm">
-                                                            <span>{log.type === 'ADJUST' ? '조정' : '최종 인정'}</span>
-                                                            <span className="font-mono text-base">{log.recognizedMinutes ?? 0}m</span>
-                                                        </div>
-                                                        {typeof log.accumulatedTotal === 'number' && (
-                                                            <div className="flex justify-between text-slate-500">
-                                                                <span>누적</span>
-                                                                <span className="font-mono">{log.accumulatedTotal}m</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+            <AttendanceLogModal
+                show={showLogModal}
+                onClose={() => setShowLogModal(false)}
+                reg={selectedRegForLog}
+                logs={logs}
+                zones={zones}
+            />
         </div>
     );
 };
