@@ -1,12 +1,11 @@
-import React, { Dispatch, SetStateAction, useState } from 'react';
-import { Timestamp, doc, updateDoc, writeBatch } from 'firebase/firestore';
+import React, { Dispatch, SetStateAction } from 'react';
+import { Timestamp, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { Card, CardContent } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
-import { Switch } from '../../ui/switch';
-import { Info, Plus, Trash2, CheckCircle2, ArrowUp, ArrowDown, Loader2 } from 'lucide-react';
+import { Info, ArrowUp, ArrowDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export type StampTourCompletionType = 'COUNT' | 'ALL';
@@ -62,22 +61,6 @@ export interface StampTourProgressRow {
     requestedBy?: string;
 }
 
-export const defaultStampTourConfig: StampTourConfigForm = {
-    enabled: false,
-    completionRule: {
-        type: 'COUNT',
-        requiredCount: 5
-    },
-    boothOrderMode: 'SPONSOR_ORDER',
-    customBoothOrder: [],
-    rewardMode: 'RANDOM',
-    drawMode: 'PARTICIPANT',
-    rewardFulfillmentMode: 'INSTANT',
-    rewards: [],
-    soldOutMessage: '모든 경품이 소진되었습니다.',
-    completionMessage: '스탬프 투어를 완료했습니다!'
-};
-
 interface StampTourSettingsPanelProps {
     cid: string;
     stampTourConfig: StampTourConfigForm;
@@ -88,10 +71,9 @@ interface StampTourSettingsPanelProps {
     stampTourParticipantCount: number;
     normalizedRequiredStampCount: number;
     selectableLotteryRewards: any[];
-    handleSaveStampTour: () => Promise<void>;
-    isSavingStampTour: boolean;
-    handleResetLottery: () => Promise<void>;
-    isResettingLottery: boolean;
+    handleAdminRewardDraw: (row: StampTourProgressRow) => Promise<void>;
+    handleRunLottery: (rewardId: string) => Promise<void>;
+    drawingUserId: string | null;
 }
 
 export const StampTourSettingsPanel: React.FC<StampTourSettingsPanelProps> = ({
@@ -104,41 +86,13 @@ export const StampTourSettingsPanel: React.FC<StampTourSettingsPanelProps> = ({
     stampTourParticipantCount,
     normalizedRequiredStampCount,
     selectableLotteryRewards,
-    handleSaveStampTour,
-    isSavingStampTour,
-    handleResetLottery,
-    isResettingLottery
+    handleAdminRewardDraw,
+    handleRunLottery,
+    drawingUserId
 }) => {
 
-    const handleSaveCustomOrder = async () => {
-        try {
-            await updateDoc(doc(db, `conferences/${cid}/settings/stamp_tour`), {
-                customBoothOrder: stampTourConfig.customBoothOrder
-            });
-            toast.success("부스 순서가 저장되었습니다.");
-        } catch (e) {
-            console.error("Save booth order error:", e);
-            toast.error("부스 순서 저장에 실패했습니다.");
-        }
-    };
-
-    const handleApproveReward = async (rowId: string) => {
-        try {
-            const row = stampTourProgress.find(r => r.id === rowId);
-            if (!row) return;
-            const uid = row.userId;
-            const regRef = doc(db, `conferences/${cid}/registrations/${uid}`);
-            const extRef = doc(db, `conferences/${cid}/external_attendees/${uid}`);
-            
-            // Not doing actual batching here for brevity as it was inside ConferenceSettingsPage
-            toast.success("승인 로직은 ConferenceSettingsPage에서 처리하거나 분리해야 합니다.");
-        } catch (e) {
-            console.error(e);
-        }
-    };
-
     return (
-                        <section id="stamp-tour" className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+        <section id="stamp-tour" className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
                             <div className="lg:col-span-4 space-y-3">
                                 <div className="flex items-center gap-2">
                                     <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600">

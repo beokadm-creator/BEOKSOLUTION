@@ -1,3 +1,19 @@
+export const defaultStampTourConfig = {
+    enabled: false,
+    completionRule: {
+        type: 'COUNT' as const,
+        requiredCount: 5
+    },
+    boothOrderMode: 'SPONSOR_ORDER' as const,
+    customBoothOrder: [],
+    rewardMode: 'RANDOM' as const,
+    drawMode: 'PARTICIPANT' as const,
+    rewardFulfillmentMode: 'INSTANT' as const,
+    rewards: [],
+    soldOutMessage: '모든 경품이 소진되었습니다.',
+    completionMessage: '스탬프 투어를 완료했습니다!'
+};
+
 export type StampTourCompletionRule = {
   type?: "COUNT" | "ALL";
   requiredCount?: number;

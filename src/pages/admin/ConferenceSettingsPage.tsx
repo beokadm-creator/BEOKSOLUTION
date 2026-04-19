@@ -1,26 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
-import { collection, doc, getDoc, getDocs, onSnapshot, setDoc, Timestamp, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, setDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, functions, storage } from '../../firebase';
+import { db, storage, functions } from '../../firebase';
 import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Card, CardContent } from '../../components/ui/card';
-import { Switch } from '../../components/ui/switch';
-import BilingualInput from '../../components/ui/bilingual-input';
-import BilingualImageUpload from '../../components/ui/bilingual-image-upload';
-import RichTextEditor from '../../components/ui/RichTextEditor';
-import { ArrowDown, ArrowUp, Calendar, MapPin, Globe, FileText, ImageIcon, Save, Loader2, Info, X } from 'lucide-react';
+import { Save, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Skeleton } from '../../components/ui/skeleton';
 import {
+    getStampMissionTargetCount,
+    getSelectableStampTourRewards,
+    normalizeStampTourRewards,
+    hasValidStampTourRewards
+} from '../../utils/stampTour';
+import {
     StampTourConfigForm,
     StampTourProgressRow,
-    defaultStampTourConfig,
     StampTourSettingsPanel
 } from '../../components/admin/conference/StampTourSettingsPanel';
+import { defaultStampTourConfig } from '../../utils/stampTour';
 import { GeneralSettingsForm } from '../../components/admin/conference/GeneralSettingsForm';
 import { VisualAssetsForm } from '../../components/admin/conference/VisualAssetsForm';
 
@@ -554,10 +553,9 @@ export default function ConferenceSettingsPage() {
                             stampTourParticipantCount={stampTourParticipantCount}
                             normalizedRequiredStampCount={normalizedRequiredStampCount}
                             selectableLotteryRewards={selectableLotteryRewards}
-                            handleSaveStampTour={handleSaveStampTour}
-                            isSavingStampTour={isSavingStampTour}
-                            handleResetLottery={handleResetLottery}
-                            isResettingLottery={isResettingLottery}
+                            handleAdminRewardDraw={handleAdminRewardDraw}
+                            handleRunLottery={handleRunLottery}
+                            drawingUserId={drawingUserId}
                         />
                         <hr className="border-slate-100" />
                     </>
