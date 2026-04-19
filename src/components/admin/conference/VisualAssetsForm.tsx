@@ -3,7 +3,7 @@ import { Card, CardContent } from '../../ui/card';
 import { Label } from '../../ui/label';
 import { Image as ImageIcon, FileText, X } from 'lucide-react';
 import BilingualImageUpload from '../../ui/bilingual-image-upload';
-import { RichTextEditor } from '../../ui/rich-text-editor';
+import RichTextEditor from '../../ui/RichTextEditor';
 
 interface VisualAssetsFormProps {
     cid: string;
