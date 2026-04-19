@@ -16,13 +16,13 @@ import { ArrowDown, ArrowUp, Calendar, MapPin, Globe, FileText, ImageIcon, Save,
 import toast from 'react-hot-toast';
 import { Skeleton } from '../../components/ui/skeleton';
 import {
-    getSelectableStampTourRewards,
-    getStampMissionTargetCount,
-    getStampTourRewardTitle,
-    hasValidStampTourRewards,
-    isStampTourRewardDrawCompleted,
-    normalizeStampTourRewards
-} from '../../utils/stampTour';
+    StampTourConfigForm,
+    StampTourProgressRow,
+    defaultStampTourConfig,
+    StampTourSettingsPanel
+} from '../../components/admin/conference/StampTourSettingsPanel';
+import { GeneralSettingsForm } from '../../components/admin/conference/GeneralSettingsForm';
+import { VisualAssetsForm } from '../../components/admin/conference/VisualAssetsForm';
 
 interface ConferenceData {
     title: { ko: string; en: string };
@@ -59,59 +59,6 @@ interface SponsorSummary {
     isStampTourParticipant?: boolean;
 }
 
-type StampTourCompletionType = 'COUNT' | 'ALL';
-type StampTourBoothOrderMode = 'SPONSOR_ORDER' | 'CUSTOM';
-type StampTourRewardMode = 'RANDOM' | 'FIXED';
-type StampTourDrawMode = 'PARTICIPANT' | 'ADMIN' | 'BOTH';
-type StampTourRewardFulfillmentMode = 'INSTANT' | 'LOTTERY';
-
-interface StampTourRewardForm {
-    id: string;
-    name: string;
-    label?: string;
-    imageUrl?: string;
-    totalQty: number;
-    remainingQty: number;
-    weight?: number;
-    order?: number;
-    isFallback?: boolean;
-    drawCompletedAt?: Timestamp;
-}
-
-interface StampTourConfigForm {
-    enabled: boolean;
-    endAt?: Timestamp;
-    completionRule: {
-        type: StampTourCompletionType;
-        requiredCount?: number;
-    };
-    boothOrderMode: StampTourBoothOrderMode;
-    customBoothOrder: string[];
-    rewardMode: StampTourRewardMode;
-    drawMode: StampTourDrawMode;
-    rewardFulfillmentMode: StampTourRewardFulfillmentMode;
-    lotteryScheduledAt?: Timestamp;
-    rewards: StampTourRewardForm[];
-    soldOutMessage: string;
-    completionMessage: string;
-}
-
-interface StampTourProgressRow {
-    id: string;
-    userId: string;
-    isCompleted?: boolean;
-    userName?: string;
-    userOrg?: string;
-    rewardName?: string;
-    rewardLabel?: string;
-    rewardStatus: 'NONE' | 'REQUESTED' | 'REDEEMED';
-    lotteryStatus?: 'PENDING' | 'SELECTED' | 'NOT_SELECTED';
-    completedAt?: Timestamp;
-    requestedAt?: Timestamp;
-    redeemedAt?: Timestamp;
-    requestedBy?: string;
-}
-
 const defaultData: ConferenceData = {
     title: { ko: '', en: '' },
     subtitle: '',
@@ -137,22 +84,6 @@ const defaultData: ConferenceData = {
         guestbookEnabled: true,
         stampTourEnabled: false
     }
-};
-
-const defaultStampTourConfig: StampTourConfigForm = {
-    enabled: false,
-    completionRule: {
-        type: 'COUNT',
-        requiredCount: 5
-    },
-    boothOrderMode: 'SPONSOR_ORDER',
-    customBoothOrder: [],
-    rewardMode: 'RANDOM',
-    drawMode: 'PARTICIPANT',
-    rewardFulfillmentMode: 'INSTANT',
-    rewards: [],
-    soldOutMessage: '모든 보상이 소진되었습니다. 다음 기회에 다시 도전해 주세요!',
-    completionMessage: '스탬프 투어를 완료하셨습니다! 축하드립니다. 보상 추첨 결과는 추후 안내드립니다.'
 };
 
 export default function ConferenceSettingsPage() {
