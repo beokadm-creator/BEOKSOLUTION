@@ -16,7 +16,7 @@
     "prepare": "husky",
     "pre-deploy": "node scripts/pre-deploy-check.js",
     "deploy:live": "firebase deploy --only hosting --project eregi-8fc1e",
-    "deploy:prod": "firebase deploy --only hosting,functions --project eregi-8fc1e",
+    "deploy:prod": "echo 'ERROR: Use deploy:live for frontend, and targeted firebase deploy --only functions:<name> for backend.' && exit 1",
     "check-versions": "node scripts/check-versions.js"
   },
   "dependencies": {

@@ -7,7 +7,7 @@
     "build": "tsc",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
-    "deploy": "firebase deploy --only functions",
+    "deploy": "echo 'ERROR: Full deployment is blocked. Use targeted deployments: firebase deploy --only functions:<name>' && exit 1",
     "logs": "firebase functions:log"
   },
   "engines": {

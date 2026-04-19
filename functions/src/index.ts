@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+ 
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import cors from 'cors';
@@ -6,12 +6,10 @@ import { approveTossPayment, cancelTossPayment as cancelTossPaymentApi } from '.
 import { verifyPaymentAmount } from './utils/paymentVerifier'; // New import
 
 import { onRegistrationCreated, onExternalAttendeeCreated, validateBadgePrepToken, issueDigitalBadge, resendBadgePrepToken, generateBadgePrepToken, sendBadgeNotification, bulkSendNotifications } from './badge/index';
-// import { migrateExternalAttendeeParticipations } from './migrations/migrateExternalAttendeeParticipations';
 import { migrateRegistrationsForOptions, migrateRegistrationsForOptionsCallable } from './migrations/migrateRegistrationsForOptions';
 import { monitorRegistrationIntegrity, monitorMemberCodeIntegrity } from './monitoring/dataIntegrity';
 import { dailyErrorReport, weeklyPerformanceReport } from './monitoring/scheduledReports';
 import { resolveDataIntegrityAlert } from './monitoring/resolveAlert';
-// import { checkAlimTalkConfig, checkAlimTalkConfigHttp } from './alimtalk/checkConfig';
 import { scheduledAutoCheckout, manualAutoCheckout } from './attendance/autoCheckout';
 import { sendVendorAlimTalk } from './vendor/sendAlimTalk';
 import { resolveVendorBadgeScan } from './vendor/resolveBadgeScan';
@@ -35,7 +33,6 @@ export {
     resendBadgePrepToken,
     bulkSendNotifications,
     generateFirebaseAuthUserForExternalAttendee,
-    // migrateExternalAttendeeParticipations,
     migrateRegistrationsForOptions,
     migrateRegistrationsForOptionsCallable,
     monitorRegistrationIntegrity,
@@ -54,15 +51,8 @@ export {
     manualDataCleanup,
     requestStampReward,
     adminDrawStampReward,
-    runStampRewardLottery,
-    // healthCheck,
-    // scheduledHealthCheck,
-    // checkAlimTalkConfig,
-    // checkAlimTalkConfigHttp,
-    // sendAlimTalkTest
+    runStampRewardLottery
 };
-
-// import { sendAlimTalkTest } from './alimtalk/sendTest';
 
 import { generateFirebaseAuthUserForExternalAttendee } from './auth/external';
 
@@ -1492,10 +1482,6 @@ export const logPerformance = functions
             const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred'; throw new functions.https.HttpsError('internal', errorMessage);
         }
     });
-
-// 7. Debug Tools
-// export { debugNHNTemplate, sendTestAlimTalkHTTP } from './debug';
-
 
 /**
  * --------------------------------------------------------------------------

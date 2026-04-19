@@ -96,15 +96,21 @@ jobs:
       - name: Node.js 설치
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
       
       - name: 의존성 설치
-        run: npm install
+        run: npm ci
       
-      - name: Vite 빌드
+      - name: Build client
         run: npm run build
         continue-on-error: false
+      
+      - name: Build Functions
+        run: |
+          cd functions
+          npm install
+          npm run build
       
       - name: 빌드 결과 확인
         run: |
