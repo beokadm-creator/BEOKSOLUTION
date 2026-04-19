@@ -33,6 +33,12 @@ changelog:
 - If a function MUST be deployed, use targeted deployments ONLY: `firebase deploy --only functions:<functionName>`
 - If you see commented-out `export` statements in `functions/src/index.ts`, DO NOT deploy functions as they will be deleted from the live environment.
 
+# 🚨 [NEW] DRIFT PREVENTION RULES 🚨
+**To prevent configuration and deployment drift, all agents MUST follow these rules:**
+1. **Firestore Indexes**: Before adding a new index to `firestore.indexes.json`, ALWAYS run `firebase firestore:indexes --project eregi-8fc1e > firestore.indexes.json.new` to check the current live backend state. Never overwrite existing live indexes blindly.
+2. **Security Rules**: When modifying `firestore.rules`, ensure you do not break the `isSuperAdmin` bypass or expose PII (like `adminEmails` in `societies`).
+3. **Dependencies**: Do not blindly update packages in `package.json` unless explicitly requested. The project uses React 19 + Vite (Rolldown).
+
 ## Rollback Prevention System (ENFORCED)
 This codebase has **multi-layer protection** against accidental rollbacks:
 
