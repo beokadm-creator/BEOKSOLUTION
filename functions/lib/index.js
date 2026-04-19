@@ -37,7 +37,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.healthCheck = exports.onTossWebhook = exports.logPerformance = exports.logError = exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.confirmTossPaymentHttp = exports.confirmTossPayment = exports.runStampRewardLottery = exports.adminDrawStampReward = exports.requestStampReward = exports.manualDataCleanup = exports.scheduledDataCleanup = exports.withdrawConsent = exports.logAuditEvent = exports.processVendorVisit = exports.resolveVendorBadgeScan = exports.sendVendorAlimTalk = exports.manualAutoCheckout = exports.scheduledAutoCheckout = exports.resolveDataIntegrityAlert = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.bulkSendNotifications = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.corsHandler = void 0;
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const cors_1 = __importDefault(require("cors"));
@@ -50,7 +49,6 @@ Object.defineProperty(exports, "validateBadgePrepToken", { enumerable: true, get
 Object.defineProperty(exports, "issueDigitalBadge", { enumerable: true, get: function () { return index_1.issueDigitalBadge; } });
 Object.defineProperty(exports, "resendBadgePrepToken", { enumerable: true, get: function () { return index_1.resendBadgePrepToken; } });
 Object.defineProperty(exports, "bulkSendNotifications", { enumerable: true, get: function () { return index_1.bulkSendNotifications; } });
-// import { migrateExternalAttendeeParticipations } from './migrations/migrateExternalAttendeeParticipations';
 const migrateRegistrationsForOptions_1 = require("./migrations/migrateRegistrationsForOptions");
 Object.defineProperty(exports, "migrateRegistrationsForOptions", { enumerable: true, get: function () { return migrateRegistrationsForOptions_1.migrateRegistrationsForOptions; } });
 Object.defineProperty(exports, "migrateRegistrationsForOptionsCallable", { enumerable: true, get: function () { return migrateRegistrationsForOptions_1.migrateRegistrationsForOptionsCallable; } });
@@ -62,7 +60,6 @@ Object.defineProperty(exports, "dailyErrorReport", { enumerable: true, get: func
 Object.defineProperty(exports, "weeklyPerformanceReport", { enumerable: true, get: function () { return scheduledReports_1.weeklyPerformanceReport; } });
 const resolveAlert_1 = require("./monitoring/resolveAlert");
 Object.defineProperty(exports, "resolveDataIntegrityAlert", { enumerable: true, get: function () { return resolveAlert_1.resolveDataIntegrityAlert; } });
-// import { checkAlimTalkConfig, checkAlimTalkConfigHttp } from './alimtalk/checkConfig';
 const autoCheckout_1 = require("./attendance/autoCheckout");
 Object.defineProperty(exports, "scheduledAutoCheckout", { enumerable: true, get: function () { return autoCheckout_1.scheduledAutoCheckout; } });
 Object.defineProperty(exports, "manualAutoCheckout", { enumerable: true, get: function () { return autoCheckout_1.manualAutoCheckout; } });
@@ -87,7 +84,6 @@ const runStampRewardLottery_1 = require("./stampTour/runStampRewardLottery");
 Object.defineProperty(exports, "runStampRewardLottery", { enumerable: true, get: function () { return runStampRewardLottery_1.runStampRewardLottery; } });
 exports.corsHandler = (0, cors_1.default)({ origin: true });
 admin.initializeApp();
-// import { sendAlimTalkTest } from './alimtalk/sendTest';
 const external_1 = require("./auth/external");
 Object.defineProperty(exports, "generateFirebaseAuthUserForExternalAttendee", { enumerable: true, get: function () { return external_1.generateFirebaseAuthUserForExternalAttendee; } });
 // --------------------------------------------------------------------------
@@ -1362,8 +1358,6 @@ exports.logPerformance = functions
         throw new functions.https.HttpsError('internal', errorMessage);
     }
 });
-// 7. Debug Tools
-// export { debugNHNTemplate, sendTestAlimTalkHTTP } from './debug';
 /**
  * --------------------------------------------------------------------------
  * TOSS PAYMENTS WEBHOOK
