@@ -1416,40 +1416,6 @@ const UserHubPage: React.FC = () => {
                                 </div>
                             </div>
                         ))}
-                        {!loading && false && (
-                            <div className="bg-white rounded-xl border border-gray-200 p-6">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-lg font-bold text-gray-900">방명록 기록</h3>
-                                    <span className="text-xs font-semibold text-gray-500">{guestbookEntries.length}건</span>
-                                </div>
-                                {guestbookEntries.length === 0 ? (
-                                    <div className="text-sm text-gray-500 bg-gray-50 border border-gray-100 rounded-lg p-4">
-                                        아직 남긴 방명록이 없습니다.
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {guestbookEntries.map(entry => (
-                                            <div key={entry.id} className="flex flex-col gap-1 border border-gray-100 rounded-lg p-4">
-                                                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                                                    <span className="font-semibold text-gray-700">{entry.conferenceName}</span>
-                                                    <span className="text-gray-300">•</span>
-                                                    <span>{entry.vendorName}</span>
-                                                    {entry.timestamp?.toDate && (
-                                                        <>
-                                                            <span className="text-gray-300">•</span>
-                                                            <span>{entry.timestamp.toDate().toLocaleString()}</span>
-                                                        </>
-                                                    )}
-                                                </div>
-                                                <div className="text-sm text-gray-700 whitespace-pre-wrap">
-                                                    {entry.message || '메시지 없음'}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
                     </div>
                 )}
 

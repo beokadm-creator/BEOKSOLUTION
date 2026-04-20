@@ -195,7 +195,7 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
                 const regId = regRef.id;
 
                 // Generate Receipt Number (Atomic Increment)
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                 
                 const receiptNumber = await generateReceiptNumber(conferenceId, transaction as any);
 
                 // Generate Confirmation QR (Phase 1)

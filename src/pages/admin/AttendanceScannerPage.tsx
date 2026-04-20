@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, Timestamp, addDoc, collection, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, Timestamp, collection, runTransaction } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Loader2, AlertCircle, CheckCircle, X, MapPin, LogIn } from 'lucide-react';
 import { Button } from '../../components/ui/button';

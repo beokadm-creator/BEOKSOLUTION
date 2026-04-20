@@ -107,7 +107,7 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
         } else {
           // URL에서 societyId 추출
           const hostname = window.location.hostname;
-          let societyIdToUse = extractSocietyFromHost(hostname) || DOMAIN_CONFIG.DEFAULT_SOCIETY;
+          const societyIdToUse = extractSocietyFromHost(hostname) || DOMAIN_CONFIG.DEFAULT_SOCIETY;
 
           confIdToUse = `${societyIdToUse}_${targetSlug}`;
         }

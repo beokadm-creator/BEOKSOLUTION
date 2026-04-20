@@ -130,7 +130,7 @@ describe('whitelist', () => {
         tier: 'MEMBER',
         isUsed: true, // 이미 사용됨
         usedBy: 'user-123',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         usedAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 } as any,
       };
 

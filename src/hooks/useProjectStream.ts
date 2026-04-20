@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { translationDb as rtdb } from '../lib/translationFirebase';
-import { ref, onValue, off, get, query, limitToLast, orderByChild, endBefore } from 'firebase/database';
+import { ref, onValue, get, query, limitToLast, orderByChild, endBefore } from 'firebase/database';
 
 export const useProjectStream = (projectIdOrSlug: string | undefined, activeSessionId?: string | null, options: { subscribe?: boolean } = { subscribe: true }) => {
   const [realProjectId, setRealProjectId] = useState<string | null>(null);

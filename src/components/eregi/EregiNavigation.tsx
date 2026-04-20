@@ -55,7 +55,7 @@ const EregiNavigation: React.FC<EregiNavigationProps> = ({
         console.log('[EregiNavigation] authUser:', {
             name: authUser?.name,
             email: authUser?.email,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
             displayName: (authUser as any)?.displayName
         });
     }, [displayUser, authUser]);

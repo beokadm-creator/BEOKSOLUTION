@@ -85,11 +85,11 @@ const VendorDashboard: React.FC<Props> = ({ confId: initialConfId }) => {
                         // Stop immediately
                         stopScanner();
                     },
-                    (errorMessage) => {
+                    (_errorMessage) => {
                         // ignore general scan errors
                     }
-                ).catch((err) => {
-                    console.error("Camera fail:", err);
+                ).catch((_err) => {
+                    console.error("Camera fail:", _err);
                     setCameraError("카메라 접근에 실패했습니다. 권한을 확인해주세요.");
                     setIsScanning(false);
                 });

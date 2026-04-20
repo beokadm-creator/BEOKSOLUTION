@@ -1,5 +1,3 @@
-import { Timestamp } from 'firebase/firestore';
-
 /**
  * Returns today's date string in KST (YYYY-MM-DD).
  * This safely calculates KST without using error-prone UTC manipulation.

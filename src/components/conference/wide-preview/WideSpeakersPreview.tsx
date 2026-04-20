@@ -113,9 +113,9 @@ export const WideSpeakersPreview: React.FC<WideSpeakersPreviewProps> = ({ speake
                                         </h5>
                                     </div>
                                     <p className="text-xl md:text-2xl font-bold text-slate-800 leading-relaxed">
-                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                        { }
                                         {(selectedSpeaker.presentationTitle as any)?.[lang] ||
-                                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                          
                                          (selectedSpeaker.presentationTitle as any)?.ko ||
                                          t(selectedSpeaker.presentationTitle) ||
                                          (lang === 'ko' ? '주제 미정' : 'TBD')}

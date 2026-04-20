@@ -13,7 +13,7 @@
  * - Test error scenarios (invalid QR, missing registration, Firestore errors)
  */
 
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useCheckIn } from './useCheckIn';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { generateBadgeQr } from '../utils/transaction';

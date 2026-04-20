@@ -133,7 +133,7 @@ export function useRegistrationsPagination({
         };
 
         loadData();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+         
     }, [conferenceId, refreshTick]);
 
     // 2. allData + searchQuery → 클라이언트 사이드 필터 및 페이지 슬라이싱

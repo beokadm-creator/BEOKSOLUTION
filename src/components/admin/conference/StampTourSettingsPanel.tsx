@@ -6,7 +6,6 @@ import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Info, ArrowUp, ArrowDown } from 'lucide-react';
-import toast from 'react-hot-toast';
 import { getStampTourRewardTitle, isStampTourRewardDrawCompleted } from '../../../utils/stampTour';
 
 export type StampTourCompletionType = 'COUNT' | 'ALL';
@@ -85,7 +84,7 @@ export const StampTourSettingsPanel: React.FC<StampTourSettingsPanelProps> = ({
     stampTourProgress,
     formatKstTimestamp,
     stampTourParticipantCount,
-    normalizedRequiredStampCount,
+    _normalizedRequiredStampCount,
     selectableLotteryRewards,
     handleAdminRewardDraw,
     handleRunLottery,

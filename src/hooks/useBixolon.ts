@@ -79,7 +79,7 @@ export const useBixolon = () => {
             mediaType === 1 ? 0 : (labelGapMm && labelGapMm > 0 ? labelGapMm : 3);
         const labelGapDots = mmToDots(effectiveLabelGapMm, dpmm);
         const printStartOffsetDots = mmToDots(layout.printStartOffsetMm ?? 0, dpmm);
-        const cutFeedDots = mmToDots(layout.cutFeedMm ?? 0, dpmm);
+        const _cutFeedDots = mmToDots(layout.cutFeedMm ?? 0, dpmm);
         const enableCutting = layout.enableCutting ?? true;
         const cutPaperType = layout.cutPaperType ?? 0;
         const printerFont = layout.printerFont || 'Malgun Gothic';
@@ -227,8 +227,8 @@ export const useBixolon = () => {
                 }
             }
             return true;
-        } catch (e) {
-            console.error("[Bixolon] HTTP Post failed:", e);
+        } catch (_err) {
+            console.error("[Bixolon] HTTP Post failed:", _err);
             setError('로컬 WebPrint 에이전트 연결 실패 (127.0.0.1:18080)');
             return false;
         }
@@ -242,7 +242,7 @@ export const useBixolon = () => {
             const success = await printViaHttp(payload);
             setPrinting(false);
             return success;
-        } catch (err) {
+        } catch (_err) {
             setError('시스템 오류');
             setPrinting(false);
             return false;
@@ -265,7 +265,7 @@ export const useBixolon = () => {
             const success = await printViaHttp(payload);
             setPrinting(false);
             return success;
-        } catch (err) {
+        } catch (_err) {
             setError('시스템 오류');
             setPrinting(false);
             return false;

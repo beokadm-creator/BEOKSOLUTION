@@ -37,7 +37,7 @@ export const MonitoringTab: React.FC = () => {
         try {
             await resolveAlert(alertId, 'Super Admin Resolved', 'admin');
             toast.success("Alert resolved.");
-        } catch (e) {
+        } catch (_e) {
             toast.error("Failed to resolve alert.");
         } finally {
             setResolvingAlertId(null);

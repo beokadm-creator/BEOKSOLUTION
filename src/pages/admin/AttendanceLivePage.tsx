@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { collection, query, where, getDocs, doc, updateDoc, getDoc, Timestamp, addDoc, increment, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, getDoc, Timestamp, addDoc, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent } from '../../components/ui/card';
-import { Loader2, LogIn, LogOut, RefreshCw, CheckCircle, FileText, X, Search, Clock, MapPin, Calendar, AlertCircle, Settings } from 'lucide-react';
+import { Loader2, LogIn, LogOut, RefreshCw, CheckCircle, FileText, Search, Clock, MapPin, Calendar, Settings } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../../lib/utils';
 import { getKstToday } from '../../utils/dateUtils';

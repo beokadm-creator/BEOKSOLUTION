@@ -9,7 +9,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import { useAuth } from '../hooks/useAuth';
 
 export default function WithdrawConsentPage() {
-    const [searchParams] = useSearchParams();
+    useSearchParams();
     const { auth } = useAuth();
     const [status, setStatus] = useState<'loading' | 'confirm' | 'processing' | 'success' | 'error'>('loading');
     const [message, setMessage] = useState('');

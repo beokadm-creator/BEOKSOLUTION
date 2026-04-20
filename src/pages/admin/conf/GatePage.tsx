@@ -6,7 +6,6 @@ import { Loader2, ArrowLeft, AlertCircle, CheckCircle, Palette, MapPin, ScanLine
 import { Button } from '../../../components/ui/button';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { cn } from '../../../lib/utils';
 import { getKstToday } from '../../../utils/dateUtils';
 
 interface ScannerState {

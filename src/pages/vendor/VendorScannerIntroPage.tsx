@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import { QrCode, Monitor, Smartphone, AlertCircle } from 'lucide-react';
+import { Monitor, Smartphone, AlertCircle } from 'lucide-react';
 
 export default function VendorScannerIntroPage() {
     const navigate = useNavigate();
