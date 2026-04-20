@@ -7,6 +7,7 @@ import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Info, ArrowUp, ArrowDown } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getStampTourRewardTitle, isStampTourRewardDrawCompleted } from '../../../utils/stampTour';
 
 export type StampTourCompletionType = 'COUNT' | 'ALL';
 export type StampTourBoothOrderMode = 'SPONSOR_ORDER' | 'CUSTOM';
@@ -72,7 +73,7 @@ interface StampTourSettingsPanelProps {
     normalizedRequiredStampCount: number;
     selectableLotteryRewards: any[];
     handleAdminRewardDraw: (row: StampTourProgressRow) => Promise<void>;
-    handleRunLottery: (rewardId: string) => Promise<void>;
+    handleRunLottery: () => Promise<void>;
     drawingUserId: string | null;
 }
 
@@ -627,6 +628,5 @@ export const StampTourSettingsPanel: React.FC<StampTourSettingsPanelProps> = ({
                                 </Card>
                             </div>
                         </section>
-
     );
 };

@@ -104,11 +104,12 @@ export default function DashboardPage() {
             let completionMode = 'DAILY_SEPARATE';
             let cumulativeGoalMinutes = 0;
             const allZones: { id: string; name: string }[] = [];
+            let confDates: string[] = [];
             if (rulesSnap.exists()) {
                 const rulesData = rulesSnap.data().rules || {};
-                const dates = Object.keys(rulesData).sort();
+                confDates = Object.keys(rulesData).sort();
                 const seenZoneIds = new Set<string>();
-                dates.forEach(dateStr => {
+                confDates.forEach(dateStr => {
                     const rule = rulesData[dateStr];
                     if (rule.zones && Array.isArray(rule.zones)) {
                         rule.zones.forEach((z: { id: string; name: string }) => {
@@ -119,8 +120,8 @@ export default function DashboardPage() {
                         });
                     }
                 });
-                if (dates.length > 0) {
-                    const firstRule = rulesData[dates[0]];
+                if (confDates.length > 0) {
+                    const firstRule = rulesData[confDates[0]];
                     globalGoal = firstRule.globalGoalMinutes || 0;
                     completionMode = firstRule.completionMode || 'DAILY_SEPARATE';
                     cumulativeGoalMinutes = firstRule.cumulativeGoalMinutes || 0;
@@ -131,24 +132,50 @@ export default function DashboardPage() {
             // 2. Fetch Access Logs for first entry / last exit
             const accessLogsRef = collection(db, `conferences/${selectedConferenceId}/access_logs`);
             const accessLogsSnap = await getDocs(accessLogsRef);
-            const userTimes: Record<string, { firstEntryTime?: number, lastExitTime?: number }> = {};
+            const userTimes: Record<string, { firstEntryTime?: number, lastExitTime?: number, daily: Record<string, { firstEntryTime?: number, lastExitTime?: number }> }> = {};
+            
             accessLogsSnap.forEach(d => {
                 const data = d.data();
                 const logTime = (data.timestamp?.toMillis?.()) || (data.timestamp?.seconds ? data.timestamp.seconds * 1000 : null) || (data.timestamp instanceof Date ? data.timestamp.getTime() : (data.timestamp ? new Date(data.timestamp).getTime() : null));
                 const id = data.registrationId || data.scannedQr;
                 if (!id || !logTime) return;
 
-                if (!userTimes[id]) userTimes[id] = {};
+                const dateObj = new Date(logTime);
+                const logDateStr = dateObj.toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+
+                if (!userTimes[id]) userTimes[id] = { daily: {} };
+                if (!userTimes[id].daily[logDateStr]) userTimes[id].daily[logDateStr] = {};
+
                 if (data.action === 'ENTRY') {
                     if (!userTimes[id].firstEntryTime || logTime < userTimes[id].firstEntryTime!) {
                         userTimes[id].firstEntryTime = logTime;
+                    }
+                    if (!userTimes[id].daily[logDateStr].firstEntryTime || logTime < userTimes[id].daily[logDateStr].firstEntryTime!) {
+                        userTimes[id].daily[logDateStr].firstEntryTime = logTime;
                     }
                 } else if (data.action === 'EXIT') {
                     if (!userTimes[id].lastExitTime || logTime > userTimes[id].lastExitTime!) {
                         userTimes[id].lastExitTime = logTime;
                     }
+                    if (!userTimes[id].daily[logDateStr].lastExitTime || logTime > userTimes[id].daily[logDateStr].lastExitTime!) {
+                        userTimes[id].daily[logDateStr].lastExitTime = logTime;
+                    }
                 }
             });
+
+            if (confDates.length === 0) {
+                const extractedDates = new Set<string>();
+                Object.values(userTimes).forEach(ut => {
+                    Object.keys(ut.daily || {}).forEach(d => extractedDates.add(d));
+                });
+                confDates = Array.from(extractedDates).sort();
+            }
+
+            const formatTime = (ts?: number) => {
+                if (!ts) return '';
+                const d = new Date(ts);
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+            };
 
             // 3. Fetch Registrations
             const regRef = collection(db, `conferences/${selectedConferenceId}/registrations`);
@@ -156,14 +183,24 @@ export default function DashboardPage() {
             const regSnap = await getDocs(regQuery);
             const regs = regSnap.docs.map(d => {
                 const data = d.data();
-                const times = userTimes[d.id] || (data.badgeQr && userTimes[data.badgeQr]) || {};
+                const times = userTimes[d.id] || (data.badgeQr && userTimes[data.badgeQr]) || { daily: {} };
                 const totalMinutes = typeof data.totalMinutes === 'number' ? data.totalMinutes : 0;
                 const zoneMinutes: Record<string, number> = data.zoneMinutes || {};
+                const dailyMinutesData: Record<string, number> = data.dailyMinutes || {};
                 const zoneCompleted: Record<string, boolean> = data.zoneCompleted || {};
                 let isCompliant = !!data.isCompleted;
                 if (completionMode !== 'CUMULATIVE' && goal > 0) {
                     isCompliant = totalMinutes >= goal;
                 }
+
+                const dailyColumns = confDates.reduce((acc, dateStr, idx) => {
+                    const dayLabel = `${idx + 1}일차(${dateStr})`;
+                    acc[`${dayLabel} 수강인정(분)`] = dailyMinutesData[dateStr] || 0;
+                    acc[`${dayLabel} 최초입장`] = formatTime(times.daily?.[dateStr]?.firstEntryTime);
+                    acc[`${dayLabel} 마지막퇴장`] = formatTime(times.daily?.[dateStr]?.lastExitTime);
+                    return acc;
+                }, {} as Record<string, unknown>);
+
                 return {
                     '이름': data.userName || data.name || data.userInfo?.name || 'Unknown',
                     '전화번호': data.phone || data.mobile || data.userInfo?.phone || data.userInfo?.mobile || '',
@@ -173,11 +210,12 @@ export default function DashboardPage() {
                     '회원등급': data.memberGrade || data.tier || data.userTier || data.grade || data.categoryName || data.userInfo?.grade || data.userInfo?.memberGrade || '',
                     '구분': '내부등록',
                     '결제금액': Number(data.amount) || Number(data.paymentAmount) || 0,
-                    '최초입장시간': times.firstEntryTime,
-                    '마지막 퇴장시간': times.lastExitTime,
+                    '최초입장시간': formatTime(times.firstEntryTime),
+                    '마지막 퇴장시간': formatTime(times.lastExitTime),
                     '현재 상태': data.attendanceStatus === 'INSIDE' ? '입장 중' : '퇴장',
-                    '수강인정시간(분)': totalMinutes,
+                    '총 수강인정시간(분)': totalMinutes,
                     '수강완료표기': isCompliant ? 'Y' : 'N',
+                    ...dailyColumns,
                     ...(allZones.length >= 2 ? allZones.reduce((acc, zone) => {
                         acc[`${zone.name} 수강인정(분)`] = zoneMinutes[zone.id] || 0;
                         acc[`${zone.name} 수강완료`] = zoneCompleted[zone.id] === true ? 'Y' : 'N';
@@ -192,14 +230,24 @@ export default function DashboardPage() {
             const extSnap = await getDocs(extQuery);
             const exts = extSnap.docs.map(d => {
                 const data = d.data();
-                const times = userTimes[d.id] || (data.badgeQr && userTimes[data.badgeQr]) || {};
+                const times = userTimes[d.id] || (data.badgeQr && userTimes[data.badgeQr]) || { daily: {} };
                 const totalMinutes = typeof data.totalMinutes === 'number' ? data.totalMinutes : 0;
                 const zoneMinutes: Record<string, number> = data.zoneMinutes || {};
+                const dailyMinutesData: Record<string, number> = data.dailyMinutes || {};
                 const zoneCompleted: Record<string, boolean> = data.zoneCompleted || {};
                 let isCompliant = !!data.isCompleted;
                 if (completionMode !== 'CUMULATIVE' && goal > 0) {
                     isCompliant = totalMinutes >= goal;
                 }
+
+                const dailyColumns = confDates.reduce((acc, dateStr, idx) => {
+                    const dayLabel = `${idx + 1}일차(${dateStr})`;
+                    acc[`${dayLabel} 수강인정(분)`] = dailyMinutesData[dateStr] || 0;
+                    acc[`${dayLabel} 최초입장`] = formatTime(times.daily?.[dateStr]?.firstEntryTime);
+                    acc[`${dayLabel} 마지막퇴장`] = formatTime(times.daily?.[dateStr]?.lastExitTime);
+                    return acc;
+                }, {} as Record<string, unknown>);
+
                 return {
                     '이름': data.name || 'Unknown',
                     '전화번호': data.phone || data.mobile || '',
@@ -209,11 +257,12 @@ export default function DashboardPage() {
                     '회원등급': data.memberGrade || data.tier || data.userTier || data.grade || data.categoryName || '비회원 (외부)',
                     '구분': '외부등록',
                     '결제금액': Number(data.amount) || 0,
-                    '최초입장시간': times.firstEntryTime,
-                    '마지막 퇴장시간': times.lastExitTime,
+                    '최초입장시간': formatTime(times.firstEntryTime),
+                    '마지막 퇴장시간': formatTime(times.lastExitTime),
                     '현재 상태': data.attendanceStatus === 'INSIDE' ? '입장 중' : '퇴장',
-                    '수강인정시간(분)': totalMinutes,
+                    '총 수강인정시간(분)': totalMinutes,
                     '수강완료표기': isCompliant ? 'Y' : 'N',
+                    ...dailyColumns,
                     ...(allZones.length >= 2 ? allZones.reduce((acc, zone) => {
                         acc[`${zone.name} 수강인정(분)`] = zoneMinutes[zone.id] || 0;
                         acc[`${zone.name} 수강완료`] = zoneCompleted[zone.id] === true ? 'Y' : 'N';
@@ -222,18 +271,7 @@ export default function DashboardPage() {
                 };
             });
 
-            // Combine and format
-            const formatTime = (ts?: number) => {
-                if (!ts) return '';
-                const d = new Date(ts);
-                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-            };
-
-            const combined = [...regs, ...exts].map(r => ({
-                ...r,
-                '최초입장시간': formatTime(r['최초입장시간'] as number),
-                '마지막 퇴장시간': formatTime(r['마지막 퇴장시간'] as number),
-            }));
+            const combined = [...regs, ...exts];
 
             const ws = XLSX.utils.json_to_sheet(combined);
             const wb = XLSX.utils.book_new();
