@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSociety } from '../../hooks/useSociety';
 import { functions } from '../../firebase';
 import { httpsCallable } from 'firebase/functions';
 import toast from 'react-hot-toast';
 import { Button } from '../../components/ui/button';
 import { Trash2, UserPlus, Link as LinkIcon, AlertTriangle } from 'lucide-react';
+import { getSocietyAdminEmails } from '../../utils/societyAdmin';
 
 export default function AdminUsersPage() {
     const { society, loading: societyLoading } = useSociety();
     const [createModalOpen, setCreateModalOpen] = useState(false);
     const [loadingAction, setLoadingAction] = useState(false);
+    const [adminEmails, setAdminEmails] = useState<string[]>([]);
 
     // Form State
     const [email, setEmail] = useState('');
@@ -19,10 +21,14 @@ export default function AdminUsersPage() {
     // Linking State
     const [linkMode, setLinkMode] = useState<{ active: boolean, existingUser?: { uid: string; email: string } }>({ active: false });
 
+    useEffect(() => {
+        if (society) {
+            getSocietyAdminEmails(society.id).then(setAdminEmails);
+        }
+    }, [society]);
+
     if (societyLoading) return <div>로딩 중...</div>;
     if (!society) return <div>No society context found.</div>;
-
-    const adminEmails = society.adminEmails || [];
 
     const resetForm = () => {
         setEmail('');
@@ -65,6 +71,7 @@ export default function AdminUsersPage() {
             }
             
             resetForm();
+            getSocietyAdminEmails(society.id).then(setAdminEmails);
 
         } catch (err) {
             console.error(err);
@@ -83,6 +90,7 @@ export default function AdminUsersPage() {
         try {
             await removeFn({ email: targetEmail, societyId: society.id });
             toast.success('Access removed');
+            getSocietyAdminEmails(society.id).then(setAdminEmails);
         } catch (err) {
             console.error(err);
             toast.error(err instanceof Error ? err.message : 'Failed to remove admin');

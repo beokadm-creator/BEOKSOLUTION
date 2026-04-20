@@ -4,8 +4,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { useSubdomain } from '../../hooks/useSubdomain';
 import LoadingSpinner from '../common/LoadingSpinner';
 import { httpsCallable } from 'firebase/functions';
-import { functions, db, auth } from '../../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { functions, auth } from '../../firebase';
+import { getSocietyAdminEmails } from '../../utils/societyAdmin';
 
 import { SUPER_ADMINS } from '../../constants/defaults';
 
@@ -143,24 +143,13 @@ const AdminGuard: React.FC = () => {
       }
 
       try {
-          console.log(`🛡️ [AdminGuard] Fetching society document: ${currentSocietyId}`);
-          const socRef = doc(db, 'societies', currentSocietyId);
-          const socSnap = await getDoc(socRef);
-          
-          console.log(`🛡️ [AdminGuard] Document exists: ${socSnap.exists()}`);
-          
-          if (socSnap.exists()) {
-              const data = socSnap.data();
-              const adminEmails = data.adminEmails || [];
-              console.log(`🛡️ [AdminGuard] adminEmails:`, adminEmails);
-              console.log(`🛡️ [AdminGuard] Checking if ${userEmail} in adminEmails`);
-              const isAuthorized = adminEmails.includes(userEmail);
-              console.log(`🛡️ [AdminGuard] isAuthorized: ${isAuthorized}`);
-              setIsAdminAuthorized(isAuthorized);
-          } else {
-              console.log(`🛡️ [AdminGuard] ❌ Society document not found`);
-              setIsAdminAuthorized(false);
-          }
+          console.log(`🛡️ [AdminGuard] Fetching admin config for: ${currentSocietyId}`);
+          const adminEmails = await getSocietyAdminEmails(currentSocietyId);
+          console.log(`🛡️ [AdminGuard] adminEmails:`, adminEmails);
+          console.log(`🛡️ [AdminGuard] Checking if ${userEmail} in adminEmails`);
+          const isAuthorized = adminEmails.includes(userEmail);
+          console.log(`🛡️ [AdminGuard] isAuthorized: ${isAuthorized}`);
+          setIsAdminAuthorized(isAuthorized);
       } catch (error) {
           console.log(`🛡️ [AdminGuard] ❌ Exception:`, error);
           setIsAdminAuthorized(false);

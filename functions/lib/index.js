@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.healthCheck = exports.onTossWebhook = exports.logPerformance = exports.logError = exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.confirmTossPaymentHttp = exports.confirmTossPayment = exports.runStampRewardLottery = exports.adminDrawStampReward = exports.requestStampReward = exports.manualDataCleanup = exports.scheduledDataCleanup = exports.withdrawConsent = exports.logAuditEvent = exports.processVendorVisit = exports.resolveVendorBadgeScan = exports.sendVendorAlimTalk = exports.manualAutoCheckout = exports.scheduledAutoCheckout = exports.resolveDataIntegrityAlert = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.bulkSendNotifications = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.corsHandler = void 0;
+exports.healthCheck = exports.onTossWebhook = exports.logPerformance = exports.logError = exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.confirmTossPaymentHttp = exports.confirmTossPayment = exports.runStampRewardLottery = exports.adminDrawStampReward = exports.requestStampReward = exports.manualDataCleanup = exports.scheduledDataCleanup = exports.withdrawConsent = exports.logAuditEvent = exports.processVendorVisit = exports.resolveVendorBadgeScan = exports.sendVendorAlimTalk = exports.manualAutoCheckout = exports.scheduledAutoCheckout = exports.resolveDataIntegrityAlert = exports.manualHealthCheck = exports.scheduledHealthCheck = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.bulkSendNotifications = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.corsHandler = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const cors_1 = __importDefault(require("cors"));
@@ -58,6 +58,9 @@ Object.defineProperty(exports, "monitorMemberCodeIntegrity", { enumerable: true,
 const scheduledReports_1 = require("./monitoring/scheduledReports");
 Object.defineProperty(exports, "dailyErrorReport", { enumerable: true, get: function () { return scheduledReports_1.dailyErrorReport; } });
 Object.defineProperty(exports, "weeklyPerformanceReport", { enumerable: true, get: function () { return scheduledReports_1.weeklyPerformanceReport; } });
+const scheduledHealthCheck_1 = require("./monitoring/scheduledHealthCheck");
+Object.defineProperty(exports, "scheduledHealthCheck", { enumerable: true, get: function () { return scheduledHealthCheck_1.scheduledHealthCheck; } });
+Object.defineProperty(exports, "manualHealthCheck", { enumerable: true, get: function () { return scheduledHealthCheck_1.manualHealthCheck; } });
 const resolveAlert_1 = require("./monitoring/resolveAlert");
 Object.defineProperty(exports, "resolveDataIntegrityAlert", { enumerable: true, get: function () { return resolveAlert_1.resolveDataIntegrityAlert; } });
 const autoCheckout_1 = require("./attendance/autoCheckout");
@@ -740,9 +743,9 @@ exports.createSocietyAdminUser = functions
         }
         // 5. Update Firestore
         functions.logger.info("Updating society document:", societyId);
-        await admin.firestore().collection('societies').doc(societyId).update({
+        await admin.firestore().doc(`societies/${societyId}/private/admin`).set({
             adminEmails: admin.firestore.FieldValue.arrayUnion(email)
-        });
+        }, { merge: true });
         return { success: true, uid: userRecord.uid, warning };
     }
     catch (error) {
@@ -770,9 +773,9 @@ exports.removeSocietyAdminUser = functions
     }
     try {
         // 1. Remove from Firestore
-        await admin.firestore().collection('societies').doc(societyId).update({
+        await admin.firestore().doc(`societies/${societyId}/private/admin`).set({
             adminEmails: admin.firestore.FieldValue.arrayRemove(email)
-        });
+        }, { merge: true });
         // 2. Try to remove claims (Optional but good practice)
         try {
             const userRecord = await admin.auth().getUserByEmail(email);

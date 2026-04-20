@@ -9,6 +9,7 @@ import { onRegistrationCreated, onExternalAttendeeCreated, validateBadgePrepToke
 import { migrateRegistrationsForOptions, migrateRegistrationsForOptionsCallable } from './migrations/migrateRegistrationsForOptions';
 import { monitorRegistrationIntegrity, monitorMemberCodeIntegrity } from './monitoring/dataIntegrity';
 import { dailyErrorReport, weeklyPerformanceReport } from './monitoring/scheduledReports';
+import { scheduledHealthCheck, manualHealthCheck } from './monitoring/scheduledHealthCheck';
 import { resolveDataIntegrityAlert } from './monitoring/resolveAlert';
 import { scheduledAutoCheckout, manualAutoCheckout } from './attendance/autoCheckout';
 import { sendVendorAlimTalk } from './vendor/sendAlimTalk';
@@ -39,6 +40,8 @@ export {
     monitorMemberCodeIntegrity,
     dailyErrorReport,
     weeklyPerformanceReport,
+    scheduledHealthCheck,
+    manualHealthCheck,
     resolveDataIntegrityAlert,
     scheduledAutoCheckout,
     manualAutoCheckout,
@@ -790,9 +793,9 @@ export const createSocietyAdminUser = functions
 
             // 5. Update Firestore
             functions.logger.info("Updating society document:", societyId);
-            await admin.firestore().collection('societies').doc(societyId).update({
+            await admin.firestore().doc(`societies/${societyId}/private/admin`).set({
                 adminEmails: admin.firestore.FieldValue.arrayUnion(email)
-            });
+            }, { merge: true });
 
             return { success: true, uid: userRecord.uid, warning };
 
@@ -825,9 +828,9 @@ export const removeSocietyAdminUser = functions
 
         try {
             // 1. Remove from Firestore
-            await admin.firestore().collection('societies').doc(societyId).update({
+            await admin.firestore().doc(`societies/${societyId}/private/admin`).set({
                 adminEmails: admin.firestore.FieldValue.arrayRemove(email)
-            });
+            }, { merge: true });
 
             // 2. Try to remove claims (Optional but good practice)
             try {

@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
 import { useSociety } from '../hooks/useSociety';
 import { toast } from 'react-hot-toast';
 import { Lock } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { SUPER_ADMINS } from '../constants/defaults';
-import { auth, authPersistenceReady, db } from '../firebase';
+import { auth, authPersistenceReady } from '../firebase';
+import { getSocietyAdminEmails } from '../utils/societyAdmin';
 
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -18,7 +18,7 @@ interface SocietyLoginPageProps {
     societyId?: string;
 }
 
-const SocietyLoginPage: React.FC<SocietyLoginPageProps> = ({ societyId }) => {
+const SocietyLoginPage: React.FC<SocietyLoginPageProps> = ({ _societyId }) => {
     const { society, loading: socLoading } = useSociety();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -55,13 +55,7 @@ const SocietyLoginPage: React.FC<SocietyLoginPageProps> = ({ societyId }) => {
                     return;
                 }
 
-                const socRef = doc(db, 'societies', society.id);
-                const socSnap = await getDoc(socRef);
-
-                if (!socSnap.exists()) throw new Error("Society data missing");
-
-                const data = socSnap.data();
-                const adminEmails = data.adminEmails || [];
+                const adminEmails = await getSocietyAdminEmails(society.id);
 
                 const isAuthorized = adminEmails.includes(email);
 

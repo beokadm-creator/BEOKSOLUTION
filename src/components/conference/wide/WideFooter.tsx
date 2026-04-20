@@ -21,7 +21,7 @@ export const WideFooter: React.FC<WideFooterProps> = ({ data: propData }) => {
     address: society.footerInfo?.address,
     president: society.footerInfo?.representativeName,
     businessNumber: society.footerInfo?.bizRegNumber,
-    email: society.footerInfo?.contactEmail || society.adminEmails?.[0],
+    email: society.footerInfo?.contactEmail,
     phone: society.footerInfo?.contactPhone
   } : null);
 

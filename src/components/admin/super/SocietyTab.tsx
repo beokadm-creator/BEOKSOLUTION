@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { doc, updateDoc, getDoc, getDocs, collection, query, where, limit, deleteDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import toast from 'react-hot-toast';
@@ -8,6 +8,7 @@ import { Label } from '../../ui/label';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../../ui/card';
 import { Building2, Plus, Edit, Trash2, Save } from 'lucide-react';
 import { useSuperAdmin } from '../../../hooks/useSuperAdmin';
+import { getSocietyAdminEmails } from '../../../utils/societyAdmin';
 
 export const SocietyTab: React.FC = () => {
     const { societies, createSociety, refreshSocieties } = useSuperAdmin();
@@ -17,12 +18,29 @@ export const SocietyTab: React.FC = () => {
     const [socAdmin, setSocAdmin] = useState('');
     const [socDomainCode, setSocDomainCode] = useState('');
 
-    const [editingSoc, setEditingSoc] = useState<{ id: string; name: { ko: string; en?: string }; description?: { ko?: string }; homepageUrl?: string; adminEmails?: string[]; domainCode?: string; aliases?: string[] } | null>(null);
+    const [editingSoc, setEditingSoc] = useState<{ id: string; name: { ko: string; en?: string }; description?: { ko?: string }; homepageUrl?: string; domainCode?: string; aliases?: string[] } | null>(null);
     const [editDescKo, setEditDescKo] = useState('');
     const [editHomepage, setEditHomepage] = useState('');
     const [editDomainCode, setEditDomainCode] = useState('');
     const [editAliases, setEditAliases] = useState('');
     const [deletingSocietyId, setDeletingSocietyId] = useState<string | null>(null);
+    const [societyAdminEmails, setSocietyAdminEmails] = useState<Record<string, string[]>>({});
+
+    useEffect(() => {
+        if (societies.length === 0) return;
+        const loadEmails = async () => {
+            const emailsMap: Record<string, string[]> = {};
+            await Promise.all(societies.map(async (s) => {
+                try {
+                    emailsMap[s.id] = await getSocietyAdminEmails(s.id);
+                } catch {
+                    emailsMap[s.id] = [];
+                }
+            }));
+            setSocietyAdminEmails(emailsMap);
+        };
+        loadEmails();
+    }, [societies]);
 
     const handleCreateSociety = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -185,11 +203,11 @@ export const SocietyTab: React.FC = () => {
                                 <div className="flex-1">
                                     <div className="font-semibold text-slate-900">{s.name.ko}</div>
                                     <div className="text-xs text-slate-500">ID: {s.id} / Domain: {(s as { domainCode?: string }).domainCode || '-'}</div>
-                                    <div className="text-xs text-slate-500">{s.adminEmails.join(', ')}</div>
+                                    <div className="text-xs text-slate-500">{(societyAdminEmails[s.id] || []).join(', ') || 'No admins'}</div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-900" onClick={() => {
-                                        setEditingSoc({ id: s.id, name: s.name, description: s.description, homepageUrl: s.homepageUrl, adminEmails: s.adminEmails, domainCode: (s as { domainCode?: string }).domainCode, aliases: (s as { aliases?: string[] }).aliases });
+                                        setEditingSoc({ id: s.id, name: s.name, description: s.description, homepageUrl: s.homepageUrl, domainCode: (s as { domainCode?: string }).domainCode, aliases: (s as { aliases?: string[] }).aliases });
                                         setEditDescKo(s.name.ko);
                                         setEditHomepage(s.homepageUrl || '');
                                         setEditDomainCode(((s as { domainCode?: string }).domainCode || s.id).toLowerCase());

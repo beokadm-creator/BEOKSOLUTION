@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { SUPER_ADMINS } from '../constants/defaults';
 import { resolveSocietyByIdentifier } from '../utils/societyResolver';
+import { getSocietyAdminEmails } from '../utils/societyAdmin';
 
 const EMPTY_ADMIN_STATE = { isAdmin: false, loading: false, permissions: null, isSocietyAdmin: false };
 
@@ -54,8 +55,8 @@ export const useSocietyAdmin = (societyId: string | undefined, userEmail: string
                 const resolved = await resolveSocietyByIdentifier(societyId);
 
                 if (resolved) {
-                    const data = resolved.data;
-                    const isAuthorized = data.adminEmails && Array.isArray(data.adminEmails) && data.adminEmails.includes(userEmail);
+                    const adminEmails = await getSocietyAdminEmails(resolved.id);
+                    const isAuthorized = Array.isArray(adminEmails) && adminEmails.includes(userEmail);
                     
                     console.log('🛡️ [useSocietyAdmin] Society data:', { societyId, resolvedSocietyId: resolved.id, isAuthorized });
                     

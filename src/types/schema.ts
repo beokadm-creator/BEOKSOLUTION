@@ -40,7 +40,8 @@ export interface Society {
   introduction?: LocalizedText;
   logoUrl?: string;
   homepageUrl?: string;
-  adminEmails: string[];
+  /** @deprecated Moved to societies/{id}/private/admin for PII protection. Kept for backward compat during migration. */
+  adminEmails?: string[];
   settings?: {
     abstractEnabled?: boolean;
     [key: string]: unknown;
@@ -74,6 +75,18 @@ export interface Society {
     isPinned?: boolean;
   }[];
   createdAt: Timestamp;
+}
+
+/**
+ * Collection: `societies/{societyId}/private`
+ * Path: `societies/{societyId}/private/admin`
+ * Document ID: 'admin'
+ *
+ * Private admin configuration — not readable by unauthenticated users.
+ * Access controlled by Firestore rules: isSuperAdmin() || isSocietyAdmin(societyId).
+ */
+export interface SocietyPrivateConfig {
+  adminEmails: string[];
 }
 
 /**

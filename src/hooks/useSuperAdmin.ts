@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, collection, Timestamp, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { ConferenceInfo, Society } from '../types/schema';
+import { writeSocietyAdminEmails } from '../utils/societyAdmin';
 
 // Mock Auth for Super Admin (In real app, use Firebase Auth + Custom Claims or DB lookup)
 // For demo, we just simulate "am I super admin?" check.
@@ -68,13 +69,15 @@ export const useSuperAdmin = () => {
             const dataToSet = {
                 id,
                 name: { ko: nameKo, en: nameEn },
-                adminEmails: [adminEmail],
                 domainCode: id,
                 aliases: Array.from(new Set([id, getNameInitials(nameEn)].filter(Boolean))),
                 createdAt: Timestamp.now()
             };
             console.log('[createSociety] Writing document:', dataToSet);
             await setDoc(societyRef, dataToSet);
+            
+            await writeSocietyAdminEmails(id, [adminEmail]);
+            console.log('[createSociety] Private admin doc written successfully');
             console.log('[createSociety] Document written successfully');
             
             await fetchSocieties(); // Refresh list

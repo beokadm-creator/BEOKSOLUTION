@@ -16,11 +16,11 @@ service cloud.firestore {
     }
 
     function isSocietyAdmin(societyId) {
-      let societyDoc = get(/databases/$(database)/documents/societies/$(societyId));
+      let adminDoc = get(/databases/$(database)/documents/societies/$(societyId)/private/admin);
       return isAuthenticated() &&
-        societyDoc.data != null &&
-        societyDoc.data.adminEmails != null &&
-        request.auth.token.email in societyDoc.data.adminEmails;
+        adminDoc.data != null &&
+        adminDoc.data.adminEmails != null &&
+        request.auth.token.email in adminDoc.data.adminEmails;
     }
 
     function isConferenceAdmin(confId) {
@@ -86,6 +86,12 @@ service cloud.firestore {
       // Notification templates are admin resources
       match /notification-templates/{templateId} {
         allow read, write: if isSuperAdmin() || isSocietyAdmin(societyId);
+      }
+
+      // Private admin config (adminEmails) — PII protection
+      match /private/admin {
+        allow read: if isSuperAdmin() || isSocietyAdmin(societyId);
+        allow write: if isSuperAdmin();
       }
 
       // Default deny for unlisted society subcollections
