@@ -7,7 +7,7 @@ import { doc, getDoc, collection, getDocs, query, where, limit } from 'firebase/
 import { db, auth } from '../firebase';
 import { Conference } from '../types/schema';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { LayoutDashboard, Globe, FileText, Users, Settings, QrCode, Monitor, CreditCard, LogOut, ArrowLeft, Printer, BarChart, UserPlus, Building2, Bell, IdCard, Trophy } from 'lucide-react';
+import { LayoutDashboard, Globe, FileText, Users, Settings, Monitor, CreditCard, LogOut, ArrowLeft, BarChart, UserPlus, Building2, Bell, IdCard, Trophy } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/ui/button';
 import { resolveSocietyByIdentifier } from '../utils/societyResolver';
@@ -167,33 +167,45 @@ export default function ConfLayout() {
     if (loading) return <LoadingSpinner />;
     if (!conference) return <div>Conference Not Found</div>;
 
-    const navItems = [
-        { href: `/admin/conf/${cid}`, label: '대시보드', icon: LayoutDashboard },
-        { href: `/admin/conf/${cid}/settings`, label: '행사 정보', icon: Globe },
-        ...(conference?.features?.stampTourEnabled
-            ? [{ href: `/admin/conf/${cid}/settings#stamp-tour`, label: '스탬프투어 설정', icon: Settings }]
-            : []),
-        { href: `/admin/conf/${cid}/settings/registration`, label: '등록 설정', icon: CreditCard },
-        { href: `/admin/conf/${cid}/sponsors`, label: '스폰서 관리', icon: Building2 },
-        { href: `/admin/conf/${cid}/agenda`, label: '프로그램', icon: FileText },
-        { href: `/admin/conf/${cid}/abstracts`, label: '초록 관리', icon: FileText },
-        { href: `/admin/conf/${cid}/notices`, label: '공지사항 관리', icon: Bell },
-        { href: `/admin/conf/${cid}/registrations`, label: '등록자 관리', icon: Users },
-        { href: `/admin/conf/${cid}/badge-management`, label: '명찰 관리', icon: IdCard },
-        { href: `/admin/conf/${cid}/options`, label: '옵션 관리', icon: Settings },
-        { href: `/admin/conf/${cid}/external-attendees`, label: '외부 참석자', icon: UserPlus },
-        { href: `/admin/conf/${cid}/infodesk`, label: '인포데스크', icon: Printer },
-        { href: `/admin/conf/${cid}/gate`, label: '출입 게이트', icon: QrCode },
-        { href: `/admin/conf/${cid}/attendance-settings`, label: '수강 설정', icon: Settings },
-        { href: `/admin/conf/${cid}/attendance-live`, label: '실시간 출결', icon: Monitor },
-        { href: `/admin/conf/${cid}/statistics`, label: '수강 현황', icon: BarChart },
+    const navSections = [
+        {
+            label: '콘텐츠',
+            items: [
+                { href: `/admin/conf/${cid}/settings`, label: '행사 정보', icon: Globe },
+                { href: `/admin/conf/${cid}/agenda`, label: '프로그램', icon: FileText },
+                { href: `/admin/conf/${cid}/abstracts`, label: '초록 관리', icon: FileText },
+                { href: `/admin/conf/${cid}/notices`, label: '공지사항', icon: Bell },
+            ]
+        },
+        {
+            label: '등록',
+            items: [
+                { href: `/admin/conf/${cid}/settings/registration`, label: '등록 설정', icon: CreditCard },
+                { href: `/admin/conf/${cid}/registrations`, label: '등록자 관리', icon: Users },
+                { href: `/admin/conf/${cid}/external-attendees`, label: '외부 참석자', icon: UserPlus },
+                { href: `/admin/conf/${cid}/options`, label: '옵션 관리', icon: Settings },
+            ]
+        },
+        {
+            label: '현장 운영',
+            items: [
+                { href: `/admin/conf/${cid}/badge-management`, label: '명찰 관리', icon: IdCard },
+                { href: `/admin/conf/${cid}/attendance-settings`, label: '출결 설정', icon: Settings },
+                { href: `/admin/conf/${cid}/attendance-live`, label: '실시간 출결', icon: Monitor },
+                { href: `/admin/conf/${cid}/statistics`, label: '수강 현황', icon: BarChart },
+                ...(conference?.features?.stampTourEnabled
+                    ? [{ href: `/admin/conf/${cid}/stamp-tour-draw`, label: '스탬프투어 추첨', icon: Trophy }]
+                    : []),
+                { href: `/admin/conf/${cid}/sponsors`, label: '스폰서 관리', icon: Building2 },
+            ]
+        },
     ];
 
     if (conference?.features?.stampTourEnabled) {
-        navItems.splice(3, 0, {
-            href: `/admin/conf/${cid}/stamp-tour-draw`,
-            label: '스탬프투어 추첨',
-            icon: Trophy
+        navSections[0].items.splice(1, 0, {
+            href: `/admin/conf/${cid}/settings#stamp-tour`,
+            label: '스탬프투어 설정',
+            icon: Settings
         });
     }
 
@@ -216,39 +228,58 @@ export default function ConfLayout() {
                             )}
                         </div>
                         <nav className="flex-1 p-4 space-y-1">
-                            {/* Force render for all admins: No permission filter applied */}
-                            {navItems.map(item => {
-                                const isActive = location.pathname === item.href || `${location.pathname}${location.hash}` === item.href;
-                                const isStampTourLink = item.href.includes('#stamp-tour');
-                                return (
-                                    <Link
-                                        key={item.href}
-                                        to={item.href}
-                                        onClick={(e) => {
-                                            if (!isStampTourLink) return;
-                                            if (location.pathname === `/admin/conf/${cid}/settings`) {
-                                                e.preventDefault();
-                                                const section = document.getElementById('stamp-tour');
-                                                if (section) {
-                                                    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                                }
-                                                if (window.location.hash !== '#stamp-tour') {
-                                                    window.history.replaceState(null, '', `/admin/conf/${cid}/settings#stamp-tour`);
-                                                }
-                                            }
-                                        }}
-                                        className={cn(
-                                            "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
-                                            isActive
-                                                ? "bg-[#f0f5fa] text-[#003366] shadow-sm border border-[#e1ecf6] font-bold"
-                                                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                                        )}
-                                    >
-                                        <item.icon className={cn("w-4 h-4", isActive ? "text-[#24669e]" : "text-slate-400")} />
-                                        {item.label}
-                                    </Link>
-                                );
-                            })}
+                            <Link
+                                to={`/admin/conf/${cid}`}
+                                className={cn(
+                                    "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
+                                    location.pathname === `/admin/conf/${cid}`
+                                        ? "bg-[#f0f5fa] text-[#003366] shadow-sm border border-[#e1ecf6] font-bold"
+                                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                                )}
+                            >
+                                <LayoutDashboard className={cn("w-4 h-4", location.pathname === `/admin/conf/${cid}` ? "text-[#24669e]" : "text-slate-400")} />
+                                대시보드
+                            </Link>
+
+                            {navSections.map((section, si) => (
+                                <div key={si} className={si > 0 ? "mt-4 pt-3 border-t border-gray-100" : "mt-3"}>
+                                    <div className="px-3 mb-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                                        {section.label}
+                                    </div>
+                                    {section.items.map(item => {
+                                        const isActive = location.pathname === item.href || `${location.pathname}${location.hash}` === item.href;
+                                        const isStampTourLink = item.href.includes('#stamp-tour');
+                                        return (
+                                            <Link
+                                                key={item.href}
+                                                to={item.href}
+                                                onClick={(e) => {
+                                                    if (!isStampTourLink) return;
+                                                    if (location.pathname === `/admin/conf/${cid}/settings`) {
+                                                        e.preventDefault();
+                                                        const section = document.getElementById('stamp-tour');
+                                                        if (section) {
+                                                            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                        }
+                                                        if (window.location.hash !== '#stamp-tour') {
+                                                            window.history.replaceState(null, '', `/admin/conf/${cid}/settings#stamp-tour`);
+                                                        }
+                                                    }
+                                                }}
+                                                className={cn(
+                                                    "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
+                                                    isActive
+                                                        ? "bg-[#f0f5fa] text-[#003366] shadow-sm border border-[#e1ecf6] font-bold"
+                                                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                                                )}
+                                            >
+                                                <item.icon className={cn("w-4 h-4", isActive ? "text-[#24669e]" : "text-slate-400")} />
+                                                {item.label}
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
+                            ))}
                         </nav>
                         <div className="p-4 border-t border-gray-100">
                             <Button variant="ghost" className="w-full justify-start text-gray-400 hover:text-red-500" onClick={() => auth.signOut()}>

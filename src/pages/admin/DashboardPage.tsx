@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useAdminStore } from '../../store/adminStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import DataWidget from '../../components/eregi/DataWidget';
-import { Users, CreditCard, Ticket, AlertCircle, Download, Loader2 } from 'lucide-react';
+import { Users, CreditCard, Ticket, AlertCircle, Download, Loader2, Printer, QrCode } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { collection, query, getDocs, doc, getDoc, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { safeText } from '../../utils/safeText';
@@ -20,6 +21,8 @@ interface RegistrationData {
 
 export default function DashboardPage() {
     const { selectedConferenceId, selectedConferenceSlug, selectedConferenceTitle } = useAdminStore();
+    const navigate = useNavigate();
+    const { cid } = useParams<{ cid: string }>();
     const [stats, setStats] = useState({
         totalRegistrations: 0,
         pendingPayments: 0,
@@ -350,7 +353,22 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-2 gap-4">
-                            {/* Add quick action buttons here if needed */}
+                            <Button
+                                onClick={() => navigate(`/admin/conf/${cid}/infodesk`)}
+                                className="flex items-center justify-center gap-2"
+                                variant="outline"
+                            >
+                                <Printer className="w-4 h-4" />
+                                인포데스크
+                            </Button>
+                            <Button
+                                onClick={() => navigate(`/admin/conf/${cid}/gate`)}
+                                className="flex items-center justify-center gap-2"
+                                variant="outline"
+                            >
+                                <QrCode className="w-4 h-4" />
+                                출입 게이트
+                            </Button>
                             <Button
                                 onClick={handleExportReport}
                                 disabled={isExporting}
