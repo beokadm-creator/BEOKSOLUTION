@@ -66,6 +66,7 @@ import VendorDashboard from './pages/vendor/VendorDashboard';
 import VendorIntroPage from './pages/conference/VendorIntroPage';
 
 import SecurityPolicyManager from './components/admin/SecurityPolicyManager';
+import GlobalExpertManagerPage from './pages/admin/GlobalExpertManagerPage';
 
 // New Layouts
 import SuperLayout from './layouts/SuperLayout';
@@ -149,6 +150,7 @@ const App: React.FC = () => {
                   <Route element={<SuperLayout />}>
                     <Route path="/super" element={<SuperAdminPage />} />
                     <Route path="/super/security" element={<SecurityPolicyManager />} />
+                    <Route path="/super/experts" element={<GlobalExpertManagerPage />} />
                   </Route>
 
                   {/* L1: Society Layout (DEV 환경에서 society 파라미터 사용) */}
@@ -377,6 +379,7 @@ const App: React.FC = () => {
                 <Route element={<SuperLayout />}>
                   <Route path="/super" element={<SuperAdminPage />} />
                   <Route path="/super/security" element={<SecurityPolicyManager />} />
+                  <Route path="/super/experts" element={<GlobalExpertManagerPage />} />
                 </Route>
               </Route>
 

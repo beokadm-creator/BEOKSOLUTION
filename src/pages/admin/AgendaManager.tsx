@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCMS } from '../../hooks/useCMS';
 import { Agenda, Speaker } from '../../types/schema';
-import { Timestamp, collection, getDocs, query, where } from 'firebase/firestore';
+import { GlobalExpertSelectorModal } from '../../components/admin/GlobalExpertSelectorModal';
+import { GlobalExpert } from '../../types/schema';
+import { Timestamp, collection, getDocs, query, where, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -12,7 +14,7 @@ import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ImageUpload from '../../components/ui/ImageUpload';
 import BilingualInput from '../../components/ui/bilingual-input';
 import toast from 'react-hot-toast';
-import { Plus, Save, User, MapPin, Clock, ExternalLink, Trash2, Calendar, Mic2, LayoutList, ChevronRight } from 'lucide-react';
+import { Plus, Save, User, MapPin, Clock, ExternalLink, Trash2, Calendar, Mic2, LayoutList, ChevronRight, BookOpen } from 'lucide-react';
 import { useAdminStore } from '../../store/adminStore';
 import { cn } from '../../lib/utils';
 
@@ -27,6 +29,7 @@ const AgendaManager: React.FC = () => {
     // Form States
     const [agendaForm, setAgendaForm] = useState<Partial<Agenda>>({});
     const [speakerForm, setSpeakerForm] = useState<Partial<Speaker>>({});
+    const [isExpertModalOpen, setIsExpertModalOpen] = useState(false);
     const [sessionType, setSessionType] = useState<string>('');
     const agendaSyncInitializedRef = useRef(false);
 
@@ -117,18 +120,55 @@ const AgendaManager: React.FC = () => {
         if (!selectedAgendaId) return toast.error("세션을 먼저 저장하거나 선택해주세요.");
         if (!speakerForm.name?.ko) return toast.error("연자 이름은 필수입니다.");
 
-        const speakerData = {
-            ...speakerForm,
-            agendaId: selectedAgendaId,
-            // Ensure photoUrl is explicitly set to empty string if missing, to override existing value
-            photoUrl: speakerForm.photoUrl || ""
-        };
+        try {
+            // --- 1. Global Expert Directory (Reverse Sync) ---
+            let currentGlobalExpertId = speakerForm.globalExpertId;
+            
+            // Generate a unique ID if it doesn't exist
+            if (!currentGlobalExpertId) {
+                currentGlobalExpertId = `expert_${Date.now()}`;
+            }
 
-        await saveSpeaker(speakerData as Omit<Speaker, 'id'>, speakerForm.id); // Pass ID to update instead of create
+            const globalExpertData: Partial<GlobalExpert> = {
+                name: speakerForm.name,
+                organization: speakerForm.organization || "",
+                photoUrl: speakerForm.photoUrl || "",
+                bio: speakerForm.bio,
+                isPublic: true, // Default to public for auto-synced experts
+                updatedAt: Timestamp.now()
+            };
 
-        toast.success("연자 정보가 저장되었습니다.");
-        setSpeakerForm({});
-        fetchSpeakers(selectedAgendaId);
+            // If it's a new global expert, set initial fields
+            if (!speakerForm.globalExpertId) {
+                globalExpertData.id = currentGlobalExpertId;
+                globalExpertData.createdAt = Timestamp.now();
+                globalExpertData.history = [confId!]; // Add current conference to history
+            } else {
+                // To safely update history, we should fetch it first, but for simplicity we assume 
+                // it's handled on the Global Expert page. We just ensure we don't overwrite it here.
+            }
+
+            // Save to global_experts collection
+            const expertRef = doc(db, 'global_experts', currentGlobalExpertId);
+            await setDoc(expertRef, globalExpertData, { merge: true });
+
+            // --- 2. Local Conference Speaker ---
+            const speakerData = {
+                ...speakerForm,
+                agendaId: selectedAgendaId,
+                photoUrl: speakerForm.photoUrl || "",
+                globalExpertId: currentGlobalExpertId // Link local speaker to global expert
+            };
+
+            await saveSpeaker(speakerData as Omit<Speaker, 'id'>, speakerForm.id);
+
+            toast.success("연자 정보가 인명사전 및 스케줄에 저장되었습니다.");
+            setSpeakerForm({});
+            fetchSpeakers(selectedAgendaId);
+        } catch (error) {
+            console.error("Save speaker error:", error);
+            toast.error("저장 중 오류가 발생했습니다.");
+        }
     };
 
     const handleDeleteSpeaker = async (e: React.MouseEvent, id: string) => {
@@ -451,16 +491,27 @@ const AgendaManager: React.FC = () => {
 
                                         {/* Speaker Edit Form */}
                                         <div className="lg:w-2/3 p-6 overflow-y-auto bg-white">
-                                            <div className="flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-                                                <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
-                                                    {speakerForm.id ? <User className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                                            <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
+                                                        {speakerForm.id ? <User className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="font-bold text-slate-800">
+                                                            {speakerForm.id ? '연자 정보 수정' : '새 연자 추가'}
+                                                        </h3>
+                                                        <p className="text-xs text-slate-400">사진과 상세 약력을 입력할 수 있습니다.</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <h3 className="font-bold text-slate-800">
-                                                        {speakerForm.id ? '연자 정보 수정' : '새 연자 추가'}
-                                                    </h3>
-                                                    <p className="text-xs text-slate-400">사진과 상세 약력을 입력할 수 있습니다.</p>
-                                                </div>
+                                                <Button 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    onClick={() => setIsExpertModalOpen(true)}
+                                                    className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                                                >
+                                                    <BookOpen className="w-4 h-4 mr-1.5" />
+                                                    인명사전에서 불러오기
+                                                </Button>
                                             </div>
 
                                             <div className="space-y-6">
@@ -557,6 +608,23 @@ const AgendaManager: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {isExpertModalOpen && (
+                <GlobalExpertSelectorModal 
+                    open={isExpertModalOpen} 
+                    onOpenChange={setIsExpertModalOpen} 
+                    onSelect={(expert: GlobalExpert) => {
+                        setSpeakerForm(prev => ({
+                            ...prev,
+                            name: expert.name,
+                            organization: expert.organization || '',
+                            photoUrl: expert.photoUrl || '',
+                            bio: expert.bio || { ko: '', en: '' },
+                            globalExpertId: expert.id
+                        }));
+                    }}
+                />
+            )}
         </div>
     );
 };
