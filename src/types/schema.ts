@@ -455,6 +455,29 @@ export interface Speaker {
   abstractUrl?: string;
   agendaId?: string;
   sessionTime?: string; // e.g., "10:00 - 10:20"
+  globalExpertId?: string; // (NEW) Reference to global_experts collection
+}
+
+/**
+ * Collection: `global_experts`
+ * Path: `global_experts/{expertId}`
+ * 
+ * Global directory of speakers/experts across all societies and conferences.
+ */
+export interface GlobalExpert {
+  id: string;
+  name: LocalizedText;
+  phone?: string;
+  email?: string;
+  licenseNumber?: string;
+  organization?: string;
+  photoUrl?: string;
+  cvUrl?: string;
+  bio?: LocalizedText; // Added bio text
+  isPublic: boolean; // Allow external API access
+  history?: string[]; // Array of conference IDs where they participated
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 }
 
 /**

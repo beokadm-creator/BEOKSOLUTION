@@ -3,7 +3,7 @@ import React, { useEffect, useMemo } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { GlobalProvider } from '../contexts/GlobalContext';
 import { useAuth } from '../hooks/useAuth';
-import { ShieldCheck, LayoutDashboard } from 'lucide-react';
+import { ShieldCheck, LayoutDashboard, Users } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { auth } from '../firebase';
 
@@ -49,6 +49,9 @@ export default function SuperLayout() {
                 </Button>
                 <Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white hover:bg-[#333]" onClick={() => navigate('/super/security')}>
                     <ShieldCheck className="w-4 h-4" /> Security
+                </Button>
+                <Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white hover:bg-[#333]" onClick={() => navigate('/super/experts')}>
+                    <Users className="w-4 h-4" /> Expert Directory
                 </Button>
             </nav>
             <div className="p-4 border-t border-[#333]">
