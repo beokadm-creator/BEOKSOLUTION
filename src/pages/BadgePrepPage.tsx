@@ -39,6 +39,7 @@ import {
   resolveConferenceIdFromRoute,
   resolvePublicSlugFromConferenceId,
 } from "../utils/conferenceRoute";
+import { getBadgeDisplayName, getBadgeDisplayAffiliation } from "../utils/badgeRecord";
 import { TranslationPanel } from "../components/translation/TranslationPanel";
 
 interface TokenValidationResult {
@@ -64,6 +65,10 @@ interface TokenValidationResult {
     amount?: number;
     lastCheckIn?: { toDate?: () => Date } | null;
     isCompleted?: boolean;
+    isCheckedIn?: boolean;
+    paymentStatus?: string;
+    userId?: string;
+    orderId?: string;
     // Additional fields for enhanced badge
     sessionsCompleted?: number;
     sessionsTotal?: number;
@@ -114,6 +119,8 @@ type BadgeConfig = {
     translation?: boolean;
     stampTour?: boolean;
     home?: boolean;
+    qna?: boolean;
+    certificate?: boolean;
   };
   menuLabels?: {
     status?: { ko?: string; en?: string };
@@ -123,6 +130,8 @@ type BadgeConfig = {
     translation?: { ko?: string; en?: string };
     stampTour?: { ko?: string; en?: string };
     home?: { ko?: string; en?: string };
+    qna?: { ko?: string; en?: string };
+    certificate?: { ko?: string; en?: string };
   };
 };
 

@@ -1,12 +1,10 @@
 import React, { useLayoutEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, Timestamp, where } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
 import QRCode from "react-qr-code";
 
 import { useAuth } from "../hooks/useAuth";
-import { db, functions } from "../firebase";
-import { getStampMissionTargetCount } from "../utils/stampTour";
+import { db } from "../firebase";
 import {
     getBadgeDisplayAffiliation,
     getBadgeDisplayName,
@@ -66,41 +64,9 @@ type BadgeUiData = {
     zoneCompleted?: Record<string, boolean>;
 };
 
-type StampTourConfig = {
-    enabled: boolean;
-    endAt?: Timestamp;
-    completionRule: { type: "COUNT" | "ALL"; requiredCount?: number };
-    boothOrderMode: "SPONSOR_ORDER" | "CUSTOM";
-    customBoothOrder?: string[];
-    rewardMode: "RANDOM" | "FIXED";
-    drawMode?: "PARTICIPANT" | "ADMIN" | "BOTH";
-    rewardFulfillmentMode?: "INSTANT" | "LOTTERY";
-    lotteryScheduledAt?: Timestamp;
-    rewards: Array<{
-        id: string;
-        name: string;
-        imageUrl?: string;
-        totalQty: number;
-        remainingQty: number;
-        weight?: number;
-        order?: number;
-        isFallback?: boolean;
-    }>;
-    soldOutMessage?: string;
-    completionMessage?: string;
-};
-
-type StampProgress = {
-    rewardStatus?: "NONE" | "REQUESTED" | "REDEEMED";
-    lotteryStatus?: "PENDING" | "SELECTED" | "NOT_SELECTED";
-    rewardName?: string;
-    isCompleted?: boolean;
-    completedAt?: TimestampLike;
-};
-
-
 import { QnAPanel } from "../components/badge/QnAPanel";
 import { CertificateDownloader } from "../components/badge/CertificateDownloader";
+import { StampTourPanel } from "../components/badge/StampTourPanel";
 
 const parseConferenceEndAt = (raw: unknown): Date | null => {
     if (!raw) return null;
@@ -124,17 +90,9 @@ const ConferenceBadgePage: React.FC = () => {
     const [uiData, setUiData] = useState<BadgeUiData | null>(null);
     const [zones, setZones] = useState<AttendanceZone[]>([]);
     const [liveMinutes, setLiveMinutes] = useState(0);
-    const [msg, setMsg] = useState("珥덇린??以?..");
+    const [msg, setMsg] = useState("초기화 중...");
     const [conferenceEnded, setConferenceEnded] = useState(false);
     const [conferenceChecked, setConferenceChecked] = useState(false);
-    const [totalVendors, setTotalVendors] = useState(0);
-    const [myStamps, setMyStamps] = useState<string[]>([]);
-    const [stampConfig, setStampConfig] = useState<StampTourConfig | null>(null);
-    const [stampBoothCandidates, setStampBoothCandidates] = useState<Array<{ id: string; name: string }>>([]);
-    const [stampProgress, setStampProgress] = useState<StampProgress>({});
-    const [guestbookEntries, setGuestbookEntries] = useState<Array<{ vendorName: string; message?: string; timestamp?: Timestamp }>>([]);
-    const [rewardRequesting, setRewardRequesting] = useState(false);
-    const [rewardMessage, setRewardMessage] = useState("");
     const [badgeLang, setBadgeLang] = useState<"ko" | "en">("ko");
     const [badgeConfig, setBadgeConfig] = useState<any>(null);
 
@@ -489,72 +447,7 @@ const ConferenceBadgePage: React.FC = () => {
         };
     }, [confId, uiData?.userId]);
 
-    const orderedBooths = useMemo(() => {
-        if (!stampConfig?.enabled) return [];
-        if (stampConfig.boothOrderMode === "CUSTOM" && stampConfig.customBoothOrder?.length) {
-            const priority = stampConfig.customBoothOrder
-                .map((boothId) => stampBoothCandidates.find((candidate) => candidate.id === boothId))
-                .filter(Boolean) as Array<{ id: string; name: string }>;
-            const remaining = stampBoothCandidates.filter((candidate) => !stampConfig.customBoothOrder?.includes(candidate.id));
-            return [...priority, ...remaining];
-        }
-        return stampBoothCandidates;
-    }, [stampBoothCandidates, stampConfig]);
-
-    const stampBooths = useMemo(() => {
-        const stamped = new Set(myStamps);
-        return orderedBooths.map((booth) => ({ ...booth, isStamped: stamped.has(booth.id) }));
-    }, [myStamps, orderedBooths]);
-
-    const requiredCount = stampConfig?.enabled
-        ? getStampMissionTargetCount(stampConfig.completionRule, stampBoothCandidates.length)
-        : 0;
-    const isCompleted = stampConfig?.enabled ? (requiredCount > 0 && myStamps.length >= requiredCount) : false;
-    const certificateEnabled = badgeConfig?.menuVisibility?.certificate !== false;
-    const rewardStatus = stampProgress.rewardStatus || "NONE";
-    const completedAtMs = stampProgress.completedAt?.toDate().getTime();
-    const lotteryScheduledAtMs = stampConfig?.lotteryScheduledAt?.toDate().getTime();
-    const completedBeforeLotteryCutoff = lotteryScheduledAtMs == null || completedAtMs == null || completedAtMs <= lotteryScheduledAtMs;
-    const lotteryStatus = stampProgress.lotteryStatus || (
-        stampConfig?.rewardFulfillmentMode === "LOTTERY"
-        && isCompleted
-        && completedBeforeLotteryCutoff
-            ? "PENDING"
-            : undefined
-    );
-    const isInstantReward = stampConfig?.rewardFulfillmentMode !== "LOTTERY";
-    const canParticipantDraw = isInstantReward && stampConfig?.drawMode !== "ADMIN";
-    const missedLotteryCutoff = !isInstantReward
-        && rewardStatus === "NONE"
-        && !completedBeforeLotteryCutoff;
-
     const qnaEnabled = badgeConfig?.menuVisibility?.qna !== false;
-
-    const handleRewardRequest = async () => {
-        if (!confId || !uiData?.userId || !stampConfig?.enabled) return;
-
-        setRewardRequesting(true);
-        setRewardMessage("");
-        try {
-            const requestReward = httpsCallable(functions, "requestStampReward");
-            const response = await requestReward({
-                confId,
-                userName: uiData.name,
-                userOrg: uiData.aff
-            });
-
-            const payload = response.data as { rewardName?: string };
-            setRewardMessage(
-                payload.rewardName
-                    ? t(`상품 요청이 접수되었습니다. ${payload.rewardName}`, `Reward request received. ${payload.rewardName}`)
-                    : t("상품 요청이 접수되었습니다.", "Reward request received.")
-            );
-        } catch (error) {
-            setRewardMessage(error instanceof Error ? error.message : t("요청 처리에 실패했습니다.", "Request failed."));
-        } finally {
-            setRewardRequesting(false);
-        }
-    };
 
     if (msg) {
         return (
@@ -644,116 +537,15 @@ const ConferenceBadgePage: React.FC = () => {
                 )}
             </div>
 
-            {uiData.issued && stampConfig?.enabled && (
+            {uiData.issued && badgeConfig?.menuVisibility?.stampTour !== false && (
                 <div className="mt-6 w-full max-w-sm space-y-4">
-                    <div className="rounded-xl border border-eregi-primary/20 bg-eregi-primary/5 p-6 text-center shadow-sm">
-                        <h3 className="mb-3 text-xl font-display font-semibold text-eregi-primary">{t("스탬프 투어", "Stamp Tour")}</h3>
-                        <p className="mb-6 text-base font-body text-eregi-primary/80 leading-relaxed">{t("참여 부스를 방문하고 스탬프를 모아보세요", "Visit participating booths and collect stamps")}</p>
-
-                        <div className="mb-3 flex items-center justify-between text-base font-body font-medium text-eregi-primary">
-                            <span>{t("현재 진행 현황", "Current progress")}</span>
-                            <span className="rounded-full bg-card px-4 py-2 text-eregi-primary font-semibold border border-eregi-primary/20">
-                                {myStamps.length} / {requiredCount || totalVendors}
-                            </span>
-                        </div>
-
-                        <div className="mb-6 h-3 w-full overflow-hidden rounded-full bg-eregi-neutral-200">
-                            <div
-                                className="h-3 rounded-full bg-eregi-primary transition-all duration-1000 ease-out"
-                                style={{ width: `${Math.min(100, requiredCount > 0 ? (myStamps.length / requiredCount) * 100 : 0)}%` }}
-                            />
-                        </div>
-
-                        {isCompleted && (
-                            <div className="mt-6 space-y-3">
-                                <div className="text-base font-body font-semibold text-eregi-primary">
-                                    {stampConfig.completionMessage || t("스탬프 투어를 완료했습니다!", "Stamp tour completed!")}
-                                </div>
-                                {rewardStatus === "NONE" && canParticipantDraw && (
-                                    <button
-                                        type="button"
-                                        className="w-full rounded-lg bg-eregi-primary py-3 text-base font-body font-semibold text-eregi-primary-foreground disabled:opacity-50 transition-colors hover:bg-eregi-primary/90"
-                                        onClick={handleRewardRequest}
-                                        disabled={rewardRequesting}
-                                    >
-                                        {rewardRequesting ? t("처리 중...", "Processing...") : t("상품 요청", "Request reward")}
-                                    </button>
-                                )}
-                                {rewardStatus === "NONE" && !canParticipantDraw && isInstantReward && (
-                                    <div className="rounded-lg bg-eregi-primary/10 border border-eregi-primary/20 py-3 px-4 text-base font-body font-medium text-eregi-primary">
-                                        {t("관리자 추첨 대기 중", "Waiting for admin draw")}
-                                    </div>
-                                )}
-                                {!isInstantReward && lotteryStatus === "PENDING" && (
-                                    <div className="rounded-lg bg-eregi-primary/10 border border-eregi-primary/20 py-3 px-4 text-base font-body font-medium text-eregi-primary">
-                                        {t("예약 추첨 대기 중", "Scheduled draw pending")}
-                                    </div>
-                                )}
-                                {!isInstantReward && lotteryStatus === "PENDING" && stampConfig.lotteryScheduledAt && (
-                                    <div className="text-sm font-body text-eregi-primary/70">
-                                        {t("추첨 예정", "Scheduled draw")}: {stampConfig.lotteryScheduledAt.toDate().toLocaleString(badgeLang === "ko" ? "ko-KR" : "en-US")}
-                                    </div>
-                                )}
-                                {missedLotteryCutoff && (
-                                    <div className="rounded-lg bg-eregi-neutral-100 border border-eregi-neutral-200 py-3 px-4 text-base font-body font-medium text-muted-foreground">
-                                        {t("예약 추첨 마감 이후 완료되어 이번 추첨 대상에서 제외되었습니다", "Completed after the draw cutoff, excluded from this round")}
-                                    </div>
-                                )}
-                                {rewardStatus === "REQUESTED" && (
-                                    <div className="rounded-lg bg-amber-50 border border-amber-200 py-3 px-4 text-base font-body font-medium text-amber-700">
-                                        {t("상품 요청 완료", "Reward request submitted")}
-                                    </div>
-                                )}
-                                {rewardStatus === "REDEEMED" && (
-                                    <div className="rounded-lg bg-emerald-50 border border-emerald-200 py-3 px-4 text-base font-body font-medium text-emerald-700">
-                                        {t("상품 수령 완료", "Reward redeemed")}
-                                    </div>
-                                )}
-                                {!isInstantReward && lotteryStatus === "NOT_SELECTED" && (
-                                    <div className="rounded-lg bg-eregi-neutral-100 border border-eregi-neutral-200 py-3 px-4 text-base font-body font-medium text-muted-foreground">
-                                        {t("이번 추첨에서는 미당첨입니다", "Not selected in this draw")}
-                                    </div>
-                                )}
-                                {rewardMessage && (
-                                    <div className="text-sm font-body text-eregi-primary/70">{rewardMessage}</div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="rounded-lg border border-eregi-neutral-200 bg-card p-5 shadow-sm">
-                        <h4 className="mb-4 text-base font-display font-semibold text-foreground">{t("참여 부스 안내", "Participating booths")}</h4>
-                        {stampBooths.length === 0 ? (
-                            <div className="text-sm font-body text-muted-foreground">{t("참여 부스가 없습니다", "No participating booths")}</div>
-                        ) : (
-                            <div className="space-y-3">
-                                {stampBooths.map((booth) => (
-                                    <div key={booth.id} className="flex items-center justify-between text-base">
-                                        <span className="font-body font-medium text-foreground">{booth.name}</span>
-                                        <span className={`rounded-full px-3 py-1 text-sm font-body font-medium ${booth.isStamped ? "bg-eregi-primary/10 text-eregi-primary border border-eregi-primary/20" : "bg-eregi-neutral-100 text-muted-foreground border border-eregi-neutral-200"}`}>
-                                            {booth.isStamped ? t("완료", "Completed") : t("대기", "Pending")}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <h4 className="mb-3 text-sm font-bold text-slate-800">{t("방명록 참여 업체", "Guestbook booths")}</h4>
-                        {guestbookEntries.length === 0 ? (
-                            <div className="text-xs text-slate-400">{t("방명록 참여 업체가 없습니다.", "No guestbook booth entries.")}</div>
-                        ) : (
-                            <div className="space-y-2">
-                                {guestbookEntries.map((entry, index) => (
-                                    <div key={`${entry.vendorName}-${index}`} className="text-sm text-slate-700">
-                                        <span className="font-medium">{entry.vendorName}</span>
-                                        {entry.message && <span className="text-xs text-slate-500"> - {entry.message}</span>}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    <StampTourPanel
+                        confId={confId || ""}
+                        userId={uiData.userId}
+                        userName={uiData.name}
+                        userAff={uiData.aff}
+                        badgeLang={badgeLang}
+                    />
                 </div>
             )}
 
