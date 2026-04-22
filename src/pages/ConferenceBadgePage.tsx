@@ -94,7 +94,21 @@ const ConferenceBadgePage: React.FC = () => {
     const [conferenceEnded, setConferenceEnded] = useState(false);
     const [conferenceChecked, setConferenceChecked] = useState(false);
     const [badgeLang, setBadgeLang] = useState<"ko" | "en">("ko");
-    const [badgeConfig, setBadgeConfig] = useState<any>(null);
+    const [badgeConfig, setBadgeConfig] = useState<{
+        menuVisibility?: {
+            status?: boolean;
+            sessions?: boolean;
+            materials?: boolean;
+            program?: boolean;
+            translation?: boolean;
+            stampTour?: boolean;
+            home?: boolean;
+            qna?: boolean;
+            certificate?: boolean;
+        };
+        bgColor?: string;
+        textColor?: string;
+    } | null>(null);
 
     const t = (ko: string, en: string) => (
         badgeLang === "ko" ? ko : en
@@ -360,94 +374,8 @@ const ConferenceBadgePage: React.FC = () => {
         return () => clearInterval(timer);
     }, [uiData, zones]);
 
-    useLayoutEffect(() => {
-        if (!confId || !uiData?.userId) return;
-
-        let unsubscribeStamps = () => { };
-        let unsubscribeProgress = () => { };
-
-        const fetchStampTour = async () => {
-            try {
-                const configSnap = await getDoc(doc(db, `conferences/${confId}/settings`, "stamp_tour"));
-                if (configSnap.exists()) {
-                    const cfg = configSnap.data() as Partial<StampTourConfig>;
-                    setStampConfig({
-                        enabled: cfg.enabled === true,
-                        endAt: cfg.endAt,
-                        completionRule: cfg.completionRule || { type: "COUNT", requiredCount: 5 },
-                        boothOrderMode: cfg.boothOrderMode || "SPONSOR_ORDER",
-                        customBoothOrder: cfg.customBoothOrder || [],
-                        rewardMode: cfg.rewardMode || "RANDOM",
-                        drawMode: cfg.drawMode || "PARTICIPANT",
-                        rewardFulfillmentMode: cfg.rewardFulfillmentMode || "INSTANT",
-                        lotteryScheduledAt: cfg.lotteryScheduledAt,
-                        rewards: Array.isArray(cfg.rewards) ? cfg.rewards : [],
-                        soldOutMessage: cfg.soldOutMessage,
-                        completionMessage: cfg.completionMessage
-                    });
-                } else {
-                    setStampConfig(null);
-                }
-
-                const sponsorsSnap = await getDocs(
-                    query(collection(db, `conferences/${confId}/sponsors`), where("isStampTourParticipant", "==", true))
-                );
-                const boothCandidates = sponsorsSnap.docs.map((snapshot) => {
-                    const sponsor = snapshot.data() as { vendorId?: string; name?: string };
-                    return {
-                        id: sponsor.vendorId || snapshot.id,
-                        name: sponsor.name || snapshot.id
-                    };
-                });
-                setStampBoothCandidates(boothCandidates);
-                setTotalVendors(boothCandidates.length);
-
-                unsubscribeStamps = onSnapshot(
-                    query(collection(db, `conferences/${confId}/stamps`), where("userId", "==", uiData.userId)),
-                    (snapshot) => {
-                        const uniqueVendors = Array.from(new Set(
-                            snapshot.docs
-                                .map((stampDoc) => (stampDoc.data() as { vendorId?: string }).vendorId)
-                                .filter(Boolean)
-                        )) as string[];
-                        setMyStamps(uniqueVendors);
-                    }
-                );
-
-                unsubscribeProgress = onSnapshot(
-                    doc(db, `conferences/${confId}/stamp_tour_progress/${uiData.userId}`),
-                    (snapshot) => {
-                        setStampProgress(snapshot.exists() ? snapshot.data() as StampProgress : {});
-                    }
-                );
-
-                const guestbookSnap = await getDocs(
-                    query(collection(db, `conferences/${confId}/guestbook_entries`), where("userId", "==", uiData.userId))
-                );
-                setGuestbookEntries(
-                    guestbookSnap.docs.map((guestbookDoc) => {
-                        const guestbook = guestbookDoc.data() as { vendorName?: string; message?: string; timestamp?: Timestamp };
-                        return {
-                            vendorName: guestbook.vendorName || "Vendor",
-                            message: guestbook.message,
-                            timestamp: guestbook.timestamp
-                        };
-                    })
-                );
-            } catch (error) {
-                console.error("Failed to load stamp tour data", error);
-            }
-        };
-
-        fetchStampTour();
-
-        return () => {
-            unsubscribeStamps();
-            unsubscribeProgress();
-        };
-    }, [confId, uiData?.userId]);
-
     const qnaEnabled = badgeConfig?.menuVisibility?.qna !== false;
+    const certificateEnabled = badgeConfig?.menuVisibility?.certificate !== false;
 
     if (msg) {
         return (

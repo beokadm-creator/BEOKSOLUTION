@@ -65,6 +65,8 @@ type BadgeMenuVisibility = {
   translation?: boolean;
   stampTour?: boolean;
   home?: boolean;
+  qna?: boolean;
+  certificate?: boolean;
 };
 
 type BadgeMenuLabel = {
@@ -80,6 +82,8 @@ type BadgeMenuLabels = {
   translation?: BadgeMenuLabel;
   stampTour?: BadgeMenuLabel;
   home?: BadgeMenuLabel;
+  qna?: BadgeMenuLabel;
+  certificate?: BadgeMenuLabel;
 };
 
 const BadgeManagementPage: React.FC = () => {
@@ -101,6 +105,8 @@ const BadgeManagementPage: React.FC = () => {
     translation: true,
     stampTour: true,
     home: true,
+    qna: true,
+    certificate: true,
   });
   const [menuLabels, setMenuLabels] = useState<Required<BadgeMenuLabels>>({
     status: { ko: "상태", en: "Status" },
@@ -110,6 +116,8 @@ const BadgeManagementPage: React.FC = () => {
     translation: { ko: "번역", en: "Translation" },
     stampTour: { ko: "메뉴", en: "Menu" },
     home: { ko: "학술대회 홈페이지로 이동", en: "Conference Home" },
+    qna: { ko: "Q&A", en: "Q&A" },
+    certificate: { ko: "참가확인서", en: "Certificate" },
   });
   const [badgeLayoutEnabled, setBadgeLayoutEnabled] = useState(false);
   const [stampTourConfig, setStampTourConfig] =
@@ -162,6 +170,8 @@ const BadgeManagementPage: React.FC = () => {
               (data.translationUrl ? data.translationUrl !== "HIDE" : true),
             stampTour: data.menuVisibility?.stampTour ?? true,
             home: data.menuVisibility?.home ?? true,
+            qna: data.menuVisibility?.qna ?? true,
+            certificate: data.menuVisibility?.certificate ?? true,
           });
           setMenuLabels({
             status: {
@@ -191,6 +201,14 @@ const BadgeManagementPage: React.FC = () => {
             home: {
               ko: data.menuLabels?.home?.ko ?? "학술대회 홈페이지로 이동",
               en: data.menuLabels?.home?.en ?? "Conference Home",
+            },
+            qna: {
+              ko: data.menuLabels?.qna?.ko ?? "Q&A",
+              en: data.menuLabels?.qna?.en ?? "Q&A",
+            },
+            certificate: {
+              ko: data.menuLabels?.certificate?.ko ?? "참가확인서",
+              en: data.menuLabels?.certificate?.en ?? "Certificate",
             },
           });
           setBadgeLayoutEnabled(data.badgeLayoutEnabled || false);
@@ -489,6 +507,8 @@ const BadgeManagementPage: React.FC = () => {
                         { key: "translation", label: "번역" },
                         { key: "stampTour", label: "메뉴" },
                         { key: "home", label: "학술대회 홈페이지로 이동" },
+                        { key: "qna", label: "Q&A" },
+                        { key: "certificate", label: "참가확인서" },
                       ] as const
                     ).map((item) => (
                       <div

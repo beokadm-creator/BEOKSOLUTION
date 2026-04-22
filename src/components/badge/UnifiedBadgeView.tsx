@@ -62,7 +62,7 @@ export const UnifiedBadgeView: React.FC<UnifiedBadgeViewProps> = ({
   }, [badgeConfig, badgeLang]);
 
   const effectiveMenuVisibility = useMemo(() => {
-    return { status: true, sessions: true, materials: true, program: true, stampTour: true, home: true, qna: true, ...badgeConfig?.menuVisibility };
+    return { status: true, sessions: true, materials: true, program: true, stampTour: true, home: true, qna: true, certificate: true, ...badgeConfig?.menuVisibility };
   }, [badgeConfig]);
 
   const translationEnabled = effectiveMenuVisibility.translation ?? true;

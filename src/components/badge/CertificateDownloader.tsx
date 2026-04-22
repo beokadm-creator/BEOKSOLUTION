@@ -42,7 +42,7 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ co
 
   if (loading || !config) return null;
 
-  // 발급 조건: 체크인 완료(isCheckedIn === true) 및 결제 완료(paymentStatus === "PAID")
+  // 발급 조건: 현장 체크인 완료 (결제 상태와 무관하게 초청자 및 무료 참석자도 발급 가능하도록 isCheckedIn만 체크)
   const canDownload = ui.isCheckedIn;
 
   const handleDownload = async () => {

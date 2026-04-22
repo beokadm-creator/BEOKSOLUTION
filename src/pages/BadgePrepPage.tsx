@@ -170,6 +170,7 @@ const BadgePrepPage: React.FC = () => {
     materials: badgeConfig?.menuVisibility?.materials ?? true,
     program: badgeConfig?.menuVisibility?.program ?? true,
     translation: badgeConfig?.menuVisibility?.translation ?? true,
+    stampTour: badgeConfig?.menuVisibility?.stampTour ?? true,
     home: badgeConfig?.menuVisibility?.home ?? true,
     qna: badgeConfig?.menuVisibility?.qna ?? true,
     certificate: badgeConfig?.menuVisibility?.certificate ?? true,
@@ -180,6 +181,8 @@ const BadgePrepPage: React.FC = () => {
     menuVisibility.materials ||
     menuVisibility.program ||
     menuVisibility.translation ||
+    menuVisibility.stampTour ||
+    menuVisibility.home ||
     menuVisibility.qna ||
     menuVisibility.certificate
       ? menuVisibility
