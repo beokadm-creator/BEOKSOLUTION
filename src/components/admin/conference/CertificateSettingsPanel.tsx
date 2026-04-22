@@ -103,7 +103,7 @@ export const CertificateSettingsPanel = ({ confId }: { confId: string }) => {
           </div>
           <Switch 
             checked={config.enabled}
-            onChange={(e) => setConfig({ ...config, enabled: e.target.checked })}
+            onCheckedChange={(checked) => setConfig({ ...config, enabled: checked })}
           />
         </div>
       </CardHeader>

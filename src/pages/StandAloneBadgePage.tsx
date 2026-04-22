@@ -126,9 +126,9 @@ type BadgeUiState = {
   id: string;
   userId: string;
   issued: boolean;
-  zone: string;
-  time: string;
-  license: string;
+  zone?: string;
+  time?: string;
+  license?: string;
   status: string;
   badgeQr: string | null;
   receiptNumber?: string;

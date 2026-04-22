@@ -58,7 +58,12 @@ type BadgeUiData = {
     paymentStatus?: string;
     amount?: number;
     license?: string;
-    badgeQr?: string | null;
+    badgeQr: string | null;
+    zone?: string;
+    time?: string;
+    dailyMinutes?: Record<string, number>;
+    zoneMinutes?: Record<string, number>;
+    zoneCompleted?: Record<string, boolean>;
 };
 
 type StampTourConfig = {
@@ -264,6 +269,9 @@ const ConferenceBadgePage: React.FC = () => {
                 isCheckedIn?: boolean;
                 amount?: number;
                 licenseNumber?: string;
+                dailyMinutes?: Record<string, number>;
+                zoneMinutes?: Record<string, number>;
+                zoneCompleted?: Record<string, boolean>;
             };
             const paymentStatus = registration?.paymentStatus || "UNKNOWN";
             if (paymentStatus !== "PAID") {
@@ -296,7 +304,10 @@ const ConferenceBadgePage: React.FC = () => {
                 paymentStatus: String(registration.paymentStatus || ""),
                 amount: registration.amount || 0,
                 license: String(registration.licenseNumber || "-"),
-                badgeQr: registration.badgeQr || null
+                badgeQr: registration.badgeQr || null,
+                dailyMinutes: registration.dailyMinutes || {},
+                zoneMinutes: registration.zoneMinutes || {},
+                zoneCompleted: registration.zoneCompleted || {}
             });
             setLiveMinutes(baseMinutes);
             setMsg("");
@@ -499,6 +510,7 @@ const ConferenceBadgePage: React.FC = () => {
         ? getStampMissionTargetCount(stampConfig.completionRule, stampBoothCandidates.length)
         : 0;
     const isCompleted = stampConfig?.enabled ? (requiredCount > 0 && myStamps.length >= requiredCount) : false;
+    const certificateEnabled = badgeConfig?.menuVisibility?.certificate !== false;
     const rewardStatus = stampProgress.rewardStatus || "NONE";
     const completedAtMs = stampProgress.completedAt?.toDate().getTime();
     const lotteryScheduledAtMs = stampConfig?.lotteryScheduledAt?.toDate().getTime();
@@ -515,6 +527,8 @@ const ConferenceBadgePage: React.FC = () => {
     const missedLotteryCutoff = !isInstantReward
         && rewardStatus === "NONE"
         && !completedBeforeLotteryCutoff;
+
+    const qnaEnabled = badgeConfig?.menuVisibility?.qna !== false;
 
     const handleRewardRequest = async () => {
         if (!confId || !uiData?.userId || !stampConfig?.enabled) return;
@@ -611,7 +625,7 @@ const ConferenceBadgePage: React.FC = () => {
                                     </div>
                                 )}
 
-                                {badgeConfig?.menuVisibility?.certificate !== false && (
+                                {certificateEnabled && (
                                     <div className="mt-2">
                                         <CertificateDownloader 
                                             confId={confId || ""} 
@@ -743,7 +757,7 @@ const ConferenceBadgePage: React.FC = () => {
                 </div>
             )}
 
-            {uiData.issued && badgeConfig?.menuVisibility?.qna !== false && (
+            {uiData.issued && qnaEnabled && (
                 <div className="mt-6 w-full max-w-sm">
                     <QnAPanel
                         confId={confId || ""}

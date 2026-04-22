@@ -18,6 +18,14 @@ export interface BadgeUiState {
   paymentStatus?: string;
   amount?: number;
   license?: string;
+  zone?: string;
+  time?: string;
+  isCompleted?: boolean;
+  lastCheckIn?: any;
+  baseMinutes?: number;
+  dailyMinutes?: Record<string, number>;
+  zoneMinutes?: Record<string, number>;
+  zoneCompleted?: Record<string, boolean>;
 }
 
 export interface UnifiedBadgeViewProps {
@@ -37,9 +45,6 @@ export interface UnifiedBadgeViewProps {
   renderStampTour?: () => React.ReactNode;
   renderQnA?: () => React.ReactNode;
   renderCertificate?: () => React.ReactNode;
-  isCheckedIn?: boolean;
-  paymentStatus?: string;
-  amount?: number;
 }
 
 
