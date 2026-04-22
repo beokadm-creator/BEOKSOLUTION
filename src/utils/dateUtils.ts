@@ -73,3 +73,13 @@ export const safeFormatDateTime = (d: any, locale = 'ko-KR', options?: Intl.Date
         return typeof d === 'string' ? d : '';
     }
 };
+
+export const parseDatetimeLocalAsKst = (dtStr: string): Date => {
+  if (!dtStr) return new Date();
+  const [datePart, timePart] = dtStr.split('T');
+  if (!datePart || !timePart) return new Date(dtStr);
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, minute] = timePart.split(':').map(Number);
+  // KST is UTC+9, so to get the UTC time, we subtract 9 hours from the KST hour
+  return new Date(Date.UTC(year, month - 1, day, hour - 9, minute, 0, 0));
+};

@@ -4,7 +4,7 @@ import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Switch } from '../../ui/switch';
 import BilingualInput from '../../ui/bilingual-input';
-import { Calendar, Globe, FileText, Info, MapPin } from 'lucide-react';
+import { Calendar, Globe, FileText, Info, MapPin, MessageSquare } from 'lucide-react';
 
 interface GeneralSettingsFormProps {
     data: any; 
@@ -179,6 +179,36 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                         features: { ...prev.features, stampTourEnabled: checked }
                                     }))}
                                     className="data-[state=checked]:bg-indigo-600"
+                                />
+                            </div>
+
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                    <Label className="text-sm font-bold text-slate-700">Q&A enabled</Label>
+                                    <p className="text-xs text-slate-500">실시간 Q&A 탭을 활성화합니다. (시간 설정은 '디지털 명찰 관리'에서 진행)</p>
+                                </div>
+                                <Switch
+                                    checked={data.features?.qnaEnabled || false}
+                                    onCheckedChange={(checked) => setData((prev: any) => ({
+                                        ...prev,
+                                        features: { ...prev.features, qnaEnabled: checked }
+                                    }))}
+                                    className="data-[state=checked]:bg-purple-600"
+                                />
+                            </div>
+
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                    <Label className="text-sm font-bold text-slate-700">Certificate enabled</Label>
+                                    <p className="text-xs text-slate-500">참가확인서(이수증) 다운로드 기능을 활성화합니다.</p>
+                                </div>
+                                <Switch
+                                    checked={data.features?.certificateEnabled || false}
+                                    onCheckedChange={(checked) => setData((prev: any) => ({
+                                        ...prev,
+                                        features: { ...prev.features, certificateEnabled: checked }
+                                    }))}
+                                    className="data-[state=checked]:bg-blue-600"
                                 />
                             </div>
                         </CardContent>

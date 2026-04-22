@@ -25,7 +25,10 @@ import {
   User,
   MapPin,
   TrendingUp,
+  HelpCircle,
 } from "lucide-react";
+import { QnAPanel } from "../components/badge/QnAPanel";
+import { CertificateDownloader } from "../components/badge/CertificateDownloader";
 import {
   Tabs,
   TabsContent,
@@ -159,23 +162,29 @@ const BadgePrepPage: React.FC = () => {
     program: badgeConfig?.menuVisibility?.program ?? true,
     translation: badgeConfig?.menuVisibility?.translation ?? true,
     home: badgeConfig?.menuVisibility?.home ?? true,
+    qna: badgeConfig?.menuVisibility?.qna ?? true,
+    certificate: badgeConfig?.menuVisibility?.certificate ?? true,
   };
   const effectiveMenuVisibility =
     menuVisibility.status ||
     menuVisibility.sessions ||
     menuVisibility.materials ||
     menuVisibility.program ||
-    menuVisibility.translation
+    menuVisibility.translation ||
+    menuVisibility.qna ||
+    menuVisibility.certificate
       ? menuVisibility
       : { ...menuVisibility, status: true };
   const translationEnabled =
     badgeConfig?.translationUrl !== "HIDE" && effectiveMenuVisibility.translation;
+  const certificateEnabled = effectiveMenuVisibility.certificate;
   const tabsOrder = [
     effectiveMenuVisibility.status ? "status" : null,
     effectiveMenuVisibility.sessions ? "sessions" : null,
     effectiveMenuVisibility.materials ? "materials" : null,
     effectiveMenuVisibility.program ? "program" : null,
     translationEnabled ? "translation" : null,
+    effectiveMenuVisibility.qna ? "qna" : null,
   ].filter(Boolean) as string[];
   const defaultTab = tabsOrder[0] || "status";
   const gridColsClass =
@@ -291,6 +300,9 @@ const BadgePrepPage: React.FC = () => {
     totalMinutes: number;
     lastCheckIn: TimestampLike | null;
     currentZone: string | null;
+    isCheckedIn: boolean;
+    paymentStatus: string;
+    amount: number;
   } | null>(null);
 
   // Enhanced: Sync detailed registration data directly from Firestore
@@ -314,6 +326,9 @@ const BadgePrepPage: React.FC = () => {
           totalMinutes: d.totalMinutes || 0,
           lastCheckIn: d.lastCheckIn,
           currentZone: d.currentZone || null,
+          isCheckedIn: !!d.isCheckedIn,
+          paymentStatus: String(d.paymentStatus || ""),
+          amount: d.amount || 0,
         });
         setIsCompleted(!!d.isCompleted);
       } else {
@@ -828,6 +843,17 @@ const BadgePrepPage: React.FC = () => {
                       </span>
                     </TabsTrigger>
                   )}
+                  {effectiveMenuVisibility.qna && (
+                    <TabsTrigger
+                      value="qna"
+                      className="flex flex-col items-center justify-center gap-1 rounded-xl px-1 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
+                    >
+                      <HelpCircle className="w-4 h-4" />
+                      <span className="text-xs font-body font-medium">
+                        {getMenuLabel("qna", "Q&A", "Q&A")}
+                      </span>
+                    </TabsTrigger>
+                  )}
                 </TabsList>
 
                 {/* Status Tab */}
@@ -888,6 +914,29 @@ const BadgePrepPage: React.FC = () => {
                         <Clock className="w-3 h-3 text-purple-500" />
                         {Math.floor(liveMinutes / 60)}시간 {liveMinutes % 60}분
                       </p>
+                    </div>
+                  )}
+
+                  {certificateEnabled && (
+                    <div className="mt-4">
+                      <CertificateDownloader 
+                        confId={getConfIdToUse(slug)} 
+                        ui={{
+                          name: getBadgeDisplayName(reg),
+                          aff: getBadgeDisplayAffiliation(reg),
+                          id: String(reg.id),
+                          userId: String(reg.userId || reg.id),
+                          issued: true,
+                          status: liveAttendance?.status || reg.attendanceStatus || "OUTSIDE",
+                          badgeQr: reg.badgeQr || null,
+                          receiptNumber: String(reg.receiptNumber || reg.orderId || "-"),
+                          isCheckedIn: liveAttendance?.isCheckedIn ?? !!reg.isCheckedIn,
+                          paymentStatus: liveAttendance?.paymentStatus ?? String(reg.paymentStatus || ""),
+                          amount: liveAttendance?.amount ?? (reg.amount || 0),
+                          license: String(reg.licenseNumber || "-")
+                        }} 
+                        badgeLang={badgeLang} 
+                      />
                     </div>
                   )}
                   </TabsContent>
@@ -1050,10 +1099,22 @@ const BadgePrepPage: React.FC = () => {
                       <TranslationPanel
                         defaultConferenceId={resolveConferenceIdFromRoute(slug)}
                       />
-                    )}
-                  </TabsContent>
-                )}
-              </Tabs>
+                  )}
+                </TabsContent>
+              )}
+
+              {effectiveMenuVisibility.qna && (
+                <TabsContent value="qna" className="mt-2 p-1">
+                  <QnAPanel
+                    confId={getConfIdToUse(slug)}
+                    userId={reg.userId || String(reg.id)}
+                    userName={getBadgeDisplayName(reg)}
+                    userAff={getBadgeDisplayAffiliation(reg)}
+                    badgeLang={badgeLang}
+                  />
+                </TabsContent>
+              )}
+            </Tabs>
             </div>
           </div>
 

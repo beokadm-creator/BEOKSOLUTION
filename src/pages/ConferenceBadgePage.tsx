@@ -54,6 +54,11 @@ type BadgeUiData = {
     lastCheckIn?: TimestampLike;
     baseMinutes: number;
     isCompleted?: boolean;
+    isCheckedIn?: boolean;
+    paymentStatus?: string;
+    amount?: number;
+    license?: string;
+    badgeQr?: string | null;
 };
 
 type StampTourConfig = {
@@ -87,6 +92,10 @@ type StampProgress = {
     isCompleted?: boolean;
     completedAt?: TimestampLike;
 };
+
+
+import { QnAPanel } from "../components/badge/QnAPanel";
+import { CertificateDownloader } from "../components/badge/CertificateDownloader";
 
 const parseConferenceEndAt = (raw: unknown): Date | null => {
     if (!raw) return null;
@@ -122,6 +131,7 @@ const ConferenceBadgePage: React.FC = () => {
     const [rewardRequesting, setRewardRequesting] = useState(false);
     const [rewardMessage, setRewardMessage] = useState("");
     const [badgeLang, setBadgeLang] = useState<"ko" | "en">("ko");
+    const [badgeConfig, setBadgeConfig] = useState<any>(null);
 
     const t = (ko: string, en: string) => (
         badgeLang === "ko" ? ko : en
@@ -207,6 +217,12 @@ const ConferenceBadgePage: React.FC = () => {
         import("firebase/firestore").then(async ({ doc, getDoc }) => {
             try {
                 const rulesSnap = await getDoc(doc(db, `conferences/${confId}/settings/attendance`));
+                const configSnap = await getDoc(doc(db, `conferences/${confId}/settings/badge_config`));
+
+                if (configSnap.exists()) {
+                    setBadgeConfig(configSnap.data());
+                }
+
                 if (!rulesSnap.exists()) return;
 
                 const attendanceSettings = rulesSnap.data() as AttendanceSettings;
@@ -233,7 +249,22 @@ const ConferenceBadgePage: React.FC = () => {
                 return;
             }
 
-            const registration = snapshot.docs[0].data();
+            const registration = snapshot.docs[0].data() as {
+                paymentStatus?: string;
+                attendanceStatus?: string;
+                currentZone?: string;
+                userId?: string;
+                confirmationQr?: string;
+                badgeQr?: string;
+                totalMinutes?: number;
+                receiptNumber?: string;
+                orderId?: string;
+                lastCheckIn?: TimestampLike;
+                isCompleted?: boolean;
+                isCheckedIn?: boolean;
+                amount?: number;
+                licenseNumber?: string;
+            };
             const paymentStatus = registration?.paymentStatus || "UNKNOWN";
             if (paymentStatus !== "PAID") {
                 setUiData(null);
@@ -260,7 +291,12 @@ const ConferenceBadgePage: React.FC = () => {
                 receiptNumber: String(registration.receiptNumber || registration.orderId || "-"),
                 lastCheckIn: registration.lastCheckIn,
                 baseMinutes,
-                isCompleted: !!registration.isCompleted
+                isCompleted: !!registration.isCompleted,
+                isCheckedIn: !!registration.isCheckedIn,
+                paymentStatus: String(registration.paymentStatus || ""),
+                amount: registration.amount || 0,
+                license: String(registration.licenseNumber || "-"),
+                badgeQr: registration.badgeQr || null
             });
             setLiveMinutes(baseMinutes);
             setMsg("");
@@ -540,8 +576,14 @@ const ConferenceBadgePage: React.FC = () => {
                     English
                 </button>
             </div>
-            <div className={`w-full max-w-sm rounded-xl border-2 p-6 text-center shadow-lg transition-all ${uiData.issued ? "border-eregi-primary/30 bg-card" : "border-eregi-primary/20 bg-card"}`}>
-                <h1 className="mb-6 text-xl font-display font-semibold tracking-wide text-eregi-primary">
+            <div 
+                className={`w-full max-w-sm rounded-xl border-2 p-6 text-center shadow-lg transition-all ${uiData.issued ? "border-eregi-primary/30 bg-card" : "border-eregi-primary/20 bg-card"}`}
+                style={{ backgroundColor: badgeConfig?.bgColor }}
+            >
+                <h1 
+                    className="mb-6 text-xl font-display font-semibold tracking-wide text-eregi-primary"
+                    style={{ color: badgeConfig?.textColor }}
+                >
                     {uiData.issued ? t("디지털 명찰", "Digital Badge") : t("등록 확인 바우처", "Registration Voucher")}
                 </h1>
 
@@ -566,6 +608,16 @@ const ConferenceBadgePage: React.FC = () => {
                                 {uiData.isCompleted && (
                                     <div className="flex items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-2 text-sm font-body font-semibold text-emerald-700">
                                         {t("✅ 수강 인정 시간 달성", "✅ Attendance Goal Met")}
+                                    </div>
+                                )}
+
+                                {badgeConfig?.menuVisibility?.certificate !== false && (
+                                    <div className="mt-2">
+                                        <CertificateDownloader 
+                                            confId={confId || ""} 
+                                            ui={uiData} 
+                                            badgeLang={badgeLang} 
+                                        />
                                     </div>
                                 )}
                             </div>
@@ -688,6 +740,18 @@ const ConferenceBadgePage: React.FC = () => {
                             </div>
                         )}
                     </div>
+                </div>
+            )}
+
+            {uiData.issued && badgeConfig?.menuVisibility?.qna !== false && (
+                <div className="mt-6 w-full max-w-sm">
+                    <QnAPanel
+                        confId={confId || ""}
+                        userId={uiData.userId}
+                        userName={uiData.name}
+                        userAff={uiData.aff}
+                        badgeLang={badgeLang}
+                    />
                 </div>
             )}
 

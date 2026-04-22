@@ -19,6 +19,8 @@ import {
     StampTourProgressRow,
     StampTourSettingsPanel
 } from '../../components/admin/conference/StampTourSettingsPanel';
+import { QnASettingsPanel } from '../../components/admin/conference/QnASettingsPanel';
+import { CertificateSettingsPanel } from '../../components/admin/conference/CertificateSettingsPanel';
 import { defaultStampTourConfig } from '../../utils/stampTour';
 import { GeneralSettingsForm } from '../../components/admin/conference/GeneralSettingsForm';
 import { VisualAssetsForm } from '../../components/admin/conference/VisualAssetsForm';
@@ -45,8 +47,10 @@ interface ConferenceData {
         editDeadline?: string;
     };
     features: {
-        guestbookEnabled: boolean;
-        stampTourEnabled: boolean;
+        guestbookEnabled?: boolean;
+        stampTourEnabled?: boolean;
+        qnaEnabled?: boolean;
+        certificateEnabled?: boolean;
     };
 }
 
@@ -81,7 +85,9 @@ const defaultData: ConferenceData = {
     },
     features: {
         guestbookEnabled: true,
-        stampTourEnabled: false
+        stampTourEnabled: false,
+        qnaEnabled: false,
+        certificateEnabled: false
     }
 };
 
@@ -198,7 +204,9 @@ export default function ConferenceSettingsPage() {
                         welcomeMessageImages: snapData.welcomeMessageImages || [],
                         features: {
                             guestbookEnabled: snapData.features?.guestbookEnabled ?? true,
-                            stampTourEnabled: snapData.features?.stampTourEnabled ?? false
+                            stampTourEnabled: snapData.features?.stampTourEnabled ?? false,
+                            qnaEnabled: snapData.features?.qnaEnabled ?? false,
+                            certificateEnabled: snapData.features?.certificateEnabled ?? false
                         }
                     });
 
@@ -373,7 +381,9 @@ export default function ConferenceSettingsPage() {
                 abstractEditDeadline: data.abstractDeadlines.editDeadline ? Timestamp.fromDate(parseDatetimeLocal(data.abstractDeadlines.editDeadline)) : null,
                 features: {
                     guestbookEnabled: data.features.guestbookEnabled,
-                    stampTourEnabled: data.features.stampTourEnabled
+                    stampTourEnabled: data.features.stampTourEnabled,
+                    qnaEnabled: data.features.qnaEnabled,
+                    certificateEnabled: data.features.certificateEnabled
                 },
                 updatedAt: Timestamp.now()
             };
@@ -541,6 +551,20 @@ export default function ConferenceSettingsPage() {
                 <GeneralSettingsForm data={data} setData={setData} />
                 <hr className="border-slate-100" />
                 
+                {data.features?.qnaEnabled && (
+                    <>
+                        <QnASettingsPanel confId={cid || ''} />
+                        <hr className="border-slate-100 my-12" />
+                    </>
+                )}
+
+                {data.features?.certificateEnabled && (
+                    <>
+                        <CertificateSettingsPanel confId={cid || ''} />
+                        <hr className="border-slate-100 my-12" />
+                    </>
+                )}
+
                 {data.features.stampTourEnabled && (
                     <>
                         <StampTourSettingsPanel

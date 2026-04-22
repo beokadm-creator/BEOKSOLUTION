@@ -34,9 +34,11 @@ import {
   Download,
   User,
   MapPin,
-  TrendingUp,
+ TrendingUp,
   Sparkles,
   Gift,
+  QrCode,
+  HelpCircle
 } from "lucide-react";
 import {
   Tabs,
@@ -45,6 +47,8 @@ import {
   TabsTrigger,
 } from "../components/ui/tabs";
 import { TranslationPanel } from "../components/translation/TranslationPanel";
+import { QnAPanel } from "../components/badge/QnAPanel";
+import { CertificateDownloader } from "../components/badge/CertificateDownloader";
 import { functions } from "../firebase";
 import { getStampMissionTargetCount } from "../utils/stampTour";
 import {
@@ -100,6 +104,7 @@ type BadgeConfig = {
     translation?: boolean;
     stampTour?: boolean;
     home?: boolean;
+    qna?: boolean;
   };
   menuLabels?: {
     status?: { ko?: string; en?: string };
@@ -130,6 +135,9 @@ type BadgeUiState = {
   dailyMinutes?: Record<string, number>;
   zoneMinutes?: Record<string, number>;
   zoneCompleted?: Record<string, boolean>;
+  isCheckedIn?: boolean;
+  paymentStatus?: string;
+  amount?: number;
 };
 
 type StampTourConfig = {
@@ -416,6 +424,9 @@ const StandAloneBadgePage: React.FC = () => {
             dailyMinutes,
             zoneMinutes,
             zoneCompleted,
+            isCheckedIn: !!d.isCheckedIn,
+            paymentStatus: String(d.paymentStatus || ""),
+            amount: d.amount || 0,
           });
           setLiveMinutes(baseMinutes); // Will be recalculated by the interval if inside
           setLiveSessionMinutes(0);
@@ -885,6 +896,7 @@ const StandAloneBadgePage: React.FC = () => {
       setRewardRequesting(false);
     }
   };
+  
   if (msg && status !== "READY")
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center font-sans">
@@ -915,6 +927,8 @@ const StandAloneBadgePage: React.FC = () => {
     translation: badgeConfig?.menuVisibility?.translation ?? true,
     stampTour: badgeConfig?.menuVisibility?.stampTour ?? true,
     home: badgeConfig?.menuVisibility?.home ?? true,
+    qna: badgeConfig?.menuVisibility?.qna ?? true,
+    certificate: badgeConfig?.menuVisibility?.certificate ?? true,
   };
   const effectiveMenuVisibility =
     menuVisibility.status ||
@@ -922,11 +936,14 @@ const StandAloneBadgePage: React.FC = () => {
     menuVisibility.materials ||
     menuVisibility.program ||
     menuVisibility.translation ||
-    menuVisibility.stampTour
+    menuVisibility.stampTour ||
+    menuVisibility.qna ||
+    menuVisibility.certificate
       ? menuVisibility
       : { ...menuVisibility, status: true };
   const translationEnabled =
     badgeConfig?.translationUrl !== "HIDE" && effectiveMenuVisibility.translation;
+  const certificateEnabled = effectiveMenuVisibility.certificate;
   const tabsOrder = [
     effectiveMenuVisibility.status ? "status" : null,
     effectiveMenuVisibility.sessions ? "sessions" : null,
@@ -934,6 +951,7 @@ const StandAloneBadgePage: React.FC = () => {
     effectiveMenuVisibility.program ? "program" : null,
     translationEnabled ? "translation" : null,
     effectiveMenuVisibility.stampTour ? "stamp-tour" : null,
+    effectiveMenuVisibility.qna ? "qna" : null,
   ].filter(Boolean) as string[];
   const defaultTab = tabsOrder[0] || "status";
   const gridColsClass =
@@ -1284,6 +1302,17 @@ const StandAloneBadgePage: React.FC = () => {
                     </span>
                   </TabsTrigger>
                 )}
+                {effectiveMenuVisibility.qna && (
+                  <TabsTrigger
+                    value="qna"
+                    className="flex flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 hover:bg-slate-50"
+                  >
+                    <HelpCircle className="w-4 h-4" />
+                    <span className="text-[11px] font-body font-semibold">
+                      {getMenuLabel("qna", "Q&A", "Q&A")}
+                    </span>
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               {/* Status Tab */}
@@ -1354,6 +1383,16 @@ const StandAloneBadgePage: React.FC = () => {
                       <Clock className="w-3 h-3 text-purple-500" />
                       {formatMinutes(liveMinutes)}
                     </p>
+                  </div>
+                )}
+
+                {certificateEnabled && (
+                  <div className="mt-4">
+                    <CertificateDownloader 
+                      confId={getConfIdToUse(slug)} 
+                      ui={ui} 
+                      badgeLang={badgeLang} 
+                    />
                   </div>
                 )}
 
@@ -1831,6 +1870,18 @@ const StandAloneBadgePage: React.FC = () => {
                     </div>
                   </>
                 )}
+                </TabsContent>
+              )}
+
+              {effectiveMenuVisibility.qna && (
+                <TabsContent value="qna" className="mt-2 p-1">
+                  <QnAPanel
+                    confId={getConfIdToUse(slug)}
+                    userId={ui.userId}
+                    userName={ui.name}
+                    userAff={ui.aff}
+                    badgeLang={badgeLang}
+                  />
                 </TabsContent>
               )}
             </Tabs>

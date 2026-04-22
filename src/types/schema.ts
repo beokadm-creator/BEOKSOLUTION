@@ -134,6 +134,8 @@ export interface Conference {
   features?: {
     guestbookEnabled?: boolean;
     stampTourEnabled?: boolean;
+    qnaEnabled?: boolean;
+    certificateEnabled?: boolean;
   };
   location: string;
   venue?: {
@@ -158,6 +160,8 @@ export interface ConferenceInfo {
   features?: {
     guestbookEnabled?: boolean;
     stampTourEnabled?: boolean;
+    qnaEnabled?: boolean;
+    certificateEnabled?: boolean;
   };
   venue?: {
     name: LocalizedText;
