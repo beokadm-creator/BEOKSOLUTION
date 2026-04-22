@@ -170,7 +170,7 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
                                 <div className="space-y-0.5">
                                     <Label className="text-sm font-bold text-slate-700">Stamp tour enabled</Label>
-                                    <p className="text-xs text-slate-500">스탬프 투어 기능을 활성화합니다.</p>
+                                    <p className="text-xs text-slate-500">스탬프 투어 기능을 활성화합니다. (디지털 명찰 메뉴 노출 여부도 함께 변경됩니다)</p>
                                 </div>
                                 <Switch
                                     checked={data.features.stampTourEnabled}
@@ -185,7 +185,7 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
                                 <div className="space-y-0.5">
                                     <Label className="text-sm font-bold text-slate-700">Q&A enabled</Label>
-                                    <p className="text-xs text-slate-500">실시간 Q&A 탭을 활성화합니다. (시간 설정은 '디지털 명찰 관리'에서 진행)</p>
+                                    <p className="text-xs text-slate-500">실시간 Q&A 탭을 활성화합니다. (디지털 명찰 메뉴 노출 여부도 함께 변경됩니다)</p>
                                 </div>
                                 <Switch
                                     checked={data.features?.qnaEnabled || false}
@@ -200,7 +200,7 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
                                 <div className="space-y-0.5">
                                     <Label className="text-sm font-bold text-slate-700">Certificate enabled</Label>
-                                    <p className="text-xs text-slate-500">참가확인서(이수증) 다운로드 기능을 활성화합니다.</p>
+                                    <p className="text-xs text-slate-500">참가확인서(이수증) 다운로드 기능을 활성화합니다. (디지털 명찰 메뉴 노출 여부도 함께 변경됩니다)</p>
                                 </div>
                                 <Switch
                                     checked={data.features?.certificateEnabled || false}

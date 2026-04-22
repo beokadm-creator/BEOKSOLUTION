@@ -390,6 +390,16 @@ export default function ConferenceSettingsPage() {
 
             await updateDoc(docRef, updateData);
 
+            // Sync menuVisibility in badge_config when features change
+            const badgeConfigRef = doc(db, `conferences/${cid}/settings`, 'badge_config');
+            await setDoc(badgeConfigRef, {
+                menuVisibility: {
+                    stampTour: data.features.stampTourEnabled,
+                    qna: data.features.qnaEnabled,
+                    certificate: data.features.certificateEnabled
+                }
+            }, { merge: true });
+
             const endAt = stampTourConfig.endAt || getKstEndOfDayTimestamp(data.dates.end) || undefined;
             const stampConfigRef = doc(db, `conferences/${cid}/settings`, 'stamp_tour');
             await setDoc(stampConfigRef, {
