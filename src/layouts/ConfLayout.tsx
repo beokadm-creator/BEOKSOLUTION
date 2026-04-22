@@ -197,7 +197,6 @@ export default function ConfLayout() {
                     ? [{ href: `/admin/conf/${cid}/stamp-tour-draw`, label: '스탬프투어 추첨', icon: Trophy }]
                     : []),
                 { href: `/admin/conf/${cid}/sponsors`, label: '스폰서 관리', icon: Building2 },
-                { href: `/admin/conf/${cid}/translation`, label: '동시번역 관리', icon: Languages },
                 { href: `/admin/conf/${cid}/moderator`, label: 'Q&A 좌장 뷰', icon: MessageSquare },
             ]
         },
