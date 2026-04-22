@@ -7,7 +7,7 @@ import { doc, getDoc, collection, getDocs, query, where, limit } from 'firebase/
 import { db, auth } from '../firebase';
 import { Conference } from '../types/schema';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { LayoutDashboard, Globe, FileText, Users, Settings, Monitor, CreditCard, LogOut, ArrowLeft, BarChart, UserPlus, Building2, Bell, IdCard, Trophy } from 'lucide-react';
+import { LayoutDashboard, Globe, FileText, Users, Settings, Monitor, CreditCard, LogOut, ArrowLeft, BarChart, UserPlus, Building2, Bell, IdCard, Trophy, Languages, MessageSquare } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/ui/button';
 import { resolveSocietyByIdentifier } from '../utils/societyResolver';
@@ -197,6 +197,8 @@ export default function ConfLayout() {
                     ? [{ href: `/admin/conf/${cid}/stamp-tour-draw`, label: '스탬프투어 추첨', icon: Trophy }]
                     : []),
                 { href: `/admin/conf/${cid}/sponsors`, label: '스폰서 관리', icon: Building2 },
+                { href: `/admin/conf/${cid}/translation`, label: '동시번역 관리', icon: Languages },
+                { href: `/admin/conf/${cid}/moderator`, label: 'Q&A 좌장 뷰', icon: MessageSquare },
             ]
         },
     ];

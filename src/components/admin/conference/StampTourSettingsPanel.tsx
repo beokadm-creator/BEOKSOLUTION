@@ -84,7 +84,7 @@ export const StampTourSettingsPanel: React.FC<StampTourSettingsPanelProps> = ({
     stampTourProgress,
     formatKstTimestamp,
     stampTourParticipantCount,
-    _normalizedRequiredStampCount,
+    normalizedRequiredStampCount,
     selectableLotteryRewards,
     handleAdminRewardDraw,
     handleRunLottery,
@@ -103,6 +103,8 @@ export const StampTourSettingsPanel: React.FC<StampTourSettingsPanelProps> = ({
                                 <p className="text-slate-500 leading-relaxed text-sm">
                                     스탬프 투어의 세부 설정을 구성합니다. 완료 조건, 보상 방식, 추첨 설정 등 참가자 경험에 영향을 미치는 핵심 옵션을 설정하세요.<br />
                                     보상은 참가자 완료 후 즉시 지급하거나, 관리자가 지정한 시간에 일괄 추첨으로 지급할 수 있습니다.
+                                    <br/><br/>
+                                    참가자: {stampTourParticipantCount} / 목표: {normalizedRequiredStampCount} / 보상: {selectableLotteryRewards.length}
                                 </p>
                                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
                                     <div className="text-xs font-semibold text-slate-500 mb-1">스탬프 투어 종료일시(KST)</div>

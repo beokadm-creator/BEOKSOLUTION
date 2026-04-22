@@ -42,6 +42,7 @@ import GatePage from './pages/admin/conf/GatePage';
 import StampTourDrawPage from './pages/admin/conf/StampTourDrawPage';
 import AgendaManager from './pages/admin/AgendaManager';
 import SponsorManager from './pages/admin/SponsorManager';
+import QnAModeratorPage from './pages/admin/QnAModeratorPage';
 import RegistrationListPage from './pages/admin/RegistrationListPage';
 import RegistrationDetailPage from './pages/admin/RegistrationDetailPage';
 import PageEditor from './pages/admin/PageEditor';
@@ -191,6 +192,7 @@ const App: React.FC = () => {
                     <Route path="notices" element={<NoticesManager />} />
                     <Route path="agenda" element={<AgendaManager />} />
                     <Route path="sponsors" element={<SponsorManager />} />
+                    <Route path="moderator" element={<QnAModeratorPage />} />
                     <Route path="page-editor" element={<PageEditor />} />
                     <Route path="badge-editor" element={<BadgeEditorPage />} />
                     <Route path="badge-management" element={<BadgeManagementPage />} />

@@ -159,9 +159,9 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                 </div>
                                 <Switch
                                     checked={data.features.guestbookEnabled}
-                                    onCheckedChange={(checked) => setData((prev: any) => ({
+                                    onChange={(e) => setData((prev: any) => ({
                                         ...prev,
-                                        features: { ...prev.features, guestbookEnabled: checked }
+                                        features: { ...prev.features, guestbookEnabled: e.target.checked }
                                     }))}
                                     className="data-[state=checked]:bg-emerald-600"
                                 />
@@ -174,9 +174,9 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                 </div>
                                 <Switch
                                     checked={data.features.stampTourEnabled}
-                                    onCheckedChange={(checked) => setData((prev: any) => ({
+                                    onChange={(e) => setData((prev: any) => ({
                                         ...prev,
-                                        features: { ...prev.features, stampTourEnabled: checked }
+                                        features: { ...prev.features, stampTourEnabled: e.target.checked }
                                     }))}
                                     className="data-[state=checked]:bg-indigo-600"
                                 />
@@ -189,9 +189,9 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                 </div>
                                 <Switch
                                     checked={data.features?.qnaEnabled || false}
-                                    onCheckedChange={(checked) => setData((prev: any) => ({
+                                    onChange={(e) => setData((prev: any) => ({
                                         ...prev,
-                                        features: { ...prev.features, qnaEnabled: checked }
+                                        features: { ...prev.features, qnaEnabled: e.target.checked }
                                     }))}
                                     className="data-[state=checked]:bg-purple-600"
                                 />
@@ -204,9 +204,9 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                 </div>
                                 <Switch
                                     checked={data.features?.certificateEnabled || false}
-                                    onCheckedChange={(checked) => setData((prev: any) => ({
+                                    onChange={(e) => setData((prev: any) => ({
                                         ...prev,
-                                        features: { ...prev.features, certificateEnabled: checked }
+                                        features: { ...prev.features, certificateEnabled: e.target.checked }
                                     }))}
                                     className="data-[state=checked]:bg-blue-600"
                                 />

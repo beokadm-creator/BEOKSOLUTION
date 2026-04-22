@@ -105,6 +105,7 @@ type BadgeConfig = {
     stampTour?: boolean;
     home?: boolean;
     qna?: boolean;
+    certificate?: boolean;
   };
   menuLabels?: {
     status?: { ko?: string; en?: string };
@@ -114,6 +115,8 @@ type BadgeConfig = {
     translation?: { ko?: string; en?: string };
     stampTour?: { ko?: string; en?: string };
     home?: { ko?: string; en?: string };
+    qna?: { ko?: string; en?: string };
+    certificate?: { ko?: string; en?: string };
   };
 };
 
