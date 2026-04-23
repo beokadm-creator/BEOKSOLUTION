@@ -51,6 +51,7 @@ import BadgeManagementPage from './pages/admin/BadgeManagementPage';
 import AdminRefundPage from './pages/admin/AdminRefundPage';
 import AbstractManagerPage from './pages/admin/AbstractManagerPage';
 import ExternalAttendeePage from './pages/admin/ExternalAttendeePage';
+import CertificateManagementPage from './pages/admin/CertificateManagementPage';
 import { NoticesManager } from './pages/admin/notices/NoticesManager';
 import { OptionsManagementPage } from './pages/admin/OptionsManagementPage';
 import SocietyLoginPage from './pages/SocietyLoginPage';
@@ -200,6 +201,7 @@ const App: React.FC = () => {
                     <Route path="external-attendees" element={<ExternalAttendeePage />} />
                     <Route path="attendance-live" element={<AttendanceLivePage />} />
                     <Route path="attendance-live/zone/:zoneId" element={<AttendanceLivePage />} />
+                    <Route path="certificates" element={<CertificateManagementPage />} />
                   </Route>
                   <Route path="/admin/conf/:cid/gate" element={<GatePage />} />
                   <Route path="/admin/conf/:cid/gate/zone/:zoneId" element={<GatePage />} />
@@ -291,6 +293,7 @@ const App: React.FC = () => {
                     <Route path="external-attendees" element={<ExternalAttendeePage />} />
                     <Route path="attendance-live" element={<AttendanceLivePage />} />
                     <Route path="attendance-live/zone/:zoneId" element={<AttendanceLivePage />} />
+                    <Route path="certificates" element={<CertificateManagementPage />} />
                   </Route>
 
                   <Route path="/admin/conf/:cid/gate" element={<GatePage />} />
