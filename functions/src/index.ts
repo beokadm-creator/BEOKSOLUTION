@@ -21,6 +21,7 @@ import { scheduledDataCleanup, manualDataCleanup } from './scheduled/dataCleanup
 import { requestStampReward } from './stampTour/requestStampReward';
 import { adminDrawStampReward } from './stampTour/adminDrawStampReward';
 import { runStampRewardLottery } from './stampTour/runStampRewardLottery';
+import { issueCertificate, verifyCertificate, verifyCertificatePublic, revokeCertificate, logCertificateDownload, reissueCertificate } from './certificate/index';
 
 export const corsHandler = cors({ origin: true });
 
@@ -54,7 +55,13 @@ export {
     manualDataCleanup,
     requestStampReward,
     adminDrawStampReward,
-    runStampRewardLottery
+    runStampRewardLottery,
+    issueCertificate,
+    verifyCertificate,
+    verifyCertificatePublic,
+    revokeCertificate,
+    logCertificateDownload,
+    reissueCertificate
 };
 
 import { generateFirebaseAuthUserForExternalAttendee } from './auth/external';
