@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth as firebaseAuth } from '../../firebase';
+import { getDoc, doc } from 'firebase/firestore';
+import { auth as firebaseAuth, db } from '../../firebase';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -52,6 +53,36 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
             setMode(initialMode);
         }
     }, [initialMode]);
+
+    useEffect(() => {
+        const checkSettings = async () => {
+            if (!isOpen || !confId) return;
+            try {
+                // Check paymentMode from RegistrationSettings
+                const regDoc = await getDoc(doc(db, `conferences/${confId}/settings/registration`));
+                if (regDoc.exists()) {
+                    const regData = regDoc.data();
+                    if (regData.paymentMode === 'FREE_ALL') {
+                        // Bypass directly to registration page
+                        console.log('[RegistrationModal] FREE_ALL mode detected, bypassing auth');
+                        onClose();
+                        navigate(`/${confId.split('_')[1]}/register`, {
+                            state: {
+                                memberVerified: true,
+                                memberName: '',
+                                memberGrade: 'FREE_ATTENDEE',
+                                memberCode: 'FREE_ATTENDEE',
+                                calculatedPrice: 0,
+                            }
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('[RegistrationModal] Error checking registration settings:', error);
+            }
+        };
+        checkSettings();
+    }, [isOpen, confId, navigate, onClose]);
 
     // Non-member selection
     const [selectedNonMemberType, setSelectedNonMemberType] = useState<string>('');

@@ -332,6 +332,14 @@ export default function RegistrationPage() {
     // Calculate Price based on Grade
     useEffect(() => {
         // PRIORITY 1: Use pre-calculated totalPrice from modal if available
+        if (regSettings?.paymentMode === 'FREE_ALL') {
+            console.log('[RegistrationPage] FREE_ALL mode detected, forcing base price to 0');
+            updateBasePrice(0);
+            setSelectedTier('FREE_ATTENDEE');
+            setFinalCategory(language === 'ko' ? '무료 참석자' : 'Free Attendee');
+            return;
+        }
+
         if (paramCalculatedPrice !== undefined && paramCalculatedPrice >= 0) {
             console.log('[RegistrationPage] Using pre-calculated totalPrice from modal:', paramCalculatedPrice);
             updateBasePrice(paramCalculatedPrice);

@@ -230,7 +230,7 @@ export interface PrivateConfigSecrets {
 // B. Registration Settings
 // ------------------------------------------
 
-export type RegistrationPeriodType = 'EARLY' | 'ONSITE';
+export type RegistrationPeriodType = 'EARLY' | 'REGULAR' | 'LATE' | 'ONSITE';
 
 export interface RegistrationPeriod {
   name: LocalizedText;
@@ -238,7 +238,7 @@ export interface RegistrationPeriod {
   startDate: Timestamp;
   endDate: Timestamp;
   prices: {
-    [tier in UserTier]?: number; // e.g., MEMBER: 10000, NON_MEMBER: 20000
+    [tier: string]: number; // Support dynamic grade codes like 'NON_MEMBER', 'STUDENT', etc.
   };
 }
 
@@ -248,7 +248,9 @@ export interface RegistrationPeriod {
  * Path: `conferences/{confId}/settings/registration_periods`
  */
 export interface RegistrationSettings {
+  paymentMode?: 'TIERED' | 'FREE_ALL';
   periods: RegistrationPeriod[];
+  refundPolicy?: string;
 }
 
 /**

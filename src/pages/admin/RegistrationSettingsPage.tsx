@@ -17,25 +17,29 @@ import { Trash2, Plus, Save, FileText } from 'lucide-react';
 interface RegistrationPeriod {
     id: string;
     name: { ko: string; en?: string };
-    type: 'EARLY' | 'REGULAR' | 'ONSITE';
+    type: 'EARLY' | 'REGULAR' | 'LATE' | 'ONSITE';
     startDate: Timestamp;
     endDate: Timestamp;
     prices: Record<string, number>; // Dynamic pricing based on Grade IDs
 }
 
 interface RegistrationSettings {
+    paymentMode: 'TIERED' | 'FREE_ALL';
     periods: RegistrationPeriod[];
     refundPolicy: string;
 }
+
+const defaultSettings: RegistrationSettings = {
+    paymentMode: 'TIERED',
+    periods: [],
+    refundPolicy: ''
+};
 
 const RegistrationSettingsPage: React.FC = () => {
     const { cid } = useParams<{ cid: string }>();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [settings, setSettings] = useState<RegistrationSettings>({
-        periods: [],
-        refundPolicy: ''
-    });
+    const [settings, setSettings] = useState<RegistrationSettings>(defaultSettings);
     const [societyId, setSocietyId] = useState<string | null>(null);
 
     // Use useSocietyGrades hook for loading grades
@@ -76,12 +80,14 @@ const RegistrationSettingsPage: React.FC = () => {
                 const docSnap = await getDoc(docRef);
 
                 if (docSnap.exists()) {
-                    setSettings(docSnap.data() as RegistrationSettings);
-                } else {
+                    const data = docSnap.data();
                     setSettings({
-                        periods: [],
-                        refundPolicy: ''
+                        paymentMode: data.paymentMode || 'TIERED',
+                        periods: data.periods || [],
+                        refundPolicy: data.refundPolicy || ''
                     });
+                } else {
+                    setSettings(defaultSettings);
                 }
             } catch (err) {
                 console.error("[RegistrationSettings] Fetch Error:", err);
@@ -212,15 +218,60 @@ const RegistrationSettingsPage: React.FC = () => {
 
     return (
         <div className="p-8 max-w-6xl mx-auto">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold">등록 설정 관리</h1>
-                <Button onClick={handleSave} disabled={loading}>
+            <div className="flex justify-between items-center mb-8">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900">등록/요금 설정 (Registration Settings)</h1>
+                    <p className="text-gray-500 mt-1">학술대회 등록 기간과 요금, 환불 정책을 관리합니다.</p>
+                </div>
+                <Button onClick={handleSave} disabled={loading || gradesLoading} className="bg-blue-600 hover:bg-blue-700">
                     <Save className="w-4 h-4 mr-2" />
-                    {loading ? '저장 중...' : '변경사항 저장'}
+                    저장하기 (Save)
                 </Button>
             </div>
 
             <div className="space-y-8">
+                {/* Payment Mode Selection */}
+                <Card className="border-2 border-blue-100 shadow-sm">
+                    <CardHeader className="bg-blue-50/50 pb-4">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            결제 모드 (Payment Mode)
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-6">
+                        <div className="flex flex-col gap-4">
+                            <label className="flex items-start gap-3 cursor-pointer p-4 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
+                                <input
+                                    type="radio"
+                                    name="paymentMode"
+                                    value="TIERED"
+                                    checked={settings.paymentMode === 'TIERED'}
+                                    onChange={() => setSettings(prev => ({ ...prev, paymentMode: 'TIERED' }))}
+                                    className="mt-1 w-4 h-4 text-blue-600 focus:ring-blue-500"
+                                />
+                                <div>
+                                    <div className="font-bold text-slate-900">등급별 유료 결제 (Tiered Pricing)</div>
+                                    <p className="text-sm text-slate-500 mt-1">회원/비회원 등급별로 요금을 설정합니다. 참가자는 회원 인증 후 요금을 결제해야 합니다.</p>
+                                </div>
+                            </label>
+                            
+                            <label className="flex items-start gap-3 cursor-pointer p-4 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
+                                <input
+                                    type="radio"
+                                    name="paymentMode"
+                                    value="FREE_ALL"
+                                    checked={settings.paymentMode === 'FREE_ALL'}
+                                    onChange={() => setSettings(prev => ({ ...prev, paymentMode: 'FREE_ALL' }))}
+                                    className="mt-1 w-4 h-4 text-blue-600 focus:ring-blue-500"
+                                />
+                                <div>
+                                    <div className="font-bold text-slate-900">전면 무료 (Free for All)</div>
+                                    <p className="text-sm text-slate-500 mt-1">모든 참가자가 무료로 등록합니다. 회원 인증 없이 기본 정보만 입력하면 등록이 완료됩니다.</p>
+                                </div>
+                            </label>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 <div>
                     <h2 className="text-xl font-semibold mb-4 flex items-center">
                         <Plus className="w-5 h-5 mr-2" /> 등록 기간 및 가격
@@ -287,6 +338,7 @@ const RegistrationSettingsPage: React.FC = () => {
                                                         value={period.prices?.[code] || 0}
                                                         onChange={(e) => updatePrice(idx, code, Number(e.target.value))}
                                                         placeholder="0"
+                                                        disabled={settings.paymentMode === 'FREE_ALL'}
                                                     />
                                                 </div>
                                             ))}

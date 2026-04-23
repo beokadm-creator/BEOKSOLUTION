@@ -38,6 +38,7 @@ export async function verifyPaymentAmount(
             return { isValid: true, expectedAmount: claimedAmount };
         }
         const regSettings = regSettingsSnap.data() || {};
+        const isFreeAll = regSettings.paymentMode === 'FREE_ALL';
 
         // 2. Identify Active Period using KST date comparison
         //    Admin sets dates in KST, so we compare KST date strings (YYYY-MM-DD).
@@ -75,14 +76,20 @@ export async function verifyPaymentAmount(
 
         console.log(`[PaymentVerifier] ✅ Active period: ${JSON.stringify(activePeriod.name || activePeriod.label)}`);
 
-        // 3. Get Base Price for Tier (supports both 'totalPrices' and 'prices' field names)
+        // 3. Get Base Price for Tier
         const prices = activePeriod.totalPrices || activePeriod.prices || {};
-        const basePrice = prices[tierId] ?? 0;
+        let basePrice = 0;
+        
+        if (isFreeAll) {
+            console.log(`[PaymentVerifier] FREE_ALL mode active for ${confId}. Base price forced to 0.`);
+            basePrice = 0;
+        } else {
+            basePrice = prices[tierId] ?? 0;
+            console.log(`[PaymentVerifier] Tier: "${tierId}", Base price: ${basePrice}, Available: ${JSON.stringify(Object.keys(prices))}`);
 
-        console.log(`[PaymentVerifier] Tier: "${tierId}", Base price: ${basePrice}, Available: ${JSON.stringify(Object.keys(prices))}`);
-
-        if (basePrice === 0 && Object.keys(prices).length > 0) {
-            console.warn(`[PaymentVerifier] Price is 0 for tier "${tierId}". Check tier key mapping.`);
+            if (basePrice === 0 && Object.keys(prices).length > 0) {
+                console.warn(`[PaymentVerifier] Price is 0 for tier "${tierId}". Check tier key mapping.`);
+            }
         }
 
         // 4. Calculate Options Total
