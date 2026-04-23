@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Agenda, Speaker } from '@/types/schema';
-import { MessageSquare, CheckCircle, Clock, Search, Maximize2, X, RefreshCw } from 'lucide-react';
+import { MessageSquare, CheckCircle, Clock, Maximize2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
@@ -20,7 +20,7 @@ interface Question {
 }
 
 export const QnAModeratorPage = () => {
-  const { confId } = useParams();
+  const { cid } = useParams<{ cid: string }>();
   const [agendas, setAgendas] = useState<Agenda[]>([]);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [selectedAgendaId, setSelectedAgendaId] = useState<string>('all');
@@ -30,25 +30,25 @@ export const QnAModeratorPage = () => {
   const [showAnswered, setShowAnswered] = useState(false);
 
   useEffect(() => {
-    if (!confId) return;
+    if (!cid) return;
     const fetchAgendasAndSpeakers = async () => {
-      const agendasSnap = await getDocs(query(collection(db, `conferences/${confId}/agendas`), orderBy("startTime", "asc")));
+      const agendasSnap = await getDocs(query(collection(db, `conferences/${cid}/agendas`), orderBy("startTime", "asc")));
       setAgendas(agendasSnap.docs.map(d => ({ id: d.id, ...d.data() } as Agenda)));
-      
-      const speakersSnap = await getDocs(collection(db, `conferences/${confId}/speakers`));
+
+      const speakersSnap = await getDocs(collection(db, `conferences/${cid}/speakers`));
       setSpeakers(speakersSnap.docs.map(d => ({ id: d.id, ...d.data() } as Speaker)));
     };
     fetchAgendasAndSpeakers();
-  }, [confId]);
+  }, [cid]);
 
   useEffect(() => {
-    if (!confId) return;
+    if (!cid) return;
 
-    let q = query(collection(db, `conferences/${confId}/questions`), orderBy("createdAt", "desc"));
-    
+    let q = query(collection(db, `conferences/${cid}/questions`), orderBy("createdAt", "desc"));
+
     if (selectedAgendaId !== 'all') {
       // NOTE: requires composite index for agendaId + createdAt
-      q = query(collection(db, `conferences/${confId}/questions`), where("agendaId", "==", selectedAgendaId), orderBy("createdAt", "desc"));
+      q = query(collection(db, `conferences/${cid}/questions`), where("agendaId", "==", selectedAgendaId), orderBy("createdAt", "desc"));
     }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -57,10 +57,10 @@ export const QnAModeratorPage = () => {
     });
 
     return () => unsubscribe();
-  }, [confId, selectedAgendaId]);
+  }, [cid, selectedAgendaId]);
 
   const toggleAnswered = async (qId: string, currentStatus: boolean) => {
-    await updateDoc(doc(db, `conferences/${confId}/questions`, qId), {
+    await updateDoc(doc(db, `conferences/${cid}/questions`, qId), {
       isAnswered: !currentStatus
     });
   };
