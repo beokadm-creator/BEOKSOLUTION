@@ -744,6 +744,53 @@ export default function RegistrationPage() {
             // Save to sessionStorage to retrieve after success
             sessionStorage.setItem(`pending_reg_${orderId}`, JSON.stringify(regData));
 
+            if (totalPrice === 0) {
+                // Call our new Cloud Function for free registration
+                const response = await fetch(
+                    `https://us-central1-eregi-8fc1e.cloudfunctions.net/processFreeRegistrationHttp`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            regId: regRef.id,
+                            confId: confId,
+                            userData: {
+                                userId: auth.user?.id || firebaseAuth.currentUser?.uid || 'GUEST',
+                                name: formData.name,
+                                email: formData.email,
+                                phone: formData.phone,
+                                affiliation: formData.affiliation,
+                                licenseNumber: formData.licenseNumber,
+                                tier: selectedTier,
+                                categoryName: finalCategory,
+                                isAnonymous: false,
+                                memberVerificationData: mvFromURL
+                            },
+                            amount: 0,
+                            baseAmount: basePrice,
+                            optionsTotal: optionsTotal,
+                            selectedOptions: selectedOptions.map(o => ({
+                                optionId: o.option.id,
+                                name: o.option.name,
+                                price: o.option.price,
+                                quantity: o.quantity,
+                                totalPrice: o.option.price * o.quantity
+                            }))
+                        })
+                    }
+                );
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || '무료 등록 처리에 실패했습니다.');
+                }
+
+                const origin = window.location.origin;
+                const pureSlug = confId.includes('_') ? confId.split('_').slice(1).join('_') : confId;
+                window.location.href = `/${pureSlug}/register/success?orderId=${orderId}&name=${encodeURIComponent(formData.name)}`;
+                return;
+            }
+
             // 2. Process Payment
             if (paymentWidget) {
                 const origin = window.location.origin;
@@ -1000,30 +1047,38 @@ export default function RegistrationPage() {
                                     )}
 
                                     {/* Total */}
-                                    <div className="flex justify-between items-center py-3 border-t-2 border-slate-300 mt-2">
-                                        <div>
-                                            <p className="text-sm font-medium text-slate-700">{language === 'ko' ? '총 결제 금액' : 'Total Amount'}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-2xl font-bold text-blue-600">{totalPrice.toLocaleString()}원</p>
-                                        </div>
+                                <div className="flex justify-between items-center py-3 border-t-2 border-slate-300 mt-2">
+                                    <div>
+                                        <p className="text-sm font-medium text-slate-700">{language === 'ko' ? '총 결제 금액' : 'Total Amount'}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-2xl font-bold text-blue-600">{totalPrice.toLocaleString()}원</p>
                                     </div>
                                 </div>
+                            </div>
 
-
-                                {/* Payment Widget Area */}
-                                <div id="payment-widget" ref={paymentMethodsWidgetRef} className="min-h-[300px]" />
-                            </CardContent>
-                            <CardFooter>
+                            {/* Payment Widget Area */}
+                            <div 
+                                id="payment-widget" 
+                                ref={paymentMethodsWidgetRef} 
+                                className={totalPrice === 0 ? "hidden" : "min-h-[300px]"} 
+                            />
+                        </CardContent>
+                        <CardFooter>
                                 <Button
                                     className="w-full h-12 text-lg font-bold bg-blue-600 hover:bg-blue-700 shadow-md"
                                     onClick={handlePayment}
-                                    disabled={isProcessing || !paymentWidget}
+                                    disabled={isProcessing || (totalPrice > 0 && !paymentWidget)}
                                 >
                                     {isProcessing ? (
                                         <>
                                             <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                                            {language === 'ko' ? '결제 진행 중...' : 'Processing...'}
+                                            {language === 'ko' ? '처리 중...' : 'Processing...'}
+                                        </>
+                                    ) : totalPrice === 0 ? (
+                                        <>
+                                            <CheckCircle2 className="w-5 h-5 mr-2" />
+                                            {language === 'ko' ? '등록 완료' : 'Complete Registration'}
                                         </>
                                     ) : (
                                         <>

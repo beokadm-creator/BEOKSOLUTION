@@ -59,6 +59,7 @@ const paymentMethodToKorean = (method: string | undefined): string => {
         case 'VIRTUAL': return '가상계좌';
         case 'CASH': return '현금';
         case 'ADMIN_FREE': return '관리자 무료 등록';
+        case 'FREE': return '무료 등록';
         default: return method;
     }
 };

@@ -542,6 +542,178 @@ export const confirmTossPaymentHttp = functions
     });
 
 
+// --------------------------------------------------------------------------
+// FREE REGISTRATION (0 KRW)
+// --------------------------------------------------------------------------
+export const processFreeRegistrationHttp = functions
+    .runWith({
+        enforceAppCheck: false,
+        ingressSettings: 'ALLOW_ALL'
+    })
+    .https.onRequest(async (req, res) => {
+        return corsHandler(req, res, async () => {
+            if (req.method === 'OPTIONS') {
+                res.status(204).end();
+                return;
+            }
+
+            if (req.method !== 'POST') {
+                res.status(405).json({ error: 'Method not allowed' });
+                return;
+            }
+
+            const { regId, confId, userData, amount, baseAmount, optionsTotal, selectedOptions } = req.body;
+
+            if (!regId || !confId || !userData || amount === undefined) {
+                res.status(400).json({ error: 'Missing required parameters' });
+                return;
+            }
+
+            if (Number(amount) !== 0) {
+                res.status(400).json({ error: 'Amount must be 0 for free registration' });
+                return;
+            }
+
+            // [Security] Verify Payment Amount against Database
+            const verification = await verifyPaymentAmount(confId, userData.tier, selectedOptions || [], Number(amount));
+            if (!verification.isValid) {
+                functions.logger.error(`[Security] Free Registration verification failed for ${regId}: ${verification.error}`);
+                res.status(403).json({ error: verification.error || 'Payment amount verification failed' });
+                return;
+            }
+
+            if (userData.userId && userData.userId !== 'GUEST' && confId) {
+                const existingRegsSnap = await admin.firestore()
+                    .collection(`conferences/${confId}/registrations`)
+                    .where('userId', '==', userData.userId)
+                    .where('status', '==', 'PAID')
+                    .limit(1)
+                    .get();
+                if (!existingRegsSnap.empty) {
+                    functions.logger.warn(`[DuplicateBlock-HTTP] userId=${userData.userId} already has PAID registration in ${confId}`);
+                    res.status(409).json({ error: '이미 해당 학술대회에 등록이 완료된 계정입니다. 동일 계정으로 중복 등록은 불가합니다.' });
+                    return;
+                }
+            }
+
+            try {
+                const db = admin.firestore();
+                const regRef = db.collection(`conferences/${confId}/registrations`).doc(regId);
+                const confSnap = await db.collection('conferences').doc(confId).get();
+                const societyId = confSnap.data()?.societyId;
+
+                const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+                const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+
+                await regRef.set({
+                    id: regId,
+                    userId: userData.userId || 'GUEST',
+                    userInfo: {
+                        name: userData.name,
+                        email: userData.email,
+                        phone: userData.phone,
+                        affiliation: userData.affiliation,
+                        licenseNumber: userData.licenseNumber || ''
+                    },
+                    email: userData.email,
+                    phone: userData.phone,
+                    name: userData.name,
+                    conferenceId: confId,
+                    status: 'PAID',
+                    paymentStatus: 'PAID',
+                    paymentMethod: 'FREE',
+                    paymentKey: 'FREE',
+                    orderId: `FREE-${regId}`,
+                    amount: 0,
+                    baseAmount: baseAmount || 0,
+                    optionsTotal: optionsTotal || 0,
+                    options: selectedOptions || [],
+                    tier: userData.tier || null,
+                    categoryName: userData.categoryName || null,
+                    memberVerificationData: null,
+                    isAnonymous: userData.isAnonymous || false,
+                    agreementDetails: {},
+                    paymentDetails: { status: 'DONE', method: 'FREE' },
+                    receiptNumber: `${dateStr}-${rand}`,
+                    confirmationQr: regId,
+                    badgeQr: null,
+                    isCheckedIn: false,
+                    checkInTime: null,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    paidAt: admin.firestore.FieldValue.serverTimestamp()
+                }, { merge: false });
+
+                try {
+                    if (societyId && userData.memberVerificationData && userData.memberVerificationData.id) {
+                        const memberId = userData.memberVerificationData.id;
+                        const memberRef = db.collection('societies').doc(societyId).collection('members').doc(memberId);
+                        await memberRef.update({
+                            used: true,
+                            usedBy: userData.userId || 'unknown',
+                            usedAt: admin.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+
+                    if (userData.userId && userData.userId !== 'GUEST') {
+                        const userRef = db.collection('users').doc(userData.userId);
+                        const userSnap = await userRef.get();
+
+                        if (!userSnap.exists) {
+                            await userRef.set({
+                                uid: userData.userId,
+                                email: userData.email,
+                                name: userData.name,
+                                phone: userData.phone,
+                                affiliation: userData.affiliation,
+                                organization: userData.affiliation,
+                                licenseNumber: userData.licenseNumber || '',
+                                tier: userData.tier || 'NON_MEMBER',
+                                isAnonymous: false,
+                                isForeigner: false,
+                                country: 'KR',
+                                authStatus: { emailVerified: false, phoneVerified: false },
+                                simplePassword: null,
+                                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                            });
+                        } else {
+                            await userRef.update({
+                                email: userData.email,
+                                name: userData.name,
+                                phone: userData.phone,
+                                affiliation: userData.affiliation,
+                                organization: userData.affiliation,
+                                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                            });
+                        }
+
+                        await db.collection('users').doc(userData.userId).collection('participations').doc(regId).set({
+                            conferenceId: confId,
+                            conferenceName: '', 
+                            registrationId: regId,
+                            societyId: societyId || 'unknown',
+                            role: 'ATTENDEE',
+                            registeredAt: admin.firestore.FieldValue.serverTimestamp(),
+                            paidAt: admin.firestore.FieldValue.serverTimestamp(),
+                            amount: 0,
+                            status: 'PAID'
+                        }, { merge: true });
+                    }
+                } catch (postProcessError) {
+                    functions.logger.error("Failed to post-process for Free Registration:", postProcessError);
+                }
+
+                res.status(200).json({ success: true, data: { status: 'DONE', method: 'FREE' } });
+
+            } catch (error: unknown) {
+                functions.logger.error("Error in processFreeRegistrationHttp:", error);
+                const errorMessage = error instanceof Error ? error.message : 'Registration failed';
+                res.status(500).json({ error: errorMessage });
+            }
+        });
+    });
+
 // 4. Cancel TossPayment
 export const cancelTossPayment = functions
     .runWith({
