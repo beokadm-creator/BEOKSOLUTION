@@ -36,6 +36,7 @@ interface Conference {
 const LandingPage: React.FC = () => {
     const [societies, setSocieties] = useState<Society[]>([]);
     const [conferences, setConferences] = useState<Conference[]>([]);
+    const [pastConferences, setPastConferences] = useState<Conference[]>([]);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
@@ -48,13 +49,41 @@ const LandingPage: React.FC = () => {
                 setSocieties(socList);
 
                 // Fetch Conferences
-                const confSnap = await getDocs(query(collection(db, 'conferences'), limit(6)));
+                const confSnap = await getDocs(query(collection(db, 'conferences'), limit(50)));
                 const confList = confSnap.docs.map(d => {
                     const data = d.data();
                     const sName = socList.find(s => s.id === data.societyId)?.name.ko || data.societyId;
                     return { id: d.id, ...data, societyName: sName } as Conference;
                 });
-                setConferences(confList);
+
+                const activeConfs = confList
+                .filter(c => {
+                    const status = (c.status || '').toUpperCase();
+                    return !['CLOSED', 'ARCHIVED', 'HIDDEN', 'SETUP'].includes(status);
+                })
+                .sort((a, b) => {
+                    const dateA = (a.dates?.start as any)?.seconds || Number.MAX_SAFE_INTEGER;
+                    const dateB = (b.dates?.start as any)?.seconds || Number.MAX_SAFE_INTEGER;
+                    // Sort by start date ascending (closest to now first, undefined last)
+                    return dateA - dateB;
+                })
+                .slice(0, 6);
+
+                const pastConfs = confList
+                .filter(c => {
+                    const status = (c.status || '').toUpperCase();
+                    return ['CLOSED', 'ARCHIVED'].includes(status);
+                })
+                .sort((a, b) => {
+                    const dateA = (a.dates?.start as any)?.seconds || 0;
+                    const dateB = (b.dates?.start as any)?.seconds || 0;
+                    // Sort by start date descending (most recent past event first)
+                    return dateB - dateA;
+                })
+                .slice(0, 4); // Show up to 4 past events
+
+                setConferences(activeConfs);
+                setPastConferences(pastConfs);
             } catch (err) {
                 console.error("Error fetching landing data:", err);
             } finally {
@@ -282,6 +311,38 @@ const LandingPage: React.FC = () => {
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    )}
+
+                    {/* PAST CONFERENCES (ARCHIVE) */}
+                    {!loading && pastConferences.length > 0 && (
+                        <div className="mt-16 border-t border-slate-100 pt-16">
+                            <div className="flex items-center gap-3 mb-8">
+                                <h3 className="text-xl font-bold text-slate-900">지난 행사</h3>
+                                <span className="px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg text-xs font-bold uppercase tracking-wider">Archive</span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {pastConferences.map(conf => (
+                                    <div 
+                                        key={conf.id} 
+                                        onClick={() => window.open(`https://${conf.societyId}.eregi.co.kr`, '_blank')}
+                                        className="group bg-slate-50 rounded-2xl p-5 border border-slate-100 hover:bg-white hover:shadow-md hover:border-slate-200 transition-all cursor-pointer flex flex-col justify-between h-full min-h-[140px]"
+                                    >
+                                        <div>
+                                            <div className="flex justify-between items-start mb-3">
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{conf.societyName}</span>
+                                            </div>
+                                            <h4 className="text-sm font-bold text-slate-700 line-clamp-2 group-hover:text-blue-700 transition-colors">
+                                                {formatTitle(conf.title)}
+                                            </h4>
+                                        </div>
+                                        <div className="flex items-center justify-between mt-4">
+                                            <span className="text-xs font-medium text-slate-500">{formatDateRange(conf.dates)}</span>
+                                            <ChevronRight size={14} className="text-slate-300 group-hover:text-blue-600 transition-colors" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>

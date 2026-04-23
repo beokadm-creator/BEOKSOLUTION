@@ -22,6 +22,7 @@ const PlatformHome: React.FC = () => {
     const { auth } = useAuth();
     const { user } = auth;
     const [activeConferences, setActiveConferences] = useState<ConfSummary[]>([]);
+    const [pastConferences, setPastConferences] = useState<ConfSummary[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -62,12 +63,26 @@ const PlatformHome: React.FC = () => {
                         startDate: data.dates?.start?.seconds || 0
                     };
                 })
-                    // Filter ACTIVE or PUBLIC (or just show all for now to verify KADD)
-                    // The user said: "filter by status in JS"
-                    .filter((c: ConfSummary) => c.status !== 'HIDDEN' && c.status !== 'ARCHIVED')
-                    .sort((a: ConfSummary, b: ConfSummary) => (b.startDate || 0) - (a.startDate || 0)); // Newest first
+                const activeList = list
+                    // Filter ACTIVE or PUBLIC
+                    .filter((c: ConfSummary) => !['CLOSED', 'ARCHIVED', 'HIDDEN', 'SETUP'].includes(c.status || ''))
+                    .sort((a: ConfSummary, b: ConfSummary) => {
+                        const dateA = a.startDate || Number.MAX_SAFE_INTEGER;
+                        const dateB = b.startDate || Number.MAX_SAFE_INTEGER;
+                        return dateA - dateB;
+                    });
 
-                setActiveConferences(list);
+                const pastList = list
+                    .filter((c: ConfSummary) => ['CLOSED', 'ARCHIVED'].includes(c.status || ''))
+                    .sort((a: ConfSummary, b: ConfSummary) => {
+                        const dateA = a.startDate || 0;
+                        const dateB = b.startDate || 0;
+                        return dateB - dateA;
+                    })
+                    .slice(0, 4);
+
+                setActiveConferences(activeList);
+                setPastConferences(pastList);
             } catch (e) {
                 console.error("Failed to load conferences", e);
             } finally {
@@ -213,6 +228,42 @@ const PlatformHome: React.FC = () => {
                     ) : (
                         <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
                             <p className="text-slate-500">현재 등록 가능한 학술대회가 없습니다.</p>
+                        </div>
+                    )}
+
+                    {/* PAST CONFERENCES (ARCHIVE) */}
+                    {!loading && pastConferences.length > 0 && (
+                        <div className="mt-16 border-t border-slate-200 pt-16">
+                            <div className="flex items-center gap-3 mb-8">
+                                <h3 className="text-2xl font-bold text-slate-900">지난 행사</h3>
+                                <span className="px-2.5 py-1 bg-slate-200 text-slate-600 rounded-lg text-xs font-bold uppercase tracking-wider">Archive</span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {pastConferences.map(conf => (
+                                    <div 
+                                        key={conf.id} 
+                                        onClick={() => {
+                                            const token = getRootCookie('eregi_session');
+                                            const baseUrl = `https://${conf.societyId}.eregi.co.kr`;
+                                            window.location.href = token ? `${baseUrl}?token=${token}` : baseUrl;
+                                        }}
+                                        className="group bg-white rounded-xl p-5 border border-slate-200 hover:shadow-md hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between h-full min-h-[140px]"
+                                    >
+                                        <div>
+                                            <div className="flex justify-between items-start mb-3">
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{conf.societyId}</span>
+                                            </div>
+                                            <h4 className="text-sm font-bold text-slate-700 line-clamp-2 group-hover:text-blue-700 transition-colors">
+                                                {conf.title}
+                                            </h4>
+                                        </div>
+                                        <div className="flex items-center justify-between mt-4">
+                                            <span className="text-xs font-medium text-slate-500">{conf.dates}</span>
+                                            <span className="text-slate-300 group-hover:text-blue-600 transition-colors">&rarr;</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>
