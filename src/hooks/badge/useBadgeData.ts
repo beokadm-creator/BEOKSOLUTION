@@ -1,7 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { getFirestore, collection, query, where, orderBy, getDocs, onSnapshot, doc, getDoc } from "firebase/firestore";
 import { isBadgeIssued, getBadgeDisplayName, getBadgeDisplayAffiliation, BadgeRecordSource } from "@/utils/badgeRecord";
-import { BadgeUiData, BadgeConfig } from "@/components/badge/UnifiedBadgeView";
+import type { BadgeConfig, BadgeUiState } from "@/types/badge";
+
+type BadgeUiData = BadgeUiState & {
+  qrValue: string;
+  zone: string;
+  baseMinutes?: number;
+  isCompleted?: boolean;
+};
 
 export type BadgeStrategy = 
   | { type: 'AUTH'; userId: string; confId: string }
