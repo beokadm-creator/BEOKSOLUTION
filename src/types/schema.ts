@@ -1205,7 +1205,97 @@ export interface VendorSponsorshipRequest {
 }
 
 // ==========================================
-// 9. Audit Logging (NEW)
+// 9. Certificate Issuance (NEW)
+// ==========================================
+
+/**
+ * Certificate status lifecycle:
+ * ISSUED → REVOKED (admin revocation)
+ * REVOKED → REISSUED (admin reissues; old cert stays REISSUED, new cert created as ISSUED)
+ *
+ * Frontend treats both ISSUED and REISSUED as "active/발급됨" in the admin list.
+ * Public verification treats REISSUED same as REVOKED (superseded).
+ */
+export type CertificateStatus = 'ISSUED' | 'REVOKED' | 'REISSUED';
+
+/**
+ * Source collection the certificate was issued from
+ */
+export type CertificateSourceType = 'registration' | 'external_attendee';
+
+/**
+ * Collection: `conferences/{confId}/certificates/{certId}`
+ * Path: `conferences/{confId}/certificates/{certId}`
+ *
+ * Individual certificate record issued to an attendee.
+ * certId = auto-generated Firestore document ID.
+ * verificationToken = unique, unguessable URL-safe token for public verification.
+ */
+export interface CertificateRecord {
+  id: string;                               // certId (Firestore document ID)
+  conferenceId: string;                      // confId
+  sourceType: CertificateSourceType;         // 'registration' | 'external_attendee'
+  sourceId: string;                          // regId or external_attendee ID
+
+  certificateNumber: string;                 // Sequential number, e.g., "CERT-2026-001"
+  verificationToken: string;                 // Unique token for public verification URL, e.g., "crt_abc123..."
+
+  // Attendee snapshot (immutable after issuance)
+  attendeeName: string;
+  attendeeEmail?: string;
+  attendeeOrganization?: string;
+
+  // Status & lifecycle
+  status: CertificateStatus;
+  issuedAt: Timestamp;
+  revokedAt?: Timestamp;
+  revokedBy?: string;                        // Admin UID who revoked
+  revokeReason?: string;
+
+  // Reissue chain (populated when status transitions to REISSUED)
+  supersededById?: string;                   // New certId that replaces this one (set on old cert)
+  previousCertificateId?: string;            // Old certId that this replaces (set on new cert)
+  reissuedAt?: Timestamp;                    // When reissue happened (set on old cert)
+  reissuedBy?: string;                       // Admin UID who triggered reissue (set on old cert)
+  reissuedReason?: string;                   // Reason for reissue (set on old cert)
+
+  // Download tracking
+  downloadCount?: number;                    // Incremented atomically on each download log
+
+  // Metadata
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+/**
+ * Collection: `conferences/{confId}/settings/certificate_counter`
+ * Path: `conferences/{confId}/settings/certificate_counter`
+ * Document ID: 'certificate_counter'
+ *
+ * Monotonic counter for certificate number generation.
+ * Updated atomically via Firestore transaction.
+ */
+export interface CertificateCounter {
+  id: string;                                // 'certificate_counter'
+  nextSerialNumber: number;                  // Next serial number to assign
+  updatedAt: Timestamp;
+}
+
+/**
+ * Certificate download log entry (subdocument)
+ * Collection: `conferences/{confId}/certificates/{certId}/download_logs/{logId}`
+ */
+export interface CertificateDownloadLog {
+  id: string;
+  downloadedAt: Timestamp;
+  method: 'OWNER' | 'BADGE_TOKEN' | 'ADMIN';
+  callerUid?: string;
+  callerEmail?: string;
+  userAgent?: string;
+}
+
+// ==========================================
+// 10. Audit Logging (NEW)
 // ==========================================
 
 /**

@@ -1,28 +1,49 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Download, Loader2, FileCheck } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import toast from 'react-hot-toast';
-import { BadgeUiState } from './UnifiedBadgeView';
+import { QRCodeSVG } from 'qrcode.react';
+import { BadgeUiState } from "@/types/badge";
+
+interface CertificateMeta {
+  certificateId: string;
+  certificateNumber: string;
+  verificationToken: string;
+}
+
+const VERIFICATION_BASE_URL =
+  'https://us-central1-eregi-8fc1e.cloudfunctions.net/verifyCertificatePublic';
 
 interface CertificateDownloaderProps {
   confId: string;
   ui: BadgeUiState;
   badgeLang: "ko" | "en";
+  badgeToken?: string;
 }
 
-export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ confId, ui, badgeLang }) => {
+export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ confId, ui, badgeLang, badgeToken }) => {
   const [config, setConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [issuing, setIssuing] = useState(false);
+  const [certMeta, setCertMeta] = useState<CertificateMeta | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const certificateRef = useRef<HTMLDivElement>(null);
+  const issuanceAttempted = useRef(false);
 
   const t = (ko: string, en: string) => (badgeLang === "ko" ? ko : en);
+  const canDownload = !!ui.isCheckedIn;
+
+  const verificationUrl = useMemo(() => {
+    if (!certMeta?.verificationToken) return null;
+    return `${VERIFICATION_BASE_URL}?token=${certMeta.verificationToken}`;
+  }, [certMeta?.verificationToken]);
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -40,10 +61,48 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ co
     fetchConfig();
   }, [confId]);
 
-  if (loading || !config) return null;
+  const ensureCertificateIssued = useCallback(async () => {
+    if (issuanceAttempted.current || issuing) return;
+    issuanceAttempted.current = true;
+    setIssuing(true);
+    try {
+      const issueFn = httpsCallable<{ confId: string; regId: string; badgeToken?: string }, { success: boolean; certificateId: string; certificateNumber: string; verificationToken: string; message?: string }>(
+        functions,
+        'issueCertificate'
+      );
+      const result = await issueFn({
+        confId,
+        regId: ui.id,
+        ...(badgeToken ? { badgeToken } : {}),
+      });
+      if (result.data.success) {
+        setCertMeta({
+          certificateId: result.data.certificateId,
+          certificateNumber: result.data.certificateNumber,
+          verificationToken: result.data.verificationToken,
+        });
+      }
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      if (code === 'failed-precondition') {
+        toast.error(t("현장 체크인이 필요합니다.", "On-site check-in required."));
+      } else if (code && code !== 'permission-denied') {
+        console.error('Certificate issuance failed:', err);
+        toast.error(t("참가확인서 등록에 실패했습니다.", "Certificate registration failed."));
+      }
+    } finally {
+      setIssuing(false);
+    }
+  }, [confId, ui.id, badgeToken, issuing, t]);
 
-  // 발급 조건: 현장 체크인 완료 (결제 상태와 무관하게 초청자 및 무료 참석자도 발급 가능하도록 isCheckedIn만 체크)
-  const canDownload = ui.isCheckedIn;
+  // Issue certificate on dialog open (idempotent backend, single attempt per mount)
+  useEffect(() => {
+    if (isOpen && canDownload && !certMeta) {
+      ensureCertificateIssued();
+    }
+  }, [isOpen, canDownload, certMeta, ensureCertificateIssued]);
+
+  if (loading || !config) return null;
 
   const handleDownload = async () => {
     if (!certificateRef.current) return;
@@ -72,6 +131,22 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ co
 
       pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`${ui.name}_참가확인서.pdf`);
+      
+      if (certMeta) {
+        try {
+          const logFn = httpsCallable<{ confId: string; certificateId: string; badgeToken?: string }, { success: boolean }>(
+            functions,
+            'logCertificateDownload'
+          );
+          await logFn({
+            confId,
+            certificateId: certMeta.certificateId,
+            ...(badgeToken ? { badgeToken } : {}),
+          });
+        } catch {
+          // Download logging is non-blocking — PDF is already saved
+        }
+      }
       
       toast.success(t("다운로드가 완료되었습니다.", "Download complete."), { id: 'cert' });
       setIsOpen(false);
@@ -175,6 +250,25 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ co
                     )}
                   </div>
                 </div>
+
+                {certMeta && (
+                  <div className="flex items-center justify-between px-4 pt-4 mt-4 border-t border-slate-200">
+                    <div className="text-xs text-slate-500">
+                      <div className="font-semibold text-slate-700">{certMeta.certificateNumber}</div>
+                      {verificationUrl && (
+                        <div className="mt-1 break-all">{verificationUrl}</div>
+                      )}
+                    </div>
+                    {verificationUrl && (
+                      <QRCodeSVG
+                        value={verificationUrl}
+                        size={64}
+                        level="M"
+                        includeMargin={false}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

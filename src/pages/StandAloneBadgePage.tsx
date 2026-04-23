@@ -1,7 +1,6 @@
 import React, {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -16,36 +15,20 @@ import {
   orderBy,
   type Query,
   getDocs,
-  doc,
-  getDoc,
 } from "firebase/firestore"; // RAW SDK
-import { httpsCallable } from "firebase/functions";
-import { QRCodeSVG } from "qrcode.react";
 import { useNavigate } from "react-router-dom";
 import { SESSION_KEYS } from "../utils/cookie";
 import {
-  RefreshCw,
-  CheckCircle,
   Loader2,
   Clock,
+  CheckCircle,
   FileText,
   Calendar,
   Languages,
   Download,
-  User,
   MapPin,
- TrendingUp,
-  Sparkles,
-  Gift,
-  QrCode,
-  HelpCircle
+  TrendingUp,
 } from "lucide-react";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "../components/ui/tabs";
 import { TranslationPanel } from "../components/translation/TranslationPanel";
 import { QnAPanel } from "../components/badge/QnAPanel";
 import { CertificateDownloader } from "../components/badge/CertificateDownloader";
@@ -61,116 +44,21 @@ import {
   resolvePublicSlugFromConferenceId,
 } from "../utils/conferenceRoute";
 import { getKstToday } from "../utils/dateUtils";
+import type {
+  AttendanceZone,
+  AttendanceSettings,
+  BadgeConfig,
+  BadgeUiState,
+} from "@/types/badge";
+import {
+  t as tFn,
+  formatBadgeMinutes,
+  effectiveMenuVisibility,
+} from "@/utils/badgeUi";
+import {
+  UnifiedBadgeView,
+} from "../components/badge/UnifiedBadgeView";
 
-type TimestampLike = {
-  toDate: () => Date;
-};
-
-type ZoneBreak = {
-  start: string;
-  end: string;
-};
-
-type AttendanceZone = {
-  id: string;
-  name?: string;
-  goalMinutes?: number;
-  start?: string;
-  end?: string;
-  breaks?: ZoneBreak[];
-  ruleDate?: string;
-};
-
-type AttendanceRule = {
-  zones?: Array<Omit<AttendanceZone, "ruleDate">>;
-  completionMode?: "DAILY_SEPARATE" | "CUMULATIVE";
-  globalGoalMinutes?: number;
-  cumulativeGoalMinutes?: number;
-};
-
-type AttendanceSettings = {
-  rules?: Record<string, AttendanceRule>;
-};
-
-type BadgeConfig = {
-  materialsUrls?: Array<{ name: string; url: string }>;
-  translationUrl?: string;
-  menuVisibility?: {
-    status?: boolean;
-    sessions?: boolean;
-    materials?: boolean;
-    program?: boolean;
-    translation?: boolean;
-    stampTour?: boolean;
-    home?: boolean;
-    qna?: boolean;
-    certificate?: boolean;
-  };
-  menuLabels?: {
-    status?: { ko?: string; en?: string };
-    sessions?: { ko?: string; en?: string };
-    materials?: { ko?: string; en?: string };
-    program?: { ko?: string; en?: string };
-    translation?: { ko?: string; en?: string };
-    stampTour?: { ko?: string; en?: string };
-    home?: { ko?: string; en?: string };
-    qna?: { ko?: string; en?: string };
-    certificate?: { ko?: string; en?: string };
-  };
-};
-
-type BadgeUiState = {
-  name: string;
-  aff: string;
-  id: string;
-  userId: string;
-  issued: boolean;
-  zone?: string;
-  time?: string;
-  license?: string;
-  status: string;
-  badgeQr: string | null;
-  receiptNumber?: string;
-  isCompleted?: boolean;
-  lastCheckIn?: TimestampLike;
-  baseMinutes?: number;
-  dailyMinutes?: Record<string, number>;
-  zoneMinutes?: Record<string, number>;
-  zoneCompleted?: Record<string, boolean>;
-  isCheckedIn?: boolean;
-  paymentStatus?: string;
-  amount?: number;
-};
-
-type StampTourConfig = {
-  enabled: boolean;
-  completionRule: { type: "COUNT" | "ALL"; requiredCount?: number };
-  boothOrderMode: "SPONSOR_ORDER" | "CUSTOM";
-  customBoothOrder?: string[];
-  rewardMode: "RANDOM" | "FIXED";
-  drawMode?: "PARTICIPANT" | "ADMIN" | "BOTH";
-  rewardFulfillmentMode?: "INSTANT" | "LOTTERY";
-  lotteryScheduledAt?: TimestampLike;
-  rewards: Array<{
-    id: string;
-    name: string;
-    imageUrl?: string;
-    remainingQty?: number;
-    totalQty?: number;
-    weight?: number;
-    order?: number;
-  }>;
-  soldOutMessage?: string;
-  completionMessage?: string;
-};
-
-type StampProgress = {
-  rewardStatus?: "NONE" | "REQUESTED" | "REDEEMED";
-  lotteryStatus?: "PENDING" | "SELECTED" | "NOT_SELECTED";
-  rewardName?: string;
-  isCompleted?: boolean;
-  completedAt?: TimestampLike;
-};
 const StandAloneBadgePage: React.FC = () => {
   // BUGFIX-20250124: Fixed React error #130 by moving unsubscribeDB to outer scope
   const { slug } = useParams();
@@ -186,7 +74,6 @@ const StandAloneBadgePage: React.FC = () => {
   >("DAILY_SEPARATE");
   const [attendanceGoalMinutes, setAttendanceGoalMinutes] = useState<number>(0);
   const [badgeConfig, setBadgeConfig] = useState<BadgeConfig | null>(null);
-  const [rewardAnimationOpen, setRewardAnimationOpen] = useState(false);
   const [msg, setMsg] = useState("초기화 중...");
   const [refreshing, setRefreshing] = useState(false);
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
@@ -197,29 +84,13 @@ const StandAloneBadgePage: React.FC = () => {
   const [badgeLang, setBadgeLang] = useState<"ko" | "en">("ko");
 
   const t = useCallback(
-    (ko: string, en: string) => (badgeLang === "ko" ? ko : en),
+    (ko: string, en: string) => tFn(badgeLang, ko, en),
     [badgeLang],
   );
 
   const formatMinutes = useCallback(
-    (minutes: number) =>
-      badgeLang === "ko"
-        ? `${Math.floor(minutes / 60)}시간 ${minutes % 60}분`
-        : `${Math.floor(minutes / 60)}h ${minutes % 60}m`,
+    (minutes: number) => formatBadgeMinutes(badgeLang, minutes),
     [badgeLang],
-  );
-
-  const getMenuLabel = useCallback(
-    (
-      key: keyof NonNullable<BadgeConfig["menuLabels"]>,
-      fallbackKo: string,
-      fallbackEn: string,
-    ) => {
-      const labels = badgeConfig?.menuLabels?.[key];
-      if (badgeLang === "ko") return labels?.ko || fallbackKo;
-      return labels?.en || fallbackEn;
-    },
-    [badgeConfig?.menuLabels, badgeLang],
   );
 
   // Helper to determine correct confId
@@ -687,214 +558,9 @@ const StandAloneBadgePage: React.FC = () => {
   const showBadgeQr = ui.issued;
   const qrValue = showBadgeQr ? ui.badgeQr || `BADGE-${ui.id}` : ui.id;
 
-  const menuVisibility = {
-    status: badgeConfig?.menuVisibility?.status ?? true,
-    sessions: badgeConfig?.menuVisibility?.sessions ?? true,
-    materials: badgeConfig?.menuVisibility?.materials ?? true,
-    program: badgeConfig?.menuVisibility?.program ?? true,
-    translation: badgeConfig?.menuVisibility?.translation ?? true,
-    stampTour: badgeConfig?.menuVisibility?.stampTour ?? true,
-    home: badgeConfig?.menuVisibility?.home ?? true,
-    qna: badgeConfig?.menuVisibility?.qna ?? true,
-    certificate: badgeConfig?.menuVisibility?.certificate ?? true,
-  };
-  const effectiveMenuVisibility =
-    menuVisibility.status ||
-    menuVisibility.sessions ||
-    menuVisibility.materials ||
-    menuVisibility.program ||
-    menuVisibility.translation ||
-    menuVisibility.stampTour ||
-    menuVisibility.qna ||
-    menuVisibility.certificate
-      ? menuVisibility
-      : { ...menuVisibility, status: true };
-  const translationEnabled =
-    badgeConfig?.translationUrl !== "HIDE" && effectiveMenuVisibility.translation;
-  const certificateEnabled = effectiveMenuVisibility.certificate;
-  const tabsOrder = [
-    effectiveMenuVisibility.status ? "status" : null,
-    effectiveMenuVisibility.sessions ? "sessions" : null,
-    effectiveMenuVisibility.materials ? "materials" : null,
-    effectiveMenuVisibility.program ? "program" : null,
-    translationEnabled ? "translation" : null,
-    effectiveMenuVisibility.stampTour ? "stamp-tour" : null,
-    effectiveMenuVisibility.qna ? "qna" : null,
-  ].filter(Boolean) as string[];
-  const defaultTab = tabsOrder[0] || "status";
-  const gridColsClass =
-    tabsOrder.length === 1
-      ? "grid-cols-1"
-      : tabsOrder.length === 2
-        ? "grid-cols-2"
-        : tabsOrder.length === 3
-          ? "grid-cols-3"
-          : tabsOrder.length === 4
-            ? "grid-cols-4"
-            : tabsOrder.length === 5
-              ? "grid-cols-5"
-              : "grid-cols-6";
+  const effectiveMenuVis = effectiveMenuVisibility(badgeConfig?.menuVisibility);
+  const certificateEnabled = effectiveMenuVis.certificate;
 
-  console.log("[StandAloneBadgePage] QR Display Debug:", {
-    issued: ui.issued,
-    badgeQr: ui.badgeQr,
-    showBadgeQr,
-    qrValue,
-    registrationId: ui.id,
-  });
-
-  // VOUCHER STATE (not issued yet)
-  if (!ui.issued) {
-    return (
-      <div className="min-h-[100dvh] bg-[radial-gradient(circle_at_top,_rgba(15,23,42,0.06),_transparent_40%),linear-gradient(180deg,_#f8fafc_0%,_#eef4ff_52%,_#f8fafc_100%)] flex flex-col items-center justify-center p-4 font-body">
-        <div className="w-full max-w-sm">
-          <div className="mb-4 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setBadgeLang("ko")}
-              className={`rounded-full px-4 py-2 text-sm font-body font-semibold transition-all ${badgeLang === "ko" ? "bg-slate-900 text-white shadow-lg shadow-slate-900/15" : "border border-white/70 bg-white/80 text-slate-600 backdrop-blur hover:bg-white"}`}
-            >
-              한국어
-            </button>
-            <button
-              type="button"
-              onClick={() => setBadgeLang("en")}
-              className={`rounded-full px-4 py-2 text-sm font-body font-semibold transition-all ${badgeLang === "en" ? "bg-slate-900 text-white shadow-lg shadow-slate-900/15" : "border border-white/70 bg-white/80 text-slate-600 backdrop-blur hover:bg-white"}`}
-            >
-              English
-            </button>
-          </div>
-          <div className="relative overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white/85 text-center shadow-[0_24px_80px_-32px_rgba(15,23,42,0.45)] backdrop-blur">
-            <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-r from-slate-900 via-eregi-primary to-sky-700" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.22),_transparent_28%),linear-gradient(180deg,_transparent_0%,_rgba(248,250,252,0.95)_34%,_rgba(255,255,255,1)_100%)]" />
-            {refreshing && (
-              <div className="absolute top-4 right-4 z-10">
-                <RefreshCw className="w-5 h-5 text-white animate-spin" />
-              </div>
-            )}
-            <div className="absolute right-[-12%] top-24 h-48 w-48 rounded-full border border-slate-200/60 bg-slate-100/40" />
-            <div className="absolute left-[-18%] bottom-16 h-40 w-40 rounded-full border border-sky-100 bg-sky-50/60" />
-
-            <div className="relative z-10 px-6 pb-7 pt-6">
-              <div className="mb-8 flex items-start justify-between gap-4 text-white">
-                <div className="text-left">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.34em] text-white/70">
-                    Conference Pass
-                  </p>
-                  <h1 className="mt-2 text-2xl font-display font-semibold tracking-tight">
-                    {t("등록 확인 바우처", "Registration Voucher")}
-                  </h1>
-                  <p className="mt-2 max-w-[15rem] text-sm text-white/80">
-                    {t(
-                      "현장 등록 데스크에서 확인 후 디지털 명찰로 전환됩니다.",
-                      "Present this at the on-site desk to activate your digital badge.",
-                    )}
-                  </p>
-                </div>
-                <div className="mt-1 rounded-full border border-white/20 bg-white/10 p-3 backdrop-blur">
-                  <Clock className="h-5 w-5 animate-pulse" />
-                </div>
-              </div>
-              <div className="rounded-[1.6rem] border border-slate-200/70 bg-white/92 p-6 shadow-[0_20px_60px_-36px_rgba(15,23,42,0.35)]">
-                <div className="mb-5 flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-left">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-700">
-                      Pending
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-amber-950">
-                      {t("명찰 발급 대기 중", "Badge issuance pending")}
-                    </p>
-                  </div>
-                  <FileText className="h-5 w-5 text-amber-600" />
-                </div>
-
-                <p className="text-sm font-semibold uppercase tracking-[0.26em] text-slate-400">
-                  {ui.aff}
-                </p>
-                <h2 className="mt-3 text-3xl font-display font-semibold tracking-tight text-slate-950">
-                  {ui.name}
-                </h2>
-
-                <div className="mt-5 grid grid-cols-1 gap-3 text-left">
-                  {ui.license && ui.license !== "-" && (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-400">
-                        {t("면허번호", "License No.")}
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-slate-800">
-                        {ui.license}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-6 rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-5 shadow-inner">
-                  <div className="mb-4 flex items-center justify-between">
-                    <div className="text-left">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">
-                        Desk QR
-                      </p>
-                      <p className="mt-1 text-sm font-medium text-slate-500">
-                        {t("등록 확인 QR", "Show this QR at the desk")}
-                      </p>
-                    </div>
-                    <div className="rounded-full bg-slate-900 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-white">
-                      Voucher
-                    </div>
-                  </div>
-                  <div className="rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm">
-                    <QRCodeSVG
-                      key={qrValue}
-                      value={qrValue}
-                      size={176}
-                      level="M"
-                      includeMargin={false}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-5 rounded-2xl border border-sky-100 bg-sky-50/80 px-4 py-4 text-left">
-                  <p className="flex items-center gap-2 text-sm font-semibold text-sky-900">
-                    <User className="h-4 w-4" />
-                    {t("등록 데스크에 QR 제시", "Present QR at check-in")}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-sky-800">
-                    {t(
-                      "확인 후 디지털 명찰이 발급됩니다.",
-                      "Your digital badge will be issued after verification.",
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Refresh Indicator */}
-          {refreshing && (
-            <div className="mt-4 flex items-center justify-center gap-2 rounded-full border border-sky-100 bg-white/80 px-5 py-3 text-center text-sm font-medium text-sky-800 shadow-sm backdrop-blur">
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              {t(
-                "명찰 발급 상태를 새로고침 중입니다...",
-                "Refreshing badge status...",
-              )}
-            </div>
-          )}
-
-          {/* Home Button */}
-          {effectiveMenuVisibility.home && (
-            <button
-              onClick={() => navigate(`/${publicSlug}`)}
-              className="mt-6 block w-full rounded-full border border-slate-200 bg-white/85 px-6 py-4 text-center font-body font-semibold text-slate-700 shadow-sm backdrop-blur transition-colors hover:bg-white"
-            >
-              {getMenuLabel("home", "학술대회 홈페이지로 이동", "Conference Home")}
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ISSUED BADGE STATE
   const todayKey = new Date().toLocaleDateString("sv-SE", {
     timeZone: "Asia/Seoul",
   });
@@ -910,587 +576,365 @@ const StandAloneBadgePage: React.FC = () => {
       ? Math.min(100, Math.floor((liveMinutes / attendanceGoalMinutes) * 100))
       : 0;
 
+  const confId = getConfIdToUse(slug);
+
   return (
-    <div className="min-h-[100dvh] bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.16),_transparent_36%),linear-gradient(180deg,_#eff6ff_0%,_#f8fafc_48%,_#eef2ff_100%)] flex flex-col p-4 font-body relative">
-      {/* Elegant background pattern */}
-      <div className="absolute inset-0 opacity-30" style={{backgroundImage: "url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"30\" fill=\"%23e2e8f0\" fill-opacity=\"0.15\"/></svg>')"}} />
-
-      <div className="w-full max-w-sm mx-auto flex-1 flex flex-col justify-center py-6 relative z-10">
-        <div className="mb-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setBadgeLang("ko")}
-            className={`rounded-full px-5 py-2.5 text-sm font-body font-semibold shadow-sm transition-all duration-200 ${badgeLang === "ko" ? "bg-slate-900 text-white shadow-lg shadow-slate-900/15" : "border border-white/70 bg-white/80 text-slate-600 backdrop-blur hover:bg-white"}`}
+    <UnifiedBadgeView
+      mode={ui.issued ? "issued" : "voucher"}
+      ui={ui}
+      menuVis={effectiveMenuVis}
+      badgeConfig={badgeConfig}
+      badgeLang={badgeLang}
+      setBadgeLang={setBadgeLang}
+      attendance={ui ? {
+        status: ui.status as "INSIDE" | "OUTSIDE",
+        currentZone: ui.zone !== "OUTSIDE" ? ui.zone : null,
+        isCheckedIn: ui.isCheckedIn,
+        paymentStatus: ui.paymentStatus,
+        amount: ui.amount,
+      } : null}
+      liveMinutes={liveMinutes}
+      refreshing={refreshing}
+      isCompleted={ui.isCompleted}
+      voucherQr={qrValue}
+      onNavigateHome={() => navigate(`/${publicSlug}`)}
+      renderStatusTab={() => (
+        <>
+          <div
+            className={`py-6 px-6 rounded-2xl font-body font-semibold text-center border-2 shadow-lg transition-all relative overflow-hidden ${
+              ui.status === "INSIDE"
+                ? "bg-gradient-to-br from-emerald-50 via-green-50/80 to-teal-50/60 text-emerald-700 border-emerald-200/70 shadow-emerald-100/50"
+                : "bg-gradient-to-br from-slate-50 to-gray-50/80 text-slate-600 border-slate-200/70 shadow-slate-100/50"
+            }`}
           >
-            한국어
-          </button>
-          <button
-            type="button"
-            onClick={() => setBadgeLang("en")}
-            className={`rounded-full px-5 py-2.5 text-sm font-body font-semibold shadow-sm transition-all duration-200 ${badgeLang === "en" ? "bg-slate-900 text-white shadow-lg shadow-slate-900/15" : "border border-white/70 bg-white/80 text-slate-600 backdrop-blur hover:bg-white"}`}
-          >
-            English
-          </button>
-        </div>
-        <div className="overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white/90 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.45)] backdrop-blur flex flex-col relative z-10">
-          <div className="relative overflow-hidden bg-gradient-to-r from-slate-950 via-eregi-primary to-sky-700 px-6 pb-6 pt-5 text-white">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.2),_transparent_28%),linear-gradient(90deg,_transparent,_rgba(255,255,255,0.08),_transparent)]" />
-            <div className="relative flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.34em] text-white/70">
-                  Conference Badge
-                </p>
-                <h2 className="mt-2 text-[1.75rem] font-display font-semibold tracking-tight">
-                  {t("디지털 명찰", "Digital Badge")}
-                </h2>
-                <p className="mt-2 text-sm text-white/80">
-                  {t("QR로 입장/퇴장 하실 수 있습니다.", "You can enter/exit with the QR code.")}
-                </p>
-              </div>
-              <div className="rounded-full border border-white/20 bg-white/10 p-3 backdrop-blur">
-                <CheckCircle className="h-5 w-5" />
-              </div>
+            {ui.status === "INSIDE" && (
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/10 via-transparent to-green-400/10 animate-pulse"></div>
+            )}
+            <div className="flex items-center justify-center gap-3 relative z-10">
+              {ui.status === "INSIDE" ? (
+                <>
+                  <div className="relative">
+                    <span className="w-4 h-4 bg-emerald-500 rounded-full flex animate-pulse shadow-lg" />
+                    <span className="absolute inset-0 w-4 h-4 bg-emerald-400 rounded-full animate-ping" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-lg font-display font-semibold">{t("학술대회 입장중", "Conference Active")}</span>
+                    <span className="text-sm opacity-80">{t("출석 인정 중", "Attendance Active")}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="w-4 h-4 bg-slate-400 rounded-full shadow-md" />
+                  <div className="flex flex-col">
+                    <span className="text-lg font-display font-semibold">{t("대기중", "Standby")}</span>
+                    <span className="text-sm opacity-80">{t("입장 전 상태", "Pre-entry")}</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
-          <div className="relative p-8 flex flex-col items-center text-center bg-[linear-gradient(180deg,_rgba(248,250,252,0.92)_0%,_white_100%)]">
-            <div className="absolute right-[-18%] top-5 h-36 w-36 rounded-full bg-sky-100/60 blur-2xl" />
-            <div className="absolute left-[-20%] bottom-10 h-32 w-32 rounded-full bg-indigo-100/60 blur-2xl" />
-
-            <div className="relative z-10 w-full">
-              <p className="text-sm font-semibold uppercase tracking-[0.28em] text-slate-400 break-keep">
-                {ui.aff || "-"}
+          {ui.zone && ui.zone !== "OUTSIDE" && (
+            <div className="bg-blue-50/50 border border-blue-100 rounded-xl py-3 px-4 flex justify-between items-center">
+              <p className="text-xs text-blue-600 font-bold">
+                {t("현재 구역", "Current zone")}
               </p>
-              <h2 className="mt-3 text-4xl font-display font-semibold tracking-tight text-slate-950 leading-tight">
-                {ui.name}
-              </h2>
-
-              {ui.license && ui.license !== "-" && (
-                <div className="mx-auto mt-5 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800">
-                  {t("면허번호", "License No.")}: {ui.license}
-                </div>
-              )}
-
-              <div className="relative mx-auto mt-6 max-w-[18rem] rounded-[1.8rem] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-5 shadow-[0_16px_40px_-28px_rgba(15,23,42,0.5)]">
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-slate-400">
-                    Access QR
-                  </p>
-                  <div className="rounded-full bg-slate-900 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-white">
-                    Active
-                  </div>
-                </div>
-                <div className="mt-4 rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm flex justify-center items-center">
-                  {showBadgeQr && (
-                    <QRCodeSVG
-                      key={qrValue}
-                      value={qrValue}
-                      size={180}
-                      level="H"
-                      includeMargin={true}
-                      className="rounded-xl"
-                    />
-                  )}
-                </div>
-                <p className="mt-4 text-sm font-medium text-slate-600 text-center">
-                  {t("QR로 입장/퇴장 하실 수 있습니다.", "You can enter/exit with the QR code.")}
-                </p>
-              </div>
+              <p className="text-sm font-black text-blue-800 flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-blue-500" />
+                {zones.find((z) => z.id === ui.zone)?.name || ui.zone}
+              </p>
             </div>
-          </div>
+          )}
 
-          <div className="border-t border-slate-200/80 bg-[linear-gradient(180deg,_rgba(248,250,252,0.78)_0%,_rgba(255,255,255,0.98)_100%)] p-3">
-            <Tabs defaultValue={defaultTab} className="w-full">
-              <TabsList
-                className={`grid w-full h-auto rounded-2xl border border-slate-200 bg-white/90 p-1.5 shadow-sm ${gridColsClass}`}
-              >
-                {effectiveMenuVisibility.status && (
-                  <TabsTrigger
-                    value="status"
-                    className="flex flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 hover:bg-slate-50"
-                  >
-                    <User className="w-4 h-4" />
-                    <span className="text-[11px] font-body font-semibold">
-                      {getMenuLabel("status", "상태", "Status")}
-                    </span>
-                  </TabsTrigger>
-                )}
-                {effectiveMenuVisibility.sessions && (
-                  <TabsTrigger
-                    value="sessions"
-                    className="flex flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 hover:bg-slate-50"
-                  >
-                    <TrendingUp className="w-4 h-4" />
-                    <span className="text-[11px] font-body font-semibold">
-                      {getMenuLabel("sessions", "수강", "Sessions")}
-                    </span>
-                  </TabsTrigger>
-                )}
-                {effectiveMenuVisibility.materials && (
-                  <TabsTrigger
-                    value="materials"
-                    className="flex flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 hover:bg-slate-50"
-                  >
-                    <FileText className="w-4 h-4" />
-                    <span className="text-[11px] font-body font-semibold">
-                      {getMenuLabel("materials", "자료", "Materials")}
-                    </span>
-                  </TabsTrigger>
-                )}
-                {effectiveMenuVisibility.program && (
-                  <TabsTrigger
-                    value="program"
-                    className="flex flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 hover:bg-slate-50"
-                  >
-                    <Calendar className="w-4 h-4" />
-                    <span className="text-[11px] font-body font-semibold">
-                      {getMenuLabel("program", "일정", "Program")}
-                    </span>
-                  </TabsTrigger>
-                )}
-                {translationEnabled && (
-                  <TabsTrigger
-                    value="translation"
-                    className="flex flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 hover:bg-slate-50"
-                  >
-                    <Languages className="w-4 h-4" />
-                    <span className="text-[11px] font-body font-semibold">
-                      {getMenuLabel("translation", "번역", "Translation")}
-                    </span>
-                  </TabsTrigger>
-                )}
-                {effectiveMenuVisibility.stampTour && (
-                  <TabsTrigger
-                    value="stamp-tour"
-                    className="flex flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 hover:bg-slate-50"
-                  >
-                    <Gift className="w-4 h-4" />
-                    <span className="text-[11px] font-body font-semibold">
-                      {getMenuLabel("stampTour", "메뉴", "Menu")}
-                    </span>
-                  </TabsTrigger>
-                )}
-                {effectiveMenuVisibility.qna && (
-                  <TabsTrigger
-                    value="qna"
-                    className="flex flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 hover:bg-slate-50"
-                  >
-                    <HelpCircle className="w-4 h-4" />
-                    <span className="text-[11px] font-body font-semibold">
-                      {getMenuLabel("qna", "Q&A", "Q&A")}
-                    </span>
-                  </TabsTrigger>
-                )}
-              </TabsList>
-
-              {/* Status Tab */}
-              {effectiveMenuVisibility.status && (
-                <TabsContent value="status" className="mt-2 p-1 space-y-2">
-                <div
-                  className={`py-6 px-6 rounded-2xl font-body font-semibold text-center border-2 shadow-lg transition-all relative overflow-hidden ${
-                    ui.status === "INSIDE"
-                      ? "bg-gradient-to-br from-emerald-50 via-green-50/80 to-teal-50/60 text-emerald-700 border-emerald-200/70 shadow-emerald-100/50"
-                      : "bg-gradient-to-br from-slate-50 to-gray-50/80 text-slate-600 border-slate-200/70 shadow-slate-100/50"
-                  }`}
-                >
-                  {ui.status === "INSIDE" && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/10 via-transparent to-green-400/10 animate-pulse"></div>
-                  )}
-                  <div className="flex items-center justify-center gap-3 relative z-10">
-                    {ui.status === "INSIDE" ? (
-                      <>
-                        <div className="relative">
-                          <span className="w-4 h-4 bg-emerald-500 rounded-full flex animate-pulse shadow-lg" />
-                          <span className="absolute inset-0 w-4 h-4 bg-emerald-400 rounded-full animate-ping" />
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-lg font-display font-semibold">{t("학술대회 입장중", "Conference Active")}</span>
-                          <span className="text-sm opacity-80">{t("출석 인정 중", "Attendance Active")}</span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <span className="w-4 h-4 bg-slate-400 rounded-full shadow-md" />
-                        <div className="flex flex-col">
-                          <span className="text-lg font-display font-semibold">{t("대기중", "Standby")}</span>
-                          <span className="text-sm opacity-80">{t("입장 전 상태", "Pre-entry")}</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {ui.zone && ui.zone !== "OUTSIDE" && (
-                  <div className="bg-blue-50/50 border border-blue-100 rounded-xl py-3 px-4 flex justify-between items-center">
-                    <p className="text-xs text-blue-600 font-bold">
-                      {t("현재 구역", "Current zone")}
-                    </p>
-                    <p className="text-sm font-black text-blue-800 flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-blue-500" />
-                      {zones.find((z) => z.id === ui.zone)?.name || ui.zone}
-                    </p>
-                  </div>
-                )}
-
-                {liveMinutes > 0 && (
-                  <div className="bg-purple-50/50 border border-purple-100 rounded-xl py-3 px-4 flex justify-between items-center">
-                    <div className="flex flex-col">
-                      <p className="text-xs text-purple-600 font-bold">
-                        {t("누적 체류 시간", "Total attendance time")}
-                      </p>
-                      {ui.status === "INSIDE" && (
-                        <p className="text-[10px] text-purple-400">
-                          {t(
-                            "현재 세션 시간이 계속 반영됩니다.",
-                            "Current session time is updating live.",
-                          )}
-                        </p>
-                      )}
-                    </div>
-                    <p className="text-sm font-black text-purple-800 flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-purple-500" />
-                      {formatMinutes(liveMinutes)}
-                    </p>
-                  </div>
-                )}
-
-                {certificateEnabled && (
-                  <div className="mt-4">
-                    <CertificateDownloader 
-                      confId={getConfIdToUse(slug)} 
-                      ui={ui} 
-                      badgeLang={badgeLang} 
-                    />
-                  </div>
-                )}
-
-                {(attendanceMode === "CUMULATIVE" && attendanceGoalMinutes > 0) && (
-                  <div className="bg-eregi-primary/5 border border-eregi-primary/10 rounded-xl py-3 px-4">
-                    <div className="flex justify-between items-center">
-                      <p className="text-xs text-eregi-primary font-body font-semibold">
-                        {t("이수 목표 / 남은 시간", "Goal / Remaining")}
-                      </p>
-                      <p className="text-xs font-body font-bold text-eregi-primary">
-                        {progressPercent}%
-                      </p>
-                    </div>
-                    <div className="mt-2 h-2 rounded-full bg-eregi-primary/10 overflow-hidden">
-                      <div
-                        className="h-full bg-eregi-primary"
-                        style={{ width: `${progressPercent}%` }}
-                      />
-                    </div>
-                    <div className="mt-2 flex justify-between items-center text-sm font-body font-semibold">
-                      <span className="text-eregi-primary">
-                        {formatMinutes(attendanceGoalMinutes)}
-                      </span>
-                      <span className="text-gray-500">{t("남음", "Left")}</span>
-                      <span className="text-gray-900">
-                        {formatMinutes(remainingMinutes)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {(attendanceMode === "CUMULATIVE" && (attendanceGoalMinutes > 0 || todayAccumulated > 0)) && (
-                  <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl py-3 px-4 flex justify-between items-center">
-                    <div className="flex flex-col">
-                      <p className="text-xs text-indigo-700 font-bold">
-                        {t("오늘 인정 시간", "Today tracked time")}
-                      </p>
-                      {ui.status === "INSIDE" && (
-                        <p className="text-[10px] text-indigo-400">
-                          {t(
-                            "현재 세션 시간이 계속 반영됩니다.",
-                            "Current session time is updating live.",
-                          )}
-                        </p>
-                      )}
-                    </div>
-                    <p className="text-sm font-black text-indigo-900 flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-indigo-500" />
-                      {formatMinutes(todayAccumulated)}
-                    </p>
-                  </div>
-                )}
-                </TabsContent>
-              )}
-
-              {/* Sessions Tab */}
-              {effectiveMenuVisibility.sessions && (
-                <TabsContent value="sessions" className="mt-2 p-1">
-                <div className="bg-white rounded-2xl py-6 px-4 border border-gray-100 shadow-sm text-center">
-                  <div
-                    className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg border-3 transition-all ${ui.isCompleted ? "bg-gradient-to-br from-emerald-50 to-green-100/80 text-emerald-600 border-emerald-200 shadow-emerald-100/50" : "bg-gradient-to-br from-slate-50 to-gray-100/80 text-slate-500 border-slate-200 shadow-slate-100/50"}`}
-                  >
-                    {ui.isCompleted ? (
-                      <CheckCircle className="w-8 h-8 text-emerald-600 drop-shadow-sm" />
-                    ) : (
-                      <TrendingUp className="w-8 h-8 text-slate-500" />
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500 font-bold mb-1 uppercase tracking-wider">
-                    {t("세션 진행", "Session Progress")}
-                  </p>
-                  <p className="text-sm text-gray-500 font-medium mb-4">
+          {liveMinutes > 0 && (
+            <div className="bg-purple-50/50 border border-purple-100 rounded-xl py-3 px-4 flex justify-between items-center">
+              <div className="flex flex-col">
+                <p className="text-xs text-purple-600 font-bold">
+                  {t("누적 체류 시간", "Total attendance time")}
+                </p>
+                {ui.status === "INSIDE" && (
+                  <p className="text-[10px] text-purple-400">
                     {t(
-                      "참가자의 출석 진행 상태입니다.",
-                      "This shows the attendee session progress.",
+                      "현재 세션 시간이 계속 반영됩니다.",
+                      "Current session time is updating live.",
                     )}
                   </p>
-
-                  <div className="flex flex-col items-center gap-1 mb-4">
-                    <span
-                      className={`text-3xl font-display font-semibold tracking-tight ${ui.isCompleted ? "text-eregi-primary" : "text-foreground"}`}
-                    >
-                      {ui.isCompleted
-                        ? t("이수 완료", "Completed")
-                        : t("진행 중", "In Progress")}
-                    </span>
-                    <span className="text-sm font-bold text-gray-500 mt-2 bg-gray-50 px-4 py-2 rounded-lg">
-                      {t("누적 인정 시간", "Tracked time")}:{" "}
-                      <span className="text-purple-600">
-                        {formatMinutes(liveMinutes)}
-                      </span>
-                    </span>
-                    {(attendanceMode === "CUMULATIVE" &&
-                      attendanceGoalMinutes > 0) && (
-                      <div className="mt-3 w-full bg-eregi-primary/5 border border-eregi-primary/10 rounded-xl px-4 py-3">
-                        <div className="flex justify-between items-center text-xs font-body font-semibold text-eregi-primary">
-                          <span>
-                            {t("목표", "Goal")}:{" "}
-                            {formatMinutes(attendanceGoalMinutes)}
-                          </span>
-                          <span>
-                            {t("남은 시간", "Remaining")}:{" "}
-                            {formatMinutes(remainingMinutes)}
-                          </span>
-                        </div>
-                        <div className="mt-2 h-2 rounded-full bg-eregi-primary/10 overflow-hidden">
-                          <div
-                            className="h-full bg-eregi-primary"
-                            style={{ width: `${progressPercent}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                </TabsContent>
-              )}
-
-              {/* Materials Tab */}
-              {effectiveMenuVisibility.materials && (
-                <TabsContent value="materials" className="mt-2 p-1 space-y-2">
-                {badgeConfig?.materialsUrls &&
-                badgeConfig.materialsUrls.length > 0 ? (
-                  badgeConfig.materialsUrls.map((mat, idx: number) => (
-                    <a
-                      key={idx}
-                      href={mat.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center p-4 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-xl transition-all group"
-                    >
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-blue-200 transition-colors">
-                        <Download className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-sm font-bold text-gray-900">
-                          {mat.name}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {t(
-                            "자료를 새 창에서 엽니다.",
-                            "Open material in a new window.",
-                          )}
-                        </p>
-                      </div>
-                    </a>
-                  ))
-                ) : (
-                  <>
-                    <a
-                      href={`/${slug}/materials`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center p-4 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-xl transition-all group"
-                    >
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-blue-200 transition-colors">
-                        <Download className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-sm font-bold text-gray-900">
-                          {t("강의 자료집", "Lecture materials")}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {t(
-                            "발표 자료를 확인할 수 있습니다.",
-                            "Open presentation materials.",
-                          )}
-                        </p>
-                      </div>
-                    </a>
-                    <a
-                      href={`/${slug}/abstracts`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center p-4 bg-white hover:bg-purple-50 border border-gray-200 hover:border-purple-200 rounded-xl transition-all group"
-                    >
-                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-purple-200 transition-colors">
-                        <FileText className="w-5 h-5 text-purple-600" />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-sm font-bold text-gray-900">
-                          {t("초록집", "Abstract book")}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {t(
-                            "초록 자료를 확인할 수 있습니다.",
-                            "Open the abstract book.",
-                          )}
-                        </p>
-                      </div>
-                    </a>
-                  </>
                 )}
-                </TabsContent>
-              )}
-
-              {/* Program Tab */}
-              {effectiveMenuVisibility.program && (
-                <TabsContent value="program" className="mt-2 p-1">
-                <a
-                  href={`/${slug}/program`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex flex-col items-center justify-center p-8 bg-white border border-gray-200 rounded-2xl hover:border-amber-300 hover:bg-amber-50 transition-all text-center gap-3"
-                >
-                  <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center">
-                    <Calendar className="w-8 h-8 text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="text-lg font-bold text-gray-900">
-                      {t("프로그램 일정 보기", "Open program schedule")}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Google Calendar / App
-                    </p>
-                  </div>
-                </a>
-                </TabsContent>
-              )}
-
-              {/* Translation Tab */}
-              {translationEnabled && (
-                <TabsContent value="translation" className="mt-2 p-1">
-                  {badgeConfig?.translationUrl &&
-                  badgeConfig.translationUrl.startsWith("http") ? (
-                    <a
-                      href={badgeConfig.translationUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block w-full"
-                    >
-                      <div className="bg-blue-50 rounded-2xl py-12 px-4 border border-blue-200 text-center hover:bg-blue-100 transition-colors cursor-pointer shadow-sm">
-                        <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 relative overflow-hidden">
-                          <Languages className="w-8 h-8 relative z-10" />
-                          <span className="absolute inset-0 bg-blue-400 opacity-20 animate-ping rounded-full" />
-                        </div>
-                        <p className="text-sm text-blue-900 font-bold mb-1">
-                          {t(
-                            "실시간 번역 서비스 연결",
-                            "Real-time Translation",
-                          )}
-                        </p>
-                        <p className="text-xs text-blue-600">
-                          {t(
-                            "클릭하면 번역 서비스로 이동합니다",
-                            "Click to open translation service",
-                          )}
-                        </p>
-                      </div>
-                    </a>
-                  ) : (
-                    <TranslationPanel
-                      defaultConferenceId={getConfIdToUse(slug)}
-                    />
-                  )}
-                </TabsContent>
-              )}
-
-              {effectiveMenuVisibility.stampTour && (
-                <TabsContent value="stamp-tour" className="mt-2 p-1 space-y-3">
-                  <StampTourPanel confId={getConfIdToUse(slug)} userId={ui.userId} userName={ui.name} userAff={ui.aff} badgeLang={badgeLang} />
-                </TabsContent>
-              )}
-
-              {effectiveMenuVisibility.qna && (
-                <TabsContent value="qna" className="mt-2 p-1">
-                  <QnAPanel
-                    confId={getConfIdToUse(slug)}
-                    userId={ui.userId}
-                    userName={ui.name}
-                    userAff={ui.aff}
-                    badgeLang={badgeLang}
-                  />
-                </TabsContent>
-              )}
-            </Tabs>
-          </div>
-        </div>
-
-        {/* Home Button - Floating Bottom aesthetics */}
-        {effectiveMenuVisibility.home && (
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => navigate(`/${publicSlug}`)}
-              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white/85 px-8 py-3 text-sm font-body font-semibold text-slate-700 shadow-sm backdrop-blur transition-colors hover:bg-white"
-            >
-              {getMenuLabel("home", "학술대회 홈페이지로 이동", "Conference Home")}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {rewardAnimationOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/70 px-6">
-          <div className="relative w-full max-w-sm overflow-hidden rounded-[2rem] bg-white p-8 text-center shadow-2xl">
-            <button
-              type="button"
-              onClick={() => setRewardAnimationOpen(false)}
-              className="absolute right-4 top-4 rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-600"
-            >
-              {t("닫기", "Close")}
-            </button>
-            <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-amber-200 via-orange-100 to-transparent" />
-            <div className="relative">
-              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg">
-                <Sparkles className="h-10 w-10 animate-pulse" />
               </div>
-              <p className="text-xs font-bold uppercase tracking-[0.3em] text-amber-600">
-                {t("상품 안내", "Reward Reveal")}
+              <p className="text-sm font-black text-purple-800 flex items-center gap-1">
+                <Clock className="w-3 h-3 text-purple-500" />
+                {formatMinutes(liveMinutes)}
               </p>
-              <h3 className="mt-2 text-2xl font-black text-gray-900">
-                {stampProgress.rewardName || t("상품 확정", "Reward assigned")}
-              </h3>
-              <p className="mt-3 text-sm leading-6 text-gray-600">
-                {rewardMessage ||
-                  t(
-                    "상품 요청이 접수되었습니다. 현장에서 확인해 주세요.",
-                    "Reward request received. Please confirm on site.",
-                  )}
-              </p>
-              <div className="mt-6 flex justify-center gap-2">
-                <span className="h-2 w-2 animate-bounce rounded-full bg-amber-400" />
-                <span className="h-2 w-2 animate-bounce rounded-full bg-orange-400 [animation-delay:120ms]" />
-                <span className="h-2 w-2 animate-bounce rounded-full bg-yellow-400 [animation-delay:240ms]" />
+            </div>
+          )}
+
+          {certificateEnabled && (
+            <div className="mt-4">
+              <CertificateDownloader
+                confId={confId}
+                ui={ui}
+                badgeLang={badgeLang}
+              />
+            </div>
+          )}
+
+          {(attendanceMode === "CUMULATIVE" && attendanceGoalMinutes > 0) && (
+            <div className="bg-eregi-primary/5 border border-eregi-primary/10 rounded-xl py-3 px-4">
+              <div className="flex justify-between items-center">
+                <p className="text-xs text-eregi-primary font-body font-semibold">
+                  {t("이수 목표 / 남은 시간", "Goal / Remaining")}
+                </p>
+                <p className="text-xs font-body font-bold text-eregi-primary">
+                  {progressPercent}%
+                </p>
+              </div>
+              <div className="mt-2 h-2 rounded-full bg-eregi-primary/10 overflow-hidden">
+                <div
+                  className="h-full bg-eregi-primary"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+              <div className="mt-2 flex justify-between items-center text-sm font-body font-semibold">
+                <span className="text-eregi-primary">
+                  {formatMinutes(attendanceGoalMinutes)}
+                </span>
+                <span className="text-gray-500">{t("남음", "Left")}</span>
+                <span className="text-gray-900">
+                  {formatMinutes(remainingMinutes)}
+                </span>
               </div>
             </div>
+          )}
+
+          {(attendanceMode === "CUMULATIVE" && (attendanceGoalMinutes > 0 || todayAccumulated > 0)) && (
+            <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl py-3 px-4 flex justify-between items-center">
+              <div className="flex flex-col">
+                <p className="text-xs text-indigo-700 font-bold">
+                  {t("오늘 인정 시간", "Today tracked time")}
+                </p>
+                {ui.status === "INSIDE" && (
+                  <p className="text-[10px] text-indigo-400">
+                    {t(
+                      "현재 세션 시간이 계속 반영됩니다.",
+                      "Current session time is updating live.",
+                    )}
+                  </p>
+                )}
+              </div>
+              <p className="text-sm font-black text-indigo-900 flex items-center gap-1">
+                <Clock className="w-3 h-3 text-indigo-500" />
+                {formatMinutes(todayAccumulated)}
+              </p>
+            </div>
+          )}
+        </>
+      )}
+      renderSessionsTab={() => (
+        <div className="bg-white rounded-2xl py-6 px-4 border border-gray-100 shadow-sm text-center">
+          <div
+            className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg border-3 transition-all ${ui.isCompleted ? "bg-gradient-to-br from-emerald-50 to-green-100/80 text-emerald-600 border-emerald-200 shadow-emerald-100/50" : "bg-gradient-to-br from-slate-50 to-gray-100/80 text-slate-500 border-slate-200 shadow-slate-100/50"}`}
+          >
+            {ui.isCompleted ? (
+              <CheckCircle className="w-8 h-8 text-emerald-600 drop-shadow-sm" />
+            ) : (
+              <TrendingUp className="w-8 h-8 text-slate-500" />
+            )}
+          </div>
+          <p className="text-xs text-gray-500 font-bold mb-1 uppercase tracking-wider">
+            {t("세션 진행", "Session Progress")}
+          </p>
+          <p className="text-sm text-gray-500 font-medium mb-4">
+            {t(
+              "참가자의 출석 진행 상태입니다.",
+              "This shows the attendee session progress.",
+            )}
+          </p>
+
+          <div className="flex flex-col items-center gap-1 mb-4">
+            <span
+              className={`text-3xl font-display font-semibold tracking-tight ${ui.isCompleted ? "text-eregi-primary" : "text-foreground"}`}
+            >
+              {ui.isCompleted
+                ? t("이수 완료", "Completed")
+                : t("진행 중", "In Progress")}
+            </span>
+            <span className="text-sm font-bold text-gray-500 mt-2 bg-gray-50 px-4 py-2 rounded-lg">
+              {t("누적 인정 시간", "Tracked time")}:{" "}
+              <span className="text-purple-600">
+                {formatMinutes(liveMinutes)}
+              </span>
+            </span>
+            {(attendanceMode === "CUMULATIVE" &&
+              attendanceGoalMinutes > 0) && (
+              <div className="mt-3 w-full bg-eregi-primary/5 border border-eregi-primary/10 rounded-xl px-4 py-3">
+                <div className="flex justify-between items-center text-xs font-body font-semibold text-eregi-primary">
+                  <span>
+                    {t("목표", "Goal")}:{" "}
+                    {formatMinutes(attendanceGoalMinutes)}
+                  </span>
+                  <span>
+                    {t("남은 시간", "Remaining")}:{" "}
+                    {formatMinutes(remainingMinutes)}
+                  </span>
+                </div>
+                <div className="mt-2 h-2 rounded-full bg-eregi-primary/10 overflow-hidden">
+                  <div
+                    className="h-full bg-eregi-primary"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
-    </div>
+      renderMaterialsTab={() =>
+        badgeConfig?.materialsUrls &&
+        badgeConfig.materialsUrls.length > 0 ? (
+          badgeConfig.materialsUrls.map((mat, idx: number) => (
+            <a
+              key={idx}
+              href={mat.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center p-4 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-xl transition-all group"
+            >
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-blue-200 transition-colors">
+                <Download className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-bold text-gray-900">
+                  {mat.name}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {t(
+                    "자료를 새 창에서 엽니다.",
+                    "Open material in a new window.",
+                  )}
+                </p>
+              </div>
+            </a>
+          ))
+        ) : (
+          <>
+            <a
+              href={`/${slug}/materials`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center p-4 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-xl transition-all group"
+            >
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-blue-200 transition-colors">
+                <Download className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-bold text-gray-900">
+                  {t("강의 자료집", "Lecture materials")}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {t(
+                    "발표 자료를 확인할 수 있습니다.",
+                    "Open presentation materials.",
+                  )}
+                </p>
+              </div>
+            </a>
+            <a
+              href={`/${slug}/abstracts`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center p-4 bg-white hover:bg-purple-50 border border-gray-200 hover:border-purple-200 rounded-xl transition-all group"
+            >
+              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-purple-200 transition-colors">
+                <FileText className="w-5 h-5 text-purple-600" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-bold text-gray-900">
+                  {t("초록집", "Abstract book")}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {t(
+                    "초록 자료를 확인할 수 있습니다.",
+                    "Open the abstract book.",
+                  )}
+                </p>
+              </div>
+            </a>
+          </>
+        )
+      }
+      renderProgramTab={() => (
+        <a
+          href={`/${slug}/program`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex flex-col items-center justify-center p-8 bg-white border border-gray-200 rounded-2xl hover:border-amber-300 hover:bg-amber-50 transition-all text-center gap-3"
+        >
+          <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center">
+            <Calendar className="w-8 h-8 text-amber-600" />
+          </div>
+          <div>
+            <p className="text-lg font-bold text-gray-900">
+              {t("프로그램 일정 보기", "Open program schedule")}
+            </p>
+            <p className="text-sm text-gray-500">
+              Google Calendar / App
+            </p>
+          </div>
+        </a>
+      )}
+      renderTranslationTab={() =>
+        badgeConfig?.translationUrl &&
+        badgeConfig.translationUrl.startsWith("http") ? (
+          <a
+            href={badgeConfig.translationUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full"
+          >
+            <div className="bg-blue-50 rounded-2xl py-12 px-4 border border-blue-200 text-center hover:bg-blue-100 transition-colors cursor-pointer shadow-sm">
+              <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 relative overflow-hidden">
+                <Languages className="w-8 h-8 relative z-10" />
+                <span className="absolute inset-0 bg-blue-400 opacity-20 animate-ping rounded-full" />
+              </div>
+              <p className="text-sm text-blue-900 font-bold mb-1">
+                {t(
+                  "실시간 번역 서비스 연결",
+                  "Real-time Translation",
+                )}
+              </p>
+              <p className="text-xs text-blue-600">
+                {t(
+                  "클릭하면 번역 서비스로 이동합니다",
+                  "Click to open translation service",
+                )}
+              </p>
+            </div>
+          </a>
+        ) : (
+          <TranslationPanel
+            defaultConferenceId={getConfIdToUse(slug)}
+          />
+        )
+      }
+      renderStampTourTab={() => (
+        <StampTourPanel
+          confId={getConfIdToUse(slug)}
+          userId={ui.userId}
+          userName={ui.name}
+          userAff={ui.aff}
+          badgeLang={badgeLang}
+        />
+      )}
+      renderQnATab={() => (
+        <QnAPanel
+          confId={getConfIdToUse(slug)}
+          userId={ui.userId}
+          userName={ui.name}
+          userAff={ui.aff}
+          badgeLang={badgeLang}
+        />
+      )}
+    />
   );
 };
 
