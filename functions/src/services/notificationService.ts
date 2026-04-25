@@ -15,6 +15,8 @@
  */
 
 import * as functions from 'firebase-functions';
+import * as admin from 'firebase-admin';
+import { sendAlimTalk } from '../utils/nhnCloud';
 
 // 공통 인터페이스
 export interface AlimTalkParams {
@@ -59,7 +61,6 @@ class NHNProvider implements IAlimTalkProvider {
     async send(params: AlimTalkParams, entityId?: string, entityType: 'society' | 'vendor' = 'society'): Promise<AlimTalkResult> {
         try {
             // Firestore에서 NHN Cloud 설정 가져오기
-            const admin = require('firebase-admin');
             const db = admin.firestore();
 
             if (!entityId) {
@@ -96,7 +97,6 @@ class NHNProvider implements IAlimTalkProvider {
             const senderKey = nhnConfig.senderKey;
 
             // NHN Cloud API 호출
-            const { sendAlimTalk } = require('../utils/nhnCloud');
             const result = await sendAlimTalk(
                 {
                     appKey: appKey,

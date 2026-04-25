@@ -16,7 +16,7 @@ import { createAuditLogEntry } from '../audit/logAuditEvent';
 export const scheduledDataCleanup = functions.pubsub
     .schedule('0 3 * * *')
     .timeZone('Asia/Seoul')
-    .onRun(async (context) => {
+    .onRun(async (_context) => {
         const db = admin.firestore();
         const now = admin.firestore.Timestamp.now();
         const threeYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 1095 * 24 * 60 * 60 * 1000));
