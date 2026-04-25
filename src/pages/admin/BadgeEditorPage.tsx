@@ -536,6 +536,7 @@ const BadgeEditorPage: React.FC = () => {
                         {[
                             { type: 'NAME', label: '이름', desc: 'userName', icon: Plus },
                             { type: 'ORG', label: '소속', desc: 'affiliation', icon: Plus },
+                            { type: 'POSITION', label: '직급', desc: 'position', icon: Plus },
                             { type: 'CATEGORY', label: '등록구분', desc: 'userTier', icon: Plus },
                             { type: 'LICENSE', label: '면허번호', desc: 'licenseNumber', icon: Plus },
                             { type: 'AFFILIATION', label: '전문분야', desc: 'affiliation2', icon: Plus },

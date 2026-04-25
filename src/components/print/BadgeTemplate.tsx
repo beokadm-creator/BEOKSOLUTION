@@ -114,6 +114,25 @@ const BadgeTemplate: React.FC<BadgeTemplateProps> = ({ data, config }) => {
         </div>
       )}
 
+      {/* Position Field */}
+      {layout.POSITION && (
+        <div
+          style={{
+            position: 'absolute',
+            left: layout.POSITION.align === 'center' ? '50%' : layout.POSITION.x,
+            top: layout.POSITION.y,
+            fontSize: layout.POSITION.fontSize,
+            color: layout.POSITION.color || '#000',
+            textAlign: layout.POSITION.align || 'left',
+            fontWeight: layout.POSITION.fontWeight || 'normal',
+            zIndex: 1,
+            transform: layout.POSITION.align === 'center' ? 'translateX(-50%)' : 'none',
+          }}
+        >
+          {data.position || data.POSITION}
+        </div>
+      )}
+
       {/* Price Field */}
       {layout.PRICE && (
         <div
