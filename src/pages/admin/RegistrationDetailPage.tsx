@@ -437,9 +437,9 @@ const RegistrationDetailPage: React.FC = () => {
             } else {
                 throw new Error('Failed to send notification');
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Failed to send notification:', error);
-            toast.error(`발송 실패: ${error.message || '알 수 없는 오류'}`);
+            toast.error(`발송 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
         } finally {
             setIsResending(false);
         }
@@ -493,7 +493,7 @@ const RegistrationDetailPage: React.FC = () => {
         try {
             // 1. Update Registration Document
             const regRef = doc(db, 'conferences', effectiveCid, 'registrations', id);
-            const regUpdatePayload: any = {
+            const regUpdatePayload: Record<string, unknown> = {
                 userName: editData.userName,
                 userPhone: editData.userPhone,
                 affiliation: editData.userOrg,
@@ -504,7 +504,7 @@ const RegistrationDetailPage: React.FC = () => {
             };
 
             // Also update nested userInfo if it exists to keep structure consistent
-            if ((data as any).userInfo) {
+            if ((data as Record<string, unknown>).userInfo) {
                 regUpdatePayload['userInfo.name'] = editData.userName;
                 regUpdatePayload['userInfo.phone'] = editData.userPhone;
                 regUpdatePayload['userInfo.affiliation'] = editData.userOrg;
@@ -513,8 +513,8 @@ const RegistrationDetailPage: React.FC = () => {
             }
 
             // Also update legacy fields if they existed
-            if ((data as any).userAffiliation) regUpdatePayload.userAffiliation = editData.userOrg;
-            if ((data as any).license) regUpdatePayload.license = editData.licenseNumber;
+            if ((data as Record<string, unknown>).userAffiliation) regUpdatePayload.userAffiliation = editData.userOrg;
+            if ((data as Record<string, unknown>).license) regUpdatePayload.license = editData.licenseNumber;
 
             await updateDoc(regRef, regUpdatePayload);
 
@@ -569,7 +569,7 @@ const RegistrationDetailPage: React.FC = () => {
 
     const canCancel = data.status === 'PAID' && data.paymentKey;
     const canRequestRefund = data.status === 'PAID';
-    const canManualApprove = data.status === 'PENDING' || data.status === 'FAILED' || data.status === 'WAITING_FOR_DEPOSIT' || data.status === 'PENDING_PAYMENT' || (data.status === 'PAID' && (data as any).paymentStatus !== 'PAID');
+    const canManualApprove = data.status === 'PENDING' || data.status === 'FAILED' || data.status === 'WAITING_FOR_DEPOSIT' || data.status === 'PENDING_PAYMENT' || (data.status === 'PAID' && (data as Record<string, unknown>).paymentStatus !== 'PAID');
 
     return (
         <div className="p-8 max-w-4xl mx-auto bg-white min-h-screen">

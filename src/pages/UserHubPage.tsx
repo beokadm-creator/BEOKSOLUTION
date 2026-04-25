@@ -23,7 +23,7 @@ import { logger } from '../utils/logger';
 import { CreditCard } from 'lucide-react';
 import { Submission, ConferenceUser } from '../types/schema';
 import { normalizeUserData } from '../utils/userDataMapper';
-import { safeFormatDate } from '../utils/dateUtils';
+import { safeFormatDate, type DateLike } from '../utils/dateUtils';
 import { DOMAIN_CONFIG, extractSocietyFromHost } from '../utils/domainHelper';
 import { resolveSocietyByIdentifier } from '../utils/societyResolver';
 
@@ -186,7 +186,40 @@ interface ConsentHistoryEntry {
     timestamp?: Timestamp;
 }
 
-// [Step 512-Des] Visual Gratification: CountUp Animation
+// Conference data as stored in Firestore (flexible shape from doc.data())
+interface FirestoreConferenceData {
+    societyId?: string;
+    title?: unknown;
+    dates?: { start?: unknown; end?: unknown; startDate?: unknown };
+    startDate?: unknown;
+    endDate?: unknown;
+    venue?: { name?: unknown; address?: unknown };
+    venueName?: unknown;
+    venueAddress?: unknown;
+    slug?: string;
+    receipt?: unknown;
+    [key: string]: unknown;
+}
+
+interface FirestoreSocietyData {
+    name?: unknown;
+    [key: string]: unknown;
+}
+const getAbstractConfLabel = (abs: Submission): string => {
+    const r = abs as unknown as Record<string, unknown>;
+    return (r.confId as string | undefined)?.toUpperCase() || 'UNKNOWN';
+};
+
+const getAbstractConferenceId = (abs: Submission): string => {
+    const r = abs as unknown as Record<string, unknown>;
+    return forceString(r.slug || r.conferenceSlug || r.confId || r.conferenceId);
+};
+
+const getAbstractSocietyId = (abs: Submission): string => {
+    const r = abs as unknown as Record<string, unknown>;
+    return forceString(r.societyId);
+};
+
 const AnimatedCounter = ({ value }: { value: number }) => {
     const [count, setCount] = useState(0);
 
@@ -248,7 +281,7 @@ const UserHubPage: React.FC = () => {
     }, [authLoading]);
 
     const [totalPoints, setTotalPoints] = useState(0);
-    const [societies, setSocieties] = useState<Array<{ id: string; name: string | { ko?: string; en?: string };[key: string]: unknown }>>([]);
+    const [societies, setSocieties] = useState<Array<{ id: string; name?: string | { ko?: string; en?: string }; [key: string]: unknown }>>([]);
 
     // Profile
     const [profile, setProfile] = useState({ displayName: '', phoneNumber: '', affiliation: '', licenseNumber: '', email: '' });
@@ -428,7 +461,7 @@ const UserHubPage: React.FC = () => {
 
         try {
             const snapSoc = await getDocs(collection(db, 'societies'));
-            setSocieties(snapSoc.docs.map(d => ({ id: d.id, ...d.data() })) as any);
+            setSocieties(snapSoc.docs.map(d => ({ id: d.id, ...d.data() })));
         } catch (socErr) {
             logger.error('UserHub', 'Societies fetch error', socErr);
         }
@@ -463,7 +496,7 @@ const UserHubPage: React.FC = () => {
                 return isInSocietyScope(absSociety, absSlug);
             });
 
-            setAbstracts(scopedAbstracts as any);
+            setAbstracts(scopedAbstracts as unknown as Submission[]);
             logger.debug('UserHub', 'Abstracts fetched', { count: scopedAbstracts.length });
         } catch (absErr) {
             logger.error('UserHub', 'Abstracts fetch error', absErr);
@@ -780,12 +813,12 @@ const UserHubPage: React.FC = () => {
                         ]);
 
                         // [PERF] Step 3: Build lookup Maps (O(1) access)
-                        const confCache = new Map<string, any>();
+                        const confCache = new Map<string, FirestoreConferenceData>();
                         confDocs.forEach((confData, i) => {
                             if (confData) confCache.set(uniqueConfSlugs[i], confData);
                         });
 
-                        const societyCache = new Map<string, any>();
+                        const societyCache = new Map<string, FirestoreSocietyData>();
                         societyDocs.forEach((snap, i) => {
                             if (snap.exists()) societyCache.set(uniqueSocietyIds[i], snap.data());
                         });
@@ -795,7 +828,7 @@ const UserHubPage: React.FC = () => {
                         const regDocs = await Promise.all(
                             participationData.map(p => getDoc(doc(db, `conferences/${p.confSlug}/registrations/${p.docSnap.id}`)).catch(() => null))
                         );
-                        const regCache = new Map<string, any>();
+                        const regCache = new Map<string, Record<string, unknown>>();
                         regDocs.forEach(snap => {
                             if (snap && snap.exists()) regCache.set(snap.id, snap.data());
                         });
@@ -803,7 +836,7 @@ const UserHubPage: React.FC = () => {
 
                         // [PERF] Step 4: Map registrations using cached data (no more per-item Firestore calls)
                         const loadedRegs: Array<UserReg | null> = participationData.map(({ docSnap, data, confSlug }) => {
-                            const cData = confCache.get(confSlug) as ({ societyId?: string;[key: string]: unknown }) | undefined;
+                            const cData = confCache.get(confSlug);
 
                             let realTitle = forceString(data.conferenceName || confSlug);
                             let socName = forceString(data.societyName);
@@ -812,18 +845,20 @@ const UserHubPage: React.FC = () => {
                             let receiptConfig: ReceiptConfig | undefined = undefined;
 
                             if (cData) {
-                                realTitle = forceString((cData as any).title?.ko || (cData as any).title?.en || (cData as any).title || (cData as any).slug);
+                                realTitle = forceString(
+                                    (cData.title as Stringable)?.ko || (cData.title as Stringable)?.en || cData.title || cData.slug
+                                );
 
-                                const dateStart = (cData as any).dates?.start || (cData as any).startDate || (cData as any).dates?.startDate;
-                                const dateEnd = (cData as any).dates?.end || (cData as any).endDate;
-                                const s = safeFormatDate(dateStart);
-                                const e = safeFormatDate(dateEnd);
+                                const dateStart = cData.dates?.start || cData.startDate || cData.dates?.startDate;
+                                const dateEnd = cData.dates?.end || cData.endDate;
+                                const s = safeFormatDate(dateStart as DateLike);
+                                const e = safeFormatDate(dateEnd as DateLike);
                                 dates = s === e ? s : `${s} ~ ${e}`;
 
-                                const venueName = (cData as any).venue?.name || (cData as any).venueName;
-                                const venueAddress = (cData as any).venue?.address || (cData as any).venueAddress;
+                                const venueName = cData.venue?.name || cData.venueName;
+                                const venueAddress = cData.venue?.address || cData.venueAddress;
                                 loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : '장소 정보 없음');
-                                receiptConfig = (cData as any).receipt as ReceiptConfig | undefined;
+                                receiptConfig = cData.receipt as ReceiptConfig | undefined;
                             }
 
                             let societyId = data.societyId as string;
@@ -938,14 +973,14 @@ const UserHubPage: React.FC = () => {
                         Promise.all(uniqueSocIds.map(sid => getDoc(doc(db, 'societies', sid))))
                     ]);
 
-                    const confCache = new Map<string, any>();
+                    const confCache = new Map<string, FirestoreConferenceData>();
                     confDocs.forEach((confData, i) => { if (confData) confCache.set(uniqueConfSlugs[i], confData); });
 
-                    const socCache = new Map<string, any>();
+                    const socCache = new Map<string, FirestoreSocietyData>();
                     socDocs.forEach((snap, i) => { if (snap.exists()) socCache.set(uniqueSocIds[i], snap.data()); });
 
                     const validRegs: UserReg[] = enrichedDocs.map(({ docSnap, data, confSlug }) => {
-                        const cData = confCache.get(confSlug) as ({ societyId?: string;[key: string]: unknown }) | undefined;
+                        const cData = confCache.get(confSlug) as FirestoreConferenceData | undefined;
 
                         let realTitle = forceString(data.conferenceName || confSlug);
                         let socName = forceString(data.societyName);
@@ -954,17 +989,19 @@ const UserHubPage: React.FC = () => {
                         let receiptConfig: ReceiptConfig | undefined = undefined;
 
                         if (cData) {
-                            realTitle = forceString((cData as any).title?.ko || (cData as any).title?.en || (cData as any).title);
-                            const venueName = (cData as any).venue?.name || (cData as any).venueName;
-                            const venueAddress = (cData as any).venue?.address || (cData as any).venueAddress;
+                            realTitle = forceString(
+                                (cData.title as Stringable)?.ko || (cData.title as Stringable)?.en || cData.title
+                            );
+                            const venueName = cData.venue?.name || cData.venueName;
+                            const venueAddress = cData.venue?.address || cData.venueAddress;
                             loc = venueName ? forceString(venueName) : (venueAddress ? forceString(venueAddress) : '장소 정보 없음');
 
-                            const dateStart = (cData as any).dates?.start || (cData as any).startDate || (cData as any).dates?.startDate;
-                            const dateEnd = (cData as any).dates?.end || (cData as any).endDate;
-                            const s = safeFormatDate(dateStart);
-                            const e = safeFormatDate(dateEnd);
+                            const dateStart = cData.dates?.start || cData.startDate || cData.dates?.startDate;
+                            const dateEnd = cData.dates?.end || cData.endDate;
+                            const s = safeFormatDate(dateStart as DateLike);
+                            const e = safeFormatDate(dateEnd as DateLike);
                             dates = s === e ? s : `${s} ~ ${e}`;
-                            receiptConfig = (cData as any).receipt as ReceiptConfig | undefined;
+                            receiptConfig = cData.receipt as ReceiptConfig | undefined;
                         }
 
                         let societyId = data.societyId as string;
@@ -1231,7 +1268,7 @@ const UserHubPage: React.FC = () => {
     const societyName = getSocietyName();
     const pageTitle = isMain ? "통합 마이페이지" : `${societyName} 마이페이지`;
 
-    const formatDate = (date: any): string => {
+    const formatDate = (date: DateLike): string => {
         return safeFormatDate(date, 'ko-KR');
     };
 
@@ -1514,7 +1551,7 @@ const UserHubPage: React.FC = () => {
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="flex flex-col">
                                         <div className="text-xs font-bold text-eregi-600 mb-1 bg-eregi-50 inline-block px-2 py-0.5 rounded">
-                                            [(abs as any).confId?.toUpperCase() || 'UNKNOWN']
+                                            [{getAbstractConfLabel(abs)}]
                                         </div>
                                         <h3 className="font-heading-3 text-slate-900 mt-2">
                                             {abs.title?.ko || abs.title?.en || 'Untitled'}
@@ -1545,17 +1582,14 @@ const UserHubPage: React.FC = () => {
                                                 e.stopPropagation();
                                                 // [Fix-Step 410-D] Correct Edit URL with proper query string
                                                 const currentHost = window.location.hostname;
-                                                const absData = abs as any;
-                                                const abstractSlug = getSafeConferenceSlug(
-                                                    forceString(absData.slug || absData.conferenceSlug || absData.confId || absData.conferenceId)
-                                                );
+                                                const abstractSlug = getSafeConferenceSlug(getAbstractConferenceId(abs));
                                                 if (!abstractSlug) {
                                                     toast.error('학술대회 정보가 없어 초록 수정 페이지로 이동할 수 없습니다.');
                                                     return;
                                                 }
                                                 const fallbackSocietyFromHost = extractSocietyFromHost(currentHost);
                                                 const abstractSocietyId = forceString(
-                                                    absData.societyId ||
+                                                    getAbstractSocietyId(abs) ||
                                                     getSocietyIdFromSlug(abstractSlug) ||
                                                     fallbackSocietyFromHost
                                                 );
@@ -1593,12 +1627,7 @@ const UserHubPage: React.FC = () => {
 
                                                 try {
                                                     const db = getFirestore();
-                                                    const confId = forceString(
-                                                        (abs as any).confId ||
-                                                        (abs as any).conferenceId ||
-                                                        (abs as any).slug ||
-                                                        (abs as any).conferenceSlug
-                                                    );
+                                                    const confId = getAbstractConferenceId(abs);
                                                     if (!confId) {
                                                         toast.error("유효하지 않은 컨퍼런스 ID입니다.");
                                                         return;

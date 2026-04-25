@@ -111,7 +111,7 @@ const AbstractSubmissionPage: React.FC = () => {
         setAuthors(newAuthors);
     };
 
-    const handleEdit = (sub: any) => {
+    const handleEdit = (sub: Record<string, unknown>) => {
         setEditingId(sub.id);
         setTitleKo(sub.title?.ko || '');
         setTitleEn(sub.title?.en || '');

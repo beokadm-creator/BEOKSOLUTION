@@ -84,7 +84,7 @@ export const buildPrintData = (
     const cutPaperType = layout.cutPaperType ?? 0;
     const printerFont = layout.printerFont || 'Malgun Gothic';
 
-    const functions: Record<string, any> = {
+    const functions: Record<string, Record<string, unknown[]>> = {
         "func01": { "clearBuffer": [] },
         "func02": { "directDrawHex": [asciiToHex(`CUT${enableCutting ? 1 : 0}\r`)] },
         "func03": { "directDrawHex": [asciiToHex(`CL${heightDots}\r`)] },

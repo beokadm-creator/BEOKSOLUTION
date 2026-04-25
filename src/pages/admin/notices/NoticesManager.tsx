@@ -167,7 +167,7 @@ export const NoticesManager = () => {
     setVideoUrls(newUrls);
   };
 
-  const formatDate = (timestamp: any) => {
+  const formatDate = (timestamp: unknown) => {
     try {
       return safeFormatDate(timestamp, language === 'ko' ? 'ko-KR' : 'en-US', {
         year: 'numeric',

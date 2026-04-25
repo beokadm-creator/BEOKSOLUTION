@@ -67,15 +67,15 @@ interface ParticipantRecord {
     isExternal: boolean;
     firstEntryTime?: number;
     lastExitTime?: number;
-    lastCheckIn?: any;
-    lastCheckOut?: any;
+    lastCheckIn?: unknown;
+    lastCheckOut?: unknown;
     currentZone?: string | null;
     zoneMinutes: Record<string, number>;
     zoneCompleted: Record<string, boolean>;
 }
 
 // Robust timestamp parser to handle all Firestore/JS variations
-const ensureMillis = (val: any): number | undefined => {
+const ensureMillis = (val: unknown): number | undefined => {
     if (!val) return undefined;
     if (typeof val.toMillis === 'function') return val.toMillis();
     if (val.seconds !== undefined) return val.seconds * 1000 + (val.nanoseconds ? val.nanoseconds / 1000000 : 0);

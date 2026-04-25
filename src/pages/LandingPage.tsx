@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import { safeFormatDate } from '../utils/dateUtils';
+import type { DateLike } from '../utils/dateUtils';
 import {
     Users,
     Calendar,
@@ -33,6 +34,15 @@ interface Conference {
     status: string;
 }
 
+const toEpochSeconds = (ts: unknown): number => {
+    if (!ts) return 0;
+    if (typeof ts === 'object' && ts !== null && 'seconds' in ts) return (ts as { seconds: number }).seconds;
+    if (typeof ts === 'object' && ts !== null && 'toMillis' in ts) {
+        try { return Math.floor((ts as { toMillis: () => number }).toMillis() / 1000); } catch { return 0; }
+    }
+    return 0;
+};
+
 const LandingPage: React.FC = () => {
     const [societies, setSocieties] = useState<Society[]>([]);
     const [conferences, setConferences] = useState<Conference[]>([]);
@@ -62,8 +72,8 @@ const LandingPage: React.FC = () => {
                     return !['CLOSED', 'ARCHIVED', 'HIDDEN', 'SETUP'].includes(status);
                 })
                 .sort((a, b) => {
-                    const dateA = (a.dates?.start as any)?.seconds || Number.MAX_SAFE_INTEGER;
-                    const dateB = (b.dates?.start as any)?.seconds || Number.MAX_SAFE_INTEGER;
+                    const dateA = toEpochSeconds(a.dates?.start) || Number.MAX_SAFE_INTEGER;
+                    const dateB = toEpochSeconds(b.dates?.start) || Number.MAX_SAFE_INTEGER;
                     // Sort by start date ascending (closest to now first, undefined last)
                     return dateA - dateB;
                 })
@@ -75,8 +85,8 @@ const LandingPage: React.FC = () => {
                     return ['CLOSED', 'ARCHIVED'].includes(status);
                 })
                 .sort((a, b) => {
-                    const dateA = (a.dates?.start as any)?.seconds || 0;
-                    const dateB = (b.dates?.start as any)?.seconds || 0;
+                    const dateA = toEpochSeconds(a.dates?.start) || 0;
+                    const dateB = toEpochSeconds(b.dates?.start) || 0;
                     // Sort by start date descending (most recent past event first)
                     return dateB - dateA;
                 })
@@ -99,7 +109,7 @@ const LandingPage: React.FC = () => {
         return title?.ko || 'Untitled Conference';
     };
 
-    const formatDate = (dateObj: any) => {
+    const formatDate = (dateObj: DateLike) => {
         if (!dateObj) return 'TBA';
         return safeFormatDate(dateObj, 'ko-KR', {
             year: 'numeric',
@@ -110,8 +120,8 @@ const LandingPage: React.FC = () => {
 
     const formatDateRange = (dates?: { start: unknown; end: unknown }) => {
         if (!dates?.start && !dates?.end) return '일정 추후 공지';
-        const start = formatDate(dates?.start);
-        const end = formatDate(dates?.end);
+        const start = formatDate(dates?.start as DateLike);
+        const end = formatDate(dates?.end as DateLike);
         if (!dates?.end || start === end) return start;
         return `${start} - ${end}`;
     };
