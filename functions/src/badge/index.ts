@@ -267,7 +267,7 @@ export const validateBadgePrepToken = functions
     enforceAppCheck: false,
     ingressSettings: 'ALLOW_ALL'
   })
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   .https.onCall(async (data, _context) => {
     const { confId, token } = data;
 
@@ -442,7 +442,7 @@ export const issueDigitalBadge = functions
     enforceAppCheck: false,
     ingressSettings: 'ALLOW_ALL'
   })
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   .https.onCall(async (data, _context) => {
     const { confId, regId, issueOption } = data;
 
@@ -800,7 +800,7 @@ export const bulkSendNotifications = functions
     functions.logger.info(`[BulkSend] Tokens ready: ${tokenGenerated}, skipped: ${skipped}, errors: ${tokenErrors}`);
 
     // 6. NHN Cloud 배치 발송 (최대 1,000명씩)
-    const { sendAlimTalkBatch } = require('../utils/nhnCloud');
+    const { sendAlimTalkBatch } = await import('../utils/nhnCloud');
     let totalSent = 0;
     let totalFailed = 0;
     const NHN_CHUNK = 1000;
