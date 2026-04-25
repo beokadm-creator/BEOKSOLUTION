@@ -21,6 +21,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { WideFooterPreview } from '../components/conference/wide-preview/WideFooterPreview';
 import { toFirestoreUserData } from '../utils/userDataMapper';
+import { normalizeFieldSettings } from '../utils/registrationFieldSettings';
+import type { RegistrationFieldSettings } from '../types/schema';
 import type { ConferenceOption } from '../types/schema';
 
 // Dynamic Types based on DB
@@ -36,6 +38,8 @@ interface RegistrationPeriod {
 interface RegistrationSettings {
     periods: RegistrationPeriod[];
     refundPolicy?: string;
+    paymentMode?: 'TIERED' | 'FREE_ALL';
+    fieldSettings?: RegistrationFieldSettings;
 }
 
 interface InfraSettings {
@@ -189,7 +193,7 @@ export default function RegistrationPage() {
     const [tossClientKey, setTossClientKey] = useState<string | null>(null);
     const [paymentWidget, setPaymentWidget] = useState<PaymentWidgetInstance | null>(null);
     const paymentMethodsWidgetRef = useRef<HTMLDivElement>(null);
-    const paymentMethodsInstanceRef = useRef<unknown>(null);
+    const paymentMethodsInstanceRef = useRef<any>(null);
 
     // State - Form
     const [formData, setFormData] = useState({
@@ -204,6 +208,9 @@ export default function RegistrationPage() {
 
     const [isInfoSaved, setIsInfoSaved] = useState(false);
     const [finalCategory, setFinalCategory] = useState('');
+
+    // Dynamic Field Settings
+    const fieldSettings = normalizeFieldSettings(regSettings?.fieldSettings);
 
     // Pricing hook for optional add-ons
     const {
@@ -512,7 +519,7 @@ export default function RegistrationPage() {
         // [Fix-Step 156] Update selectedTier state
         setSelectedTier(targetGradeId);
 
-    }, [activePeriod, grades, paramMemberGrade, language, paramCalculatedPrice, updateBasePrice]);
+    }, [activePeriod, grades, paramMemberGrade, language, paramCalculatedPrice, updateBasePrice, regSettings?.paymentMode]);
 
 
     // Payment Widget Init
@@ -591,7 +598,15 @@ export default function RegistrationPage() {
     };
 
     const handleSaveBasicInfo = async () => {
-        if (!formData.name || !formData.email || !formData.phone || !formData.affiliation) {
+        // Dynamic Validation based on fieldSettings
+        const missingRequired = [];
+        if (fieldSettings.name.required && !formData.name) missingRequired.push('name');
+        if (fieldSettings.email.required && !formData.email) missingRequired.push('email');
+        if (fieldSettings.phone.required && !formData.phone) missingRequired.push('phone');
+        if (fieldSettings.affiliation.required && !formData.affiliation) missingRequired.push('affiliation');
+        if (fieldSettings.licenseNumber.required && !formData.licenseNumber) missingRequired.push('licenseNumber');
+
+        if (missingRequired.length > 0) {
             toast.error(language === 'ko' ? "필수 항목을 모두 입력해주세요." : "Please fill in all required fields.");
             return;
         }
@@ -606,10 +621,20 @@ export default function RegistrationPage() {
             // 1. Create User (Sign Up) or Update if logged in
             let uid = auth.user?.id || firebaseAuth.currentUser?.uid;
 
+            // If email is hidden and not provided, generate a dummy one for auth purposes
+            // Use phone number for better traceability if available
+            const cleanPhone = formData.phone?.replace(/[^0-9]/g, '');
+            if (!formData.email && !cleanPhone) {
+                toast.error(language === 'ko' ? "이메일 또는 휴대폰 번호 중 하나는 필수입니다." : "Either email or phone number is required.");
+                setIsProcessing(false);
+                return;
+            }
+            const authEmail = formData.email || `${cleanPhone}@no-email.placeholder`;
+
             if (!uid) {
                 // Not logged in -> Create Account
                 try {
-                    const userCredential = await createUserWithEmailAndPassword(firebaseAuth, formData.email, formData.simplePassword);
+                    const userCredential = await createUserWithEmailAndPassword(firebaseAuth, authEmail, formData.simplePassword);
                     uid = userCredential.user.uid;
                     toast.success(language === 'ko' ? "계정이 생성되었습니다." : "Account created successfully.");
                 } catch (authError: unknown) {
@@ -617,7 +642,7 @@ export default function RegistrationPage() {
                     if (err.code === 'auth/email-already-in-use') {
                         // Try logging in if email exists
                         try {
-                            const userCredential = await signInWithEmailAndPassword(firebaseAuth, formData.email, formData.simplePassword);
+                            const userCredential = await signInWithEmailAndPassword(firebaseAuth, authEmail, formData.simplePassword);
                             uid = userCredential.user.uid;
                             toast.success(language === 'ko' ? "로그인되었습니다." : "Logged in successfully.");
                         } catch (loginError: unknown) {
@@ -793,7 +818,6 @@ export default function RegistrationPage() {
                     throw new Error(errData.error || '무료 등록 처리에 실패했습니다.');
                 }
 
-                const origin = window.location.origin;
                 const pureSlug = confId.includes('_') ? confId.split('_').slice(1).join('_') : confId;
                 window.location.href = `/${pureSlug}/register/success?orderId=${orderId}&name=${encodeURIComponent(formData.name)}`;
                 return;
@@ -881,93 +905,118 @@ export default function RegistrationPage() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {/* 1. Email & Password (Guest Login / Create) */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200 mb-4">
-                                <div className="space-y-2">
-                                    <Label>{language === 'ko' ? '이메일' : 'Email'} <span className="text-red-500">*</span></Label>
-                                    <Input
-                                        type="email"
-                                        value={formData.email}
-                                        onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                        readOnly={isInfoSaved || !!auth.user}
-                                        className={isInfoSaved || !!auth.user ? 'bg-gray-100' : 'bg-white'}
-                                        placeholder="email@example.com"
-                                    />
-                                </div>
-
-                                {/* Password: Show for guests (non-authenticated users) */}
-                                {!auth.user && (
+                            {fieldSettings.email.visible && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200 mb-4">
                                     <div className="space-y-2">
-                                        <Label className="flex justify-between items-center">
-                                            <span>
-                                                {language === 'ko' ? '비밀번호' : 'Password'} <span className="text-red-500">*</span>
-                                            </span>
-                                            {/* Load Button for Guests */}
-                                            <button
-                                                type="button"
-                                                onClick={handleLoginAndLoad}
-                                                className="text-xs text-blue-600 hover:underline font-medium"
-                                                disabled={isProcessing}
-                                            >
-                                                {language === 'ko' ? '기존 정보 불러오기' : 'Load Existing Info'}
-                                            </button>
+                                        <Label>
+                                            {language === 'ko' ? '이메일' : 'Email'} 
+                                            {fieldSettings.email.required && <span className="text-red-500">*</span>}
                                         </Label>
                                         <Input
-                                            type="password"
-                                            value={formData.simplePassword}
-                                            onChange={e => setFormData({ ...formData, simplePassword: e.target.value })}
-                                            readOnly={isInfoSaved}
-                                            className="bg-white"
-                                            placeholder={language === 'ko' ? '비밀번호를 입력하세요' : 'Enter password'}
+                                            type="email"
+                                            value={formData.email}
+                                            onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                            readOnly={isInfoSaved || !!auth.user}
+                                            className={isInfoSaved || !!auth.user ? 'bg-gray-100' : 'bg-white'}
+                                            placeholder="email@example.com"
                                         />
-                                        <p className="text-xs text-gray-500">
-                                            * {language === 'ko' ? '기존 가입자는 정보를 불러오고, 처음 등록하는 경우에는 계정이 자동 생성됩니다.' : 'Existing users: info auto-loads. New users: account created.'}
-                                        </p>
                                     </div>
-                                )}
-                            </div>
+
+                                    {/* Password: Show for guests (non-authenticated users) */}
+                                    {!auth.user && (
+                                        <div className="space-y-2">
+                                            <Label className="flex justify-between items-center">
+                                                <span>
+                                                    {language === 'ko' ? '비밀번호' : 'Password'} <span className="text-red-500">*</span>
+                                                </span>
+                                                {/* Load Button for Guests */}
+                                                <button
+                                                    type="button"
+                                                    onClick={handleLoginAndLoad}
+                                                    className="text-xs text-blue-600 hover:underline font-medium"
+                                                    disabled={isProcessing}
+                                                >
+                                                    {language === 'ko' ? '기존 정보 불러오기' : 'Load Existing Info'}
+                                                </button>
+                                            </Label>
+                                            <Input
+                                                type="password"
+                                                value={formData.simplePassword}
+                                                onChange={e => setFormData({ ...formData, simplePassword: e.target.value })}
+                                                readOnly={isInfoSaved}
+                                                className="bg-white"
+                                                placeholder={language === 'ko' ? '비밀번호를 입력하세요' : 'Enter password'}
+                                            />
+                                            <p className="text-xs text-gray-500">
+                                                * {language === 'ko' ? '기존 가입자는 정보를 불러오고, 처음 등록하는 경우에는 계정이 자동 생성됩니다.' : 'Existing users: info auto-loads. New users: account created.'}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             {/* 2. Personal Info */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>{language === 'ko' ? '이름' : 'Name'} <span className="text-red-500">*</span></Label>
-                                    <Input
-                                        value={formData.name}
-                                        onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                        readOnly={memberVerified || isInfoSaved}
-                                        className={memberVerified || isInfoSaved ? 'bg-gray-100' : ''}
-                                        placeholder="이름을 입력하세요"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>{language === 'ko' ? '소속' : 'Affiliation'} <span className="text-red-500">*</span></Label>
-                                    <Input
-                                        value={formData.affiliation}
-                                        onChange={e => setFormData({ ...formData, affiliation: e.target.value })}
-                                        readOnly={isInfoSaved}
-                                        className={isInfoSaved ? 'bg-gray-100' : ''}
-                                        placeholder="소속을 입력하세요"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>{language === 'ko' ? '면허번호' : 'License Number'} <span className="text-red-500">*</span></Label>
-                                    <Input
-                                        value={formData.licenseNumber}
-                                        onChange={e => setFormData({ ...formData, licenseNumber: e.target.value })}
-                                        readOnly={isInfoSaved || (memberVerified && !!paramMemberCode)}
-                                        className={isInfoSaved || (memberVerified && !!paramMemberCode) ? 'bg-gray-100' : ''}
-                                        placeholder="면허번호를 입력하세요"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>{language === 'ko' ? '휴대폰 번호' : 'Phone'} <span className="text-red-500">*</span></Label>
-                                    <Input
-                                        value={formData.phone}
-                                        onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                                        readOnly={isInfoSaved}
-                                        className={isInfoSaved ? 'bg-gray-100' : ''}
-                                        placeholder="010-1234-5678"
-                                    />
-                                </div>
+                                {fieldSettings.name.visible && (
+                                    <div className="space-y-2">
+                                        <Label>
+                                            {language === 'ko' ? '이름' : 'Name'} 
+                                            {fieldSettings.name.required && <span className="text-red-500">*</span>}
+                                        </Label>
+                                        <Input
+                                            value={formData.name}
+                                            onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                            readOnly={memberVerified || isInfoSaved}
+                                            className={memberVerified || isInfoSaved ? 'bg-gray-100' : ''}
+                                            placeholder="이름을 입력하세요"
+                                        />
+                                    </div>
+                                )}
+                                {fieldSettings.affiliation.visible && (
+                                    <div className="space-y-2">
+                                        <Label>
+                                            {language === 'ko' ? '소속' : 'Affiliation'} 
+                                            {fieldSettings.affiliation.required && <span className="text-red-500">*</span>}
+                                        </Label>
+                                        <Input
+                                            value={formData.affiliation}
+                                            onChange={e => setFormData({ ...formData, affiliation: e.target.value })}
+                                            readOnly={isInfoSaved}
+                                            className={isInfoSaved ? 'bg-gray-100' : ''}
+                                            placeholder="소속을 입력하세요"
+                                        />
+                                    </div>
+                                )}
+                                {fieldSettings.licenseNumber.visible && (
+                                    <div className="space-y-2">
+                                        <Label>
+                                            {language === 'ko' ? '면허번호' : 'License Number'} 
+                                            {fieldSettings.licenseNumber.required ? <span className="text-red-500">*</span> : <span className="text-slate-400 text-xs font-normal ml-1">(선택)</span>}
+                                        </Label>
+                                        <Input
+                                            value={formData.licenseNumber}
+                                            onChange={e => setFormData({ ...formData, licenseNumber: e.target.value })}
+                                            readOnly={isInfoSaved || (memberVerified && !!paramMemberCode)}
+                                            className={isInfoSaved || (memberVerified && !!paramMemberCode) ? 'bg-gray-100' : ''}
+                                            placeholder="면허번호를 입력하세요"
+                                        />
+                                    </div>
+                                )}
+                                {fieldSettings.phone.visible && (
+                                    <div className="space-y-2">
+                                        <Label>
+                                            {language === 'ko' ? '휴대폰 번호' : 'Phone'} 
+                                            {fieldSettings.phone.required && <span className="text-red-500">*</span>}
+                                        </Label>
+                                        <Input
+                                            value={formData.phone}
+                                            onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                                            readOnly={isInfoSaved}
+                                            className={isInfoSaved ? 'bg-gray-100' : ''}
+                                            placeholder="010-1234-5678"
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                         <CardFooter className={`${isInfoSaved ? 'hidden' : 'block'}`}>
@@ -1126,7 +1175,7 @@ export default function RegistrationPage() {
                         <DialogTitle>{language === 'ko' ? '환불 규정' : 'Refund Policy'}</DialogTitle>
                     </DialogHeader>
                     <div className="mt-4 whitespace-pre-wrap text-sm text-slate-600 leading-relaxed">
-                        {regSettings?.refundPolicy || (info as ConferenceInfo)?.refundPolicy || "등록 이후 환불 규정은 학회 운영 방침을 따릅니다. 자세한 사항은 사무국으로 문의해주세요."}
+                        {regSettings?.refundPolicy || "등록 이후 환불 규정은 학회 운영 방침을 따릅니다. 자세한 사항은 사무국으로 문의해주세요."}
 
                     </div>
                     <div className="mt-6 flex justify-end">

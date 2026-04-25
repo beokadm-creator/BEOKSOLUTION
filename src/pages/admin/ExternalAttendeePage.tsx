@@ -18,6 +18,8 @@ import { UserPlus, Upload, Download, FileText, Badge, Trash2, Loader2, Eye, EyeO
 import toast from 'react-hot-toast';
 import { VoucherLinkSection } from '../../components/admin/external/VoucherLinkSection';
 import type { ExternalAttendee } from '../../types/schema';
+import { normalizeFieldSettings } from '../../utils/registrationFieldSettings';
+import type { RegistrationFieldSettings } from '../../types/schema';
 import { useBixolon } from '../../hooks/useBixolon';
 
 const ExternalAttendeePage: React.FC = () => {
@@ -90,6 +92,23 @@ const ExternalAttendeePage: React.FC = () => {
     });
     const [noEmail, setNoEmail] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [fieldSettings, setFieldSettings] = useState<RegistrationFieldSettings>(normalizeFieldSettings());
+
+    // Fetch fieldSettings from registration settings
+    useEffect(() => {
+        if (!confId) return;
+        const fetchSettings = async () => {
+            try {
+                const regDoc = await getDoc(doc(db, `conferences/${confId}/settings/registration`));
+                if (regDoc.exists()) {
+                    setFieldSettings(normalizeFieldSettings(regDoc.data().fieldSettings));
+                }
+            } catch (err) {
+                console.error("Failed to fetch fieldSettings", err);
+            }
+        };
+        fetchSettings();
+    }, [confId]);
 
     // Update email when phone changes if noEmail is checked
     useEffect(() => {
@@ -206,17 +225,33 @@ const ExternalAttendeePage: React.FC = () => {
 
     // Handle individual registration
     const handleIndividualRegister = async () => {
-        // Basic validation
-        if (!formData.name || !formData.phone || !formData.organization) {
-            toast.error('이름, 전화번호, 소속은 필수 항목입니다.');
+        // Dynamic Validation based on fieldSettings
+        const missingRequired = [];
+        if (fieldSettings.name.required && !formData.name) missingRequired.push('name');
+        if (fieldSettings.phone.required && !formData.phone) missingRequired.push('phone');
+        if (fieldSettings.affiliation.required && !formData.organization) missingRequired.push('organization');
+        
+        // If email is required, it must be provided unless 'noEmail' is checked
+        if (fieldSettings.email.required && !noEmail && !formData.email) missingRequired.push('email');
+        if (fieldSettings.licenseNumber.required && !formData.licenseNumber) missingRequired.push('licenseNumber');
+
+        if (missingRequired.length > 0) {
+            toast.error('필수 항목을 모두 입력해주세요.');
             return;
         }
 
-        // Email validation
+        // Generate placeholder email if missing
         if (!formData.email) {
+            const cleanPhone = formData.phone.replace(/[^0-9]/g, '');
+            if (!cleanPhone) {
+                toast.error('이메일 또는 전화번호 중 하나는 반드시 입력해야 합니다.');
+                return;
+            }
+
             if (noEmail && formData.phone) {
-                // Should have been set by effect, but double check
-                const cleanPhone = formData.phone.replace(/[^0-9]/g, '');
+                formData.email = `${cleanPhone}@no-email.placeholder`;
+            } else if (!fieldSettings.email.required) {
+                // Not required, but we need an email for the auth system
                 formData.email = `${cleanPhone}@no-email.placeholder`;
             } else {
                 toast.error('이메일을 입력해주세요.');
@@ -350,7 +385,19 @@ const ExternalAttendeePage: React.FC = () => {
                     amount: Number(row.amount || row['등록비'] || row['결제금액'] || 0),
                     password: row.password || row['비밀번호'] ? String(row.password || row['비밀번호']) : undefined
                 };
-            }).filter(item => item.name && (item.email || item.phone)); // Valid rows only
+            }).filter(item => {
+                // Validate based on fieldSettings
+                if (fieldSettings.name.required && !item.name) return false;
+                if (fieldSettings.phone.required && !item.phone) return false;
+                if (fieldSettings.affiliation.required && !item.organization) return false;
+                
+                // Email is mandatory for Auth, so if both email and phone are missing, skip row
+                if (!item.email && !item.phone) return false;
+
+                if (fieldSettings.email.required && !item.email) return false;
+                if (fieldSettings.licenseNumber.required && !item.licenseNumber) return false;
+                return true;
+            }); // Valid rows only
 
             if (mappedData.length === 0) {
                 toast.error('유효한 데이터가 없습니다. 파일의 컬럼명을 확인해주세요.');
@@ -835,61 +882,71 @@ const ExternalAttendeePage: React.FC = () => {
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>이름 <span className="text-red-500">*</span></Label>
-                                        <Input
-                                            value={formData.name}
-                                            onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                            placeholder="홍길동"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <Label>이메일 <span className="text-red-500">*</span></Label>
-                                            <div className="flex items-center space-x-2">
-                                                <input
-                                                    type="checkbox"
-                                                    id="noEmail"
-                                                    checked={noEmail}
-                                                    onChange={(e) => handleNoEmailChange(e.target.checked)}
-                                                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                                />
-                                                <label htmlFor="noEmail" className="text-xs text-gray-500 cursor-pointer select-none">이메일 없음</label>
-                                            </div>
+                                    {fieldSettings.name.visible && (
+                                        <div className="space-y-2">
+                                            <Label>이름 {fieldSettings.name.required && <span className="text-red-500">*</span>}</Label>
+                                            <Input
+                                                value={formData.name}
+                                                onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                                placeholder="홍길동"
+                                            />
                                         </div>
-                                        <Input
-                                            type="email"
-                                            value={formData.email}
-                                            onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                            placeholder="example@email.com"
-                                            disabled={noEmail}
-                                            className={noEmail ? 'bg-gray-100 text-gray-500' : ''}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>전화번호 <span className="text-red-500">*</span></Label>
-                                        <Input
-                                            value={formData.phone}
-                                            onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                                            placeholder="010-1234-5678"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>소속 <span className="text-red-500">*</span></Label>
-                                        <Input
-                                            value={formData.organization}
-                                            onChange={e => setFormData({ ...formData, organization: e.target.value })}
-                                            placeholder="병원/학교명"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>면허번호 (선택)</Label>
-                                        <Input
-                                            value={formData.licenseNumber}
-                                            onChange={e => setFormData({ ...formData, licenseNumber: e.target.value })}
-                                            placeholder="면허번호"
-                                        />
-                                    </div>
+                                    )}
+                                    {fieldSettings.email.visible && (
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <Label>이메일 {fieldSettings.email.required && <span className="text-red-500">*</span>}</Label>
+                                                <div className="flex items-center space-x-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="noEmail"
+                                                        checked={noEmail}
+                                                        onChange={(e) => handleNoEmailChange(e.target.checked)}
+                                                        className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                                    />
+                                                    <label htmlFor="noEmail" className="text-xs text-gray-500 cursor-pointer select-none">이메일 없음</label>
+                                                </div>
+                                            </div>
+                                            <Input
+                                                type="email"
+                                                value={formData.email}
+                                                onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                                placeholder="example@email.com"
+                                                disabled={noEmail}
+                                                className={noEmail ? 'bg-gray-100 text-gray-500' : ''}
+                                            />
+                                        </div>
+                                    )}
+                                    {fieldSettings.phone.visible && (
+                                        <div className="space-y-2">
+                                            <Label>전화번호 {fieldSettings.phone.required && <span className="text-red-500">*</span>}</Label>
+                                            <Input
+                                                value={formData.phone}
+                                                onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                                                placeholder="010-1234-5678"
+                                            />
+                                        </div>
+                                    )}
+                                    {fieldSettings.affiliation.visible && (
+                                        <div className="space-y-2">
+                                            <Label>소속 {fieldSettings.affiliation.required && <span className="text-red-500">*</span>}</Label>
+                                            <Input
+                                                value={formData.organization}
+                                                onChange={e => setFormData({ ...formData, organization: e.target.value })}
+                                                placeholder="소속 기관명"
+                                            />
+                                        </div>
+                                    )}
+                                    {fieldSettings.licenseNumber.visible && (
+                                        <div className="space-y-2">
+                                            <Label>면허번호 {fieldSettings.licenseNumber.required ? <span className="text-red-500">*</span> : <span className="text-gray-400 font-normal text-xs ml-1">(선택)</span>}</Label>
+                                            <Input
+                                                value={formData.licenseNumber}
+                                                onChange={e => setFormData({ ...formData, licenseNumber: e.target.value })}
+                                                placeholder="면허번호"
+                                            />
+                                        </div>
+                                    )}
                                     <div className="space-y-2">
                                         <Label>등록비 (선택)</Label>
                                         <Input

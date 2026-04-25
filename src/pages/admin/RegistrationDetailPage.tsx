@@ -8,6 +8,8 @@ import { ArrowLeft, Printer, XCircle, CheckCircle, CreditCard, Edit, Save, X, Lo
 import toast from 'react-hot-toast';
 import { Registration } from '../../types/schema';
 import { DOMAIN_CONFIG, extractSocietyFromHost } from '../../utils/domainHelper';
+import { normalizeFieldSettings } from '../../utils/registrationFieldSettings';
+import type { RegistrationFieldSettings } from '../../types/schema';
 
 // Extended type for flattened data in UI
 // Extended type for flattened data in UI
@@ -235,6 +237,24 @@ const RegistrationDetailPage: React.FC = () => {
 
     // Resend notification state
     const [isResending, setIsResending] = useState(false);
+
+    const [fieldSettings, setFieldSettings] = useState<RegistrationFieldSettings>(normalizeFieldSettings());
+
+    // Load Registration Settings for field visibility
+    useEffect(() => {
+        if (!effectiveCid) return;
+        const fetchSettings = async () => {
+            try {
+                const regDoc = await getDoc(doc(db, `conferences/${effectiveCid}/settings/registration`));
+                if (regDoc.exists()) {
+                    setFieldSettings(normalizeFieldSettings(regDoc.data().fieldSettings));
+                }
+            } catch (err) {
+                console.error("Failed to fetch fieldSettings", err);
+            }
+        };
+        fetchSettings();
+    }, [effectiveCid]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -601,64 +621,74 @@ const RegistrationDetailPage: React.FC = () => {
                     )}
                 </div>
 
-                <div>
-                    <h3 className="text-sm font-bold text-gray-500 mb-1">이름 (Name)</h3>
-                    {isEditing ? (
-                        <input
-                            type="text"
-                            className="border p-2 rounded w-full border-blue-400 bg-blue-50"
-                            value={editData.userName}
-                            onChange={(e) => setEditData({ ...editData, userName: e.target.value })}
-                        />
-                    ) : (
-                        <p className="text-lg">{data.userName}</p>
-                    )}
-                </div>
-                <div>
-                    <h3 className="text-sm font-bold text-gray-500 mb-1">소속 (Affiliation)</h3>
-                    {isEditing ? (
-                        <input
-                            type="text"
-                            className="border p-2 rounded w-full border-blue-400 bg-blue-50"
-                            value={editData.userOrg}
-                            onChange={(e) => setEditData({ ...editData, userOrg: e.target.value })}
-                        />
-                    ) : (
-                        <p className="text-lg">{data.userOrg || data.affiliation || '-'}</p>
-                    )}
-                </div>
+                {fieldSettings.name.visible && (
+                    <div>
+                        <h3 className="text-sm font-bold text-gray-500 mb-1">이름 (Name)</h3>
+                        {isEditing ? (
+                            <input
+                                type="text"
+                                className="border p-2 rounded w-full border-blue-400 bg-blue-50"
+                                value={editData.userName}
+                                onChange={(e) => setEditData({ ...editData, userName: e.target.value })}
+                            />
+                        ) : (
+                            <p className="text-lg">{data.userName}</p>
+                        )}
+                    </div>
+                )}
+                {fieldSettings.affiliation.visible && (
+                    <div>
+                        <h3 className="text-sm font-bold text-gray-500 mb-1">소속 (Affiliation)</h3>
+                        {isEditing ? (
+                            <input
+                                type="text"
+                                className="border p-2 rounded w-full border-blue-400 bg-blue-50"
+                                value={editData.userOrg}
+                                onChange={(e) => setEditData({ ...editData, userOrg: e.target.value })}
+                            />
+                        ) : (
+                            <p className="text-lg">{data.userOrg || data.affiliation || '-'}</p>
+                        )}
+                    </div>
+                )}
 
-                <div>
-                    <h3 className="text-sm font-bold text-gray-500 mb-1">이메일 (Email) <span className="text-xs font-normal">(수정불가)</span></h3>
-                    <p className="text-lg text-gray-600">{data.userEmail}</p>
-                </div>
-                <div>
-                    <h3 className="text-sm font-bold text-gray-500 mb-1">전화번호 (Phone)</h3>
-                    {isEditing ? (
-                        <input
-                            type="text"
-                            className="border p-2 rounded w-full border-blue-400 bg-blue-50"
-                            value={editData.userPhone}
-                            onChange={(e) => setEditData({ ...editData, userPhone: e.target.value })}
-                        />
-                    ) : (
-                        <p className="text-lg">{data.userPhone}</p>
-                    )}
-                </div>
+                {fieldSettings.email.visible && (
+                    <div>
+                        <h3 className="text-sm font-bold text-gray-500 mb-1">이메일 (Email) <span className="text-xs font-normal">(수정불가)</span></h3>
+                        <p className="text-lg text-gray-600">{data.userEmail}</p>
+                    </div>
+                )}
+                {fieldSettings.phone.visible && (
+                    <div>
+                        <h3 className="text-sm font-bold text-gray-500 mb-1">전화번호 (Phone)</h3>
+                        {isEditing ? (
+                            <input
+                                type="text"
+                                className="border p-2 rounded w-full border-blue-400 bg-blue-50"
+                                value={editData.userPhone}
+                                onChange={(e) => setEditData({ ...editData, userPhone: e.target.value })}
+                            />
+                        ) : (
+                            <p className="text-lg">{data.userPhone}</p>
+                        )}
+                    </div>
+                )}
 
-                <div>
-                    <h3 className="text-sm font-bold text-gray-500 mb-1">면허번호 (License)</h3>
-                    {isEditing ? (
-                        <input
-                            type="text"
-                            className="border p-2 rounded w-full border-blue-400 bg-blue-50"
-                            value={editData.licenseNumber}
-                            onChange={(e) => setEditData({ ...editData, licenseNumber: e.target.value })}
-                        />
-                    ) : (
-                        <p className="text-lg">{data.licenseNumber || data.userInfo?.licenseNumber || (data as Record<string, unknown>).userInfo?.licensenumber || (data as Record<string, unknown>).license || (data as Record<string, unknown>).formData?.licenseNumber || '-'}</p>
-                    )}
-                </div>
+                {fieldSettings.licenseNumber.visible && (
+                    <div>
+                        <h3 className="text-sm font-bold text-gray-500 mb-1">면허번호 (License)</h3>
+                        {isEditing ? (
+                            <input
+                                type="text"
+                                className="border p-2 rounded w-full border-blue-400 bg-blue-50"
+                                value={editData.licenseNumber}
+                                onChange={(e) => setEditData({ ...editData, licenseNumber: e.target.value })}
+                            />
+                        ) : (
+                            <p className="text-lg">{data.licenseNumber || data.userInfo?.licenseNumber || (data as Record<string, unknown>).userInfo?.licensenumber || (data as Record<string, unknown>).license || (data as Record<string, unknown>).formData?.licenseNumber || '-'}</p>
+                        )}
+                    </div>
+                )}
                 <div>
                     <h3 className="text-sm font-bold text-gray-500 mb-1">등록등급 (Grade) <span className="text-xs font-normal">(수정불가)</span></h3>
                     <p className="text-lg text-gray-600">{data.tier || data.userTier || data.categoryName || data.grade || '-'}</p>

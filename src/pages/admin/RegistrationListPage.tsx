@@ -1,6 +1,6 @@
 import { useBixolon } from '../../hooks/useBixolon';
 // import { BadgeElement } from '../../types/schema';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useExcel } from '../../hooks/useExcel';
 import { useRegistrationsPagination } from '../../hooks/useRegistrationsPagination';
@@ -13,6 +13,8 @@ import { EregiButton } from '../../components/eregi/EregiForm';
 import { safeFormatDate } from '../../utils/dateUtils';
 import { handleDeleteRegistrationWithCleanup } from '../../utils/registrationDeleteHandler'; // Keep cascade delete handler
 import { Button } from '../../components/ui/button';
+import { normalizeFieldSettings } from '../../utils/registrationFieldSettings';
+import type { RegistrationFieldSettings } from '../../types/schema';
 
 // Define the root-level registration type based on PaymentSuccessHandler
 interface RootRegistration {
@@ -95,6 +97,24 @@ const RegistrationListPage: React.FC = () => {
     const [searchName, setSearchName] = useState('');
 
     const conferenceId = cid || null;
+
+    const [fieldSettings, setFieldSettings] = useState<RegistrationFieldSettings>(normalizeFieldSettings());
+
+    // Fetch fieldSettings from registration settings
+    useEffect(() => {
+        if (!conferenceId) return;
+        const fetchSettings = async () => {
+            try {
+                const regDoc = await getDoc(doc(db, `conferences/${conferenceId}/settings/registration`));
+                if (regDoc.exists()) {
+                    setFieldSettings(normalizeFieldSettings(regDoc.data().fieldSettings));
+                }
+            } catch (err) {
+                console.error("Failed to fetch fieldSettings", err);
+            }
+        };
+        fetchSettings();
+    }, [conferenceId]);
 
     // Bixolon Hook
     const { printBadge, printing: bixolonPrinting, error: bixolonError } = useBixolon();
@@ -652,11 +672,11 @@ const RegistrationListPage: React.FC = () => {
                                 </button>
                             </th>
                             <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">주문번호</th>
-                            <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">이름</th>
-                            <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">이메일</th>
-                            <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">전화번호</th>
-                            <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">소속</th>
-                            <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">면허번호</th>
+                            {fieldSettings.name.visible && <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">이름</th>}
+                            {fieldSettings.email.visible && <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">이메일</th>}
+                            {fieldSettings.phone.visible && <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">전화번호</th>}
+                            {fieldSettings.affiliation.visible && <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">소속</th>}
+                            {fieldSettings.licenseNumber.visible && <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">면허번호</th>}
                             <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">등급</th>
                             <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">결제금액</th>
                             <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">결제수단</th>
@@ -683,11 +703,11 @@ const RegistrationListPage: React.FC = () => {
                                     </div>
                                 </td>
                                 <td className="p-4 font-mono text-xs text-gray-400">{r.orderId || r.id}</td>
-                                <td className="p-4 font-medium text-gray-900">{r.userName}</td>
-                                <td className="p-4 text-sm text-gray-500">{r.userEmail || '-'}</td>
-                                <td className="p-4 text-sm text-gray-500">{r.userPhone || '-'}</td>
-                                <td className="p-4 text-sm text-gray-500">{r.userOrg || r.affiliation || '-'}</td>
-                                <td className="p-4 text-sm text-gray-500">{r.licenseNumber || '-'}</td>
+                                {fieldSettings.name.visible && <td className="p-4 font-medium text-gray-900">{r.userName}</td>}
+                                {fieldSettings.email.visible && <td className="p-4 text-sm text-gray-500">{r.userEmail || '-'}</td>}
+                                {fieldSettings.phone.visible && <td className="p-4 text-sm text-gray-500">{r.userPhone || '-'}</td>}
+                                {fieldSettings.affiliation.visible && <td className="p-4 text-sm text-gray-500">{r.userOrg || r.affiliation || '-'}</td>}
+                                {fieldSettings.licenseNumber.visible && <td className="p-4 text-sm text-gray-500">{r.licenseNumber || '-'}</td>}
                                 <td className="p-4 text-sm text-gray-500">{displayTier(r.tier)}</td>
                                 <td className="p-4 text-sm font-medium text-[#1b4d77]">
                                     <div>{(r.amount || 0).toLocaleString()}원</div>
@@ -766,7 +786,7 @@ const RegistrationListPage: React.FC = () => {
                             </tr>
                         ))}
                         {filteredData.length === 0 && (
-                            <tr><td colSpan={12} className="p-8 text-center text-gray-500">등록된 내역이 없습니다. (No records found)</td></tr>
+                            <tr><td colSpan={14} className="p-8 text-center text-gray-500">등록된 내역이 없습니다. (No records found)</td></tr>
                         )}
                     </tbody>
                 </table>
