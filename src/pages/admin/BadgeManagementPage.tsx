@@ -842,6 +842,7 @@ const BadgeManagementPage: React.FC = () => {
                             PRICE: "50,000원",
                           }}
                           config={convertBadgeLayoutToConfig(info.badgeLayout)}
+                          rawElements={info.badgeLayout.elements}
                         />
                       </div>
                     ) : (

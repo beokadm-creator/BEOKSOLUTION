@@ -1,14 +1,108 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { BadgeConfig, RegistrationData } from '../../types/print';
+import { BadgeElement } from '../../types/schema';
 
 interface BadgeTemplateProps {
   data: RegistrationData;
   config: BadgeConfig;
+  rawElements?: BadgeElement[]; // Phase 3: Added raw elements array for unified rendering
 }
 
-const BadgeTemplate: React.FC<BadgeTemplateProps> = ({ data, config }) => {
+function stringValue(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  return undefined;
+}
+
+const BadgeTemplate: React.FC<BadgeTemplateProps> = ({ data, config, rawElements }) => {
   const { dimensions, backgroundUrl, layout, qr } = config;
+
+  const renderElement = (el: BadgeElement) => {
+    if (!el.isVisible) return null;
+
+    // Convert mm to px for preview (assuming 96 DPI -> 3.779527 px/mm)
+    // Fallback if the coordinates are already large (legacy px mode)
+    const isLegacyPx = el.x > 250;
+    const pxPerMm = 3.779527;
+
+    const xPx = isLegacyPx ? el.x : Math.round(el.x * pxPerMm);
+    const yPx = isLegacyPx ? el.y : Math.round(el.y * pxPerMm);
+    const sizePx = isLegacyPx ? el.fontSize : Math.round(el.fontSize * pxPerMm);
+
+    if (el.type === 'QR') {
+      const qrValue = stringValue(data.badgeQr) || stringValue(data.registrationId) || 'NO_DATA';
+
+      return (
+        <div
+          key={el.type}
+          style={{
+            position: 'absolute',
+            left: `${xPx}px`,
+            top: `${yPx}px`,
+            zIndex: 1,
+          }}
+        >
+          <QRCodeSVG
+            value={qrValue}
+            size={sizePx}
+            level={'M'}
+            includeMargin={false}
+          />
+        </div>
+      );
+    }
+
+    let content: string | undefined = '';
+
+    if (el.type === 'CUSTOM') {
+      content = el.content;
+    } else if (el.type === 'IMAGE') {
+      return null;
+    } else {
+      const elementType: string = el.type;
+      if (elementType === 'NAME') {
+        content = data.name;
+      } else if (elementType === 'ORG') {
+        content = data.org;
+      } else if (elementType === 'CATEGORY') {
+        content = data.category;
+      } else if (elementType === 'LICENSE') {
+        content = stringValue(data.licenseNumber) || stringValue(data.LICENSE);
+      } else if (elementType === 'PRICE') {
+        content = stringValue(data.price) || stringValue(data.PRICE);
+      } else if (elementType === 'POSITION') {
+        content = data.position || stringValue(data.POSITION);
+      } else if (elementType === 'AFFILIATION') {
+        content = stringValue(data.affiliation) || stringValue(data.AFFILIATION);
+      } else {
+        const key = elementType.toLowerCase();
+        content = stringValue(data[key]) || stringValue(data[elementType]);
+      }
+    }
+
+    if (!content) return null;
+
+    return (
+      <div
+        key={`${el.type}-${xPx}-${yPx}`}
+        style={{
+          position: 'absolute',
+          left: el.textAlign === 'center' ? '50%' : `${xPx}px`,
+          top: `${yPx}px`,
+          fontSize: `${sizePx}px`,
+          color: '#000',
+          textAlign: el.textAlign || 'left',
+          fontWeight: 'bold',
+          width: el.textAlign === 'center' ? '100%' : undefined,
+          zIndex: 1,
+          transform: el.textAlign === 'center' ? 'translateX(-50%)' : 'none',
+        }}
+      >
+        {content}
+      </div>
+    );
+  };
 
   return (
     <div
@@ -37,138 +131,66 @@ const BadgeTemplate: React.FC<BadgeTemplateProps> = ({ data, config }) => {
         />
       )}
 
-      {/* Name Field */}
-      {layout.name && (
-        <div
-          style={{
-            position: 'absolute',
-            top: layout.name.y,
-            fontSize: layout.name.fontSize,
-            color: layout.name.color || '#000',
-            textAlign: layout.name.align || 'left',
-            fontWeight: layout.name.fontWeight || 'bold',
-            width: '100%', // Assuming full width for alignment, adjust if width is provided
-            zIndex: 1,
-            transform: layout.name.align === 'center' ? 'translateX(-50%)' : 'none',
-            left: layout.name.align === 'center' ? '50%' : layout.name.x,
-          }}
-        >
-          {data.name}
-        </div>
-      )}
+      {/* Render Elements Unified (if provided) */}
+      {rawElements && rawElements.length > 0 ? (
+        rawElements.map(renderElement)
+       ) : (
+        /* Fallback to legacy layout mapping if rawElements not provided */
+        <>
+          {Object.entries(layout).map(([key, style]) => {
+            if (!style) return null;
 
-      {/* Organization Field */}
-      {layout.org && (
-        <div
-          style={{
-            position: 'absolute',
-            left: layout.org.align === 'center' ? '50%' : layout.org.x,
-            top: layout.org.y,
-            fontSize: layout.org.fontSize,
-            color: layout.org.color || '#000',
-            textAlign: layout.org.align || 'left',
-            fontWeight: layout.org.fontWeight || 'normal',
-            zIndex: 1,
-            transform: layout.org.align === 'center' ? 'translateX(-50%)' : 'none',
-          }}
-        >
-          {data.org}
-        </div>
-      )}
+            let content = '';
+            if (key === 'name') content = data.name;
+            else if (key === 'org') content = data.org;
+            else if (key === 'category') content = data.category;
+            else if (key === 'LICENSE') content = stringValue(data.licenseNumber) || stringValue(data.LICENSE);
+            else if (key === 'POSITION') content = data.position || stringValue(data.POSITION);
+            else if (key === 'PRICE') content = stringValue(data.price) || stringValue(data.PRICE);
+            else content = stringValue(data[key]) || stringValue(data[key.toUpperCase()]);
 
-      {/* Category Field */}
-      {layout.category && (
-        <div
-          style={{
-            position: 'absolute',
-            left: layout.category.align === 'center' ? '50%' : layout.category.x,
-            top: layout.category.y,
-            fontSize: layout.category.fontSize,
-            color: layout.category.color || '#000',
-            textAlign: layout.category.align || 'left',
-            fontWeight: layout.category.fontWeight || 'bold',
-            zIndex: 1,
-            transform: layout.category.align === 'center' ? 'translateX(-50%)' : 'none',
-          }}
-        >
-          {data.category}
-        </div>
-      )}
+            if (!content) return null;
 
-      {/* License Number Field */}
-      {layout.LICENSE && (
-        <div
-          style={{
-            position: 'absolute',
-            left: layout.LICENSE.align === 'center' ? '50%' : layout.LICENSE.x,
-            top: layout.LICENSE.y,
-            fontSize: layout.LICENSE.fontSize,
-            color: layout.LICENSE.color || '#000',
-            textAlign: layout.LICENSE.align || 'left',
-            fontWeight: layout.LICENSE.fontWeight || 'normal',
-            zIndex: 1,
-            transform: layout.LICENSE.align === 'center' ? 'translateX(-50%)' : 'none',
-          }}
-        >
-          {data.licenseNumber || data.LICENSE}
-        </div>
-      )}
+            return (
+              <div
+                key={key}
+                style={{
+                  position: 'absolute',
+                  left: style.align === 'center' ? '50%' : style.x,
+                  top: style.y,
+                  fontSize: style.fontSize,
+                  color: style.color || '#000',
+                  textAlign: style.align || 'left',
+                  fontWeight: style.fontWeight || 'normal',
+                  width: style.align === 'center' ? '100%' : undefined,
+                  zIndex: 1,
+                  transform: style.align === 'center' ? 'translateX(-50%)' : 'none',
+                }}
+              >
+                {content}
+              </div>
+            );
+          })}
 
-      {/* Position Field */}
-      {layout.POSITION && (
-        <div
-          style={{
-            position: 'absolute',
-            left: layout.POSITION.align === 'center' ? '50%' : layout.POSITION.x,
-            top: layout.POSITION.y,
-            fontSize: layout.POSITION.fontSize,
-            color: layout.POSITION.color || '#000',
-            textAlign: layout.POSITION.align || 'left',
-            fontWeight: layout.POSITION.fontWeight || 'normal',
-            zIndex: 1,
-            transform: layout.POSITION.align === 'center' ? 'translateX(-50%)' : 'none',
-          }}
-        >
-          {data.position || data.POSITION}
-        </div>
-      )}
-
-      {/* Price Field */}
-      {layout.PRICE && (
-        <div
-          style={{
-            position: 'absolute',
-            left: layout.PRICE.align === 'center' ? '50%' : layout.PRICE.x,
-            top: layout.PRICE.y,
-            fontSize: layout.PRICE.fontSize,
-            color: layout.PRICE.color || '#000',
-            textAlign: layout.PRICE.align || 'left',
-            fontWeight: layout.PRICE.fontWeight || 'normal',
-            zIndex: 1,
-            transform: layout.PRICE.align === 'center' ? 'translateX(-50%)' : 'none',
-          }}
-        >
-          {data.price || data.PRICE}
-        </div>
-      )}
-
-      {/* QR Code */}
-      {qr && (
-        <div
-          style={{
-            position: 'absolute',
-            left: qr.x,
-            top: qr.y,
-            zIndex: 1,
-          }}
-        >
-          <QRCodeSVG
-            value={data.registrationId}
-            size={qr.size}
-            level={'M'}
-            includeMargin={false}
-          />
-        </div>
+          {/* QR Code Fallback */}
+          {qr && (
+            <div
+              style={{
+                position: 'absolute',
+                left: qr.x,
+                top: qr.y,
+                zIndex: 1,
+              }}
+            >
+              <QRCodeSVG
+                value={data.registrationId}
+                size={qr.size}
+                level={'M'}
+                includeMargin={false}
+              />
+            </div>
+          )}
+        </>
       )}
     </div>
   );
