@@ -201,6 +201,7 @@ export default function RegistrationPage() {
         email: '',
         phone: '',
         affiliation: '',
+        position: '',
         licenseNumber: paramMemberCode,
         simplePassword: '',
         confirmPassword: ''
@@ -604,6 +605,7 @@ export default function RegistrationPage() {
         if (fieldSettings.email.required && !formData.email) missingRequired.push('email');
         if (fieldSettings.phone.required && !formData.phone) missingRequired.push('phone');
         if (fieldSettings.affiliation.required && !formData.affiliation) missingRequired.push('affiliation');
+        if (fieldSettings.position.required && !formData.position) missingRequired.push('position');
         if (fieldSettings.licenseNumber.required && !formData.licenseNumber) missingRequired.push('licenseNumber');
 
         if (missingRequired.length > 0) {
@@ -668,6 +670,7 @@ export default function RegistrationPage() {
                     email: formData.email,
                     phone: formData.phone,
                     organization: formData.affiliation, // UI??affiliation, DB??organization????????????
+                    position: formData.position,
                     licenseNumber: formData.licenseNumber
                 });
 
@@ -717,6 +720,7 @@ export default function RegistrationPage() {
                     email: formData.email,
                     phone: formData.phone,
                     affiliation: formData.affiliation,
+                    position: formData.position,
                     licenseNumber: formData.licenseNumber // [Fix-Step 156] Include licenseNumber in userInfo
                 },
                 conferenceId: confId,
@@ -727,6 +731,7 @@ export default function RegistrationPage() {
                 categoryName: finalCategory,
                 orderId: orderId,
                 licenseNumber: formData.licenseNumber, // [Fix-Step 156] Include licenseNumber at root
+                position: formData.position,
                 // [Fix-Option] Include selected options
                 baseAmount: basePrice,
                 optionsTotal: optionsTotal,
@@ -793,6 +798,7 @@ export default function RegistrationPage() {
                                 email: formData.email,
                                 phone: formData.phone,
                                 affiliation: formData.affiliation,
+                                position: formData.position,
                                 licenseNumber: formData.licenseNumber,
                                 tier: selectedTier,
                                 categoryName: finalCategory,
@@ -984,6 +990,21 @@ export default function RegistrationPage() {
                                             readOnly={isInfoSaved}
                                             className={isInfoSaved ? 'bg-gray-100' : ''}
                                             placeholder="소속을 입력하세요"
+                                        />
+                                    </div>
+                                )}
+                                {fieldSettings.position.visible && (
+                                    <div className="space-y-2">
+                                        <Label>
+                                            {language === 'ko' ? '직급' : 'Position'} 
+                                            {fieldSettings.position.required && <span className="text-red-500">*</span>}
+                                        </Label>
+                                        <Input
+                                            value={formData.position}
+                                            onChange={e => setFormData({ ...formData, position: e.target.value })}
+                                            readOnly={isInfoSaved}
+                                            className={isInfoSaved ? 'bg-gray-100' : ''}
+                                            placeholder="직급을 입력하세요"
                                         />
                                     </div>
                                 )}

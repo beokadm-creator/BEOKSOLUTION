@@ -229,8 +229,10 @@ const RegistrationDetailPage: React.FC = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState({
         userName: '',
-        userOrg: '',
         userPhone: '',
+        userEmail: '',
+        userOrg: '',
+        position: '',
         licenseNumber: ''
     });
     const [isSaving, setIsSaving] = useState(false);
@@ -281,6 +283,7 @@ const RegistrationDetailPage: React.FC = () => {
                         flattened.userEmail = docData.userInfo.email || docData.userEmail;
                         flattened.userPhone = docData.userInfo.phone || docData.userPhone;
                         flattened.affiliation = docData.userInfo.affiliation || docData.affiliation;
+                        flattened.position = docData.userInfo.position || docData.position;
                         flattened.licenseNumber = docData.userInfo.licenseNumber || docData.licenseNumber;
 
                         // [Fix] Map grade/tier from userInfo if available
@@ -330,6 +333,7 @@ const RegistrationDetailPage: React.FC = () => {
                         userName: flattened.userName || '',
                         userOrg: flattened.userOrg || flattened.affiliation || '',
                         userPhone: flattened.userPhone || '',
+                        position: flattened.position || (flattened.userInfo?.position as string) || '',
                         licenseNumber: flattened.licenseNumber || ''
                     });
                 } else {
@@ -494,6 +498,7 @@ const RegistrationDetailPage: React.FC = () => {
                 userPhone: editData.userPhone,
                 affiliation: editData.userOrg,
                 organization: editData.userOrg,
+                position: editData.position,
                 licenseNumber: editData.licenseNumber,
                 updatedAt: Timestamp.now()
             };
@@ -503,6 +508,7 @@ const RegistrationDetailPage: React.FC = () => {
                 regUpdatePayload['userInfo.name'] = editData.userName;
                 regUpdatePayload['userInfo.phone'] = editData.userPhone;
                 regUpdatePayload['userInfo.affiliation'] = editData.userOrg;
+                regUpdatePayload['userInfo.position'] = editData.position;
                 regUpdatePayload['userInfo.licenseNumber'] = editData.licenseNumber;
             }
 
@@ -523,6 +529,7 @@ const RegistrationDetailPage: React.FC = () => {
                             phone: editData.userPhone,
                             organization: editData.userOrg,
                             affiliation: editData.userOrg, // legacy support fallback
+                            position: editData.position,
                             licenseNumber: editData.licenseNumber,
                         });
                         console.log('User document successfully updated');
@@ -542,6 +549,7 @@ const RegistrationDetailPage: React.FC = () => {
                     userPhone: editData.userPhone,
                     userOrg: editData.userOrg,
                     affiliation: editData.userOrg,
+                    position: editData.position,
                     licenseNumber: editData.licenseNumber
                 };
             });
@@ -609,6 +617,7 @@ const RegistrationDetailPage: React.FC = () => {
                                     userName: data.userName || '',
                                     userOrg: data.userOrg || data.affiliation || '',
                                     userPhone: data.userPhone || '',
+                                    position: data.position || (data.userInfo?.position as string) || '',
                                     licenseNumber: data.licenseNumber || ''
                                 });
                             }} disabled={isSaving}>
@@ -648,6 +657,21 @@ const RegistrationDetailPage: React.FC = () => {
                             />
                         ) : (
                             <p className="text-lg">{data.userOrg || data.affiliation || '-'}</p>
+                        )}
+                    </div>
+                )}
+                {fieldSettings.position.visible && (
+                    <div>
+                        <h3 className="text-sm font-bold text-gray-500 mb-1">직급 (Position)</h3>
+                        {isEditing ? (
+                            <input
+                                type="text"
+                                className="border p-2 rounded w-full border-blue-400 bg-blue-50"
+                                value={editData.position}
+                                onChange={(e) => setEditData({ ...editData, position: e.target.value })}
+                            />
+                        ) : (
+                            <p className="text-lg">{data.position || '-'}</p>
                         )}
                     </div>
                 )}

@@ -86,6 +86,7 @@ const ExternalAttendeePage: React.FC = () => {
         email: '',
         phone: '',
         organization: '',
+        position: '',
         licenseNumber: '',
         amount: 0,
         password: ''
@@ -201,6 +202,7 @@ const ExternalAttendeePage: React.FC = () => {
             email: data.email,
             phone: data.phone,
             organization: data.organization,
+            position: data.position || '',
             licenseNumber: data.licenseNumber || '',
             // Firestore는 undefined 값 저장 불가 → password가 있을 때만 필드 포함
             ...(data.password ? { password: data.password } : {}),
@@ -230,6 +232,7 @@ const ExternalAttendeePage: React.FC = () => {
         if (fieldSettings.name.required && !formData.name) missingRequired.push('name');
         if (fieldSettings.phone.required && !formData.phone) missingRequired.push('phone');
         if (fieldSettings.affiliation.required && !formData.organization) missingRequired.push('organization');
+        if (fieldSettings.position.required && !formData.position) missingRequired.push('position');
         
         // If email is required, it must be provided unless 'noEmail' is checked
         if (fieldSettings.email.required && !noEmail && !formData.email) missingRequired.push('email');
@@ -324,9 +327,10 @@ const ExternalAttendeePage: React.FC = () => {
                         password: formData.password,
                         email: formData.email,
                         name: formData.name,
-                        phone: formData.phone,
-                        organization: formData.organization,
-                        licenseNumber: formData.licenseNumber
+                            phone: formData.phone,
+                            organization: formData.organization,
+                            position: formData.position,
+                            licenseNumber: formData.licenseNumber
                     }) as { data: { success: boolean; uid: string; message: string } };
 
                     if (authResult.data.success) {
@@ -381,6 +385,7 @@ const ExternalAttendeePage: React.FC = () => {
                     email,
                     phone,
                     organization: String(row.organization || row['소속'] || row['직장'] || '').trim(),
+                    position: String(row.position || row['직급'] || row['직책'] || '').trim(),
                     licenseNumber: String(row.licenseNumber || row['면허번호'] || '').trim(),
                     amount: Number(row.amount || row['등록비'] || row['결제금액'] || 0),
                     password: row.password || row['비밀번호'] ? String(row.password || row['비밀번호']) : undefined
@@ -390,6 +395,7 @@ const ExternalAttendeePage: React.FC = () => {
                 if (fieldSettings.name.required && !item.name) return false;
                 if (fieldSettings.phone.required && !item.phone) return false;
                 if (fieldSettings.affiliation.required && !item.organization) return false;
+                if (fieldSettings.position.required && !item.position) return false;
                 
                 // Email is mandatory for Auth, so if both email and phone are missing, skip row
                 if (!item.email && !item.phone) return false;
@@ -805,6 +811,7 @@ const ExternalAttendeePage: React.FC = () => {
             const printSuccess = await printBadge(activeLayout, {
                 name: attendee.name || '',
                 org: attendee.organization || '',
+                position: attendee.position || '',
                 category: '외부참석자',
                 license: attendee.licenseNumber || '',
                 price: (attendee.amount || 0).toLocaleString() + '원',
@@ -934,6 +941,16 @@ const ExternalAttendeePage: React.FC = () => {
                                                 value={formData.organization}
                                                 onChange={e => setFormData({ ...formData, organization: e.target.value })}
                                                 placeholder="소속 기관명"
+                                            />
+                                        </div>
+                                    )}
+                                    {fieldSettings.position.visible && (
+                                        <div className="space-y-2">
+                                            <Label>직급 {fieldSettings.position.required && <span className="text-red-500">*</span>}</Label>
+                                            <Input
+                                                value={formData.position}
+                                                onChange={e => setFormData({ ...formData, position: e.target.value })}
+                                                placeholder="직급"
                                             />
                                         </div>
                                     )}

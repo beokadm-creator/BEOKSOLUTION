@@ -430,6 +430,7 @@ const RegistrationListPage: React.FC = () => {
             const printSuccess = await printBadge(activeLayout, {
                 name: userName,
                 org: userAffiliation,
+                position: reg.position,
                 category: displayTier(reg.tier),
                 license: reg.licenseNumber || '',
                 price: displayAmount.toLocaleString() + '원',
@@ -676,6 +677,7 @@ const RegistrationListPage: React.FC = () => {
                             {fieldSettings.email.visible && <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">이메일</th>}
                             {fieldSettings.phone.visible && <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">전화번호</th>}
                             {fieldSettings.affiliation.visible && <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">소속</th>}
+                            {fieldSettings.position.visible && <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">직급</th>}
                             {fieldSettings.licenseNumber.visible && <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">면허번호</th>}
                             <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">등급</th>
                             <th className="p-4 font-bold text-[#002244] whitespace-nowrap text-sm uppercase tracking-wider">결제금액</th>
@@ -707,6 +709,7 @@ const RegistrationListPage: React.FC = () => {
                                 {fieldSettings.email.visible && <td className="p-4 text-sm text-gray-500">{r.userEmail || '-'}</td>}
                                 {fieldSettings.phone.visible && <td className="p-4 text-sm text-gray-500">{r.userPhone || '-'}</td>}
                                 {fieldSettings.affiliation.visible && <td className="p-4 text-sm text-gray-500">{r.userOrg || r.affiliation || '-'}</td>}
+                                {fieldSettings.position.visible && <td className="p-4 text-sm text-gray-500">{r.position || '-'}</td>}
                                 {fieldSettings.licenseNumber.visible && <td className="p-4 text-sm text-gray-500">{r.licenseNumber || '-'}</td>}
                                 <td className="p-4 text-sm text-gray-500">{displayTier(r.tier)}</td>
                                 <td className="p-4 text-sm font-medium text-[#1b4d77]">
@@ -786,7 +789,7 @@ const RegistrationListPage: React.FC = () => {
                             </tr>
                         ))}
                         {filteredData.length === 0 && (
-                            <tr><td colSpan={14} className="p-8 text-center text-gray-500">등록된 내역이 없습니다. (No records found)</td></tr>
+                            <tr><td colSpan={15} className="p-8 text-center text-gray-500">등록된 내역이 없습니다. (No records found)</td></tr>
                         )}
                     </tbody>
                 </table>
