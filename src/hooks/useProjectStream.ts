@@ -1,10 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { translationDb as rtdb } from '../lib/translationFirebase';
-import { ref, onValue, get, query, limitToLast, orderByChild, endBefore } from 'firebase/database';
+import { ref, onValue, get, query, limitToLast, orderByChild, endBefore, type DataSnapshot } from 'firebase/database';
+
+interface StreamItem {
+  original: string;
+  refined?: string;
+  ko?: string;
+  en?: string;
+  status: 'raw' | 'translating' | 'final' | 'merged';
+  timestamp: number;
+  seq?: number;
+  mergedIds?: string[];
+  sessionId?: string;
+}
 
 export const useProjectStream = (projectIdOrSlug: string | undefined, activeSessionId?: string | null, options: { subscribe?: boolean } = { subscribe: true }) => {
   const [realProjectId, setRealProjectId] = useState<string | null>(null);
-  const [streamData, setStreamData] = useState<Record<string, { original: string; refined?: string; ko?: string; en?: string; status: 'raw' | 'translating' | 'final' | 'merged'; timestamp: number; seq?: number; mergedIds?: string[], sessionId?: string }> | null>(null);
+  const [streamData, setStreamData] = useState<Record<string, StreamItem> | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
@@ -25,7 +37,7 @@ export const useProjectStream = (projectIdOrSlug: string | undefined, activeSess
       const data = snapshot.val();
       
       if (data) {
-        const items = Object.values(data) as any[];
+              const items = Object.values(data) as StreamItem[];
         if (items.length > 0) {
           const newOldest = Math.min(...items.map(i => i.timestamp));
           oldestTimestampRef.current = newOldest;
@@ -68,12 +80,12 @@ export const useProjectStream = (projectIdOrSlug: string | undefined, activeSess
             limitToLast(50)
           );
 
-          unsubscribeStream = onValue(streamQuery, (snapshot: any) => {
+          unsubscribeStream = onValue(streamQuery, (snapshot: DataSnapshot) => {
             if (!mounted) return;
             const data = snapshot.val() || {};
             
             if (!oldestTimestampRef.current && Object.keys(data).length > 0) {
-              const items = Object.values(data) as any[];
+        const items = Object.values(data) as StreamItem[];
               oldestTimestampRef.current = Math.min(...items.map(i => i.timestamp));
             }
 

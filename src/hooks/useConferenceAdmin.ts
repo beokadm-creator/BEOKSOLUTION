@@ -2,11 +2,14 @@ import { useState, useEffect } from 'react';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getKstToday } from '../utils/dateUtils';
+import type { Registration } from '../types/schema';
+
+type RegistrationWithId = Registration & { id: string };
 
 export interface DashboardStats {
     totalRegistrants: number;
     totalRevenue: number;
-    recentRegistrations: any[]; // Using any to avoid circular import or define it inline
+    recentRegistrations: RegistrationWithId[];
     dailyTrend: { date: string; count: number }[];
 }
 
@@ -56,10 +59,10 @@ export const useConferenceAdmin = (conferenceId: string, userEmail?: string) => 
             
             let totalRevenue = 0;
             const dailyCounts: Record<string, number> = {};
-            const allRegs = snap.docs.map(d => ({ id: d.id, ...d.data() }) as Registration & { id: string });
+            const allRegs = snap.docs.map(d => ({ id: d.id, ...d.data() }) as RegistrationWithId);
 
             // Group by userId to handle duplicates (users who tried multiple times)
-            const userRegistrations = new Map<string, (Registration & { id: string })[]>();
+            const userRegistrations = new Map<string, RegistrationWithId[]>();
             allRegs.forEach(reg => {
                 if (reg.userId) {
                     if (!userRegistrations.has(reg.userId)) {
@@ -70,7 +73,7 @@ export const useConferenceAdmin = (conferenceId: string, userEmail?: string) => 
             });
 
             // Count each user once, using their best registration
-            const deduplicatedRegs: (Registration & { id: string })[] = [];
+            const deduplicatedRegs: RegistrationWithId[] = [];
             userRegistrations.forEach((regs) => {
                 // Sort by status priority: PAID > others
                 const sorted = regs.sort((a, b) => {

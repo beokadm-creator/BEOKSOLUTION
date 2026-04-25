@@ -2,7 +2,7 @@ import { doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { v4 as uuidv4 } from 'uuid';
 
-interface TransactionHelper {
+export interface TransactionHelper {
     get: (ref: unknown) => { exists: () => boolean; data: () => Record<string, unknown> };
     update: (ref: unknown, data: Record<string, unknown>) => void;
 }

@@ -27,9 +27,14 @@ export const clearTranslationCache = (slug?: string, societyId?: string) => {
     }
 };
 
+interface TranslationConfig {
+    id?: string;
+    [key: string]: unknown;
+}
+
 interface UseTranslationResult {
     t: (obj: unknown) => string;
-    config: unknown;
+    config: TranslationConfig | null;
     loading: boolean;
     error: string | null;
     currentLang: string;
@@ -47,7 +52,7 @@ const toLocalizedText = (obj: unknown, lang: string) => {
 };
 
 export const useTranslation = (slug: string): UseTranslationResult => {
-    const [config, setConfig] = useState<unknown>(null);
+    const [config, setConfig] = useState<TranslationConfig | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [currentLang, setCurrentLang] = useState<string>(localStorage.getItem('preferredLanguage') || 'ko');
@@ -72,7 +77,7 @@ export const useTranslation = (slug: string): UseTranslationResult => {
         const now = Date.now();
 
         if (cached && (now - cached.timestamp < CACHE_TTL)) {
-            setConfig(cached.data);
+            setConfig(cached.data as TranslationConfig);
             setLoading(false);
             return;
         }
@@ -80,7 +85,7 @@ export const useTranslation = (slug: string): UseTranslationResult => {
         const pending = pendingTranslations.get(cacheKey);
         if (pending) {
             pending.then(data => {
-                setConfig(data);
+                setConfig(data as TranslationConfig);
                 setLoading(false);
             });
             return;
@@ -255,7 +260,7 @@ export const useTranslation = (slug: string): UseTranslationResult => {
         error,
         currentLang,
         setLanguage,
-        confId: (config as any)?.id || null,
+        confId: config?.id || null,
         urlSlug: slug,
         refresh
     };

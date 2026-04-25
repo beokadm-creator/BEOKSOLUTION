@@ -3,6 +3,7 @@ import { doc, runTransaction, Timestamp, collection, getDoc, setDoc, query, wher
 import { db, auth as firebaseAuth } from '../firebase';
 import { Registration, RegistrationPeriod, ConferenceUser, RegistrationSettings } from '../types/schema';
 import { generateReceiptNumber, generateConfirmationQr } from '../utils/transaction';
+import type { TransactionHelper } from '../utils/transaction';
 import toast from 'react-hot-toast';
 import { toFirestoreUserData } from '../utils/userDataMapper';
 
@@ -122,7 +123,7 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
 
             const cleanedFormData = removeUndefined(formData);
 
-            const dataToSave = {
+            const dataToSave: Record<string, unknown> = {
                 userId: currentUser.uid, // All users are authenticated (email/password)
                 conferenceId,
                 status: 'PENDING',
@@ -196,7 +197,7 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
 
                 // Generate Receipt Number (Atomic Increment)
                  
-                const receiptNumber = await generateReceiptNumber(conferenceId, transaction as any);
+                const receiptNumber = await generateReceiptNumber(conferenceId, transaction as unknown as TransactionHelper);
 
                 // Generate Confirmation QR (Phase 1)
                 const confirmationQr = generateConfirmationQr(regId, user.id);
@@ -208,6 +209,8 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
                     paymentStatus: 'PAID',
                     paymentMethod,
                     amount,
+                    baseAmount: amount,
+                    optionsTotal: 0,
                     refundAmount: 0,
                     receiptNumber,
                     userTier: user.tier,
@@ -218,7 +221,6 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
                     userPhone: user.phone,
                     affiliation: user.organization, // Map new field to legacy schema
                     licenseNumber: user.licenseNumber,
-                    lastUpdated: serverTimestamp(),
 
                     confirmationQr,
                     badgeQr: null, // Phase 2: Null until check-in
