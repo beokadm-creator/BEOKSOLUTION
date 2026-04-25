@@ -37,7 +37,7 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ co
   const certificateRef = useRef<HTMLDivElement>(null);
   const issuanceAttempted = useRef(false);
 
-  const t = (ko: string, en: string) => (badgeLang === "ko" ? ko : en);
+  const t = useCallback((ko: string, en: string) => (badgeLang === "ko" ? ko : en), [badgeLang]);
   const canDownload = !!ui.isCheckedIn;
 
   const verificationUrl = useMemo(() => {

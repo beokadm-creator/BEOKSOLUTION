@@ -74,6 +74,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
   // Subscribe to active session for selected project
   useEffect(() => {
     if (!selectedProjectId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveSessionId(null);
       setActiveSessionInfo(null);
       return;

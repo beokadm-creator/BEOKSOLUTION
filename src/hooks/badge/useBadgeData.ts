@@ -16,6 +16,10 @@ export type BadgeStrategy =
 
 export function useBadgeData(strategy: BadgeStrategy) {
   const db = getFirestore();
+  const strategyType = strategy.type;
+  const strategyId = strategy.type === 'AUTH' ? strategy.userId : strategy.token;
+  const confId = strategy.confId;
+
   const [status, setStatus] = useState<"INIT" | "LOADING" | "READY" | "NO_AUTH" | "NO_DATA" | "REDIRECTING">("INIT");
   const [msg, setMsg] = useState("초기화 중...");
   const [uiData, setUiData] = useState<BadgeUiData | null>(null);
@@ -34,8 +38,8 @@ export function useBadgeData(strategy: BadgeStrategy) {
 
       try {
         // Fetch Settings first
-        const rulesRef = doc(db, `conferences/${strategy.confId}/settings/attendance`);
-        const configRef = doc(db, `conferences/${strategy.confId}/settings/badge_config`);
+        const rulesRef = doc(db, `conferences/${confId}/settings/attendance`);
+        const configRef = doc(db, `conferences/${confId}/settings/badge_config`);
         
         const [rulesSnap, configSnap] = await Promise.all([getDoc(rulesRef), getDoc(configRef)]);
         
@@ -61,16 +65,21 @@ export function useBadgeData(strategy: BadgeStrategy) {
         let targetQuery: any = null;
         let targetSource: BadgeRecordSource | null = null;
 
-        if (strategy.type === 'AUTH') {
+        if (strategyType === 'AUTH') {
+          if (!strategyId) {
+            setStatus("NO_AUTH");
+            setMsg("인증 정보가 없습니다.");
+            return;
+          }
           const qReg = query(
-            collection(db, "conferences", strategy.confId, "registrations"),
-            where("userId", "==", strategy.userId),
+            collection(db, "conferences", confId, "registrations"),
+            where("userId", "==", strategyId),
             where("paymentStatus", "==", "PAID"),
             orderBy("createdAt", "desc")
           );
           const qExt = query(
-            collection(db, "conferences", strategy.confId, "external_attendees"),
-            where("userId", "==", strategy.userId),
+            collection(db, "conferences", confId, "external_attendees"),
+            where("userId", "==", strategyId),
             where("paymentStatus", "==", "PAID")
           );
 
@@ -85,7 +94,12 @@ export function useBadgeData(strategy: BadgeStrategy) {
               targetSource = "external_attendees";
             }
           }
-        } else if (strategy.type === 'TOKEN') {
+        } else if (strategyType === 'TOKEN') {
+          if (!strategyId) {
+            setStatus("NO_AUTH");
+            setMsg("토큰 정보가 없습니다.");
+            return;
+          }
           // Token strategy usually involves a cloud function to validate, but here we just fetch directly if we know the regId from token
           // Since BadgePrepPage has the token validation logic via cloud functions, we can handle it there, but let's assume we pass the regId directly
           // For now, if type is token, we assume strategy.userId is actually the document ID and collection
@@ -145,7 +159,7 @@ export function useBadgeData(strategy: BadgeStrategy) {
     return () => {
       if (unsubscribeDB) unsubscribeDB();
     };
-  }, [strategy.confId, strategy.type, (strategy as any).userId]);
+  }, [db, confId, strategyType, strategyId]);
 
   return { status, msg, uiData, badgeConfig, zones, lastQueryRef, lastSourceRef, setUiData };
 }
