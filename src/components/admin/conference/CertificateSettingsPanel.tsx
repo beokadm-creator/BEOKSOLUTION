@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { FileText, Save, Loader2, Image as ImageIcon, Link as LinkIcon } from 'lucide-react';
+import { FileText, Save, Loader2, Image as ImageIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export const CertificateSettingsPanel = ({ confId }: { confId: string }) => {

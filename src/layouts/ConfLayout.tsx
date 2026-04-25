@@ -7,7 +7,7 @@ import { doc, getDoc, collection, getDocs, query, where, limit } from 'firebase/
 import { db, auth } from '../firebase';
 import { Conference } from '../types/schema';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { LayoutDashboard, Globe, FileText, Users, Settings, Monitor, CreditCard, LogOut, ArrowLeft, BarChart, UserPlus, Building2, Bell, IdCard, Trophy, Languages, MessageSquare, Award } from 'lucide-react';
+import { LayoutDashboard, Globe, FileText, Users, Settings, Monitor, CreditCard, LogOut, ArrowLeft, BarChart, UserPlus, Building2, Bell, IdCard, Trophy, MessageSquare, Award } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/ui/button';
 import { resolveSocietyByIdentifier } from '../utils/societyResolver';

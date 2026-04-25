@@ -4,7 +4,7 @@ import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Switch } from '../../ui/switch';
 import BilingualInput from '../../ui/bilingual-input';
-import { Calendar, Globe, FileText, Info, MapPin, MessageSquare } from 'lucide-react';
+import { Calendar, Globe, FileText, Info, MapPin } from 'lucide-react';
 
 interface GeneralSettingsFormProps {
     data: any; 

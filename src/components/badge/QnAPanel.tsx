@@ -3,7 +3,7 @@ import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc
 import { db } from "@/firebase";
 import { Agenda, Speaker } from "@/types/schema";
 import { Loader2, MessageSquare, Send } from "lucide-react";
-import { getKstToday, parseDatetimeLocalAsKst } from "@/utils/dateUtils";
+import { parseDatetimeLocalAsKst } from "@/utils/dateUtils";
 import toast from "react-hot-toast";
 
 interface QnAPanelProps {

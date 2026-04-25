@@ -26,9 +26,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 
-import { db, functions } from "../../firebase";
-import { QnASettingsPanel } from "../../components/admin/conference/QnASettingsPanel";
-import { StampTourSettingsPanel } from "../../components/admin/conference/StampTourSettingsPanel";
+import { db } from "../../firebase";
 import { useConference } from "../../hooks/useConference";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
