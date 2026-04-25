@@ -71,7 +71,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                                 memberVerified: true,
                                 memberName: '',
                                 memberGrade: 'FREE_ATTENDEE',
-                                memberCode: 'FREE_ATTENDEE',
+                                memberCode: '', // 면허번호 입력창에 하드코딩되지 않도록 빈 값으로 전달
                                 calculatedPrice: 0,
                             }
                         });
