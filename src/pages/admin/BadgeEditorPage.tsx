@@ -106,7 +106,8 @@ const BadgeEditorPage: React.FC = () => {
                 }
                 setBgUrl(layout.backgroundImageUrl);
                 setPrinterDpmm(layout.printerDpmm || 8);
-                setPrinterFont((layout as any).printerFont || 'Malgun Gothic');
+                const layoutRecord = layout as Record<string, unknown>;
+                setPrinterFont((layoutRecord as Record<string, unknown>).printerFont as string || 'Malgun Gothic');
                 setPrintOffsetXmm(layout.printOffsetXmm || 0);
                 setPrintOffsetYmm(layout.printOffsetYmm || 0);
                 setPrintStartOffsetMm(layout.printStartOffsetMm || 0);
@@ -146,9 +147,10 @@ const BadgeEditorPage: React.FC = () => {
                 ...extraSettingsToSave
             });
             toast.success('명찰 레이아웃이 저장되었습니다! ✅');
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error(e);
-            if (e?.code === 'permission-denied' || e?.message?.includes('Missing or insufficient permissions')) {
+            const message = e instanceof Error ? e.message : String(e);
+            if (message.includes('permission-denied') || message.includes('Missing or insufficient permissions')) {
                 toast.error('저장 권한이 없습니다. 세션이 만료되었을 수 있습니다. 다시 로그인해주세요.', { duration: 5000 });
                 setTimeout(() => {
                     const params = new URLSearchParams(window.location.search);
@@ -156,7 +158,7 @@ const BadgeEditorPage: React.FC = () => {
                     window.location.href = society ? `/admin/login?society=${society}` : '/admin/login';
                 }, 3000);
             } else {
-                toast.error(`저장 실패: ${e?.message || '알 수 없는 오류'}`);
+                toast.error(`저장 실패: ${message || '알 수 없는 오류'}`);
             }
         }
     };

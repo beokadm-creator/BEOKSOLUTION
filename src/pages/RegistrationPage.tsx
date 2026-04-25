@@ -193,7 +193,7 @@ export default function RegistrationPage() {
     const [tossClientKey, setTossClientKey] = useState<string | null>(null);
     const [paymentWidget, setPaymentWidget] = useState<PaymentWidgetInstance | null>(null);
     const paymentMethodsWidgetRef = useRef<HTMLDivElement>(null);
-    const paymentMethodsInstanceRef = useRef<any>(null);
+    const paymentMethodsInstanceRef = useRef<{ update(amount: number): void } | null>(null);
 
     // State - Form
     const [formData, setFormData] = useState({

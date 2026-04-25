@@ -131,7 +131,7 @@ describe('whitelist', () => {
         isUsed: true, // 이미 사용됨
         usedBy: 'user-123',
          
-        usedAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 } as any,
+        usedAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 } as { seconds: number; nanoseconds: number },
       };
 
       (getDocs as jest.Mock).mockResolvedValue({

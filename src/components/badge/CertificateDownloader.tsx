@@ -28,7 +28,7 @@ interface CertificateDownloaderProps {
 }
 
 export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ confId, ui, badgeLang, badgeToken }) => {
-  const [config, setConfig] = useState<any>(null);
+  const [config, setConfig] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [issuing, setIssuing] = useState(false);

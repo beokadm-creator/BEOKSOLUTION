@@ -110,7 +110,7 @@ export const MonitoringTab: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        {healthCheckData.checks && Object.entries(healthCheckData.checks as Record<string, any>).map(([key, check]) => (
+                                        {healthCheckData.checks && Object.entries(healthCheckData.checks as Record<string, Record<string, unknown>>).map(([key, check]) => (
                                             <div key={key} className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
                                                 <span className="text-sm font-mono text-slate-300">{key}</span>
                                                 <div className="flex items-center gap-2">

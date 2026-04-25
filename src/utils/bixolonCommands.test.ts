@@ -73,7 +73,7 @@ describe('bixolonCommands', () => {
             };
 
             const data = buildPrintData(layoutWithQR, mockUserData);
-            const qrFunc = Object.values(data.functions).find((f: any) => f.drawQRCode);
+            const qrFunc = Object.values(data.functions).find((f) => f && typeof f === 'object' && 'drawQRCode' in f);
             expect(qrFunc).toBeDefined();
             // QR data should match
             expect(qrFunc.drawQRCode[0]).toBe('QR123');
@@ -92,10 +92,10 @@ describe('bixolonCommands', () => {
             };
 
             const data = buildPrintData(layoutWithPosition, userDataWithPosition);
-            const textFunc = Object.values(data.functions).find((f: any) => f.drawTrueTypeFont);
+            const textFunc = Object.values(data.functions).find((f) => f && typeof f === 'object' && 'drawTrueTypeFont' in f);
             expect(textFunc).toBeDefined();
             // Text should match position
-            expect(textFunc.drawTrueTypeFont[0]).toBe('Manager');
+            expect((textFunc as { drawTrueTypeFont: string[] }).drawTrueTypeFont[0]).toBe('Manager');
         });
 
         it('handles hidden elements', () => {
@@ -107,8 +107,7 @@ describe('bixolonCommands', () => {
             };
 
             const data = buildPrintData(layoutWithHidden, mockUserData);
-            const textFunc = Object.values(data.functions).find((f: any) => f.drawTrueTypeFont);
-            expect(textFunc).toBeUndefined(); // Should not generate print command
+            const textFunc = Object.values(data.functions).find((f) => f && typeof f === 'object' && 'drawTrueTypeFont' in f);            expect(textFunc).toBeUndefined(); // Should not generate print command
         });
     });
 });

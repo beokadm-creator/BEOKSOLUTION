@@ -22,10 +22,31 @@ function toKSTDateString(date: Date): string {
     }).format(date);
 }
 
+interface SelectedOption {
+    optionId: string;
+    quantity?: number;
+}
+
+interface RegistrationPeriod {
+    startDate?: admin.firestore.Timestamp;
+    start?: admin.firestore.Timestamp;
+    endDate?: admin.firestore.Timestamp;
+    end?: admin.firestore.Timestamp;
+    name?: string;
+    label?: string;
+    totalPrice?: Record<string, number>;
+    prices?: Record<string, number>;
+}
+
+interface DbOption {
+    id: string;
+    price?: number;
+}
+
 export async function verifyPaymentAmount(
     confId: string,
     tierId: string,
-    selectedOptions: any[],
+    selectedOptions: SelectedOption[],
     claimedAmount: number
 ): Promise<VerificationResult> {
     const db = admin.firestore();
@@ -53,13 +74,13 @@ export async function verifyPaymentAmount(
             return { isValid: true, expectedAmount: claimedAmount };
         }
 
-        const activePeriod = periods.find((p: any) => {
+        const activePeriod = periods.find((p: RegistrationPeriod) => {
             const s = p.startDate || p.start;
             const e = p.endDate || p.end;
             if (!s || !e) return false;
 
-            const startDate: Date = s.toDate ? s.toDate() : new Date(s);
-            const endDate: Date = e.toDate ? e.toDate() : new Date(e);
+            const startDate: Date = s.toDate();
+            const endDate: Date = e.toDate();
 
             const startKSTStr = toKSTDateString(startDate);
             const endKSTStr = toKSTDateString(endDate);
@@ -99,7 +120,7 @@ export async function verifyPaymentAmount(
             const dbOptions = optionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
             for (const selected of selectedOptions) {
-                const dbOption: any = dbOptions.find(o => o.id === selected.optionId);
+                const dbOption: DbOption | undefined = dbOptions.find(o => o.id === selected.optionId);
                 if (!dbOption) {
                     return { isValid: false, expectedAmount: 0, error: `Invalid option: ${selected.optionId}` };
                 }

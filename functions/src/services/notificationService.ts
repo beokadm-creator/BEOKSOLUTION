@@ -16,7 +16,7 @@
 
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import { sendAlimTalk } from '../utils/nhnCloud';
+import { sendAlimTalk as sendAlimTalkNHN } from '../utils/nhnCloud';
 
 // 공통 인터페이스
 export interface AlimTalkParams {
@@ -38,7 +38,7 @@ export interface AlimTalkResult {
     messageId?: string;
     error?: string;
     provider: 'aligo' | 'nhn';
-    rawResponse?: any;
+    rawResponse?: unknown;
 }
 
 /**
@@ -97,7 +97,7 @@ class NHNProvider implements IAlimTalkProvider {
             const senderKey = nhnConfig.senderKey;
 
             // NHN Cloud API 호출
-            const result = await sendAlimTalk(
+            const result = await sendAlimTalkNHN(
                 {
                     appKey: appKey,
                     secretKey: secretKey,
@@ -113,7 +113,7 @@ class NHNProvider implements IAlimTalkProvider {
             if (result.success) {
                 return {
                     success: true,
-                    messageId: result.requestId,
+                    messageId: result.requestId as string,
                     provider: 'nhn',
                     rawResponse: result.rawResponse
                 };
@@ -125,13 +125,17 @@ class NHNProvider implements IAlimTalkProvider {
                     rawResponse: result.rawResponse
                 };
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             functions.logger.error('NHN send failed', error);
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            const responseData = error && typeof error === 'object' && 'response' in error
+                ? (error as { response?: { data?: unknown } }).response?.data
+                : undefined;
             return {
                 success: false,
-                error: error.message,
+                error: message,
                 provider: 'nhn',
-                rawResponse: error.response?.data
+                rawResponse: responseData
             };
         }
     }

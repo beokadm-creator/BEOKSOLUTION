@@ -65,7 +65,7 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
     return (lang === 'en' ? val.en : val.ko) || val.ko || '';
   };
 
-  const formatDate = (date: any) => safeFormatDate(date);
+  const formatDate = (date: unknown) => safeFormatDate(date);
 
   const dates = period ? `${formatDate(period.start)} ~ ${formatDate(period.end)}` : '';
 

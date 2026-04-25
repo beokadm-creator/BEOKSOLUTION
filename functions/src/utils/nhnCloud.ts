@@ -31,7 +31,7 @@ export interface BatchAlimTalkSendResult {
     successCount: number;
     failCount: number;
     error?: string;
-    rawResponse?: any;
+    rawResponse?: unknown;
 }
 
 export interface AlimTalkSendResult {
@@ -41,7 +41,7 @@ export interface AlimTalkSendResult {
     resultCode?: string;
     resultMessage?: string;
     error?: string;
-    rawResponse?: any;
+    rawResponse?: unknown;
 }
 
 /**
@@ -91,12 +91,16 @@ export async function sendAlimTalk(
                 rawResponse: response.data
             };
         }
-    } catch (error: any) {
-        console.error('[NHN Cloud AlimTalk] Send error:', error.response?.data || error.message);
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        const responseData = error && typeof error === 'object' && 'response' in error
+            ? (error as { response?: { data?: { header?: { resultMessage?: string } } } }).response?.data
+            : undefined;
+        console.error('[NHN Cloud AlimTalk] Send error:', responseData || message);
         return {
             success: false,
-            error: error.response?.data?.header?.resultMessage || error.message || 'Unknown error occurred',
-            rawResponse: error.response?.data
+            error: responseData?.header?.resultMessage || message || 'Unknown error occurred',
+            rawResponse: responseData
         };
     }
 }
@@ -135,8 +139,8 @@ export async function sendAlimTalkBatch(
         });
 
         if (response.data.header.isSuccessful) {
-            const sendResults = response.data.message?.sendResults || [];
-            const successCount = sendResults.filter((r: any) => r.resultCode === 0).length;
+            const sendResults: Array<{ resultCode: number }> = response.data.message?.sendResults || [];
+            const successCount = sendResults.filter(r => r.resultCode === 0).length;
             const failCount = sendResults.length - successCount;
             return {
                 success: true,
@@ -156,15 +160,19 @@ export async function sendAlimTalkBatch(
                 rawResponse: response.data
             };
         }
-    } catch (error: any) {
-        console.error('[NHN Cloud AlimTalk] Batch send error:', error.response?.data || error.message);
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        const responseData = error && typeof error === 'object' && 'response' in error
+            ? (error as { response?: { data?: { header?: { resultMessage?: string } } } }).response?.data
+            : undefined;
+        console.error('[NHN Cloud AlimTalk] Batch send error:', responseData || message);
         return {
             success: false,
             totalCount: recipients.length,
             successCount: 0,
             failCount: recipients.length,
-            error: error.response?.data?.header?.resultMessage || error.message || 'Unknown error',
-            rawResponse: error.response?.data
+            error: responseData?.header?.resultMessage || message || 'Unknown error',
+            rawResponse: responseData
         };
     }
 }
@@ -208,12 +216,16 @@ export async function getTemplateList(config: NHNCloudConfig): Promise<any> {
                 rawResponse: response.data
             };
         }
-    } catch (error: any) {
-        console.error('[NHN Cloud AlimTalk] Get templates error:', error.response?.data || error.message);
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        const responseData = error && typeof error === 'object' && 'response' in error
+            ? (error as { response?: { data?: { header?: { resultMessage?: string } } } }).response?.data
+            : undefined;
+        console.error('[NHN Cloud AlimTalk] Get templates error:', responseData || message);
         return {
             success: false,
-            error: error.response?.data?.header?.resultMessage || error.message || 'Unknown error occurred',
-            details: error.response?.data
+            error: responseData?.header?.resultMessage || message || 'Unknown error occurred',
+            details: responseData
         };
     }
 }
@@ -249,12 +261,16 @@ export async function getTemplate(config: NHNCloudConfig, templateCode: string):
                 rawResponse: response.data
             };
         }
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[NHN API] Get template error:', error);
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        const responseData = error && typeof error === 'object' && 'response' in error
+            ? (error as { response?: { data?: unknown } }).response?.data
+            : undefined;
         return {
             success: false,
-            error: error.message,
-            details: error.response?.data
+            error: message,
+            details: responseData
         };
     }
 }
@@ -287,11 +303,15 @@ export async function getSendHistory(
                 error: response.data.header.resultMessage
             };
         }
-    } catch (error: any) {
-        console.error('[NHN Cloud AlimTalk] Get send history error:', error.response?.data || error.message);
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        const responseData = error && typeof error === 'object' && 'response' in error
+            ? (error as { response?: { data?: { header?: { resultMessage?: string } } } }).response?.data
+            : undefined;
+        console.error('[NHN Cloud AlimTalk] Get send history error:', responseData || message);
         return {
             success: false,
-            error: error.response?.data?.header?.resultMessage || error.message || 'Unknown error occurred'
+            error: responseData?.header?.resultMessage || message || 'Unknown error occurred'
         };
     }
 }
@@ -307,10 +327,10 @@ export async function validateConfig(config: NHNCloudConfig): Promise<{ valid: b
             valid: result.success,
             error: result.error
         };
-    } catch (error: any) {
+    } catch (error: unknown) {
         return {
             valid: false,
-            error: error.message
+            error: error instanceof Error ? error.message : 'Unknown error'
         };
     }
 }

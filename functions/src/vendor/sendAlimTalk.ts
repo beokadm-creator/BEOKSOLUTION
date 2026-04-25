@@ -104,11 +104,11 @@ export const sendVendorAlimTalk = functions.https.onCall(async (data, context) =
                 result.error || 'Failed to send AlimTalk'
             );
         }
-    } catch (error: any) {
+    } catch (error: unknown) {
         functions.logger.error('Error sending vendor AlimTalk:', error);
         throw new functions.https.HttpsError(
             'internal',
-            error.message || 'Failed to send AlimTalk'
+            error instanceof Error ? error.message : 'Failed to send AlimTalk'
         );
     }
 });

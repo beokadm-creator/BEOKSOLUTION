@@ -8,7 +8,7 @@ export const approveTossPayment = async (paymentKey: string, orderId: string, am
     try {
         const encryptedSecretKey = `Basic ${Buffer.from(secretKey + ':').toString('base64')}`;
 
-        const requestBody: any = {
+        const requestBody: { paymentKey: string; orderId: string; amount: number; storeId?: string } = {
             paymentKey,
             orderId,
             amount

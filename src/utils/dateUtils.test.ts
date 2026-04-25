@@ -5,7 +5,7 @@
 import { safeFormatDate, safeFormatDateTime } from './dateUtils';
 
 const mockConsoleError = jest.fn();
-(globalThis as any).console.error = mockConsoleError;
+(globalThis as { console: { error: typeof mockConsoleError } }).console.error = mockConsoleError;
 
 describe('safeFormatDate', () => {
     beforeEach(() => {

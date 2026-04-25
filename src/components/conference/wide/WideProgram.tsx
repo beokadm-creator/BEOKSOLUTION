@@ -42,7 +42,7 @@ export const WideProgram = ({ agendas, speakers = [], lang = 'ko' }: { agendas?:
                 // @ts-expect-error - Check for seconds (Firestore serialized)
                 else if (agenda.startTime.seconds) date = new Date(agenda.startTime.seconds * 1000);
                  
-                else date = new Date(agenda.startTime as any);
+                else date = new Date(agenda.startTime as string | number);
             }
 
             if (!date || isNaN(date.getTime())) return;

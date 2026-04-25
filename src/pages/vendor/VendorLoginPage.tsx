@@ -43,9 +43,10 @@ export default function VendorLoginPage() {
 
             toast.success('로그인 성공!');
             navigate('/partner');
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Vendor login failed:', error);
-            if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+            const errCode = error instanceof Error && 'code' in error ? (error as { code: string }).code : '';
+            if (errCode === 'auth/user-not-found' || errCode === 'auth/wrong-password' || errCode === 'auth/invalid-credential') {
                 toast.error('이메일 또는 비밀번호가 올바르지 않습니다.');
             } else {
                 toast.error('로그인 중 오류가 발생했습니다.');
