@@ -242,6 +242,15 @@ export interface RegistrationPeriod {
   };
 }
 
+export type RegistrationFieldKey = 'name' | 'email' | 'phone' | 'affiliation' | 'licenseNumber';
+
+export interface RegistrationFieldSetting {
+  visible: boolean;
+  required: boolean;
+}
+
+export type RegistrationFieldSettings = Record<RegistrationFieldKey, RegistrationFieldSetting>;
+
 /**
  * Collection: `settings`
  * Document: `registration_periods`
@@ -251,6 +260,7 @@ export interface RegistrationSettings {
   paymentMode?: 'TIERED' | 'FREE_ALL';
   periods: RegistrationPeriod[];
   refundPolicy?: string;
+  fieldSettings?: RegistrationFieldSettings;
 }
 
 /**
