@@ -6,9 +6,11 @@ import { Switch } from '../../ui/switch';
 import BilingualInput from '../../ui/bilingual-input';
 import { Calendar, Globe, FileText, Info, MapPin } from 'lucide-react';
 
+import { ConferenceInfo } from '../../../types/conference';
+
 interface GeneralSettingsFormProps {
-    data: any; 
-    setData: React.Dispatch<React.SetStateAction<any>>;
+    data: ConferenceInfo; 
+    setData: React.Dispatch<React.SetStateAction<ConferenceInfo>>;
 }
 
 export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, setData }) => {
@@ -45,8 +47,8 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                 label="학술대회명 (Title)"
                                 valueKO={data.title.ko}
                                 valueEN={data.title.en}
-                                onChangeKO={(value) => setData((prev: any) => ({ ...prev, title: { ...prev.title, ko: value } }))}
-                                onChangeEN={(value) => setData((prev: any) => ({ ...prev, title: { ...prev.title, en: value } }))}
+                                onChangeKO={(value) => setData((prev: ConferenceInfo) => ({ ...prev, title: { ...prev.title, ko: value } }))}
+                                onChangeEN={(value) => setData((prev: ConferenceInfo) => ({ ...prev, title: { ...prev.title, en: value } }))}
                                 placeholderKO="e.g. 2026 Spring Conference"
                                 placeholderEN="e.g. The 35th Spring Conference"
                                 required
@@ -56,7 +58,7 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                 <Label className="text-base font-medium text-slate-700">부제 / 표어 (Subtitle)</Label>
                                 <Input
                                     value={data.subtitle || ''}
-                                    onChange={(e) => setData((prev: any) => ({ ...prev, subtitle: e.target.value }))}
+                                    onChange={(e) => setData((prev: ConferenceInfo) => ({ ...prev, subtitle: e.target.value }))}
                                     placeholder="예: Innovating the Future of Medicine"
                                     className="h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-lg text-base"
                                 />
@@ -68,7 +70,7 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                     <Input
                                         type="datetime-local"
                                         value={data.dates.start}
-                                        onChange={(e) => setData((prev: any) => ({ ...prev, dates: { ...prev.dates, start: e.target.value } }))}
+                                        onChange={(e) => setData((prev: ConferenceInfo) => ({ ...prev, dates: { ...prev.dates, start: e.target.value } }))}
                                         className="h-11 border-slate-200 rounded-lg"
                                     />
                                 </div>
@@ -77,7 +79,7 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                     <Input
                                         type="datetime-local"
                                         value={data.dates.end}
-                                        onChange={(e) => setData((prev: any) => ({ ...prev, dates: { ...prev.dates, end: e.target.value } }))}
+                                        onChange={(e) => setData((prev: ConferenceInfo) => ({ ...prev, dates: { ...prev.dates, end: e.target.value } }))}
                                         className="h-11 border-slate-200 rounded-lg"
                                     />
                                 </div>
@@ -113,7 +115,7 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                     <Input
                                         type="datetime-local"
                                         value={data.abstractDeadlines?.submissionDeadline || ''}
-                                        onChange={(e) => setData((prev: any) => ({ ...prev, abstractDeadlines: { ...(prev.abstractDeadlines || {}), submissionDeadline: e.target.value } }))}
+                                        onChange={(e) => setData((prev: ConferenceInfo) => ({ ...prev, abstractDeadlines: { ...(prev.abstractDeadlines || {}), submissionDeadline: e.target.value } }))}
                                         className="h-11 border-slate-200 rounded-lg"
                                     />
                                 </div>
@@ -122,7 +124,7 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                     <Input
                                         type="datetime-local"
                                         value={data.abstractDeadlines?.editDeadline || ''}
-                                        onChange={(e) => setData((prev: any) => ({ ...prev, abstractDeadlines: { ...(prev.abstractDeadlines || {}), editDeadline: e.target.value } }))}
+                                        onChange={(e) => setData((prev: ConferenceInfo) => ({ ...prev, abstractDeadlines: { ...(prev.abstractDeadlines || {}), editDeadline: e.target.value } }))}
                                         className="h-11 border-slate-200 rounded-lg"
                                     />
                                 </div>
@@ -159,7 +161,7 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                 </div>
                                 <Switch
                                     checked={data.features.guestbookEnabled}
-                                    onCheckedChange={(checked) => setData((prev: any) => ({
+                                    onCheckedChange={(checked) => setData((prev: ConferenceInfo) => ({
                                         ...prev,
                                         features: { ...prev.features, guestbookEnabled: checked }
                                     }))}
@@ -174,7 +176,7 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                 </div>
                                 <Switch
                                     checked={data.features.stampTourEnabled}
-                                    onCheckedChange={(checked) => setData((prev: any) => ({
+                                    onCheckedChange={(checked) => setData((prev: ConferenceInfo) => ({
                                         ...prev,
                                         features: { ...prev.features, stampTourEnabled: checked }
                                     }))}
@@ -189,7 +191,7 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                 </div>
                                 <Switch
                                     checked={data.features?.qnaEnabled || false}
-                                    onCheckedChange={(checked) => setData((prev: any) => ({
+                                    onCheckedChange={(checked) => setData((prev: ConferenceInfo) => ({
                                         ...prev,
                                         features: { ...prev.features, qnaEnabled: checked }
                                     }))}
@@ -204,7 +206,7 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                 </div>
                                 <Switch
                                     checked={data.features?.certificateEnabled || false}
-                                    onCheckedChange={(checked) => setData((prev: any) => ({
+                                    onCheckedChange={(checked) => setData((prev: ConferenceInfo) => ({
                                         ...prev,
                                         features: { ...prev.features, certificateEnabled: checked }
                                     }))}
@@ -239,11 +241,11 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                 label="장소명 (Venue Name)"
                                 valueKO={data.venue.name.ko}
                                 valueEN={data.venue.name.en}
-                                onChangeKO={(value) => setData((prev: any) => ({
+                                onChangeKO={(value) => setData((prev: ConferenceInfo) => ({
                                     ...prev,
                                     venue: { ...prev.venue, name: { ...prev.venue.name, ko: value } }
                                 }))}
-                                onChangeEN={(value) => setData((prev: any) => ({
+                                onChangeEN={(value) => setData((prev: ConferenceInfo) => ({
                                     ...prev,
                                     venue: { ...prev.venue, name: { ...prev.venue.name, en: value } }
                                 }))}
@@ -256,11 +258,11 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                 label="전체 주소 (Address)"
                                 valueKO={data.venue.address.ko}
                                 valueEN={data.venue.address.en}
-                                onChangeKO={(value) => setData((prev: any) => ({
+                                onChangeKO={(value) => setData((prev: ConferenceInfo) => ({
                                     ...prev,
                                     venue: { ...prev.venue, address: { ...prev.venue.address, ko: value } }
                                 }))}
-                                onChangeEN={(value) => setData((prev: any) => ({
+                                onChangeEN={(value) => setData((prev: ConferenceInfo) => ({
                                     ...prev,
                                     venue: { ...prev.venue, address: { ...prev.venue.address, en: value } }
                                 }))}
@@ -275,7 +277,7 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                     <Globe className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
                                     <Input
                                         value={data.venue.mapUrl || ''}
-                                        onChange={(e) => setData((prev: any) => ({ ...prev, venue: { ...prev.venue, mapUrl: e.target.value } }))}
+                                        onChange={(e) => setData((prev: ConferenceInfo) => ({ ...prev, venue: { ...prev.venue, mapUrl: e.target.value } }))}
                                         placeholder="https://map.naver.com/..."
                                         className="pl-10 h-11 border-slate-200 rounded-lg"
                                     />
@@ -288,7 +290,7 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({ data, 
                                     <Globe className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
                                     <Input
                                         value={data.venue.googleMapEmbedUrl || ''}
-                                        onChange={(e) => setData((prev: any) => ({ ...prev, venue: { ...prev.venue, googleMapEmbedUrl: e.target.value } }))}
+                                        onChange={(e) => setData((prev: ConferenceInfo) => ({ ...prev, venue: { ...prev.venue, googleMapEmbedUrl: e.target.value } }))}
                                         placeholder="https://www.google.com/maps/embed?..."
                                         className="pl-10 h-11 border-slate-200 rounded-lg"
                                     />

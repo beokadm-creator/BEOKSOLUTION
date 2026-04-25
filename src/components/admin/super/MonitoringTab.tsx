@@ -6,13 +6,14 @@ import { useMonitoringData } from '../../../hooks/useMonitoringData';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../../firebase';
 import toast from 'react-hot-toast';
+import { Badge } from '../../ui/badge';
 import LoadingSpinner from '../../common/LoadingSpinner';
 
 export const MonitoringTab: React.FC = () => {
     const [monitoringDate, setMonitoringDate] = useState(() => new Date().toISOString().split('T')[0]);
     const { data, loading: monitoringLoading, error, refetch: refetchMonitoring, resolveAlert } = useMonitoringData(monitoringDate);
 
-    const [healthCheckData, setHealthCheckData] = useState<any>(null);
+    const [healthCheckData, setHealthCheckData] = useState<Record<string, unknown> | null>(null);
     const [healthCheckLoading, setHealthCheckLoading] = useState(false);
     const [resolvingAlertId, setResolvingAlertId] = useState<string | null>(null);
 
@@ -21,7 +22,7 @@ export const MonitoringTab: React.FC = () => {
         try {
             const checkFn = httpsCallable(functions, 'healthCheck');
             const res = await checkFn();
-            setHealthCheckData(res.data);
+            setHealthCheckData(res.data as Record<string, unknown>);
             toast.success("Health check completed.");
         } catch (e) {
             console.error("Health Check Error:", e);
@@ -109,7 +110,7 @@ export const MonitoringTab: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        {healthCheckData.checks && Object.entries(healthCheckData.checks).map(([key, check]: [string, any]) => (
+                                        {healthCheckData.checks && Object.entries(healthCheckData.checks as Record<string, any>).map(([key, check]) => (
                                             <div key={key} className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
                                                 <span className="text-sm font-mono text-slate-300">{key}</span>
                                                 <div className="flex items-center gap-2">

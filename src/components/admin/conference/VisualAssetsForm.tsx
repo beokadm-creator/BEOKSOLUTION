@@ -5,10 +5,12 @@ import { Image as ImageIcon, FileText, X } from 'lucide-react';
 import BilingualImageUpload from '../../ui/bilingual-image-upload';
 import RichTextEditor from '../../ui/RichTextEditor';
 
+import { ConferenceInfo } from '../../../types/conference';
+
 interface VisualAssetsFormProps {
     cid: string;
-    data: any;
-    setData: React.Dispatch<React.SetStateAction<any>>;
+    data: ConferenceInfo;
+    setData: React.Dispatch<React.SetStateAction<ConferenceInfo>>;
     uploadingImage: boolean;
     handleAddImage: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
     handleRemoveImage: (index: number) => void;
@@ -54,11 +56,11 @@ export const VisualAssetsForm: React.FC<VisualAssetsFormProps> = ({
                                 label="메인 배너 (Main Banner)"
                                 valueKO={data.visualAssets?.banner?.ko}
                                 valueEN={data.visualAssets?.banner?.en}
-                                onChangeKO={(url) => setData((prev: any) => ({
+                                onChangeKO={(url) => setData((prev: ConferenceInfo) => ({
                                     ...prev,
                                     visualAssets: { ...prev.visualAssets, banner: { ...(prev.visualAssets?.banner || {}), ko: url } }
                                 }))}
-                                onChangeEN={(url) => setData((prev: any) => ({
+                                onChangeEN={(url) => setData((prev: ConferenceInfo) => ({
                                     ...prev,
                                     visualAssets: { ...prev.visualAssets, banner: { ...(prev.visualAssets?.banner || {}), en: url } }
                                 }))}
@@ -75,11 +77,11 @@ export const VisualAssetsForm: React.FC<VisualAssetsFormProps> = ({
                                 label="포스터 / 안내 이미지 (Poster)"
                                 valueKO={data.visualAssets?.poster?.ko}
                                 valueEN={data.visualAssets?.poster?.en}
-                                onChangeKO={(url) => setData((prev: any) => ({
+                                onChangeKO={(url) => setData((prev: ConferenceInfo) => ({
                                     ...prev,
                                     visualAssets: { ...prev.visualAssets, poster: { ...(prev.visualAssets?.poster || {}), ko: url } }
                                 }))}
-                                onChangeEN={(url) => setData((prev: any) => ({
+                                onChangeEN={(url) => setData((prev: ConferenceInfo) => ({
                                     ...prev,
                                     visualAssets: { ...prev.visualAssets, poster: { ...(prev.visualAssets?.poster || {}), en: url } }
                                 }))}
@@ -121,10 +123,10 @@ export const VisualAssetsForm: React.FC<VisualAssetsFormProps> = ({
                                 </Label>
                                 <RichTextEditor
                                     value={data.welcomeMessage?.ko || ''}
-                                    onChange={(value) => setData((prev: any) => ({
-                                        ...prev,
-                                        welcomeMessage: { ...(prev.welcomeMessage || {}), ko: value }
-                                    }))}
+                                    onChange={(value) => setData((prev: ConferenceInfo) => ({
+                                    ...prev,
+                                    welcomeMessage: { ...(prev.welcomeMessage || {}), ko: value }
+                                }))}
                                     placeholder="환영사를 작성해주세요. 학술대회 참가자들에게 전하는 인사말입니다..."
                                 />
                             </div>
@@ -136,10 +138,10 @@ export const VisualAssetsForm: React.FC<VisualAssetsFormProps> = ({
                                 </Label>
                                 <RichTextEditor
                                     value={data.welcomeMessage?.en || ''}
-                                    onChange={(value) => setData((prev: any) => ({
-                                        ...prev,
-                                        welcomeMessage: { ...(prev.welcomeMessage || {}), en: value }
-                                    }))}
+                                    onChange={(value) => setData((prev: ConferenceInfo) => ({
+                                    ...prev,
+                                    welcomeMessage: { ...(prev.welcomeMessage || {}), en: value }
+                                }))}
                                     placeholder="e.g. Dear Colleagues and Friends..."
                                 />
                             </div>

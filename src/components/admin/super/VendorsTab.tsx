@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, Timestamp, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, Timestamp, query, where, orderBy, setDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import toast from 'react-hot-toast';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../../ui/card';
@@ -10,10 +10,35 @@ import { Label } from '../../ui/label';
 import { Textarea } from '../../ui/textarea';
 import LoadingSpinner from '../../common/LoadingSpinner';
 
+export interface VendorData {
+    id: string;
+    name: string;
+    slug?: string;
+    description?: string;
+    adminEmail?: string;
+    logoUrl?: string;
+    homeUrl?: string;
+    createdAt?: Timestamp;
+    updatedAt?: Timestamp;
+}
+
+export interface VendorRequest {
+    id: string;
+    vendorId: string;
+    vendorName: string;
+    conferenceId: string;
+    status: 'pending' | 'approved' | 'rejected';
+    requestedAt?: Timestamp;
+    approvedAt?: Timestamp;
+    rejectedAt?: Timestamp;
+    approvedBy?: string;
+    rejectedBy?: string;
+}
+
 export const VendorsTab: React.FC = () => {
-    const [vendors, setVendors] = useState<any[]>([]);
+    const [vendors, setVendors] = useState<VendorData[]>([]);
     const [loadingVendors, setLoadingVendors] = useState(false);
-    const [vendorRequests, setVendorRequests] = useState<any[]>([]);
+    const [vendorRequests, setVendorRequests] = useState<VendorRequest[]>([]);
     const [loadingVendorRequests, setLoadingVendorRequests] = useState(false);
 
     const [newVendorName, setNewVendorName] = useState('');
@@ -21,7 +46,7 @@ export const VendorsTab: React.FC = () => {
     const [newVendorEmail, setNewVendorEmail] = useState('');
     const [newVendorSlug, setNewVendorSlug] = useState('');
 
-    const [editingVendor, setEditingVendor] = useState<any | null>(null);
+    const [editingVendor, setEditingVendor] = useState<VendorData | null>(null);
     const [editVendorName, setEditVendorName] = useState('');
     const [editVendorDesc, setEditVendorDesc] = useState('');
     const [editVendorEmail, setEditVendorEmail] = useState('');
@@ -39,7 +64,7 @@ export const VendorsTab: React.FC = () => {
         setLoadingVendors(true);
         try {
             const snap = await getDocs(collection(db, 'vendors'));
-            setVendors(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setVendors(snap.docs.map(d => ({ id: d.id, ...d.data() } as VendorData)));
         } catch (e) {
             console.error(e);
         } finally {
@@ -52,7 +77,7 @@ export const VendorsTab: React.FC = () => {
         try {
             const q = query(collection(db, 'vendor_requests'), where('status', '==', 'pending'), orderBy('requestedAt', 'desc'));
             const snap = await getDocs(q);
-            setVendorRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setVendorRequests(snap.docs.map(d => ({ id: d.id, ...d.data() } as VendorRequest)));
         } catch (e) {
             console.error(e);
         } finally {
@@ -133,14 +158,14 @@ export const VendorsTab: React.FC = () => {
         }
     };
 
-    const handleApproveVendorRequest = async (request: any) => {
+    const handleApproveVendorRequest = async (request: VendorRequest) => {
         try {
             const vendorSnap = await getDoc(doc(db, 'vendors', request.vendorId));
             if (!vendorSnap.exists()) {
                 toast.error('Vendor not found.');
                 return;
             }
-            const vendorData = vendorSnap.data() as any;
+            const vendorData = vendorSnap.data() as VendorData;
 
             await setDoc(doc(db, `conferences/${request.conferenceId}/sponsors/${request.vendorId}`), {
                 name: vendorData.name || request.vendorId,
@@ -167,7 +192,7 @@ export const VendorsTab: React.FC = () => {
         }
     };
 
-    const handleRejectVendorRequest = async (request: any) => {
+    const handleRejectVendorRequest = async (request: VendorRequest) => {
         if (!window.confirm('Reject this participation request?')) return;
         try {
             await updateDoc(doc(db, 'vendor_requests', request.id), {

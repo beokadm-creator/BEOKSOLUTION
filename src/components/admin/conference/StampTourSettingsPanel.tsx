@@ -8,6 +8,8 @@ import { Label } from '../../ui/label';
 import { Info, ArrowUp, ArrowDown } from 'lucide-react';
 import { getStampTourRewardTitle, isStampTourRewardDrawCompleted } from '../../../utils/stampTour';
 
+import { SponsorData } from '../../../types/schema';
+
 export type StampTourCompletionType = 'COUNT' | 'ALL';
 export type StampTourBoothOrderMode = 'SPONSOR_ORDER' | 'CUSTOM';
 export type StampTourRewardMode = 'RANDOM' | 'FIXED';
@@ -65,12 +67,12 @@ interface StampTourSettingsPanelProps {
     cid: string;
     stampTourConfig: StampTourConfigForm;
     setStampTourConfig: Dispatch<SetStateAction<StampTourConfigForm>>;
-    sponsors: any[];
+    sponsors: SponsorData[];
     stampTourProgress: StampTourProgressRow[];
-    formatKstTimestamp: (ts: any) => string;
+    formatKstTimestamp: (ts: Timestamp | undefined | null) => string;
     stampTourParticipantCount: number;
     normalizedRequiredStampCount: number;
-    selectableLotteryRewards: any[];
+    selectableLotteryRewards: StampTourRewardForm[];
     handleAdminRewardDraw: (row: StampTourProgressRow) => Promise<void>;
     handleRunLottery: () => Promise<void>;
     drawingUserId: string | null;
