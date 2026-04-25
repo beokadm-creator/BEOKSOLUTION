@@ -3,6 +3,7 @@ import { Outlet, Navigate, useNavigate, NavLink, useLocation, useParams } from '
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import type { VendorProfile } from '../types/schema';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { LogOut, Building2, PanelLeftClose, PanelLeft, LayoutDashboard, QrCode, Settings, Users, Bell } from 'lucide-react';
 
@@ -24,7 +25,7 @@ const getVendorSlug = (v: { id: string; name?: string; slug?: string } | undefin
 export default function VendorPortalLayout() {
     const [loading, setLoading] = useState(true);
     const [authorized, setAuthorized] = useState(false);
-    const [vendors, setVendors] = useState<any[]>([]);
+    const [vendors, setVendors] = useState<VendorProfile[]>([]);
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const navigate = useNavigate();
     const location = useLocation();
@@ -69,7 +70,7 @@ export default function VendorPortalLayout() {
                 if (uniqueVendors.length === 0) {
                     setAuthorized(false);
                 } else {
-                    setVendors(uniqueVendors as any[]);
+                    setVendors(uniqueVendors as VendorProfile[]);
                     setAuthorized(true);
                 }
             } catch (err) {

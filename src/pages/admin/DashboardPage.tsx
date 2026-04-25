@@ -19,6 +19,12 @@ interface RegistrationData {
     [key: string]: unknown;
 }
 
+const toMillis = (ts: { seconds: number; nanoseconds?: number } | Date | undefined): number => {
+    if (!ts) return 0;
+    if (ts instanceof Date) return ts.getTime();
+    return ts.seconds * 1000;
+};
+
 export default function DashboardPage() {
     const { selectedConferenceId, selectedConferenceSlug, selectedConferenceTitle } = useAdminStore();
     const navigate = useNavigate();
@@ -66,8 +72,8 @@ export default function DashboardPage() {
                         if (a.status === 'REFUNDED' && b.status !== 'REFUNDED') return -1;
                         if (a.status !== 'REFUNDED' && b.status === 'REFUNDED') return 1;
                         // If same status, newer first
-                        const aTime = (a.createdAt as any)?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
-                        const bTime = (b.createdAt as any)?.toMillis?.() || (b.createdAt as any)?.seconds * 1000 || 0;
+                        const aTime = toMillis(a.createdAt);
+                        const bTime = toMillis(b.createdAt);
                         return bTime - aTime;
                     });
 

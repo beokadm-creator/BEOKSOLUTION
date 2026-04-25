@@ -10,6 +10,7 @@ import { Loader2, LogIn, LogOut, RefreshCw, CheckCircle, FileText, Search, Clock
 import toast from 'react-hot-toast';
 import { cn } from '../../lib/utils';
 import { getKstToday } from '../../utils/dateUtils';
+import type { AttendanceZone } from '../../types/attendance';
 
 import { AdjustAttendanceModal } from '../../components/admin/attendance/AdjustAttendanceModal';
 import { AttendanceLogModal } from '../../components/admin/attendance/AttendanceLogModal';
@@ -135,7 +136,7 @@ const AttendanceLivePage: React.FC = () => {
     }, [cid]);
 
     // Keep allZones globally to safely check rules for zones spanning across days
-    const allZonesRef = useRef<ZoneRule[]>([]);
+    const allZonesRef = useRef<AttendanceZone[]>([]);
 
     useEffect(() => {
         if (!cid) return;
@@ -151,17 +152,17 @@ const AttendanceLivePage: React.FC = () => {
                 const allRules = snap.data().rules || {};
                 
                 // Extract all zones into allZonesRef
-                const allZones: any[] = [];
-                Object.entries(allRules).forEach(([dateStr, rule]: [string, any]) => {
+                const allZones: AttendanceZone[] = [];
+                Object.entries(allRules).forEach(([dateStr, rule]: [string, DailyRule | undefined]) => {
                     if (rule?.zones) {
-                        rule.zones.forEach((z: any) => {
+                        rule.zones.forEach((z: ZoneRule) => {
                             allZones.push({
                                 ...z,
                                 ruleDate: dateStr,
                                 globalGoalMinutes: rule.globalGoalMinutes || 0,
                                 completionMode: rule.completionMode || 'DAILY_SEPARATE',
                                 cumulativeGoalMinutes: rule.cumulativeGoalMinutes || 0
-                            });
+                            } as AttendanceZone);
                         });
                     }
                 });
@@ -390,7 +391,7 @@ const AttendanceLivePage: React.FC = () => {
                 durationMinutes = Math.floor((boundedEnd.getTime() - boundedStart.getTime()) / 60000);
 
                 if (zoneRule && zoneRule.breaks) {
-                    zoneRule.breaks.forEach((brk: any) => {
+                    zoneRule.breaks.forEach((brk: BreakTime) => {
                         const breakStart = new Date(`${zoneDateStr}T${brk.start}:00+09:00`);
                         const breakEnd = new Date(`${zoneDateStr}T${brk.end}:00+09:00`);
                         const overlapStart = Math.max(boundedStart.getTime(), breakStart.getTime());

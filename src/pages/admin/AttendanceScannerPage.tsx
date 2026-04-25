@@ -6,6 +6,8 @@ import { Loader2, AlertCircle, CheckCircle, X, MapPin, LogIn } from 'lucide-reac
 import { Button } from '../../components/ui/button';
 import toast from 'react-hot-toast';
 import { getKstToday } from '../../utils/dateUtils';
+import type { AttendanceZone, AttendanceRulesMap, BreakTime } from '../../types/attendance';
+import { cn } from '../../lib/utils';
 
 interface ScannerState {
     status: 'IDLE' | 'PROCESSING' | 'SUCCESS' | 'ERROR';
@@ -24,7 +26,7 @@ const AttendanceScannerPage: React.FC = () => {
     const { cid } = useParams<{ cid: string }>();
     const [loading, setLoading] = useState(true);
 
-    const [zones, setZones] = useState<any[]>([]);
+    const [zones, setZones] = useState<AttendanceZone[]>([]);
     const [selectedZoneId, setSelectedZoneId] = useState<string>('');
     const [mode, setMode] = useState<'ENTER_ONLY' | 'EXIT_ONLY' | 'AUTO'>('ENTER_ONLY');
     const [conferenceTitle, setConferenceTitle] = useState('');
@@ -38,6 +40,7 @@ const AttendanceScannerPage: React.FC = () => {
     const inputRef = useRef<HTMLInputElement>(null);
     const [inputValue, setInputValue] = useState('');
     const scanMemoryRef = useRef<Map<string, number>>(new Map());
+    const allZonesRef = useRef<AttendanceZone[]>([]);
 
     useEffect(() => {
         if (!cid) return;
@@ -53,11 +56,11 @@ const AttendanceScannerPage: React.FC = () => {
                 const rulesRef = doc(db, `conferences/${cid}/settings/attendance`);
                 const rulesSnap = await getDoc(rulesRef);
                 if (rulesSnap.exists()) {
-                    const allRules = rulesSnap.data().rules || {};
-                    const allZones: any[] = [];
-                    Object.entries(allRules).forEach(([dateStr, rule]: [string, any]) => {
+                    const allRules = (rulesSnap.data().rules || {}) as AttendanceRulesMap;
+                    const allZones: AttendanceZone[] = [];
+                    Object.entries(allRules).forEach(([dateStr, rule]) => {
                         if (rule?.zones) {
-                            rule.zones.forEach((z: any) => {
+                            rule.zones.forEach((z: AttendanceZone) => {
                                 allZones.push({
                                     ...z,
                                     ruleDate: dateStr,
@@ -69,7 +72,8 @@ const AttendanceScannerPage: React.FC = () => {
                         }
                     });
 
-                    const uniqueZones = Array.from(new Map(allZones.map((item: any) => [item.id, item])).values());
+                    const uniqueZones = Array.from(new Map(allZones.map((item: AttendanceZone) => [item.id, item])).values());
+                    allZonesRef.current = allZones;
                     setZones(uniqueZones);
                     if (uniqueZones.length > 0) setSelectedZoneId(uniqueZones[0].id);
                 }
@@ -104,7 +108,7 @@ const AttendanceScannerPage: React.FC = () => {
 
         try {
             const decodeTypos = (s: string) => {
-                const map: any = { 'ㅂ': 'q', 'ㅈ': 'w', 'ㄷ': 'e', 'ㄱ': 'r', 'ㅅ': 't', 'ㅛ': 'y', 'ㅕ': 'u', 'ㅑ': 'i', 'ㅐ': 'o', 'ㅔ': 'p', 'ㅁ': 'a', 'ㄴ': 's', 'ㅇ': 'd', 'ㄹ': 'f', 'ㅎ': 'g', 'ㅗ': 'h', 'ㅓ': 'j', 'ㅏ': 'k', 'ㅣ': 'l', 'ㅋ': 'z', 'ㅌ': 'x', 'ㅊ': 'c', 'ㅍ': 'v', 'ㅠ': 'b', 'ㅜ': 'n', 'ㅡ': 'm' };
+                const map: Record<string, string> = { 'ㅂ': 'q', 'ㅈ': 'w', 'ㄷ': 'e', 'ㄱ': 'r', 'ㅅ': 't', 'ㅛ': 'y', 'ㅕ': 'u', 'ㅑ': 'i', 'ㅐ': 'o', 'ㅔ': 'p', 'ㅁ': 'a', 'ㄴ': 's', 'ㅇ': 'd', 'ㄹ': 'f', 'ㅎ': 'g', 'ㅗ': 'h', 'ㅓ': 'j', 'ㅏ': 'k', 'ㅣ': 'l', 'ㅋ': 'z', 'ㅌ': 'x', 'ㅊ': 'c', 'ㅍ': 'v', 'ㅠ': 'b', 'ㅜ': 'n', 'ㅡ': 'm' };
                 return s.split('').map(c => map[c] || c).join('').replace(/[^a-zA-Z0-9-]/g, '');
             };
 
@@ -124,9 +128,9 @@ const AttendanceScannerPage: React.FC = () => {
                 userData: { name: res.userName, affiliation: res.affiliation },
                 actionType: res.actionType
             });
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error(e);
-            setScannerState({ status: 'ERROR', message: e.message || 'Error', lastScanned: code });
+            setScannerState({ status: 'ERROR', message: e instanceof Error ? e.message : 'Error', lastScanned: code });
         } finally {
             setTimeout(() => setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE' }), 2000);
         }
@@ -187,7 +191,7 @@ const AttendanceScannerPage: React.FC = () => {
                     throw new Error('입장 시간 기록(lastCheckIn)이 누락되어 처리할 수 없습니다.');
                 }
                 const checkInDateStr = getKstToday(lastIn);
-                const rule = zones.find(z => z.id === curZoneId) || allZones.find(z => z.id === curZoneId && z.ruleDate === checkInDateStr) || allZones.find(z => z.id === curZoneId);
+                const rule = zones.find(z => z.id === curZoneId) || allZonesRef.current.find(z => z.id === curZoneId && z.ruleDate === checkInDateStr) || allZonesRef.current.find(z => z.id === curZoneId);
 
                 let bS = lastIn, bE = now;
                 if (rule && rule.start && rule.end) {
@@ -203,7 +207,7 @@ const AttendanceScannerPage: React.FC = () => {
                     const diff = Math.floor((bE.getTime() - bS.getTime()) / 60000);
                     let ded = 0;
                     if (rule?.breaks) {
-                        rule.breaks.forEach((b: any) => {
+                        rule.breaks.forEach((b: BreakTime) => {
                             const ds = rule.ruleDate || getKstToday(bS);
                             const bsS = new Date(`${ds}T${b.start}:00+09:00`);
                             const bsE = new Date(`${ds}T${b.end}:00+09:00`);
@@ -279,22 +283,22 @@ const AttendanceScannerPage: React.FC = () => {
 
             if (isZoneSwitch) {
                 const logExitRef = doc(collection(db, `conferences/${cid}/${col}/${id}/logs`));
-                tx.set(logExitRef, { type: 'EXIT', zoneId: curZoneId, timestamp: tsNow, date: todayStr, method: 'KIOSK_DESK', rawDuration, deduction, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
+                tx.set(logExitRef, { type: 'EXIT', zoneId: curZoneId, timestamp: tsNow, date: fallbackDateStr, method: 'KIOSK_DESK', rawDuration, deduction, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
 
                 const logEnterRef = doc(collection(db, `conferences/${cid}/${col}/${id}/logs`));
-                tx.set(logEnterRef, { type: 'ENTER', zoneId: targetZoneId, timestamp: tsNow, date: todayStr, method: 'KIOSK_DESK', recognizedMinutes: 0, accumulatedTotal: newTotal });
+                tx.set(logEnterRef, { type: 'ENTER', zoneId: targetZoneId, timestamp: tsNow, date: fallbackDateStr, method: 'KIOSK_DESK', recognizedMinutes: 0, accumulatedTotal: newTotal });
 
                 const accExitRef = doc(collection(db, `conferences/${cid}/access_logs`));
-                tx.set(accExitRef, { action: 'EXIT', scannedQr: data.badgeQr || id, locationId: curZoneId, timestamp: tsNow, date: todayStr, method: 'KIOSK_DESK', registrationId: id, isExternal: isExt, rawDuration, deduction, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
+                tx.set(accExitRef, { action: 'EXIT', scannedQr: data.badgeQr || id, locationId: curZoneId, timestamp: tsNow, date: fallbackDateStr, method: 'KIOSK_DESK', registrationId: id, isExternal: isExt, rawDuration, deduction, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
 
                 const accEnterRef = doc(collection(db, `conferences/${cid}/access_logs`));
-                tx.set(accEnterRef, { action: 'ENTRY', scannedQr: data.badgeQr || id, locationId: targetZoneId, timestamp: tsNow, date: todayStr, method: 'KIOSK_DESK', registrationId: id, isExternal: isExt, recognizedMinutes: 0, accumulatedTotal: newTotal });
+                tx.set(accEnterRef, { action: 'ENTRY', scannedQr: data.badgeQr || id, locationId: targetZoneId, timestamp: tsNow, date: fallbackDateStr, method: 'KIOSK_DESK', registrationId: id, isExternal: isExt, recognizedMinutes: 0, accumulatedTotal: newTotal });
             } else {
                 const logRef = doc(collection(db, `conferences/${cid}/${col}/${id}/logs`));
-                tx.set(logRef, { type: action, zoneId: action === 'ENTER' ? targetZoneId : curZoneId, timestamp: tsNow, date: todayStr, method: 'KIOSK_DESK', rawDuration: action === 'EXIT' ? rawDuration : 0, deduction: action === 'EXIT' ? deduction : 0, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
+                tx.set(logRef, { type: action, zoneId: action === 'ENTER' ? targetZoneId : curZoneId, timestamp: tsNow, date: fallbackDateStr, method: 'KIOSK_DESK', rawDuration: action === 'EXIT' ? rawDuration : 0, deduction: action === 'EXIT' ? deduction : 0, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
 
                 const accRef = doc(collection(db, `conferences/${cid}/access_logs`));
-                tx.set(accRef, { action: action === 'ENTER' ? 'ENTRY' : 'EXIT', scannedQr: data.badgeQr || id, locationId: action === 'ENTER' ? targetZoneId : curZoneId, timestamp: tsNow, date: todayStr, method: 'KIOSK_DESK', registrationId: id, isExternal: isExt, rawDuration: action === 'EXIT' ? rawDuration : 0, deduction: action === 'EXIT' ? deduction : 0, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
+                tx.set(accRef, { action: action === 'ENTER' ? 'ENTRY' : 'EXIT', scannedQr: data.badgeQr || id, locationId: action === 'ENTER' ? targetZoneId : curZoneId, timestamp: tsNow, date: fallbackDateStr, method: 'KIOSK_DESK', registrationId: id, isExternal: isExt, rawDuration: action === 'EXIT' ? rawDuration : 0, deduction: action === 'EXIT' ? deduction : 0, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
             }
 
             return { actionText, actionType: action, userName: name, affiliation: aff };
