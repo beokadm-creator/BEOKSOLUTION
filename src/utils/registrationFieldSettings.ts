@@ -5,6 +5,7 @@ export const FIELD_LABELS: Record<RegistrationFieldKey, string> = {
   email: '이메일',
   phone: '휴대폰 번호',
   affiliation: '소속',
+  position: '직급',
   licenseNumber: '면허번호'
 };
 
@@ -13,6 +14,7 @@ export const DEFAULT_REGISTRATION_FIELD_SETTINGS: RegistrationFieldSettings = {
   email: { visible: true, required: true },
   phone: { visible: true, required: true },
   affiliation: { visible: true, required: true },
+  position: { visible: false, required: false },
   licenseNumber: { visible: true, required: false }
 };
 

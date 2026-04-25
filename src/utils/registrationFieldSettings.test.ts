@@ -15,9 +15,11 @@ describe('registrationFieldSettings', () => {
 
   it('merges provided settings with defaults', () => {
     const result = normalizeFieldSettings({
-      licenseNumber: { visible: false, required: false }
+      licenseNumber: { visible: false, required: false },
+      position: { visible: true, required: true }
     });
     expect(result.licenseNumber).toEqual({ visible: false, required: false });
+    expect(result.position).toEqual({ visible: true, required: true });
     expect(result.email).toEqual(DEFAULT_REGISTRATION_FIELD_SETTINGS.email);
   });
 

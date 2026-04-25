@@ -41,6 +41,7 @@ export interface RegistrationData {
   name: string;
   org: string;
   category: string;
+  position?: string;
   [key: string]: unknown;
 }
 

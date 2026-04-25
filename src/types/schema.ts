@@ -9,7 +9,7 @@ export interface LocalizedText {
   en?: string;
 }
 
-export type BadgeElementType = 'NAME' | 'ORG' | 'QR' | 'CUSTOM' | 'CATEGORY' | 'LICENSE' | 'PRICE' | 'AFFILIATION' | 'IMAGE';
+export type BadgeElementType = 'NAME' | 'ORG' | 'QR' | 'CUSTOM' | 'CATEGORY' | 'LICENSE' | 'PRICE' | 'AFFILIATION' | 'POSITION' | 'IMAGE';
 
 export interface BadgeElement {
   x: number;
@@ -242,7 +242,7 @@ export interface RegistrationPeriod {
   };
 }
 
-export type RegistrationFieldKey = 'name' | 'email' | 'phone' | 'affiliation' | 'licenseNumber';
+export type RegistrationFieldKey = 'name' | 'email' | 'phone' | 'affiliation' | 'position' | 'licenseNumber';
 
 export interface RegistrationFieldSetting {
   visible: boolean;
