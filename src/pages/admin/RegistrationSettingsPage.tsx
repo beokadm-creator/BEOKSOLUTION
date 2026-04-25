@@ -11,7 +11,9 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
-import { Trash2, Plus, Save, FileText } from 'lucide-react';
+import { Trash2, Plus, Save, FileText, Settings2 } from 'lucide-react';
+import { normalizeFieldSettings, FIELD_LABELS } from '../../utils/registrationFieldSettings';
+import type { RegistrationFieldSettings, RegistrationFieldKey } from '../../types/schema';
 
 
 interface RegistrationPeriod {
@@ -27,12 +29,14 @@ interface RegistrationSettings {
     paymentMode: 'TIERED' | 'FREE_ALL';
     periods: RegistrationPeriod[];
     refundPolicy: string;
+    fieldSettings?: RegistrationFieldSettings;
 }
 
 const defaultSettings: RegistrationSettings = {
     paymentMode: 'TIERED',
     periods: [],
-    refundPolicy: ''
+    refundPolicy: '',
+    fieldSettings: normalizeFieldSettings()
 };
 
 const RegistrationSettingsPage: React.FC = () => {
@@ -84,7 +88,8 @@ const RegistrationSettingsPage: React.FC = () => {
                     setSettings({
                         paymentMode: data.paymentMode || 'TIERED',
                         periods: data.periods || [],
-                        refundPolicy: data.refundPolicy || ''
+                        refundPolicy: data.refundPolicy || '',
+                        fieldSettings: normalizeFieldSettings(data.fieldSettings)
                     });
                 } else {
                     setSettings(defaultSettings);
@@ -175,6 +180,26 @@ const RegistrationSettingsPage: React.FC = () => {
 
     const updateRefundPolicy = (value: string) => {
         setSettings(prev => ({ ...prev, refundPolicy: value }));
+    };
+
+    const toggleFieldSetting = (key: RegistrationFieldKey, field: 'visible' | 'required') => {
+        setSettings(prev => {
+            const currentFieldSettings = prev.fieldSettings || normalizeFieldSettings();
+            const newValue = !currentFieldSettings[key][field];
+            
+            const updatedFieldSettings = {
+                ...currentFieldSettings,
+                [key]: {
+                    ...currentFieldSettings[key],
+                    [field]: newValue
+                }
+            };
+            
+            return {
+                ...prev,
+                fieldSettings: normalizeFieldSettings(updatedFieldSettings)
+            };
+        });
     };
 
     const timestampToDateString = (ts: Timestamp) => {
@@ -268,6 +293,66 @@ const RegistrationSettingsPage: React.FC = () => {
                                     <p className="text-sm text-slate-500 mt-1">모든 참가자가 무료로 등록합니다. 회원 인증 없이 기본 정보만 입력하면 등록이 완료됩니다.</p>
                                 </div>
                             </label>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Field Settings Section */}
+                <Card className="border-2 border-slate-100 shadow-sm">
+                    <CardHeader className="bg-slate-50/50 pb-4">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <Settings2 className="w-5 h-5" />
+                            등록 입력 항목 설정
+                        </CardTitle>
+                        <p className="text-sm text-slate-500">참가자 등록 폼에 표시될 항목과 필수 입력 여부를 설정합니다.</p>
+                    </CardHeader>
+                    <CardContent className="pt-6">
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-3 gap-4 font-semibold text-slate-700 border-b pb-2 px-2">
+                                <div>항목명</div>
+                                <div className="text-center">표시 여부</div>
+                                <div className="text-center">필수 여부</div>
+                            </div>
+                            
+                            {(Object.keys(FIELD_LABELS) as RegistrationFieldKey[]).map((key) => {
+                                const setting = settings.fieldSettings?.[key] || normalizeFieldSettings()[key];
+                                const isName = key === 'name';
+                                
+                                return (
+                                    <div key={key} className={`grid grid-cols-3 gap-4 items-center py-3 px-2 rounded-lg ${isName ? 'bg-slate-50' : 'hover:bg-slate-50'}`}>
+                                        <div className="font-medium text-slate-900">
+                                            {FIELD_LABELS[key]}
+                                            {isName && <span className="ml-2 text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded">기본값 (변경불가)</span>}
+                                        </div>
+                                        
+                                        <div className="flex justify-center">
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="sr-only peer"
+                                                    checked={setting.visible}
+                                                    disabled={isName}
+                                                    onChange={() => toggleFieldSetting(key, 'visible')}
+                                                />
+                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 disabled:opacity-50"></div>
+                                            </label>
+                                        </div>
+                                        
+                                        <div className="flex justify-center">
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="sr-only peer"
+                                                    checked={setting.required}
+                                                    disabled={isName || !setting.visible}
+                                                    onChange={() => toggleFieldSetting(key, 'required')}
+                                                />
+                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 disabled:opacity-50"></div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </CardContent>
                 </Card>
