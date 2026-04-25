@@ -1,6 +1,6 @@
 import { BadgeElement } from '../types/schema';
 
-export const printBadge = async (layout: { width: number; height: number; elements: BadgeElement[] }, userData: { name: string; organization?: string; badgeQr: string; licenseNumber?: string; price?: string }) => {
+export const printBadge = async (layout: { width: number; height: number; elements: BadgeElement[] }, userData: { name: string; organization?: string; badgeQr: string; licenseNumber?: string; position?: string; price?: string }) => {
     console.log("---------------------------------------------------");
     console.log(`[PRINTER] Printing Badge for ${userData.name}`);
     console.log(`[PRINTER] Size: ${layout.width}x${layout.height}`);
@@ -14,6 +14,7 @@ export const printBadge = async (layout: { width: number; height: number; elemen
         if (el.type === 'ORG') content = userData.organization || 'No Org'; // Assuming user has org
         if (el.type === 'QR') content = userData.badgeQr;
         if (el.type === 'LICENSE') content = userData.licenseNumber || '';
+        if (el.type === 'POSITION') content = userData.position || '';
         if (el.type === 'PRICE') content = userData.price || '';
 
         console.log(`[PRINTER] Element [${el.type}] at (${el.x}, ${el.y}): ${content}`);

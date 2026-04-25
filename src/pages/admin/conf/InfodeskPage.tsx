@@ -300,6 +300,7 @@ const InfodeskPage: React.FC = () => {
                     const printSuccess = await printBadge(activeLayout, {
                         name: userName,
                         org: userAffiliation,
+                        position: result.data.position || '',
                         category: finalTier,
                         license: finalLicense,
                         price: `${getDisplayAmount().toLocaleString()}원`,

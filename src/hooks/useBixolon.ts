@@ -52,6 +52,7 @@ export const useBixolon = () => {
         },
         userData: {
             name: string; org: string; category?: string;
+            position?: string;
             license?: string; price?: string; affiliation?: string; qrData: string;
         }
     ) => {
@@ -110,9 +111,19 @@ export const useBixolon = () => {
             const baseXDots = mmToDots(safeXMm, dpmm);
             const baseYDots = mmToDots(safeYMm, dpmm) + offsetYdots;
 
-            const content = el.type === 'CUSTOM'
+            let content = el.type === 'CUSTOM'
                 ? (el.content || '')
-                : (userData[el.type.toLowerCase() as keyof typeof userData] || '');
+                : '';
+                
+            if (el.type !== 'CUSTOM') {
+                const key = el.type.toLowerCase();
+                // Special mappings or direct fallback
+                if (el.type === 'QR') {
+                    content = userData.qrData || 'NO_DATA';
+                } else {
+                    content = (userData[key as keyof typeof userData] as string) || '';
+                }
+            }
 
             if (el.type === 'QR') {
                 const qrSizeDots = mmToDots(safeFontSizeMm || 25, dpmm);
