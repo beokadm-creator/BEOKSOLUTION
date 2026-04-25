@@ -10,6 +10,7 @@ export default defineConfig([
     'dist',
     'dist-live',
     'backup',
+    'coverage',
     'src-old-91a3e3b',
     '*.patch.ts',
     '*.patch.tsx',
