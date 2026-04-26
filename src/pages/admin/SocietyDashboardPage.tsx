@@ -125,6 +125,7 @@ export default function SocietyDashboardPage() {
                 }
             } catch (error) {
                 console.error("[SocietyDashboard] Failed to resolve society:", error);
+                toast.error('학회 정보를 불러오지 못했습니다.');
             }
 
             if (!cancelled) {

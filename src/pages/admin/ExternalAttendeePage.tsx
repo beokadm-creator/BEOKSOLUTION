@@ -106,6 +106,7 @@ const ExternalAttendeePage: React.FC = () => {
                 }
             } catch (err) {
                 console.error("Failed to fetch fieldSettings", err);
+                toast.error('신청서 설정을 불러오지 못했습니다.');
             }
         };
         fetchSettings();
@@ -178,6 +179,7 @@ const ExternalAttendeePage: React.FC = () => {
                 }
             } catch (error) {
                 console.error('Failed to fetch receipt config:', error);
+                toast.error('영수증 설정을 불러오지 못했습니다.');
             }
         };
 

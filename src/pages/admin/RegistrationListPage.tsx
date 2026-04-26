@@ -111,6 +111,7 @@ const RegistrationListPage: React.FC = () => {
                 }
             } catch (err) {
                 console.error("Failed to fetch fieldSettings", err);
+                toast.error('신청서 설정을 불러오지 못했습니다.');
             }
         };
         fetchSettings();

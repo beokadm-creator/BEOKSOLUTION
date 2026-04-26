@@ -78,6 +78,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 }
             } catch (error) {
                 console.error('[RegistrationModal] Error checking registration settings:', error);
+                toast.error('등록 설정을 확인하지 못했습니다.');
             }
         };
         checkSettings();

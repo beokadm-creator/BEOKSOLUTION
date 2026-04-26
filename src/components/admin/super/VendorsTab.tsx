@@ -67,6 +67,7 @@ export const VendorsTab: React.FC = () => {
             setVendors(snap.docs.map(d => ({ id: d.id, ...d.data() } as VendorData)));
         } catch (e) {
             console.error(e);
+            toast.error('협력사 목록을 불러오지 못했습니다.');
         } finally {
             setLoadingVendors(false);
         }
@@ -80,6 +81,7 @@ export const VendorsTab: React.FC = () => {
             setVendorRequests(snap.docs.map(d => ({ id: d.id, ...d.data() } as VendorRequest)));
         } catch (e) {
             console.error(e);
+            toast.error('협력사 요청을 불러오지 못했습니다.');
         } finally {
             setLoadingVendorRequests(false);
         }

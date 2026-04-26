@@ -524,6 +524,7 @@ export default function RegistrationPage() {
                     setPaymentWidget(widget);
                 } catch (error) {
                     console.error("Failed to load payment widget:", error);
+                    toast.error('결제 위젯을 불러오지 못했습니다. 페이지를 새로고침해주세요.');
                 }
             })();
         }
