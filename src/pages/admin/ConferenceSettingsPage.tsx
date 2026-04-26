@@ -575,7 +575,7 @@ export default function ConferenceSettingsPage() {
 
                 {data.features?.certificateEnabled && (
                     <>
-                        <CertificateSettingsPanel confId={cid || ''} />
+                        <CertificateSettingsPanel confId={cid || ''} data={data} />
                         <hr className="border-slate-100 my-12" />
                     </>
                 )}

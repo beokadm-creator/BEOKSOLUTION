@@ -3,8 +3,9 @@ import { doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '@/firebase';
 import { Button } from '@/components/ui/button';
-import { Download, Loader2, FileCheck } from 'lucide-react';
+import { Download, Loader2, FileCheck, Award } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import toast from 'react-hot-toast';
@@ -17,9 +18,6 @@ interface CertificateMeta {
   verificationToken: string;
 }
 
-const VERIFICATION_BASE_URL =
-  'https://us-central1-eregi-8fc1e.cloudfunctions.net/verifyCertificatePublic';
-
 interface CertificateDownloaderProps {
   confId: string;
   ui: BadgeUiState;
@@ -27,30 +25,47 @@ interface CertificateDownloaderProps {
   badgeToken?: string;
 }
 
+const VERIFICATION_BASE_URL =
+  'https://us-central1-eregi-8fc1e.cloudfunctions.net/verifyCertificatePublic';
+
 export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ confId, ui, badgeLang, badgeToken }) => {
-  const [config, setConfig] = useState<Record<string, unknown> | null>(null);
+  const [config, setConfig] = useState<Record<string, any> | null>(null);
+  const [confInfo, setConfInfo] = useState<Record<string, any> | null>(null);
+  const [societyName, setSocietyName] = useState('');
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [issuing, setIssuing] = useState(false);
   const [certMeta, setCertMeta] = useState<CertificateMeta | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const certificateRef = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState<'attendance' | 'completion'>('attendance');
+  
+  const attendanceRef = useRef<HTMLDivElement>(null);
+  const completionRef = useRef<HTMLDivElement>(null);
   const issuanceAttempted = useRef(false);
 
   const t = useCallback((ko: string, en: string) => (badgeLang === "ko" ? ko : en), [badgeLang]);
-  const canDownload = !!ui.isCheckedIn;
-
-  const verificationUrl = useMemo(() => {
-    if (!certMeta?.verificationToken) return null;
-    return `${VERIFICATION_BASE_URL}?token=${certMeta.verificationToken}`;
-  }, [certMeta?.verificationToken]);
 
   useEffect(() => {
-    const fetchConfig = async () => {
+    const fetchData = async () => {
       try {
-        const snap = await getDoc(doc(db, `conferences/${confId}/settings/certificate_config`));
-        if (snap.exists() && snap.data().enabled) {
-          setConfig(snap.data());
+        const [configSnap, confSnap] = await Promise.all([
+          getDoc(doc(db, `conferences/${confId}/settings/certificate_config`)),
+          getDoc(doc(db, 'conferences', confId))
+        ]);
+        
+        if (configSnap.exists()) {
+          setConfig(configSnap.data());
+        }
+        
+        if (confSnap.exists()) {
+          const cData = confSnap.data();
+          setConfInfo(cData);
+          if (cData.societyId) {
+            const socSnap = await getDoc(doc(db, 'societies', cData.societyId));
+            if (socSnap.exists()) {
+              setSocietyName(socSnap.data().name?.ko || socSnap.data().name || '');
+            }
+          }
         }
       } catch (err) {
         console.error('Failed to load certificate config', err);
@@ -58,8 +73,25 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ co
         setLoading(false);
       }
     };
-    fetchConfig();
+    fetchData();
   }, [confId]);
+
+  const isAttendanceEnabled = config?.attendanceEnabled ?? config?.enabled ?? false;
+  const isCompletionEnabled = config?.completionEnabled ?? false;
+  
+  const canDownloadAttendance = isAttendanceEnabled && !!ui.isCheckedIn;
+  const canDownloadCompletion = isCompletionEnabled && !!ui.isCheckedIn && (ui.baseMinutes || 0) >= (config?.completionRequiredMinutes || 0);
+
+  const showButton = isAttendanceEnabled || isCompletionEnabled;
+
+  useEffect(() => {
+    if (config) {
+      if (canDownloadAttendance && !canDownloadCompletion) setActiveTab('attendance');
+      else if (!canDownloadAttendance && canDownloadCompletion) setActiveTab('completion');
+      else if (isAttendanceEnabled) setActiveTab('attendance');
+      else if (isCompletionEnabled) setActiveTab('completion');
+    }
+  }, [config, canDownloadAttendance, canDownloadCompletion, isAttendanceEnabled, isCompletionEnabled]);
 
   const ensureCertificateIssued = useCallback(async () => {
     if (issuanceAttempted.current || issuing) return;
@@ -88,31 +120,38 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ co
         toast.error(t("현장 체크인이 필요합니다.", "On-site check-in required."));
       } else if (code && code !== 'permission-denied') {
         console.error('Certificate issuance failed:', err);
-        toast.error(t("참가확인서 등록에 실패했습니다.", "Certificate registration failed."));
+        toast.error(t("증명서 발급에 실패했습니다.", "Certificate issuance failed."));
       }
     } finally {
       setIssuing(false);
     }
   }, [confId, ui.id, badgeToken, issuing, t]);
 
-  // Issue certificate on dialog open (idempotent backend, single attempt per mount)
   useEffect(() => {
-    if (isOpen && canDownload && !certMeta) {
+    if (isOpen && (canDownloadAttendance || canDownloadCompletion) && !certMeta) {
       ensureCertificateIssued();
     }
-  }, [isOpen, canDownload, certMeta, ensureCertificateIssued]);
+  }, [isOpen, canDownloadAttendance, canDownloadCompletion, certMeta, ensureCertificateIssued]);
 
-  if (loading || !config) return null;
+  if (loading || !config || !showButton) return null;
 
-  const handleDownload = async () => {
-    if (!certificateRef.current) return;
+  const verificationUrl = certMeta?.verificationToken
+    ? `${VERIFICATION_BASE_URL}?token=${certMeta.verificationToken}`
+    : null;
+
+  const autoConferenceName = confInfo?.title?.ko || '';
+  const autoDateStr = (confInfo?.dates?.start && confInfo?.dates?.end) ? `${confInfo.dates.start} ~ ${confInfo.dates.end}` : '';
+  const autoLocation = confInfo?.venue?.name?.ko || '';
+
+  const handleDownload = async (type: 'attendance' | 'completion') => {
+    const targetRef = type === 'attendance' ? attendanceRef : completionRef;
+    if (!targetRef.current) return;
     
     setGenerating(true);
-    toast.loading(t("참가확인서를 생성하고 있습니다...", "Generating certificate..."), { id: 'cert' });
+    toast.loading(t("증명서를 생성하고 있습니다...", "Generating certificate..."), { id: 'cert' });
 
     try {
-      // Create canvas from the hidden certificate div
-      const canvas = await html2canvas(certificateRef.current, {
+      const canvas = await html2canvas(targetRef.current, {
         scale: 2,
         useCORS: true,
         logging: false,
@@ -130,7 +169,7 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ co
       const pdfHeight = pdf.internal.pageSize.getHeight();
 
       pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`${ui.name}_참가확인서.pdf`);
+      pdf.save(`${ui.name}_${type === 'attendance' ? '참가확인서' : '수료증'}.pdf`);
       
       if (certMeta) {
         try {
@@ -144,12 +183,11 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ co
             ...(badgeToken ? { badgeToken } : {}),
           });
         } catch {
-          // Download logging is non-blocking — PDF is already saved
+          // ignore
         }
       }
       
-      toast.success(t("다운로드가 완료되었습니다.", "Download complete."), { id: 'cert' });
-      setIsOpen(false);
+      toast.success(t("다운로드가 완료되었습니다.", "Download completed."), { id: 'cert' });
     } catch (err) {
       console.error('Certificate generation failed', err);
       toast.error(t("생성에 실패했습니다.", "Generation failed."), { id: 'cert' });
@@ -158,145 +196,184 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ co
     }
   };
 
-  return (
-    <div className="w-full">
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogTrigger asChild>
-          <button 
-            disabled={!canDownload}
-            className={`w-full flex items-center justify-center gap-2 p-4 rounded-2xl font-bold transition-all ${canDownload ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
-          >
-            <FileCheck className="w-5 h-5" />
-            {t("참가확인서 다운로드", "Download Certificate")}
-          </button>
-        </DialogTrigger>
+  const renderCertificate = (type: 'attendance' | 'completion') => {
+    const ref = type === 'attendance' ? attendanceRef : completionRef;
+    const title = type === 'attendance' 
+      ? (config.attendanceTitle || config.title || '참가확인서') 
+      : (config.completionTitle || '수료증');
+    const bgUrl = type === 'attendance' 
+      ? (config.attendanceBgUrl || config.backgroundImageUrl || '') 
+      : (config.completionBgUrl || '');
 
-        {canDownload && (
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{t("참가확인서 미리보기", "Certificate Preview")}</DialogTitle>
-            </DialogHeader>
+    return (
+      <div className="bg-slate-100 p-2 sm:p-8 rounded-xl overflow-x-auto flex flex-col items-center gap-4">
+        <div 
+          ref={ref} 
+          className={`bg-white w-[297mm] h-[210mm] shadow-sm relative flex flex-col justify-between ${bgUrl ? '' : 'p-[30mm]'}`}
+          style={{
+            minWidth: '297mm',
+            minHeight: '210mm',
+            backgroundImage: bgUrl ? `url(${bgUrl})` : 'radial-gradient(#f1f5f9 1px, transparent 1px)',
+            backgroundSize: bgUrl ? 'cover' : '20px 20px',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+          }}
+        >
+          {!bgUrl && (
+            <div className="absolute inset-4 border-[3px] border-double border-slate-300 pointer-events-none" />
+          )}
+          
+          <div className={`relative z-10 flex flex-col h-full ${bgUrl ? 'p-[30mm]' : ''}`}>
+            <div className="text-center mt-8">
+              <h1 className="text-4xl font-black text-slate-900 tracking-[0.2em] mb-12">
+                {title}
+              </h1>
+            </div>
 
-            <div className="bg-slate-100 p-4 sm:p-8 rounded-xl overflow-x-auto flex justify-center">
-              {/* This is the actual certificate that will be rendered to PDF. We scale it up nicely. */}
-              <div 
-                ref={certificateRef} 
-                className={`bg-white w-[297mm] h-[210mm] shadow-sm relative flex flex-col justify-between ${config.backgroundImageUrl ? '' : 'p-[30mm]'}`}
-                style={{
-                  minWidth: '297mm',
-                  minHeight: '210mm',
-                  backgroundImage: config.backgroundImageUrl 
-                    ? `url(${config.backgroundImageUrl})` 
-                    : 'radial-gradient(#f1f5f9 1px, transparent 1px)',
-                  backgroundSize: config.backgroundImageUrl ? 'cover' : '20px 20px',
-                  backgroundPosition: 'center',
-                  backgroundRepeat: 'no-repeat'
-                }}
-              >
-                {/* Border Decor (Only show if no background image) */}
-                {!config.backgroundImageUrl && (
-                  <div className="absolute inset-4 border-[3px] border-double border-slate-300 pointer-events-none" />
-                )}
-                
-                <div className={`relative z-10 flex flex-col h-full ${config.backgroundImageUrl ? 'p-[30mm]' : ''}`}>
-                  <div className="text-center mt-8">
-                  <h1 className="text-4xl font-black text-slate-900 tracking-[0.2em] mb-12">
-                    {(config.title as string) || '참가확인서'}
-                  </h1>
-                </div>
-
-                  <div className="flex-1 flex flex-col justify-center px-12">
-                    <table className="w-full text-lg border-collapse mb-12">
-                      <tbody>
-                        <tr>
-                          <td className="w-32 py-4 font-bold text-slate-600 border-b border-slate-200">성명</td>
-                          <td className="py-4 font-semibold text-slate-900 border-b border-slate-200 text-xl">{ui.name}</td>
-                          <td className="w-32 py-4 font-bold text-slate-600 border-b border-slate-200">소속</td>
-                          <td className="py-4 font-semibold text-slate-900 border-b border-slate-200 text-xl">{ui.aff}</td>
-                        </tr>
-                        {(config.showLicenseNumber || config.showPaymentAmount) && (
-                          <tr>
-                            {config.showLicenseNumber && (
-                              <>
-                                <td className="w-32 py-4 font-bold text-slate-600 border-b border-slate-200">면허번호</td>
-                                <td className="py-4 font-semibold text-slate-900 border-b border-slate-200">{ui.license && ui.license !== '-' ? ui.license : ''}</td>
-                              </>
-                            )}
-                            {config.showPaymentAmount && (
-                              <>
-                                <td className="w-32 py-4 font-bold text-slate-600 border-b border-slate-200">결제금액</td>
-                                <td className="py-4 font-semibold text-slate-900 border-b border-slate-200">
-                                  {ui.amount ? `${ui.amount.toLocaleString()}원` : '무료 / 초청'}
-                                </td>
-                              </>
-                            )}
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-
-                    <div className="text-center text-xl leading-relaxed text-slate-800">
-                    위 사람은 <span className="font-bold">{config.dateStr as string}</span> 개최된<br />
-                    <span className="font-bold text-2xl my-2 inline-block">「{config.conferenceName as string}」</span> 에<br />
-                    참석하였음을 증명합니다.
-                  </div>
-                  </div>
-
-                  <div className="text-center flex flex-col items-center justify-end pb-8">
-                    <div className="text-lg text-slate-600 mb-6">{config.location as string}</div>
-                    <div className="flex items-center justify-center gap-6 relative">
-                      <div className="text-3xl font-black text-slate-900 tracking-widest">{config.societyName as string}</div>
-                      {config.stampImageUrl && (
-                        <img 
-                          src={config.stampImageUrl as string} 
-                          alt="직인" 
-                          className="w-24 h-24 object-contain absolute -right-16 -top-6 opacity-90 mix-blend-multiply"
-                          crossOrigin="anonymous"
-                        />
+            <div className="flex-1 flex flex-col justify-center px-12">
+              <table className="w-full text-lg border-collapse mb-12">
+                <tbody>
+                  <tr>
+                    <td className="w-32 py-4 font-bold text-slate-600 border-b border-slate-200">성명</td>
+                    <td className="py-4 font-semibold text-slate-900 border-b border-slate-200 text-xl">{ui.name}</td>
+                    <td className="w-32 py-4 font-bold text-slate-600 border-b border-slate-200">소속</td>
+                    <td className="py-4 font-semibold text-slate-900 border-b border-slate-200 text-xl">{ui.aff}</td>
+                  </tr>
+                  {(config.showLicenseNumber || config.showPaymentAmount) && (
+                    <tr>
+                      {config.showLicenseNumber && (
+                        <>
+                          <td className="w-32 py-4 font-bold text-slate-600 border-b border-slate-200">면허번호</td>
+                          <td className="py-4 font-semibold text-slate-900 border-b border-slate-200">{ui.license && ui.license !== '-' ? ui.license : ''}</td>
+                        </>
                       )}
-                    </div>
-                  </div>
-
-                  {certMeta && (
-                    <div className="flex items-center justify-between px-4 pt-4 mt-4 border-t border-slate-200">
-                      <div className="text-xs text-slate-500">
-                        <div className="font-semibold text-slate-700">{certMeta.certificateNumber}</div>
-                        {verificationUrl && (
-                          <div className="mt-1 break-all">{verificationUrl}</div>
-                        )}
-                      </div>
-                      {verificationUrl && (
-                        <QRCodeSVG
-                          value={verificationUrl}
-                          size={64}
-                          level="M"
-                          includeMargin={false}
-                        />
+                      {config.showPaymentAmount && (
+                        <>
+                          <td className="w-32 py-4 font-bold text-slate-600 border-b border-slate-200">결제금액</td>
+                          <td className="py-4 font-semibold text-slate-900 border-b border-slate-200">
+                            {ui.amount ? `${ui.amount.toLocaleString()}원` : '무료 / 초청'}
+                          </td>
+                        </>
                       )}
-                    </div>
+                    </tr>
                   )}
-                </div>
+                </tbody>
+              </table>
+
+              <div className="text-center text-xl leading-relaxed text-slate-800">
+                위 사람은 <span className="font-bold">{autoDateStr}</span> 개최된<br />
+                <span className="font-bold text-2xl my-2 inline-block">「{autoConferenceName}」</span> 에<br />
+                참석하였음을 증명합니다.
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-4">
-              <Button variant="outline" onClick={() => setIsOpen(false)}>
-                {t("취소", "Cancel")}
-              </Button>
-              <Button onClick={handleDownload} disabled={generating} className="bg-blue-600 hover:bg-blue-700">
-                {generating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-                {t("PDF로 저장", "Save as PDF")}
-              </Button>
+            <div className="text-center flex flex-col items-center justify-end pb-8">
+              <div className="text-lg text-slate-600 mb-6">{autoLocation}</div>
+              <div className="flex items-center justify-center gap-6 relative">
+                <div className="text-3xl font-black text-slate-900 tracking-widest">{societyName || config.societyName || ''}</div>
+                {config.stampImageUrl && (
+                  <img 
+                    src={config.stampImageUrl as string} 
+                    alt="직인" 
+                    className="w-24 h-24 object-contain absolute -right-16 -top-6 opacity-90 mix-blend-multiply"
+                    crossOrigin="anonymous"
+                  />
+                )}
+              </div>
             </div>
-          </DialogContent>
-        )}
-      </Dialog>
 
-      {!canDownload && (
-        <p className="text-center text-xs text-slate-400 mt-2">
-          {t("현장 체크인이 완료된 후 발급 가능합니다.", "Available after on-site check-in.")}
-        </p>
-      )}
-    </div>
+            {certMeta && (
+              <div className="flex items-center justify-between px-4 pt-4 mt-4 border-t border-slate-200">
+                <div className="text-xs text-slate-500">
+                  <div className="font-semibold text-slate-700">{certMeta.certificateNumber}</div>
+                  {verificationUrl && (
+                    <div className="mt-1 break-all">{verificationUrl}</div>
+                  )}
+                </div>
+                {verificationUrl && (
+                  <QRCodeSVG
+                    value={verificationUrl}
+                    size={64}
+                    level="M"
+                    includeMargin={false}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button 
+          variant="outline" 
+          className="w-full mt-3 border-blue-200 text-blue-700 bg-blue-50/50 hover:bg-blue-100 hover:text-blue-800 h-12 rounded-xl text-base shadow-sm"
+        >
+          <Award className="w-5 h-5 mr-2 text-blue-500" />
+          {t("증명서 발급", "Download Certificate")}
+        </Button>
+      </DialogTrigger>
+
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold flex items-center gap-2">
+            <FileCheck className="w-5 h-5 text-blue-600" />
+            {t("증명서 발급", "Certificate")}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="mt-4">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="attendance" disabled={!isAttendanceEnabled}>
+                참가확인서
+              </TabsTrigger>
+              <TabsTrigger value="completion" disabled={!isCompletionEnabled}>
+                수료증 (이수증)
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="attendance" className="space-y-4">
+              {!canDownloadAttendance ? (
+                <div className="p-8 text-center bg-slate-50 rounded-xl border border-slate-200 text-slate-500">
+                  {t("현장 체크인을 완료한 참석자만 참가확인서를 발급받을 수 있습니다.", "Attendance certificate is only available for checked-in participants.")}
+                </div>
+              ) : (
+                <>
+                  {renderCertificate('attendance')}
+                  <Button onClick={() => handleDownload('attendance')} disabled={generating || !certMeta} className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-base">
+                    {generating ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Download className="w-5 h-5 mr-2" />}
+                    {t("참가확인서 PDF 다운로드", "Download PDF")}
+                  </Button>
+                </>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="completion" className="space-y-4">
+              {!canDownloadCompletion ? (
+                <div className="p-8 text-center bg-slate-50 rounded-xl border border-slate-200 text-slate-500 space-y-2">
+                  <p>{t("수료 기준을 충족한 참석자만 수료증을 발급받을 수 있습니다.", "Certificate of completion is only available for those who met the requirements.")}</p>
+                  <p className="text-sm text-slate-400">
+                    현재 누적 체류 시간: <span className="font-bold text-slate-600">{ui.baseMinutes || 0}분</span> / 기준 시간: <span className="font-bold text-slate-600">{config?.completionRequiredMinutes || 0}분</span>
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {renderCertificate('completion')}
+                  <Button onClick={() => handleDownload('completion')} disabled={generating || !certMeta} className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-base">
+                    {generating ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Download className="w-5 h-5 mr-2" />}
+                    {t("수료증 PDF 다운로드", "Download PDF")}
+                  </Button>
+                </>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
