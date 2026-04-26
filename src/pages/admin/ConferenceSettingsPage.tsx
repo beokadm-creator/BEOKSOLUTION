@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
-import { collection, doc, getDoc, getDocs, onSnapshot, setDoc, Timestamp, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, setDoc, Timestamp, updateDoc, deleteField } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage, functions } from '../../firebase';
@@ -400,15 +400,20 @@ export default function ConferenceSettingsPage() {
                 }
             }, { merge: true });
 
-            const endAt = stampTourConfig.endAt || getKstEndOfDayTimestamp(data.dates.end) || undefined;
+            // Use deleteField() for undefined values to actually remove them from Firestore
+            const cleanStampTourConfig = Object.fromEntries(
+                Object.entries(stampTourConfig).map(([k, v]) => [k, v === undefined ? deleteField() : v])
+            );
+
+            const endAt = stampTourConfig.endAt || getKstEndOfDayTimestamp(data.dates.end) || deleteField();
             const stampConfigRef = doc(db, `conferences/${cid}/settings`, 'stamp_tour');
             await setDoc(stampConfigRef, {
-                ...stampTourConfig,
+                ...cleanStampTourConfig,
                 completionRule: {
                     ...stampTourConfig.completionRule,
                     requiredCount: stampTourConfig.completionRule.type === 'COUNT'
                         ? normalizedRequiredStampCount
-                        : undefined
+                        : deleteField()
                 },
                 enabled: data.features.stampTourEnabled,
                 endAt,
