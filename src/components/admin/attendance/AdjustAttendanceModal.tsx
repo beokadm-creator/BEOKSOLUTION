@@ -4,11 +4,13 @@ import { Input } from '../../ui/input';
 import { X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 
+import { AttendanceRegData, ZoneData } from './AttendanceLogModal';
+
 interface AdjustAttendanceModalProps {
     show: boolean;
     onClose: () => void;
-    reg: any;
-    zones: any[];
+    reg: AttendanceRegData | null;
+    zones: ZoneData[];
     adjustMode: 'ADJUST_MINUTES' | 'CHECKIN' | 'CHECKOUT';
     setAdjustMode: (mode: 'ADJUST_MINUTES' | 'CHECKIN' | 'CHECKOUT') => void;
     adjustZoneId: string;

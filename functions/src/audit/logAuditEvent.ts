@@ -152,12 +152,12 @@ export const logAuditEvent = functions.https.onCall(async (data, context) => {
             logId: globalLogRef.id,
         };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         functions.logger.error('[AuditLog] Failed to create audit log:', error);
         // Don't throw - audit logging should not block operations
         return {
             success: false,
-            error: error.message || 'Failed to create audit log',
+            error: error instanceof Error ? error.message : 'Failed to create audit log',
         };
     }
 });

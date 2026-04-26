@@ -5,11 +5,12 @@ import { ko } from 'date-fns/locale';
 import { sendAlimTalk } from '../services/notificationService';
 
 // Local type definitions (aligned with schema.ts)
-interface Conference {
+export interface Conference {
   id: string;
   conferenceId?: string;
   societyId: string;
   slug?: string;
+  startDate?: admin.firestore.Timestamp;
   title: { ko: string; en?: string };
   dates?: {
     start: admin.firestore.Timestamp;
@@ -20,7 +21,7 @@ interface Conference {
   };
 }
 
-interface Registration {
+export interface Registration {
   name?: string;
   email?: string;
   phone?: string;
@@ -195,10 +196,10 @@ export async function sendBadgeNotification(
         const timeZone = 'Asia/Seoul'; // Default for Korean conferences
 
         // dates.start 또는 구버전 startDate 필드에서 시작 시간을 가져옴
-        const rawStartTimestamp = conference.dates?.start || (conference as any).startDate;
+        const rawStartTimestamp = conference.dates?.start || conference.startDate;
         functions.logger.info(`[BadgeNotification] rawStartTimestamp:`, JSON.stringify({
           hasDatesStart: !!conference.dates?.start,
-          hasStartDate: !!(conference as any).startDate,
+          hasStartDate: !!conference.startDate,
           rawValue: rawStartTimestamp ? rawStartTimestamp.toDate?.()?.toISOString() : null
         }));
 
@@ -692,15 +693,16 @@ export const bulkSendNotifications = functions
     const societyName = societySnap.data()?.name?.ko || societySnap.data()?.name?.en || conference.societyId;
     const eventName = conference.title?.ko || conference.title?.en || '';
     const domain = `https://${conference.societyId}.eregi.co.kr`;
-    const redirectSlug = conference.id || (conference as any).slug || (conference as any).conferenceId;
+    const redirectSlug = conference.id || conference.slug || conference.conferenceId;
     const timeZone = 'Asia/Seoul';
-    const rawStart = conference.dates?.start || (conference as any).startDate;
+    const rawStart = conference.dates?.start || conference.startDate;
     const startDate = rawStart && typeof rawStart.toDate === 'function'
       ? formatInTimeZone(rawStart.toDate(), timeZone, 'yyyy-MM-dd HH:mm', { locale: ko })
       : '';
-    const venueName = typeof conference.venue?.name === 'object'
-      ? ((conference.venue.name as any).ko || (conference.venue.name as any).en || '')
-      : (conference.venue?.name || '');
+    const venueNameVal = conference.venue?.name;
+    const venueName = typeof venueNameVal === 'object' && venueNameVal !== null
+      ? (venueNameVal.ko || venueNameVal.en || '')
+      : (venueNameVal || '');
     let expiresAt: admin.firestore.Timestamp;
     if (conference.dates?.end) {
       expiresAt = admin.firestore.Timestamp.fromMillis(conference.dates.end.toMillis() + 48 * 3600 * 1000);

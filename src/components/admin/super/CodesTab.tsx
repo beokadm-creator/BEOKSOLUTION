@@ -11,10 +11,22 @@ import { Badge } from '../../ui/badge';
 import LoadingSpinner from '../../common/LoadingSpinner';
 import { useSuperAdmin } from '../../../hooks/useSuperAdmin';
 
+export interface VerificationCode {
+    id: string;
+    societyId: string;
+    name: string;
+    code: string;
+    used: boolean;
+    usedBy?: string;
+    usedAt?: Timestamp;
+    expiryDate?: Timestamp;
+    createdAt?: Timestamp;
+}
+
 export const CodesTab: React.FC = () => {
     const { societies } = useSuperAdmin();
     const [currentSocietyId, setCurrentSocietyId] = useState<string>('');
-    const [codes, setCodes] = useState<Array<{ id: string; societyId: string; name: string; code: string; used: boolean; usedBy?: string; usedAt?: { seconds: number } | Date; expiryDate?: { seconds: number } | Date }>>([]);
+    const [codes, setCodes] = useState<VerificationCode[]>([]);
     const [loadingCodes, setLoadingCodes] = useState(false);
 
     const [newCodeName, setNewCodeName] = useState('');
@@ -35,7 +47,7 @@ export const CodesTab: React.FC = () => {
             try {
                 const codeRef = collection(db, 'societies', currentSocietyId, 'verification_codes');
                 const snap = await getDocs(codeRef);
-                setCodes(snap.docs.map(d => ({ id: d.id, ...d.data() } as { id: string; societyId: string; name: string; code: string; used: boolean; usedBy?: string; usedAt?: { seconds: number } | Date; expiryDate?: { seconds: number } | Date })));
+                setCodes(snap.docs.map(d => ({ id: d.id, ...d.data() } as VerificationCode)));
             } catch (e) {
                 console.error("Fetch Codes Error:", e);
             } finally {
@@ -66,7 +78,7 @@ export const CodesTab: React.FC = () => {
                 // Trigger refresh by updating state slightly or rely on parent logic?
                 // Just fetch codes again:
                 const snap = await getDocs(collection(db, 'societies', currentSocietyId, 'verification_codes'));
-                setCodes(snap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
+                setCodes(snap.docs.map(d => ({ id: d.id, ...d.data() } as VerificationCode)));
             }
         } catch (e) {
             console.error("Create Code Error:", e);
@@ -189,7 +201,7 @@ export const CodesTab: React.FC = () => {
                                             <td className="p-4 font-medium text-slate-900">{c.name}</td>
                                             <td className="p-4 font-mono font-bold tracking-wider">{c.code}</td>
                                             <td className="p-4 text-xs text-slate-500">
-                                                {c.expiryDate ? (('seconds' in c.expiryDate) ? new Date(c.expiryDate.seconds * 1000).toLocaleDateString() : new Date(c.expiryDate).toLocaleDateString()) : <span className="text-slate-300">No Expiry</span>}
+                                                {c.expiryDate ? (('seconds' in c.expiryDate) ? new Date(c.expiryDate.seconds * 1000).toLocaleDateString() : new Date(c.expiryDate as unknown as string).toLocaleDateString()) : <span className="text-slate-300">No Expiry</span>}
                                             </td>
                                             <td className="p-4">
                                                 {c.used ? (

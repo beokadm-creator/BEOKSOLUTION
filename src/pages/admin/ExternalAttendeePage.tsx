@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/ta
 import { UserPlus, Upload, Download, FileText, Badge, Trash2, Loader2, Eye, EyeOff, Copy, MessageCircle, CheckSquare, Square } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { VoucherLinkSection } from '../../components/admin/external/VoucherLinkSection';
-import type { ExternalAttendee } from '../../types/schema';
+import type { ExternalAttendee, BadgeElement } from '../../types/schema';
 import { normalizeFieldSettings } from '../../utils/registrationFieldSettings';
 import type { RegistrationFieldSettings } from '../../types/schema';
 import { useBixolon } from '../../hooks/useBixolon';
@@ -337,7 +337,7 @@ const ExternalAttendeePage: React.FC = () => {
                         toast.success('회원 계정이 자동으로 생성되었습니다.');
                         // Update local state with new userId
                          
-                        (attendeeData as any).userId = authResult.data.uid;
+                        (attendeeData as Record<string, unknown>).userId = authResult.data.uid;
                     }
                 } catch (authError) {
                     console.error('Failed to auto-create auth user:', authError);
@@ -367,7 +367,7 @@ const ExternalAttendeePage: React.FC = () => {
 
             // Map data supporting both English and Korean headers
              
-            const mappedData = rawData.map((row: any) => {
+            const mappedData = rawData.map((row: Record<string, string>) => {
                 const name = String(row.name || row['이름'] || row['성명'] || '').trim();
                 const phone = String(row.phone || row['전화번호'] || row['핸드폰'] || row['연락처'] || '').trim();
                 let email = String(row.email || row['이메일'] || '').trim();
@@ -802,9 +802,9 @@ const ExternalAttendeePage: React.FC = () => {
                 height: 240,
                 unit: 'mm',
                 elements: [
-                    { x: 50, y: 20, fontSize: 25, isVisible: true, type: 'QR' } as any,
-                    { x: 50, y: 60, fontSize: 6, isVisible: true, type: 'NAME' } as any,
-                    { x: 50, y: 80, fontSize: 4, isVisible: true, type: 'ORG' } as any
+                    { x: 50, y: 20, fontSize: 25, isVisible: true, type: 'QR' } as BadgeElement,
+                    { x: 50, y: 60, fontSize: 6, isVisible: true, type: 'NAME' } as BadgeElement,
+                    { x: 50, y: 80, fontSize: 4, isVisible: true, type: 'ORG' } as BadgeElement
                 ]
             };
 

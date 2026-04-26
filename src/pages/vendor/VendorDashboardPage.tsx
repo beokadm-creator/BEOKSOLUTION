@@ -1,11 +1,20 @@
 import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { useVendor } from '../../hooks/useVendor';
+import type { VisitLog } from '../../hooks/useVendor';
 import * as XLSX from 'xlsx';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { BarChart3, Users, Clock, Download, QrCode, Search, Building2, Phone, Mail, MapPin } from 'lucide-react';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
+
+interface ExtendedVisitLog extends VisitLog {
+    userName?: string;
+    name?: string;
+    affiliation?: string;
+    scannedAt?: unknown;
+    userOrg?: string;
+}
 
 export default function VendorDashboardPage() {
     const { vendorId: paramVendorId } = useParams<{ vendorId: string }>();
@@ -27,7 +36,7 @@ export default function VendorDashboardPage() {
     }, [conferences]);
 
     const filteredLeads = useMemo(() => {
-        let res = visits;
+        let res = visits as ExtendedVisitLog[];
         if (selectedConfId !== 'all') {
             res = res.filter(v => v.conferenceId === selectedConfId);
         }
@@ -51,7 +60,7 @@ export default function VendorDashboardPage() {
     const handleExport = () => {
         if (!filteredLeads.length) return;
 
-        const worksheet = XLSX.utils.json_to_sheet(filteredLeads.map((v: any) => ({
+        const worksheet = XLSX.utils.json_to_sheet(filteredLeads.map((v) => ({
             'Name': v.visitorName || v.userName || v.name || '알 수 없음',
             'Affiliation': v.visitorOrg || v.userOrg || v.affiliation || '',
             'Phone': v.visitorPhone || '',
@@ -59,7 +68,7 @@ export default function VendorDashboardPage() {
             'Conference': confMap.get(v.conferenceId) || v.conferenceId,
             'Scanned At': v.timestamp?.toDate ? v.timestamp.toDate().toLocaleString() : new Date(v.scannedAt || v.timestamp).toLocaleString(),
             'Consent': v.isConsentAgreed ? 'Yes' : 'No (Anonymous)'
-        })));
+        } as Record<string, unknown>)));
 
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Leads');
@@ -75,13 +84,13 @@ export default function VendorDashboardPage() {
     const handleGuestbookExport = () => {
         if (!guestbookEntries.length) return;
 
-        const worksheet = XLSX.utils.json_to_sheet(filteredGuestbooks.map((g: any) => ({
+        const worksheet = XLSX.utils.json_to_sheet(filteredGuestbooks.map((g) => ({
             'Name': g.userName || 'Unknown',
             'Affiliation': g.userOrg || '',
             'Conference': g.conferenceId || '',
             'Consent': 'Agreed',
             'Created At': g.timestamp?.toLocaleString ? g.timestamp.toLocaleString() : new Date(g.timestamp || Date.now()).toLocaleString()
-        })));
+        } as Record<string, unknown>)));
 
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Guestbook');
@@ -313,7 +322,7 @@ export default function VendorDashboardPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 bg-white">
-                                    {filteredLeads.map((v: any, i) => (
+                                    {filteredLeads.map((v, i) => (
                                         <tr key={v.id || i} className="hover:bg-indigo-50/50 transition-colors">
                                             <td className="px-6 py-4 border-l-4 border-l-transparent hover:border-l-indigo-500">
                                                 <div className="font-bold text-gray-900">
@@ -407,7 +416,7 @@ export default function VendorDashboardPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 bg-white">
-                                    {filteredGuestbooks.map((g: any, i) => (
+                                    {filteredGuestbooks.map((g, i) => (
                                         <tr key={g.id || i} className="hover:bg-emerald-50/50 transition-colors">
                                             <td className="px-6 py-4 font-bold text-gray-900">{g.userName || 'Unknown'}</td>
                                             <td className="px-6 py-4 text-gray-700">{g.userOrg || '-'}</td>

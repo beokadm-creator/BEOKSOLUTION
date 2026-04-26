@@ -10,31 +10,49 @@ export const getKstToday = (date: Date = new Date()): string => {
  * Safely formats various date types into a locale date string.
  * Handles Date objects, Firestore Timestamps, objects with seconds, and string dates.
  */
-export const safeFormatDate = (d: any, locale = 'ko-KR', options?: Intl.DateTimeFormatOptions): string => {
+/**
+ * Union type covering all date representations found in Firestore data:
+ * - `Date` — native JS date objects
+ * - `Timestamp` — Firestore Timestamp instances (have `.toDate()`)
+ * - `{ seconds: number; nanoseconds?: number }` — serialized Firestore Timestamp JSON
+ * - `string | number` — ISO strings, epoch millis, or parseable date strings
+ */
+export type DateLike = Date | { toDate(): Date | unknown } | { seconds: number; nanoseconds?: number } | string | number;
+
+function hasToDate(d: DateLike): d is { toDate(): Date | unknown } & Record<string, unknown> {
+    return !!d && typeof d !== 'string' && typeof d !== 'number' && !Array.isArray(d) && typeof (d as Record<string, unknown>).toDate === 'function';
+}
+
+function hasSeconds(d: DateLike): d is { seconds: number; nanoseconds?: number } {
+    return !!d && typeof d !== 'string' && typeof d !== 'number' && !Array.isArray(d) && typeof (d as Record<string, unknown>).seconds === 'number';
+}
+
+function tryParseDate(d: DateLike): Date | null {
+    if (d instanceof Date) return d;
+    if (hasToDate(d)) {
+        const val = d.toDate();
+        return val instanceof Date ? val : null;
+    }
+    if (hasSeconds(d)) {
+        return new Date(d.seconds * 1000);
+    }
+    if (typeof d === 'string' || typeof d === 'number') {
+        const parsed = new Date(d);
+        return isNaN(parsed.getTime()) ? null : parsed;
+    }
+    return null;
+}
+
+export const safeFormatDate = (d: DateLike, locale = 'ko-KR', options?: Intl.DateTimeFormatOptions): string => {
     if (!d) return '';
     try {
-        // Handle native Date
-        if (d instanceof Date) {
-            return d.toLocaleDateString(locale, options);
+        if (hasToDate(d)) {
+            const val = d.toDate();
+            if (val instanceof Date) return val.toLocaleDateString(locale, options);
+            return String(val);
         }
-
-        // Handle Firestore Timestamp or objects with toDate()
-        if (d && typeof d.toDate === 'function') {
-            const dateVal = d.toDate();
-            return dateVal instanceof Date ? dateVal.toLocaleDateString(locale, options) : String(dateVal);
-        }
-
-        // Handle objects with seconds field (standard Firestore JSON representation)
-        if (d && typeof d.seconds === 'number') {
-            return new Date(d.seconds * 1000).toLocaleDateString(locale, options);
-        }
-
-        // Handle strings or numbers
-        const parsed = new Date(d);
-        if (!isNaN(parsed.getTime())) {
-            return parsed.toLocaleDateString(locale, options);
-        }
-
+        const date = tryParseDate(d);
+        if (date) return date.toLocaleDateString(locale, options);
         return String(d);
     } catch (err) {
         console.error('[DateUtils] Date format error:', d, err);
@@ -45,7 +63,7 @@ export const safeFormatDate = (d: any, locale = 'ko-KR', options?: Intl.DateTime
 /**
  * Safely formats into a full locale date and time string.
  */
-export const safeFormatDateTime = (d: any, locale = 'ko-KR', options?: Intl.DateTimeFormatOptions): string => {
+export const safeFormatDateTime = (d: DateLike, locale = 'ko-KR', options?: Intl.DateTimeFormatOptions): string => {
     const defaultOptions: Intl.DateTimeFormatOptions = {
         year: 'numeric',
         month: '2-digit',
@@ -57,16 +75,13 @@ export const safeFormatDateTime = (d: any, locale = 'ko-KR', options?: Intl.Date
 
     if (!d) return '';
     try {
-        if (d instanceof Date) return d.toLocaleString(locale, defaultOptions);
-        if (d && typeof d.toDate === 'function') {
-            const dateVal = d.toDate();
-            return dateVal instanceof Date ? dateVal.toLocaleString(locale, defaultOptions) : String(dateVal);
+        if (hasToDate(d)) {
+            const val = d.toDate();
+            if (val instanceof Date) return val.toLocaleString(locale, defaultOptions);
+            return String(val);
         }
-        if (d && typeof d.seconds === 'number') {
-            return new Date(d.seconds * 1000).toLocaleString(locale, defaultOptions);
-        }
-        const parsed = new Date(d);
-        if (!isNaN(parsed.getTime())) return parsed.toLocaleString(locale, defaultOptions);
+        const date = tryParseDate(d);
+        if (date) return date.toLocaleString(locale, defaultOptions);
         return String(d);
     } catch (err) {
         console.error('[DateUtils] DateTime format error:', d, err);

@@ -3,12 +3,39 @@ import { Button } from '../../ui/button';
 import { X, Clock, AlertCircle } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 
+import { Timestamp } from 'firebase/firestore';
+
+export interface AttendanceLog {
+    id: string;
+    type: 'ENTER' | 'EXIT' | 'ADJUST';
+    zoneId: string;
+    method?: string;
+    timestamp?: Timestamp;
+    rawDuration?: number;
+    deduction?: number;
+    recognizedMinutes?: number;
+    accumulatedTotal?: number;
+}
+
+export interface AttendanceRegData {
+    userName: string;
+    userEmail: string;
+    id: string;
+    // ... other properties as needed
+}
+
+export interface ZoneData {
+    id: string;
+    name: string;
+    // ... other properties as needed
+}
+
 interface AttendanceLogModalProps {
     show: boolean;
     onClose: () => void;
-    reg: any;
-    logs: any[];
-    zones: any[];
+    reg: AttendanceRegData | null;
+    logs: AttendanceLog[];
+    zones: ZoneData[];
 }
 
 export const AttendanceLogModal: React.FC<AttendanceLogModalProps> = ({ show, onClose, reg, logs, zones }) => {

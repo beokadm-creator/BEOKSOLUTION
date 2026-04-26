@@ -56,7 +56,7 @@ const EregiNavigation: React.FC<EregiNavigationProps> = ({
             name: authUser?.name,
             email: authUser?.email,
              
-            displayName: (authUser as any)?.displayName
+            displayName: (authUser as Record<string, unknown>)?.displayName
         });
     }, [displayUser, authUser]);
 

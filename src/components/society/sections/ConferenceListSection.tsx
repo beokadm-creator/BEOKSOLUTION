@@ -2,7 +2,7 @@ import React from 'react';
 import { Conference } from '../../../types/schema';
 import { Calendar, MapPin, ChevronRight, Trophy, Clock, ArrowRight } from 'lucide-react';
 import type { Language } from '../../../hooks/useLanguage';
-import { safeFormatDate } from '../../../utils/dateUtils';
+import { safeFormatDate, type DateLike } from '../../../utils/dateUtils';
 
 interface ConferenceListSectionProps {
   activeConferences: Conference[];
@@ -14,7 +14,7 @@ interface ConferenceListSectionProps {
 }
 
 // Format date helper function
-const formatDate = (ts: any, language: Language = 'ko') => {
+const formatDate = (ts: DateLike, language: Language = 'ko') => {
   if (!ts) return 'TBA';
   return safeFormatDate(ts, language === 'ko' ? 'ko-KR' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 };

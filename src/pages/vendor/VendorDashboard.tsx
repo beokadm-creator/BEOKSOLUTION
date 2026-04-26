@@ -253,7 +253,7 @@ const VendorDashboard: React.FC<Props> = ({ confId: initialConfId }) => {
                         }}>
                             <div style={{ backgroundColor: 'white', color: 'black', padding: 40, borderRadius: 15, width: '100%', maxWidth: 450, textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
                                 <h1 style={{ marginBottom: 5, fontSize: '1.8rem', color: '#2c3e50' }}>{scanResult.user.name} 님</h1>
-                                <p style={{ marginBottom: 20, color: '#7f8c8d' }}>{(scanResult.user as any).affiliation || (scanResult.reg as any).affiliation || '소속 미상'}</p>
+                                <p style={{ marginBottom: 20, color: '#7f8c8d' }}>{scanResult.reg.affiliation || scanResult.user.affiliation || '소속 미상'}</p>
 
                                 <div style={{ borderTop: '1px solid #eee', borderBottom: '1px solid #eee', padding: '20px 0', marginBottom: 30 }}>
                                     <h2 style={{ fontSize: '1.2rem', marginBottom: 15, color: '#e74c3c' }}>제3자 개인정보 제공 동의</h2>

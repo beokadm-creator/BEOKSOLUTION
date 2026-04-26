@@ -77,7 +77,7 @@ const GlobalExpertManagerPage = () => {
             const expertId = editingExpert.id || `expert_${Date.now()}`;
             const expertRef = doc(db, 'global_experts', expertId);
 
-            const payload: any = {
+            const payload: Record<string, unknown> = {
                 ...editingExpert,
                 updatedAt: Timestamp.now()
             };

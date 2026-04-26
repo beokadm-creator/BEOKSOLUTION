@@ -106,7 +106,7 @@ export const scheduledDataCleanup = functions.pubsub
                 totalDeleted: totalDeleted,
             };
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             functions.logger.error('[Data Cleanup] Failed:', error);
 
             // Create audit log for failure
@@ -115,10 +115,10 @@ export const scheduledDataCleanup = functions.pubsub
                 entityType: 'LEAD',
                 entityId: 'scheduled-cleanup-failed',
                 details: {
-                    error: error.message,
+                    error: error instanceof Error ? error.message : String(error),
                 },
                 result: 'FAILURE',
-                errorMessage: error.message,
+                errorMessage: error instanceof Error ? error.message : String(error),
                 actorId: 'system',
                 actorType: 'SYSTEM',
             }).catch(logError => {
@@ -209,8 +209,8 @@ export const manualDataCleanup = functions.https.onCall(async (data, context) =>
             total: counts.leadsPII + counts.leadsAnonymous + counts.stamps + counts.auditLogs,
         };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         functions.logger.error('[Manual Data Cleanup] Failed:', error);
-        throw new functions.https.HttpsError('internal', error.message || 'Failed to run data cleanup');
+        throw new functions.https.HttpsError('internal', error instanceof Error ? error.message : 'Failed to run data cleanup');
     }
 });

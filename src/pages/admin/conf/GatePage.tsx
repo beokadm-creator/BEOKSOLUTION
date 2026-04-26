@@ -7,6 +7,7 @@ import { Button } from '../../../components/ui/button';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { getKstToday } from '../../../utils/dateUtils';
+import type { AttendanceZone, AttendanceRulesMap, BreakTime } from '../../../types/attendance';
 
 interface ScannerState {
     status: 'IDLE' | 'PROCESSING' | 'SUCCESS' | 'ERROR';
@@ -40,7 +41,7 @@ const GatePage: React.FC = () => {
     const { selectedConferenceId } = useAdminStore();
     const [loading, setLoading] = useState(true);
 
-    const [zones, setZones] = useState<any[]>([]);
+    const [zones, setZones] = useState<AttendanceZone[]>([]);
     const [selectedZoneId, setSelectedZoneId] = useState<string>('');
     const [mode, setMode] = useState<'ENTER_ONLY' | 'EXIT_ONLY' | 'AUTO'>('AUTO');
     const [conferenceName, setConferenceName] = useState<ConferenceNameState>({
@@ -50,7 +51,7 @@ const GatePage: React.FC = () => {
     });
 
     const [showSettings, setShowSettings] = useState(false);
-    const [design, setDesign] = useState<{ textColor: string }>({ textColor: '#000000' });
+    const [design, setDesign] = useState<{ textColor: string; bgImage?: string; bgColor?: string }>({ textColor: '#000000' });
 
     const [scannerState, setScannerState] = useState<ScannerState>({
         status: 'IDLE',
@@ -60,7 +61,7 @@ const GatePage: React.FC = () => {
     const inputRef = useRef<HTMLInputElement>(null);
     const [inputValue, setInputValue] = useState('');
     const scanMemoryRef = useRef<Map<string, number>>(new Map());
-    const allZonesRef = useRef<any[]>([]);
+    const allZonesRef = useRef<AttendanceZone[]>([]);
 
     useEffect(() => {
         const confId = cid || selectedConferenceId;
@@ -82,11 +83,11 @@ const GatePage: React.FC = () => {
                 const rulesRef = doc(db, `conferences/${confId}/settings/attendance`);
                 const rulesSnap = await getDoc(rulesRef);
                 if (rulesSnap.exists()) {
-                    const allRules = rulesSnap.data().rules || {};
-                    const allZones: any[] = [];
-                    Object.entries(allRules).forEach(([dateStr, rule]: [string, any]) => {
+                    const allRules = (rulesSnap.data().rules || {}) as AttendanceRulesMap;
+                    const allZones: AttendanceZone[] = [];
+                    Object.entries(allRules).forEach(([dateStr, rule]) => {
                         if (rule?.zones) {
-                            rule.zones.forEach((z: any) => {
+                            rule.zones.forEach((z) => {
                                 allZones.push({
                                     ...z,
                                     ruleDate: dateStr,
@@ -155,7 +156,7 @@ const GatePage: React.FC = () => {
         // Debounce based on the parsed clean ID, not the raw barcode input
         let parsedIdForDebounce = code;
         const decodeTypos = (s: string) => {
-            const map: any = { 'ㅂ': 'q', 'ㅈ': 'w', 'ㄷ': 'e', 'ㄱ': 'r', 'ㅅ': 't', 'ㅛ': 'y', 'ㅕ': 'u', 'ㅑ': 'i', 'ㅐ': 'o', 'ㅔ': 'p', 'ㅁ': 'a', 'ㄴ': 's', 'ㅇ': 'd', 'ㄹ': 'f', 'ㅎ': 'g', 'ㅗ': 'h', 'ㅓ': 'j', 'ㅏ': 'k', 'ㅣ': 'l', 'ㅋ': 'z', 'ㅌ': 'x', 'ㅊ': 'c', 'ㅍ': 'v', 'ㅠ': 'b', 'ㅜ': 'n', 'ㅡ': 'm' };
+            const map: Record<string, string> = { 'ㅂ': 'q', 'ㅈ': 'w', 'ㄷ': 'e', 'ㄱ': 'r', 'ㅅ': 't', 'ㅛ': 'y', 'ㅕ': 'u', 'ㅑ': 'i', 'ㅐ': 'o', 'ㅔ': 'p', 'ㅁ': 'a', 'ㄴ': 's', 'ㅇ': 'd', 'ㄹ': 'f', 'ㅎ': 'g', 'ㅗ': 'h', 'ㅓ': 'j', 'ㅏ': 'k', 'ㅣ': 'l', 'ㅋ': 'z', 'ㅌ': 'x', 'ㅊ': 'c', 'ㅍ': 'v', 'ㅠ': 'b', 'ㅜ': 'n', 'ㅡ': 'm' };
             // Fix: Do not strip underscores/special chars that might be in IDs
             return s.split('').map(c => map[c] || c).join('').replace(/[^a-zA-Z0-9-_]/g, '');
         };
@@ -198,9 +199,9 @@ const GatePage: React.FC = () => {
                 rawSessionMinutes: res.rawSessionMinutes,
                 deductedMinutes: res.deductedMinutes
             });
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error(e);
-            setScannerState({ status: 'ERROR', message: e.message || 'Scan Failed', lastScanned: parsedIdForDebounce });
+            setScannerState({ status: 'ERROR', message: e instanceof Error ? e.message : 'Scan Failed', lastScanned: parsedIdForDebounce });
         } finally {
             setTimeout(() => setScannerState(prev => prev.status === 'PROCESSING' ? prev : { ...prev, status: 'IDLE' }), 2000);
         }
@@ -283,7 +284,7 @@ const GatePage: React.FC = () => {
                     const diff = Math.floor((bE.getTime() - bS.getTime()) / 60000);
                     let ded = 0;
                     if (rule?.breaks) {
-                        rule.breaks.forEach((b: any) => {
+                        rule.breaks.forEach((b: BreakTime) => {
                             const ds = rule.ruleDate || getKstToday(bS);
                             const bsS = new Date(`${ds}T${b.start}:00+09:00`);
                             const bsE = new Date(`${ds}T${b.end}:00+09:00`);
@@ -437,10 +438,10 @@ const GatePage: React.FC = () => {
         <div
             className="fixed inset-0 z-[99999] flex flex-col overflow-hidden font-sans transition-colors duration-500 bg-[#0A192F]"
             style={{
-                backgroundImage: (design as any).bgImage ? `url(${(design as any).bgImage})` : 'none',
+                backgroundImage: design.bgImage ? `url(${design.bgImage})` : 'none',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
-                backgroundColor: (design as any).bgColor || '#0A192F',
+                backgroundColor: design.bgColor || '#0A192F',
                 color: design.textColor || '#ffffff'
             }}
         >
@@ -461,7 +462,7 @@ const GatePage: React.FC = () => {
                 }
             `}</style>
             {/* Minimal Background Effects for Professional Kiosk Look */}
-            {!(design as any).bgImage && (
+            {!design.bgImage && (
                 <>
                     <div className="absolute inset-0 bg-gradient-to-br from-[#0A192F] via-[#0D2A4A] to-[#044B7F] opacity-90" />
                     <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-[#00E5FF]/10 to-transparent" />

@@ -5,7 +5,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { UI_TEXT } from '../../../constants/defaults';
 import { RegistrationModal } from '../RegistrationModal';
-import { safeFormatDate } from '../../../utils/dateUtils';
+import { safeFormatDate, type DateLike } from '../../../utils/dateUtils';
 import { DOMAIN_CONFIG, extractSocietyFromHost } from '../../../utils/domainHelper';
 
 type LocalizedString = { [lang: string]: string } | string;
@@ -62,7 +62,7 @@ export const WideHero: React.FC<WideHeroProps> = ({
     return (lang === 'en' ? val.en : val.ko) || val.ko || '';
   };
 
-  const formatDate = (date: any) => safeFormatDate(date);
+  const formatDate = (date: DateLike) => safeFormatDate(date);
 
   const dates = period ? `${formatDate(period.start)} ~ ${formatDate(period.end)}` : '';
 

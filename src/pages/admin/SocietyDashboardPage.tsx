@@ -418,7 +418,7 @@ export default function SocietyDashboardPage() {
         navigate(`/admin/conf/${targetCid}`);
     };
 
-    const formatDate = (ts: any) => {
+    const formatDate = (ts: unknown) => {
         if (!ts) return 'TBD';
         return safeFormatDate(ts, 'ko-KR', { year: 'numeric', month: 'short', day: 'numeric' });
     };

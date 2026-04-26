@@ -6,6 +6,7 @@ import { approveTossPayment, cancelTossPayment as cancelTossPaymentApi } from '.
 import { verifyPaymentAmount } from './utils/paymentVerifier'; // New import
 
 import { onRegistrationCreated, onExternalAttendeeCreated, validateBadgePrepToken, issueDigitalBadge, resendBadgePrepToken, generateBadgePrepToken, sendBadgeNotification, bulkSendNotifications } from './badge/index';
+import type { Conference as BadgeConference, Registration as BadgeRegistration } from './badge/index';
 import { migrateRegistrationsForOptions, migrateRegistrationsForOptionsCallable } from './migrations/migrateRegistrationsForOptions';
 import { monitorRegistrationIntegrity, monitorMemberCodeIntegrity } from './monitoring/dataIntegrity';
 import { dailyErrorReport, weeklyPerformanceReport } from './monitoring/scheduledReports';
@@ -152,7 +153,7 @@ export const confirmTossPaymentHttp = functions
                 }
 
                 // 1. Call Toss API
-                const approvalResult = await approveTossPayment(paymentKey, orderId, amount, finalSecretKey, finalStoreId) as any;
+                const approvalResult: { method?: string; status?: string; virtualAccount?: Record<string, unknown> | null; [key: string]: unknown } = await approveTossPayment(paymentKey, orderId, amount, finalSecretKey, finalStoreId);
 
                 // 2. If success (no error thrown), create Registration document
                 if (regId && confId) {
@@ -1475,7 +1476,7 @@ export const onTossWebhook = functions
             // Find Registration Document by orderId
             // [FIX-20260310] Use iterative search across conferences to avoid FAILED_PRECONDITION (missing collection group index)
             functions.logger.info(`[Toss Webhook] Searching for orderId: ${orderId} in all conferences...`);
-            let regDoc: any = null;
+            let regDoc: admin.firestore.QueryDocumentSnapshot | null = null;
 
             // 1. Get List of all conferences
             const conferencesSnap = await db.collection('conferences').get();
@@ -1616,7 +1617,7 @@ export const onTossWebhook = functions
                         const updatedRegSnap = await regRef.get();
                         const updatedRegData = updatedRegSnap.data();
 
-                        await sendBadgeNotification(db, { ...conference, id: confId } as any, regDoc.id, updatedRegData as any, token);
+                        await sendBadgeNotification(db, { ...conference, id: confId } as BadgeConference, regDoc.id, updatedRegData as BadgeRegistration, token);
                         functions.logger.info("[Toss Webhook] AlimTalk Sent");
 
                     } catch (badgeError) {
@@ -1681,9 +1682,9 @@ export const onTossWebhook = functions
                 res.status(200).json({ message: "Unknown status, ignored" });
             }
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             functions.logger.error("[Toss Webhook] Internal Error:", error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
         }
     });
 

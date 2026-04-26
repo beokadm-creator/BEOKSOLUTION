@@ -114,9 +114,9 @@ export const WideSpeakersPreview: React.FC<WideSpeakersPreviewProps> = ({ speake
                                     </div>
                                     <p className="text-xl md:text-2xl font-bold text-slate-800 leading-relaxed">
                                         { }
-                                        {(selectedSpeaker.presentationTitle as any)?.[lang] ||
-                                          
-                                         (selectedSpeaker.presentationTitle as any)?.ko ||
+                                        {(selectedSpeaker.presentationTitle as Record<string, string> | undefined)?.[lang] ||
+                                           
+                                         (selectedSpeaker.presentationTitle as Record<string, string> | undefined)?.ko ||
                                          t(selectedSpeaker.presentationTitle) ||
                                          (lang === 'ko' ? '주제 미정' : 'TBD')}
                                     </p>

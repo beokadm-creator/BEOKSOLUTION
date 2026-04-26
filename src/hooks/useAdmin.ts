@@ -15,7 +15,7 @@ export const useAdmin = (conferenceId: string) => {
     const [error, setError] = useState<string | null>(null);
 
     // 1. Save Badge Layout
-    const saveBadgeLayout = async (width: number, height: number, elements: BadgeElement[], backgroundImageUrl?: string, extraSettings?: any) => {
+    const saveBadgeLayout = async (width: number, height: number, elements: BadgeElement[], backgroundImageUrl?: string, extraSettings?: Record<string, unknown>) => {
         setLoading(true);
         try {
             // [Fix] Firestore는 undefined 값을 허용하지 않으므로 저장 전 제거

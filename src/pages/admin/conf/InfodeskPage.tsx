@@ -9,8 +9,39 @@ import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useBixolon } from '../../../hooks/useBixolon';
 import { BadgeElement } from '../../../types/schema';
+import type { PrintLayout } from '../../../types/print';
 
 // Types
+interface AttendeeRecord {
+    isExternal?: boolean;
+    status?: string;
+    paymentStatus?: string;
+    badgeIssued?: boolean;
+    name?: string;
+    userName?: string;
+    userInfo?: {
+        name?: string;
+        affiliation?: string;
+        organization?: string;
+        grade?: string;
+        licenseNumber?: string;
+        [key: string]: unknown;
+    };
+    userOrg?: string;
+    organization?: string;
+    affiliation?: string;
+    userEmail?: string;
+    userId?: string;
+    userTier?: string;
+    tier?: string;
+    licenseNumber?: string;
+    amount?: number;
+    baseAmount?: number;
+    optionsTotal?: number;
+    position?: string;
+    [key: string]: unknown;
+}
+
 interface ScannerState {
     status: 'IDLE' | 'PROCESSING' | 'SUCCESS' | 'ERROR';
     message: string;
@@ -26,6 +57,7 @@ interface DesignConfig {
     bgImage: string | null;
     textColor: string;
     fontSize: 'normal' | 'large';
+    bgColor?: string;
 }
 
 type ConferenceNameState = {
@@ -70,8 +102,8 @@ const InfodeskPage: React.FC = () => {
         lastScanned: ''
     });
 
-    const [badgeLayout, setBadgeLayout] = useState<any | null>(null);
-    const [attendeeCache, setAttendeeCache] = useState<Map<string, any>>(new Map());
+    const [badgeLayout, setBadgeLayout] = useState<PrintLayout | null>(null);
+    const [attendeeCache, setAttendeeCache] = useState<Map<string, AttendeeRecord>>(new Map());
     const inputRef = useRef<HTMLInputElement>(null);
     const [inputValue, setInputValue] = useState('');
 
@@ -266,7 +298,7 @@ const InfodeskPage: React.FC = () => {
                 regId: regId,
                 issueOption: issueOption,
                 isExternalAttendee: isExternal
-            }) as { data: { success: boolean; badgeQr: string } };
+            }) as { data: { success: boolean; badgeQr: string; position?: string } };
 
             if (!result.data.success) {
                 throw new Error("명찰 발급에 실패했습니다. 다시 시도해주세요.");
@@ -370,7 +402,7 @@ const InfodeskPage: React.FC = () => {
                 backgroundImage: design.bgImage ? `url(${design.bgImage})` : 'none',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
-                backgroundColor: (design as any).bgColor || '#0A192F',
+                backgroundColor: design.bgColor || '#0A192F',
                 color: design.textColor || '#ffffff'
             }}
         >

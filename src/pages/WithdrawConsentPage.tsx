@@ -56,10 +56,10 @@ export default function WithdrawConsentPage() {
                 setStatus('error');
                 setMessage(data.message || '동의 철회에 실패했습니다.');
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Consent withdrawal error:', error);
             setStatus('error');
-            setMessage(error.message || '동의 철회 중 오류가 발생했습니다.');
+            setMessage(error instanceof Error ? error.message : '동의 철회 중 오류가 발생했습니다.');
         }
     };
 

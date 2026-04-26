@@ -23,7 +23,7 @@ export const QnASettingsPanel = ({ confId }: { confId: string }) => {
       try {
         const snap = await getDoc(doc(db, `conferences/${confId}/settings/qna_config`));
         if (snap.exists()) {
-          setConfig(snap.data() as any);
+          setConfig(snap.data() as { enabled: boolean; startTime: string; endTime: string; [key: string]: unknown });
         }
       } catch (error) {
         console.error('Error fetching QnA config:', error);

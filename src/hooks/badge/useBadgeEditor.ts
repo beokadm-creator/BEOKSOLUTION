@@ -30,7 +30,7 @@ export const useBadgeEditor = () => {
     const [marginXMm, setMarginXMm] = useState(0);
     const [marginYMm, setMarginYMm] = useState(0);
 
-    const prevBadgeLayoutRef = useRef<any>(undefined);
+    const prevBadgeLayoutRef = useRef<unknown>(undefined);
 
     const handleDragStop = useCallback((idx: number, _e: unknown, data: { x: number, y: number }) => {
         setElements(prev => {

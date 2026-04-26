@@ -58,7 +58,7 @@ export const withdrawConsent = functions.https.onCall(async (data, context) => {
 
         // Optionally filter by conference
         if (conferenceId) {
-            leadsQuery = leadsQuery.where('conferenceId', '==', conferenceId) as any;
+            leadsQuery = leadsQuery.where('conferenceId', '==', conferenceId) as admin.firestore.Query;
         }
 
         const leadsSnapshot = await leadsQuery.get();
@@ -136,7 +136,7 @@ export const withdrawConsent = functions.https.onCall(async (data, context) => {
             message: `Successfully withdrew consent from ${withdrawnCount} lead(s)`
         };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         functions.logger.error('[Consent Withdrawal] Failed:', error);
 
         // Create audit log for failure
@@ -146,10 +146,10 @@ export const withdrawConsent = functions.https.onCall(async (data, context) => {
             entityId: visitorId,
             details: {
                 visitorId: visitorId,
-                error: error.message
+                error: error instanceof Error ? error.message : String(error)
             },
             result: 'FAILURE',
-            errorMessage: error.message,
+            errorMessage: error instanceof Error ? error.message : String(error),
             actorId: context.auth.uid,
             actorEmail: context.auth.token?.email,
             actorType: 'PARTICIPANT',
@@ -159,7 +159,7 @@ export const withdrawConsent = functions.https.onCall(async (data, context) => {
 
         throw new functions.https.HttpsError(
             'internal',
-            error.message || 'Failed to withdraw consent'
+            error instanceof Error ? error.message : 'Failed to withdraw consent'
         );
     }
 });
@@ -196,8 +196,8 @@ export const withdrawConsentHttp = functions.https.onRequest(async (req, res) =>
         // In production, implement proper token verification
         res.status(501).json({ error: 'Not implemented - use callable function' });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         functions.logger.error('[HTTP Consent Withdrawal] Failed:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
 });

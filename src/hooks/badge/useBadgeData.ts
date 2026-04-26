@@ -1,7 +1,22 @@
 import { useState, useEffect, useRef } from "react";
 import { getFirestore, collection, query, where, orderBy, getDocs, onSnapshot, doc, getDoc } from "firebase/firestore";
-import { isBadgeIssued, getBadgeDisplayName, getBadgeDisplayAffiliation, BadgeRecordSource } from "@/utils/badgeRecord";
-import type { BadgeConfig, BadgeUiState } from "@/types/badge";
+import { isBadgeIssued, getBadgeDisplayName, getBadgeDisplayAffiliation } from "@/utils/badgeRecord";
+import type { BadgeRecordSource } from "@/utils/badgeRecord";
+import type { BadgeConfig, BadgeUiState, TimestampLike } from "@/types/badge";
+import type { Query, DocumentData } from "firebase/firestore";
+
+interface ZoneData {
+  id?: string;
+  name?: string;
+  ruleDate: string;
+  [key: string]: unknown;
+}
+
+interface AttendanceRule {
+  zones?: ZoneData[];
+  breaks?: unknown[];
+  [key: string]: unknown;
+}
 
 type BadgeUiData = BadgeUiState & {
   qrValue: string;
@@ -24,9 +39,9 @@ export function useBadgeData(strategy: BadgeStrategy) {
   const [msg, setMsg] = useState("초기화 중...");
   const [uiData, setUiData] = useState<BadgeUiData | null>(null);
   const [badgeConfig, setBadgeConfig] = useState<BadgeConfig | null>(null);
-  const [zones, setZones] = useState<any[]>([]);
+  const [zones, setZones] = useState<ZoneData[]>([]);
 
-  const lastQueryRef = useRef<any>(null);
+  const lastQueryRef = useRef<Query<DocumentData> | null>(null);
   const lastSourceRef = useRef<BadgeRecordSource | null>(null);
 
   useEffect(() => {
@@ -46,10 +61,10 @@ export function useBadgeData(strategy: BadgeStrategy) {
         if (rulesSnap.exists()) {
           const attendanceSettings = rulesSnap.data();
           const allRules = attendanceSettings.rules || {};
-          const allZones: any[] = [];
-          Object.entries(allRules).forEach(([dateStr, rule]: [string, any]) => {
+          const allZones: ZoneData[] = [];
+          Object.entries(allRules).forEach(([dateStr, rule]: [string, AttendanceRule]) => {
             if (rule && rule.zones) {
-              rule.zones.forEach((z: any) => {
+              rule.zones.forEach((z) => {
                 allZones.push({ ...z, ruleDate: dateStr });
               });
             }
@@ -62,7 +77,7 @@ export function useBadgeData(strategy: BadgeStrategy) {
         }
 
         // Fetch Badge Document
-        let targetQuery: any = null;
+        let targetQuery: Query<DocumentData> | null = null;
         let targetSource: BadgeRecordSource | null = null;
 
         if (strategyType === 'AUTH') {
@@ -86,12 +101,12 @@ export function useBadgeData(strategy: BadgeStrategy) {
           const snapReg = await getDocs(qReg);
           if (!snapReg.empty) {
             targetQuery = qReg;
-            targetSource = "registrations";
+            targetSource = "REGULAR";
           } else {
             const snapExt = await getDocs(qExt);
             if (!snapExt.empty) {
               targetQuery = qExt;
-              targetSource = "external_attendees";
+              targetSource = "EXTERNAL";
             }
           }
         } else if (strategyType === 'TOKEN') {
@@ -127,17 +142,18 @@ export function useBadgeData(strategy: BadgeStrategy) {
 
           setUiData({
             id: docSnap.id,
-            userId: d.userId,
+            userId: d.userId as string,
             name: getBadgeDisplayName(d),
             aff: getBadgeDisplayAffiliation(d),
             issued: isIssued,
-            qrValue: isIssued ? (d.badgeQr || docSnap.id) : (d.confirmationQr || docSnap.id),
-            receiptNumber: d.receiptNumber,
+            badgeQr: d.badgeQr as string | null ?? null,
+            qrValue: isIssued ? (d.badgeQr || docSnap.id) as string : (d.confirmationQr || docSnap.id) as string,
+            receiptNumber: d.receiptNumber as string | undefined,
             status: String(d.attendanceStatus || "OUTSIDE"),
             zone: String(d.attendanceStatus === "INSIDE" ? d.currentZone || "Inside" : "OUTSIDE"),
-            lastCheckIn: d.lastCheckIn,
-            baseMinutes: d.totalMinutes || 0,
-            isCompleted: d.isCompleted || false
+            lastCheckIn: d.lastCheckIn as TimestampLike | undefined,
+            baseMinutes: d.totalMinutes as number || 0,
+            isCompleted: d.isCompleted as boolean || false
           });
 
           setStatus("READY");

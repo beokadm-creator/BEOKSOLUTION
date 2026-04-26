@@ -10,8 +10,8 @@ export interface StampTourConfig {
   rewardMode: "RANDOM" | "FIXED";
   drawMode?: "PARTICIPANT" | "ADMIN" | "BOTH";
   rewardFulfillmentMode?: "INSTANT" | "LOTTERY";
-  lotteryScheduledAt?: any;
-  rewards: Array<any>;
+  lotteryScheduledAt?: { seconds: number; nanoseconds?: number } | Date | string | null;
+  rewards: Array<{ name: string; description?: string; imageUrl?: string; stock?: number; [key: string]: unknown }>;
   soldOutMessage?: string;
   completionMessage?: string;
 }
@@ -21,7 +21,7 @@ export interface StampProgress {
   lotteryStatus?: "PENDING" | "SELECTED" | "NOT_SELECTED";
   rewardName?: string;
   isCompleted?: boolean;
-  completedAt?: any;
+  completedAt?: { seconds: number; nanoseconds?: number } | Date | string | null;
 }
 
 export function useStampTour(confId: string | undefined, userId: string | undefined) {
@@ -29,7 +29,7 @@ export function useStampTour(confId: string | undefined, userId: string | undefi
   const [stampBoothCandidates, setStampBoothCandidates] = useState<Array<{ id: string; name: string }>>([]);
   const [myStamps, setMyStamps] = useState<string[]>([]);
   const [stampProgress, setStampProgress] = useState<StampProgress>({});
-  const [guestbookEntries, setGuestbookEntries] = useState<Array<{ vendorName: string; message?: string; timestamp?: any }>>([]);
+  const [guestbookEntries, setGuestbookEntries] = useState<Array<{ vendorName: string; message?: string; timestamp?: { seconds: number; nanoseconds?: number } | Date | string | null }>>([]);
   const [totalVendors, setTotalVendors] = useState(0);
 
   useEffect(() => {
