@@ -27,7 +27,15 @@ export default defineConfig({
           if (id.includes('node_modules/html2canvas') || id.includes('node_modules/jspdf')) {
             return 'print-vendor';
           }
-          // 4. 나머지 node_modules는 vendor로 묶음
+          // 4. Charts — only loaded on statistics page
+          if (id.includes('node_modules/recharts/')) {
+            return 'chart-vendor';
+          }
+          // 5. UI primitives
+          if (id.includes('node_modules/@radix-ui/')) {
+            return 'ui-vendor';
+          }
+          // 6. 나머지 node_modules는 vendor로 묶음
           if (id.includes('node_modules')) {
             return 'vendor';
           }
