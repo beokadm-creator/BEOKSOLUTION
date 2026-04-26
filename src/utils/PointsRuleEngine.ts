@@ -40,7 +40,6 @@ export class PointsRuleEngine {
                 });
             });
 
-            console.log(`[PointsRuleEngine] Successfully awarded ${points} pts to ${userId}.`);
             return true;
         } catch (error) {
             console.error("[PointsRuleEngine] Transaction Failed:", error);

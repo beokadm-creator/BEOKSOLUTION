@@ -16,7 +16,6 @@ import { utils, writeFile } from 'xlsx';
 
 export default function AbstractManagerPage() {
     const { selectedConferenceId, availableConferences } = useAdminStore();
-    console.log('[AbstractManager] RENDER - selectedConferenceId:', selectedConferenceId);
 
     const { fetchAllSubmissions, judgeSubmission, deleteAbstractAsAdmin } = useAbstracts(selectedConferenceId || undefined);
     const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -99,7 +98,6 @@ export default function AbstractManagerPage() {
     const loadSubmissions = useCallback(async () => {
         setLoading(true);
         const data = await fetchAllSubmissions();
-        console.log("[AbstractManager] Fetched submissions:", data.length);
         setSubmissions(data);
         setLoading(false);
     }, [fetchAllSubmissions]);
@@ -108,19 +106,15 @@ export default function AbstractManagerPage() {
     useEffect(() => {
         // Prevent multiple executions for the same conference
         if (selectedConferenceId === prevConferenceIdRef.current) {
-            console.log('[AbstractManager] Skipping - same conference ID');
             return;
         }
 
-        // [Step 405] Debug conference selection
-        console.log("[AbstractManager] Conference ID:", selectedConferenceId);
         if (selectedConferenceId) {
             prevConferenceIdRef.current = selectedConferenceId;
             void loadSubmissions();
             fetchContextData();
         } else {
-            // [Debug] Auto-select first available for testing
-            console.log("[AbstractManager] No conference selected, waiting for conference selection");
+            // Auto-select first available for testing
         }
 
         // Fetch Societies for Excel Export
@@ -295,7 +289,6 @@ export default function AbstractManagerPage() {
             
             if (result.success) {
                 toast.success(`복구 완료: ${result.fixedCount}건 수정됨`, { id: toastId });
-                console.log("Fix logs:", result.logs);
                 if (result.fixedCount && result.fixedCount > 0) {
                      loadSubmissions();
                 }

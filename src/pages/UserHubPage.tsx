@@ -1145,8 +1145,6 @@ const UserHubPage: React.FC = () => {
         }
         const cleanPath = `/${badgeSlug}/badge`;
 
-        console.log('[UserHub] Badge click - Registration slug:', r.slug, 'Badge slug:', badgeSlug, 'Society ID:', safeSocietyId);
-
         // CRITICAL FIX: Check if user is already authenticated
         // If Firebase auth has a currentUser, redirect directly without auth page
         const authInstance = getAuth();

@@ -38,15 +38,12 @@ export const useCheckIn = (conferenceId: string) => {
 
             if (!targetRegId) throw new Error("유효하지 않은 QR 코드입니다.");
 
-            console.log('[useCheckIn] Scanning QR:', { qrData, targetRegId });
-
             // CRITICAL FIX: Try to find registration by document ID first
             const regRef = doc(db, `conferences/${conferenceId}/registrations/${targetRegId}`);
             let regSnap = await getDoc(regRef);
 
             // If not found by document ID, try to find by confirmationQr field
             if (!regSnap.exists()) {
-                console.log('[useCheckIn] Not found by doc ID, searching by confirmationQr field');
                 const q = query(
                     collection(db, `conferences/${conferenceId}/registrations`),
                     where('confirmationQr', '==', targetRegId)
@@ -59,9 +56,6 @@ export const useCheckIn = (conferenceId: string) => {
 
                 // Use the first matching registration
                 regSnap = querySnap.docs[0];
-                console.log('[useCheckIn] Found by confirmationQr:', regSnap.id);
-            } else {
-                console.log('[useCheckIn] Found by doc ID:', regSnap.id);
             }
 
             const regData = { ...regSnap.data(), id: regSnap.id } as Registration;
@@ -126,7 +120,7 @@ export const useCheckIn = (conferenceId: string) => {
 
             // Mock Sending Notification
             if (isNewIssue) {
-                console.log(`[Notification] Sending Digital Badge URL to ${scannedUser.phone || scannedUser.email}`);
+                // Notification would be sent here
             }
 
             setStatus({ loading: false, error: null, message: `Badge ${isNewIssue ? 'Issued' : 'Reprinted'} Successfully!` });

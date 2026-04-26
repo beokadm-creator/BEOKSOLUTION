@@ -67,20 +67,6 @@ export const useMemberVerification = () => {
             // Member found - return verification data
             setLoading(false);
 
-            // Debug: Log the member data received from Cloud Function
-            console.log('[useMemberVerification] Member verified successfully, memberData:', {
-                success: true,
-                message: "회원 인증이 완료되었습니다.",
-                isExpired: data.isExpired || false,
-                memberData: {
-                    name: data.memberData?.name,
-                    grade: data.grade || data.memberData?.grade,  // FIX: grade는 top-level data.grade에서 읽기
-                    code: data.memberData?.code,
-                    expiry: data.memberData?.expiry,
-                    fullData: data.memberData
-                }
-            });
-
             return {
                 success: true,
                 message: "회원 인증이 완료되었습니다.",

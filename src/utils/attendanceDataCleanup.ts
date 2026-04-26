@@ -23,7 +23,6 @@ export class AttendanceDataCleanup {
    * 고아 데이터 정리 - 등록자가 없는 access_logs 정리
    */
   static async cleanupOrphanedAccessLogs(conferenceId: string) {
-    console.log(`🧹 시작: 고아 access_logs 정리 (${conferenceId})`);
     
     try {
       // 1. 현재 유효한 등록자 목록 가져오기
@@ -33,7 +32,6 @@ export class AttendanceDataCleanup {
         registrationsSnap.docs.map(doc => doc.id)
       );
       
-      console.log(`✅ 유효한 등록자: ${validRegistrationIds.size}명`);
 
       // 2. 전체 access_logs 확인
       const accessLogsRef = collection(db, 'conferences', conferenceId, 'access_logs');
@@ -60,12 +58,10 @@ export class AttendanceDataCleanup {
             batchCount++;
             orphanedCount++;
             
-            console.log(`🗑️ 고아 로그 삭제: ${logDoc.id} (QR: ${logData.scannedQr})`);
             
             // Firestore batch 제한 (500개)
             if (batchCount >= 400) {
               await batch.commit();
-              console.log(`✅ Batch 완료: ${batchCount}개 삭제`);
               batchCount = 0;
             }
           }
@@ -75,10 +71,8 @@ export class AttendanceDataCleanup {
       // 남은 batch 실행
       if (batchCount > 0) {
         await batch.commit();
-        console.log(`✅ 최종 Batch 완료: ${batchCount}개 삭제`);
       }
 
-      console.log(`🎉 고아 access_logs 정리 완료: ${orphanedCount}개 삭제`);
       return orphanedCount;
 
     } catch (error) {
@@ -91,7 +85,6 @@ export class AttendanceDataCleanup {
    * 등록자별 로그 정리 - 존재하지 않는 등록자의 로그 정리
    */
   static async cleanupOrphanedRegistrationLogs(conferenceId: string) {
-    console.log(`🧹 시작: 고아 registration logs 정리 (${conferenceId})`);
     
     try {
       // 1. 유효한 등록자 목록
@@ -127,7 +120,6 @@ export class AttendanceDataCleanup {
 
           if (orphanedLogsCount > 0) {
             await batch.commit();
-            console.log(`🗑️ ${regId}의 고아 로그 ${orphanedLogsCount}개 삭제`);
           }
 
         } catch (error) {
@@ -135,7 +127,6 @@ export class AttendanceDataCleanup {
         }
       }
 
-      console.log(`🎉 고아 registration logs 정리 완료: ${totalDeleted}개 삭제`);
       return totalDeleted;
 
     } catch (error) {
@@ -148,7 +139,6 @@ export class AttendanceDataCleanup {
    * 전체 데이터 정합성 검사
    */
   static async checkDataIntegrity(conferenceId: string) {
-    console.log(`🔍 시작: 데이터 정합성 검사 (${conferenceId})`);
 
     interface DataIntegrityIssue {
       type: string;
@@ -213,12 +203,6 @@ export class AttendanceDataCleanup {
       // 5. 데이터 불일치 확인
       report.statistics.dataInconsistencies = report.issues.length;
 
-      console.log(`✅ 데이터 정합성 검사 완료:`);
-      console.log(`   - 전체 등록자: ${report.statistics.totalRegistrations}`);
-      console.log(`   - 전체 access_logs: ${report.statistics.totalAccessLogs}`);
-      console.log(`   - 고아 access_logs: ${report.statistics.orphanedAccessLogs}`);
-      console.log(`   - 전체 registration logs: ${report.statistics.totalRegistrationLogs}`);
-      console.log(`   - 데이터 불일치: ${report.statistics.dataInconsistencies}`);
 
       return report;
 
@@ -232,7 +216,6 @@ export class AttendanceDataCleanup {
    * 전체 정리 실행 (안전한 순서로)
    */
   static async fullCleanup(conferenceId: string) {
-    console.log(`🚀 시작: 전체 데이터 정리 (${conferenceId})`);
     
     try {
       // 1. 먼저 정합성 검사
@@ -240,7 +223,6 @@ export class AttendanceDataCleanup {
       
       if (integrityReport.statistics.orphanedAccessLogs === 0 && 
           integrityReport.statistics.dataInconsistencies === 0) {
-        console.log('✅ 정리할 데이터가 없습니다.');
         return integrityReport;
       }
 
@@ -251,9 +233,6 @@ export class AttendanceDataCleanup {
       // 3. 재검사
       const finalReport = await this.checkDataIntegrity(conferenceId);
 
-      console.log(`🎉 전체 정리 완료:`);
-      console.log(`   - 삭제된 access_logs: ${deletedAccessLogs}`);
-      console.log(`   - 삭제된 registration logs: ${deletedRegistrationLogs}`);
 
       return {
         beforeCleanup: integrityReport,
@@ -274,7 +253,6 @@ export class AttendanceDataCleanup {
    * 특정 등록자 관련 데이터 안전 삭제
    */
   static async safeDeleteRegistration(conferenceId: string, registrationId: string, adminId: string) {
-    console.log(`🗑️ 시작: 등록자 안전 삭제 (${conferenceId}/${registrationId})`);
     
     try {
       const batch = writeBatch(db);
@@ -301,7 +279,6 @@ export class AttendanceDataCleanup {
         
         accessLogsSnap.docs.forEach(logDoc => {
           batch.delete(logDoc.ref);
-          console.log(`🗑️ access_log 삭제: ${logDoc.id}`);
         });
         accessLogsCount = accessLogsSnap.size;
       }
@@ -312,7 +289,6 @@ export class AttendanceDataCleanup {
       
       logsSnap.docs.forEach(logDoc => {
         batch.delete(logDoc.ref);
-        console.log(`🗑️ registration log 삭제: ${logDoc.id}`);
       });
 
       // 4. 등록 정보 삭제
@@ -351,7 +327,6 @@ export class AttendanceDataCleanup {
 
       await batch.commit();
 
-      console.log(`✅ 등록자 안전 삭제 완료: ${registrationId}`);
       return {
         success: true,
         deletedAccessLogs: accessLogsCount,

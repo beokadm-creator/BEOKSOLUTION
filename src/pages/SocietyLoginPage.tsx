@@ -28,8 +28,6 @@ const SocietyLoginPage: React.FC<SocietyLoginPageProps> = ({ _societyId }) => {
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        console.log(`🔐 [SocietyLogin] Login attempt: ${email}`);
-
         setLoading(true);
 
         try {
@@ -39,11 +37,8 @@ const SocietyLoginPage: React.FC<SocietyLoginPageProps> = ({ _societyId }) => {
 
             const isSuperAdmin = SUPER_ADMINS.includes(email);
 
-            console.log(`🔐 [SocietyLogin] User: ${email}, IsSuperAdmin: ${isSuperAdmin}`);
-
             if (society) {
                 if (isSuperAdmin) {
-                    console.log(`🔐 [SocietyLogin] SUPER_ADMIN bypassing society check`);
                     toast.success(`Welcome Super Admin to ${society.name.en}`);
 
                     // ✅ sessionStorage에 Super Admin 정보 저장
@@ -58,8 +53,6 @@ const SocietyLoginPage: React.FC<SocietyLoginPageProps> = ({ _societyId }) => {
                 const adminEmails = await getSocietyAdminEmails(society.id);
 
                 const isAuthorized = adminEmails.includes(email);
-
-                console.log(`🔐 [SocietyLogin] Society: ${society.id}, Authorized: ${isAuthorized}, AdminEmails:`, adminEmails);
 
                 if (!isAuthorized) {
                     await auth.signOut();

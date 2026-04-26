@@ -197,7 +197,6 @@ const MemberManagerPage: React.FC = () => {
 
             // Use setDoc with the code as the document ID to maintain consistency with legacy format
             // and ensure the ID is readable (e.g., 'Member_LM' instead of random string)
-            console.log(`[MemberManager] Creating grade with ID: ${newGradeCode}`);
             await setDoc(doc(colRef, newGradeCode), newGradeObj);
 
             toast.success(`등급이 추가되었습니다. (ID: ${newGradeCode})`);

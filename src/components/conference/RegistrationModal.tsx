@@ -64,7 +64,6 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                     const regData = regDoc.data();
                     if (regData.paymentMode === 'FREE_ALL') {
                         // Bypass directly to registration page
-                        console.log('[RegistrationModal] FREE_ALL mode detected, bypassing auth');
                         onClose();
                         navigate(`/${confId.split('_')[1]}/register`, {
                             state: {
@@ -167,30 +166,22 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
     }, [gradesList, activePeriod, selectedNonMemberType]);
 
     const getGradePrice = (grade: string): number => {
-        console.log('[RegistrationModal] getGradePrice called with grade:', grade);
-        console.log('[RegistrationModal] getGradeCodeByName function:', typeof getGradeCodeByName, getGradeCodeByName);
 
         if (!activePeriod?.prices || !grade) {
-            console.log('[RegistrationModal] No active period or prices found, returning 0');
             return 0;
         }
 
         const priceObj = activePeriod.prices as Record<string, number>;
-        console.log('[RegistrationModal] priceObj keys:', Object.keys(priceObj));
 
         // Try exact match first
         if (priceObj[grade] !== undefined) {
-            console.log('[RegistrationModal] Exact match found:', grade, priceObj[grade]);
             return priceObj[grade];
         }
 
         // Try reverse lookup: Korean name → code
-        console.log('[RegistrationModal] Calling getGradeCodeByName with:', grade);
         const codeFromName = getGradeCodeByName(grade);
-        console.log('[RegistrationModal] getGradeCodeByName returned:', codeFromName);
 
         if (codeFromName && priceObj[codeFromName] !== undefined) {
-            console.log('[RegistrationModal] Name-to-code match found:', codeFromName, priceObj[codeFromName]);
             return priceObj[codeFromName];
         }
 
@@ -198,7 +189,6 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         const lowerGrade = grade.toLowerCase();
         for (const [key, price] of Object.entries(priceObj)) {
             if (key.toLowerCase() === lowerGrade) {
-                console.log('[RegistrationModal] Case-insensitive match found:', key, price);
                 return price;
             }
         }
@@ -208,12 +198,10 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         for (const [key, price] of Object.entries(priceObj)) {
             const normalizedKey = key.toLowerCase().replace(/\s+/g, '').replace(/-/g, '');
             if (normalizedKey === normalizedGrade) {
-                console.log('[RegistrationModal] Normalized match found:', key, price);
                 return price;
             }
         }
 
-        console.log('[RegistrationModal] No match found for grade:', grade, 'returning 0');
         return 0; // Not found
     };
 
@@ -294,12 +282,10 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
             // Member authenticated - calculate price for their grade
             calculatedGradeCode = verifiedMemberData.grade || '';
             calculatedPrice = getGradePrice(calculatedGradeCode);
-            console.log('[RegistrationModal] Member auth price calculation:', { grade: calculatedGradeCode, price: calculatedPrice });
         } else if (mode === 'non-member') {
             // Non-member - calculate price for selected type
             calculatedGradeCode = selectedNonMemberType;
             calculatedPrice = getGradePrice(calculatedGradeCode);
-            console.log('[RegistrationModal] Non-member price calculation:', { grade: calculatedGradeCode, price: calculatedPrice });
         }
 
         // Build registration state for RegistrationPage
@@ -336,7 +322,6 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 expiry: verifiedMemberData.expiry || '',
                 calculatedPrice: calculatedPrice
             }));
-            console.log('[RegistrationModal] Saved member verification data to sessionStorage:', storageKey);
         } else if (mode === 'non-member') {
             // Pass selected non-member type as grade
             registrationState.memberGrade = selectedNonMemberType;
@@ -348,7 +333,6 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 grade: selectedNonMemberType,
                 calculatedPrice: calculatedPrice
             }));
-            console.log('[RegistrationModal] Saved non-member selection to sessionStorage:', storageKey);
         }
 
         // Navigate to registration page with state (clean URL)

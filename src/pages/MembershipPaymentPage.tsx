@@ -38,10 +38,8 @@ export default function MembershipPaymentPage() {
     const { subdomain } = useSubdomain();
     const sid = subdomain;
 
-    console.log('[MembershipPaymentPage] Sid from subdomain:', sid);
 
     const [loading, setLoading] = useState(true);
-    console.log('[MembershipPaymentPage] Component mounted');
 
     // Get current user directly from Firebase Auth (avoid useAuth session clearing)
     const authUser = firebaseAuth.currentUser;
@@ -58,7 +56,6 @@ export default function MembershipPaymentPage() {
 
     // Add dependency on sid to trigger reload when it changes
     useEffect(() => {
-        console.log('[MembershipPaymentPage] Sid changed to:', sid);
     }, [sid]);
 
     // Reset loading when sid changes
@@ -74,33 +71,27 @@ export default function MembershipPaymentPage() {
     useEffect(() => {
         // Only load data if sid is available
         if (!sid) {
-            console.log('[MembershipPaymentPage] No sid available, skipping data load');
             return;
         }
 
-        console.log('[MembershipPaymentPage] Loading data with sid:', sid);
 
         const loadData = async () => {
             try {
                 // 1. 로그인 사용자 정보 로드
                 if (!authUser) {
-                    console.log('[MembershipPaymentPage] No auth user available');
                     toast.error('로그인이 필요합니다.');
                     navigate('/login');
                     return;
                 }
 
-                console.log('[MembershipPaymentPage] Auth user found:', authUser.uid);
 
                 // 2. Try to get user from users/{uid} first
                 const userDoc = await getDoc(doc(db, 'users', authUser.uid));
                 let userData: Record<string, unknown> | null = null;
 
                 if (userDoc.exists()) {
-                    console.log('[MembershipPaymentPage] User doc found in users/{uid}');
                     userData = userDoc.data();
                 } else {
-                    console.log('[MembershipPaymentPage] User doc not found in users/{uid}, trying societies/kadd/members');
 
                     // 3. If not found, try to get from societies/kadd/members
                     const membersRef = collection(db, 'societies', sid, 'members');
@@ -109,12 +100,10 @@ export default function MembershipPaymentPage() {
                     let memberSnap;
 
                     // Pattern 1: Search by id (Firebase Auth uid)
-                    console.log('[MembershipPaymentPage] Trying search by id (uid):', authUser.uid);
                     memberSnap = await getDocs(query(membersRef, where('id', '==', authUser.uid)));
 
                     // Pattern 2: If not found, try code
                     if (memberSnap.empty) {
-                        console.log('[MembershipPaymentPage] Trying search by code...');
                         const q1 = query(membersRef, where('licenseNumber', '==', authUser.email || ''));
                         const snap1 = await getDocs(q1);
                         if (!snap1.empty) {
@@ -124,15 +113,11 @@ export default function MembershipPaymentPage() {
 
                     // Pattern 3: Try direct code search with empty string fallback
                     if (memberSnap.empty) {
-                        console.log('[MembershipPaymentPage] Trying all members to find match...');
                         memberSnap = await getDocs(membersRef);
-                        console.log('[MembershipPaymentPage] Total members found:', memberSnap.docs.length);
                     }
 
                     if (!memberSnap.empty && memberSnap.docs.length > 0) {
-                        console.log('[MembershipPaymentPage] Member found in societies/kadd/members');
                         const memberData = memberSnap.docs[0].data();
-                        console.log('[MembershipPaymentPage] Member data:', memberData);
 
                         // Create user data from member data
                         userData = {
@@ -145,15 +130,12 @@ export default function MembershipPaymentPage() {
                         };
                     } else {
                         console.error('[MembershipPaymentPage] User not found in either users/{uid} or societies/kadd/members');
-                        console.log('[MembershipPaymentPage] Auth uid:', authUser.uid);
-                        console.log('[MembershipPaymentPage] Auth email:', authUser.email);
                         toast.error('회원 정보를 찾을 수 없습니다.');
                         setLoading(false);
                         return;
                     }
                 }
 
-                console.log('[MembershipPaymentPage] User data loaded:', userData);
                 setUser({
                     id: userDoc.id || authUser.uid,
                     name: userData.name || userData.userName || '',
@@ -181,7 +163,6 @@ export default function MembershipPaymentPage() {
                     const key = infra.payment?.domestic?.apiKey;
                     if (key) {
                         setTossClientKey(key);
-                        console.log('[MembershipPaymentPage] Toss client key loaded');
                     } else {
                         console.warn('[MembershipPaymentPage] No Toss API key found in infrastructure settings');
                     }
@@ -206,10 +187,8 @@ export default function MembershipPaymentPage() {
             (async () => {
                 try {
                     const customerKey = `cust_${uuidv4()}`;
-                    console.log('[MembershipPaymentPage] Initializing Toss widget with customerKey:', customerKey);
                     const widget = await loadPaymentWidget(tossClientKey, customerKey);
                     setPaymentWidget(widget);
-                    console.log('[MembershipPaymentPage] Toss widget initialized');
                 } catch (error) {
                     console.error('[MembershipPaymentPage] Widget initialization error:', error);
                     toast.error('결제 위젯 초기화 실패');
@@ -223,7 +202,6 @@ export default function MembershipPaymentPage() {
         if (paymentWidget && paymentMethodsWidgetRef.current && selectedTier) {
             const tier = feeTiers.find(t => t.id === selectedTier);
             if (tier) {
-                console.log('[MembershipPaymentPage] Rendering payment methods for amount:', tier.amount);
                 paymentWidget.renderPaymentMethods(
                     '#payment-widget',
                     { value: tier.amount }
@@ -255,7 +233,6 @@ export default function MembershipPaymentPage() {
             // 결제 ID 생성
             const orderId = `MEMB-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-            console.log('[MembershipPaymentPage] Requesting payment:', { orderId, tier: tier.name, amount: tier.amount });
 
             // 토스페이먼츠 결제 요청
             await paymentWidget.requestPayment({
@@ -267,7 +244,6 @@ export default function MembershipPaymentPage() {
                 failUrl: `${window.location.origin}/mypage/membership?error=payment_failed`,
             });
 
-            console.log('[MembershipPaymentPage] Payment widget opened');
         } catch (error: unknown) {
             console.error("Payment error:", error);
             const message = error instanceof Error ? error.message : 'Unknown error';

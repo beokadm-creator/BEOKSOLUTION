@@ -22,13 +22,6 @@ export const Header = () => {
   const { count } = useNoticeCount();
 
   React.useEffect(() => {
-    console.log("[Header] Auth state:", {
-      loading: auth.loading,
-      user: auth.user?.name || auth.user?.email,
-      uid: auth.user?.uid,
-      step: auth.step,
-      error: auth.error
-    });
   }, [auth.loading, auth.user, auth.step, auth.error]);
 
   return (

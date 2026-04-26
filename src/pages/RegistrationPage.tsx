@@ -155,7 +155,6 @@ export default function RegistrationPage() {
             const parsed = JSON.parse(sessionData);
             if (typeof parsed.calculatedPrice === 'number') {
                 paramCalculatedPrice = parsed.calculatedPrice;
-                console.log('[RegistrationPage] Using calculated totalPrice from member verification sessionStorage:', paramCalculatedPrice);
             }
         }
 
@@ -167,7 +166,6 @@ export default function RegistrationPage() {
                 const parsed = JSON.parse(nonMemberData);
                 if (typeof parsed.calculatedPrice === 'number') {
                     paramCalculatedPrice = parsed.calculatedPrice;
-                    console.log('[RegistrationPage] Using calculated totalPrice from non-member sessionStorage:', paramCalculatedPrice);
                 }
             }
         }
@@ -175,7 +173,6 @@ export default function RegistrationPage() {
         // Priority 3: Check location.state (may be lost during navigation)
         if (paramCalculatedPrice === undefined && location.state && typeof (location.state as { calculatedPrice?: number }).calculatedPrice === 'number') {
             paramCalculatedPrice = (location.state as { calculatedPrice?: number }).calculatedPrice;
-            console.log('[RegistrationPage] Using calculated totalPrice from location.state:', paramCalculatedPrice);
         }
     } catch (e) {
         console.warn('[RegistrationPage] Failed to read calculated totalPrice:', e);
@@ -308,8 +305,6 @@ export default function RegistrationPage() {
                     const apiKey = domesticPayment?.apiKey || defaultClientKey;
                     setTossClientKey(apiKey);
 
-                    // Log current mode for debugging
-                    console.log('[Payment] Provider:', domesticPayment?.provider, 'Test Mode:', domesticPayment?.isTestMode);
                 } else {
                     setTossClientKey(defaultClientKey);
                 }
@@ -341,7 +336,6 @@ export default function RegistrationPage() {
     useEffect(() => {
         // PRIORITY 1: Use pre-calculated totalPrice from modal if available
         if (regSettings?.paymentMode === 'FREE_ALL') {
-            console.log('[RegistrationPage] FREE_ALL mode detected, forcing base price to 0');
             updateBasePrice(0);
             setSelectedTier('FREE_ATTENDEE');
             setFinalCategory(language === 'ko' ? '무료 참석자' : 'Free Attendee');
@@ -349,7 +343,6 @@ export default function RegistrationPage() {
         }
 
         if (paramCalculatedPrice !== undefined && paramCalculatedPrice >= 0) {
-            console.log('[RegistrationPage] Using pre-calculated totalPrice from modal:', paramCalculatedPrice);
             updateBasePrice(paramCalculatedPrice);
 
             // Determine category name
@@ -454,14 +447,12 @@ export default function RegistrationPage() {
                 });
                 // FIXED: Use grade.code (not Firestore doc ID) for totalPrice lookup
                 if (matched) {
-                    console.log('[Grade Match] Matched grade:', matched.code, 'from input:', paramMemberGrade);
                     targetGradeId = matched.code || matched.id;
                 }
             }
 
             // B. If not found in grades, check if it's a direct totalPrice key (e.g. non-member types)
             if (!targetGradeId && activePeriod.totalPrices && activePeriod.totalPrices[paramMemberGrade] !== undefined) {
-                console.log('[Grade Match] Using direct totalPrice key:', paramMemberGrade);
                 targetGradeId = paramMemberGrade;
             }
         }
@@ -543,12 +534,8 @@ export default function RegistrationPage() {
             const amount = { value: totalPrice };
 
             if (paymentMethodsInstanceRef.current) {
-                // Update existing widget amount
-                console.log('[PaymentWidget] Updating amount:', totalPrice);
                 paymentMethodsInstanceRef.current.updateAmount(amount);
             } else {
-                // Initial Render
-                console.log('[PaymentWidget] Rendering methods with:', totalPrice);
                 paymentMethodsInstanceRef.current = paymentWidget.renderPaymentMethods(
                     '#payment-widget',
                     amount,

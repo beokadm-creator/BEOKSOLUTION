@@ -184,8 +184,6 @@ export async function getTemplateList(config: NHNCloudConfig): Promise<any> {
     try {
         const url = `https://api-alimtalk.cloud.toast.com/alimtalk/v2.3/appkeys/${config.appKey}/senders/${config.senderKey}/templates`;
 
-        console.log(`[NHN API] Request URL: ${url}`);
-
         const response = await axios.get(url, {
             headers: {
                 'Content-Type': 'application/json;charset=UTF-8',
@@ -196,8 +194,6 @@ export async function getTemplateList(config: NHNCloudConfig): Promise<any> {
                 pageSize: 1000
             }
         });
-
-        console.log('[NHN API] Response:', JSON.stringify(response.data, null, 2));
 
         if (response.data.header && response.data.header.isSuccessful) {
             // API 응답 구조: templateListResponse.templates
@@ -237,16 +233,12 @@ export async function getTemplate(config: NHNCloudConfig, templateCode: string):
     try {
         const url = `https://api-alimtalk.cloud.toast.com/alimtalk/v2.3/appkeys/${config.appKey}/senders/${config.senderKey}/templates/${templateCode}`;
 
-        console.log(`[NHN API] Get Template Request: ${url}`);
-
         const response = await axios.get(url, {
             headers: {
                 'Content-Type': 'application/json;charset=UTF-8',
                 'X-Secret-Key': config.secretKey
             }
         });
-
-        console.log('[NHN API] Get Template Response:', JSON.stringify(response.data, null, 2));
 
         if (response.data.header && response.data.header.isSuccessful) {
             return {

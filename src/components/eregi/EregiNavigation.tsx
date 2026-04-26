@@ -49,17 +49,6 @@ const EregiNavigation: React.FC<EregiNavigationProps> = ({
         }
     };
 
-    // Debug logging
-    React.useEffect(() => {
-        console.log('[EregiNavigation] displayUser:', displayUser);
-        console.log('[EregiNavigation] authUser:', {
-            name: authUser?.name,
-            email: authUser?.email,
-             
-            displayName: (authUser as Record<string, unknown>)?.displayName
-        });
-    }, [displayUser, authUser]);
-
     const handleMyPage = () => {
         if (customUser) {
             // For non-member, maybe reload or stay? Or assume the parent handles routing.

@@ -122,11 +122,6 @@ const StandAloneBadgePage: React.FC = () => {
 
         const confIdToUse = getConfIdToUse(slug);
 
-        console.log(
-          "[StandAloneBadgePage] Firebase user authenticated, fetching badge:",
-          { userId: user.uid, confId: confIdToUse },
-        );
-
         // STRATEGY: Try Regular Registrations FIRST, then External Attendees
 
         // 1. Define Queries
@@ -225,16 +220,12 @@ const StandAloneBadgePage: React.FC = () => {
         ) => {
           if (snap.empty) {
             // This should only happen if the document was deleted after we found it
-            console.log(
-              `[StandAloneBadgePage] ${source} registration disappeared`,
-            );
             setStatus("NO_DATA");
             setMsg("?깅줉 ?뺣낫媛 ?놁뒿?덈떎.");
             return;
           }
 
           const d = snap.docs[0].data();
-          console.log(`[StandAloneBadgePage] ${source} Registration found:`, d);
 
           // Common Field Mapping
           const uiName = getBadgeDisplayName(d);
@@ -301,7 +292,6 @@ const StandAloneBadgePage: React.FC = () => {
           // Check Regular first
           const snapReg = await getDocs(qReg);
           if (!snapReg.empty) {
-            console.log("[StandAloneBadgePage] Found in REGISTRATIONS");
             lastQueryRef.current = qReg;
             lastSourceRef.current = "REGULAR";
             unsubscribeDB = onSnapshot(qReg, (snap) =>
@@ -311,7 +301,6 @@ const StandAloneBadgePage: React.FC = () => {
             // Check External
             const snapExt = await getDocs(qExt);
             if (!snapExt.empty) {
-              console.log("[StandAloneBadgePage] Found in EXTERNAL_ATTENDEES");
               lastQueryRef.current = qExt;
               lastSourceRef.current = "EXTERNAL";
               unsubscribeDB = onSnapshot(qExt, (snap) =>
@@ -319,9 +308,6 @@ const StandAloneBadgePage: React.FC = () => {
               );
             } else {
               // No data in either
-              console.log(
-                "[StandAloneBadgePage] No PAID registration found in either collection",
-              );
               setStatus("NO_DATA");
               setMsg("?깅줉 ?뺣낫媛 ?놁뒿?덈떎.");
             }
@@ -351,9 +337,6 @@ const StandAloneBadgePage: React.FC = () => {
 
             // Check if session is for different conference
             if (currentConfId !== confIdToUse) {
-              console.log(
-                "[StandAloneBadgePage] Session for different conference, redirecting to check-status",
-              );
               navigate(`/${publicSlug}/check-status?lang=ko`, {
                 replace: true,
               });
@@ -361,10 +344,6 @@ const StandAloneBadgePage: React.FC = () => {
             }
 
             // For non-members, redirect to NonMemberHubPage which has QR code
-            console.log(
-              "[StandAloneBadgePage] Non-member detected, redirecting to hub",
-              { registrationId: session.registrationId },
-            );
             navigate(`/${publicSlug}/non-member/hub`, { replace: true });
             return;
           } catch (err) {

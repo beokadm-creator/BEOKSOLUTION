@@ -15,8 +15,7 @@ interface RegistrationState {
 }
 
 // Mock Toss Payment
-const mockRequestPayment = async (amount: number, orderId: string): Promise<boolean> => {
-    console.log(`[TossPayment] Requesting ${amount} for ${orderId}`);
+const mockRequestPayment = async (_amount: number, _orderId: string): Promise<boolean> => {
     return new Promise(resolve => setTimeout(() => resolve(true), 1500));
 };
 
@@ -236,7 +235,6 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
             });
 
             // 3. Send Notification (Async, non-blocking)
-            console.log(`[Notification] Sending confirmation for ${newRegId}`);
 
             setStatus({ loading: false, error: null, success: true, regId: newRegId });
             return true;

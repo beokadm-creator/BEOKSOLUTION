@@ -21,7 +21,6 @@ const PaymentSuccessHandler: React.FC = () => {
         // Prevent double execution using sessionStorage (persists across remounts)
         const processingKey = `payment_processing_${searchParams.get('paymentKey')}`;
         if (sessionStorage.getItem(processingKey)) {
-            console.log("Payment already being processed, skipping duplicate call");
             return;
         }
         sessionStorage.setItem(processingKey, 'true');
@@ -45,8 +44,6 @@ const PaymentSuccessHandler: React.FC = () => {
             }
 
             try {
-                console.log("Processing Payment Success...", { orderId, amount, confId });
-
                 // [Modified] Fetch registration data from sessionStorage (Garbage-Free Flow)
                 // Since we didn't save PENDING doc in Firestore, we must use session data.
                 const pendingDataStr = sessionStorage.getItem(`pending_reg_${orderId}`);
@@ -55,7 +52,6 @@ const PaymentSuccessHandler: React.FC = () => {
                 if (pendingDataStr) {
                     try {
                         regData = JSON.parse(pendingDataStr);
-                        console.log("Restored pending registration data from session");
                     } catch (e) {
                         console.error("Failed to parse pending data", e);
                     }
@@ -68,7 +64,6 @@ const PaymentSuccessHandler: React.FC = () => {
                         regData = regDoc.data();
                         // Idempotency check: If already PAID in DB, redirect
                         if (regData.paymentStatus === 'PAID') {
-                            console.log("Registration already paid (DB), redirecting");
                             const pureSlug = confId.includes('_') ? confId.split('_').slice(1).join('_') : confId;
                             const userName = regData.userInfo?.name || regData.name || '';
                             sessionStorage.removeItem(`payment_processing_${paymentKey}`);
@@ -106,7 +101,6 @@ const PaymentSuccessHandler: React.FC = () => {
                         if (infraSnap.exists()) {
                             const infraData = infraSnap.data() as InfraSettings;
                             widgetSecretKey = infraData.payment?.domestic?.secretKey || "";
-                            console.log("Using society-specific payment key");
                         }
                     } catch (infraErr) {
                         console.warn("Failed to fetch infrastructure settings:", infraErr);

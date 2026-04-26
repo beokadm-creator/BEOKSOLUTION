@@ -29,8 +29,6 @@ export const useSocietyAdmin = (societyId: string | undefined, userEmail: string
              return;
         }
         
-        console.log('🛡️ [useSocietyAdmin] Checking admin rights:', { societyId, userEmail });
-        
         const checkAdmin = async () => {
             if (!societyId) {
                 return;
@@ -46,7 +44,6 @@ export const useSocietyAdmin = (societyId: string | undefined, userEmail: string
                 const isSuperAdmin = SUPER_ADMINS.includes(userEmail || '');
                 
                 if (isSuperAdmin) {
-                    console.log('🛡️ [useSocietyAdmin] SUPER_ADMIN access granted');
                     setIsSocietyAdmin(true);
                     setLoading(false);
                     return;
@@ -57,8 +54,6 @@ export const useSocietyAdmin = (societyId: string | undefined, userEmail: string
                 if (resolved) {
                     const adminEmails = await getSocietyAdminEmails(resolved.id);
                     const isAuthorized = Array.isArray(adminEmails) && adminEmails.includes(userEmail);
-                    
-                    console.log('🛡️ [useSocietyAdmin] Society data:', { societyId, resolvedSocietyId: resolved.id, isAuthorized });
                     
                     setIsSocietyAdmin(isAuthorized);
                 } else {

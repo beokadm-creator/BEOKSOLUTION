@@ -2,7 +2,6 @@ import { collection, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore'
 import { db } from '../firebase';
 
 export const runRecovery = async (conferenceId: string, dryRun: boolean = true) => {
-    console.log(`🚀 Starting Data Recovery for Conference: ${conferenceId} (DryRun: ${dryRun})`);
     
     try {
         const regRef = collection(db, 'conferences', conferenceId, 'registrations');
@@ -23,7 +22,6 @@ export const runRecovery = async (conferenceId: string, dryRun: boolean = true) 
             
             // Check if userName is missing or empty
             if (!data.userName || data.userName.trim() === '') {
-                console.log(`⚠️ Found incomplete registration: ${rId} (User: ${data.userId})`);
                 
                 if (!data.userId) {
                     console.error(`❌ Registration ${rId} has NO userId. Marking for deletion.`);
@@ -33,7 +31,6 @@ export const runRecovery = async (conferenceId: string, dryRun: boolean = true) 
                         // await deleteDoc(d.ref); 
                         // Option 2: Mark INVALID (Safer)
                         await updateDoc(d.ref, { status: 'INVALID_NO_USERID' });
-                        console.log(`   -> Marked INVALID`);
                     }
                     continue;
                 }
@@ -44,7 +41,6 @@ export const runRecovery = async (conferenceId: string, dryRun: boolean = true) 
                 
                 if (userSnap.exists()) {
                     const userData = userSnap.data();
-                    console.log(`   ✅ Found User: ${userData.name} (${userData.email})`);
                     
                     fixed++;
                     if (!dryRun) {
@@ -54,14 +50,12 @@ export const runRecovery = async (conferenceId: string, dryRun: boolean = true) 
                             userPhone: userData.phone || '',
                             // Add other fields if needed
                         });
-                        console.log(`   -> Updated Registration`);
                     }
                 } else {
                     console.error(`❌ User ${data.userId} not found for Reg ${rId}. Orphan.`);
                     orphans++;
                     if (!dryRun) {
                         await updateDoc(d.ref, { status: 'INVALID_ORPHAN_USER' });
-                        console.log(`   -> Marked INVALID`);
                     }
                 }
             } else {
@@ -70,13 +64,6 @@ export const runRecovery = async (conferenceId: string, dryRun: boolean = true) 
             processed++;
         }
         
-        console.log('==========================================');
-        console.log(`🏁 Recovery Complete.`);
-        console.log(`Total Scanned: ${processed}`);
-        console.log(`Skipped (Valid): ${skipped}`);
-        console.log(`Fixed/To-Fix: ${fixed}`);
-        console.log(`Orphans/Invalid: ${orphans}`);
-        console.log('==========================================');
         
         return { processed, fixed, orphans, skipped };
         
