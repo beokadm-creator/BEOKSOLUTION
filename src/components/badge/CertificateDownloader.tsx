@@ -6,8 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Download, Loader2, FileCheck, Award } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 import toast from 'react-hot-toast';
 import { QRCodeSVG } from 'qrcode.react';
 import { BadgeUiState } from "@/types/badge";
@@ -163,11 +161,17 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ co
   const handleDownload = async (type: 'attendance' | 'completion') => {
     const targetRef = type === 'attendance' ? attendanceRef : completionRef;
     if (!targetRef.current) return;
-    
+
     setGenerating(true);
     toast.loading(t("증명서를 생성하고 있습니다...", "Generating certificate..."), { id: 'cert' });
 
     try {
+      // Dynamic import heavy print libraries
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf')
+      ]);
+
       const canvas = await html2canvas(targetRef.current, {
         scale: 2,
         useCORS: true,
