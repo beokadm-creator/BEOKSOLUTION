@@ -1,90 +1,98 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useSubdomain } from './hooks/useSubdomain';
 import AdminLoginPage from './pages/admin/auth/AdminLoginPage';
-import SuperAdminPage from './pages/admin/SuperAdminPage';
 import AdminGuard from './components/auth/AdminGuard';
 import AuthPage from './pages/auth/AuthPage';
-import NewAuthPortal from './pages/auth/NewAuthPortal'; // Ensure this is Clean UI
-import UserHubPage from './pages/UserHubPage';
-import StandAloneBadgePage from './pages/StandAloneBadgePage';
-import BadgePrepPage from './pages/BadgePrepPage';
+import NewAuthPortal from './pages/auth/NewAuthPortal';
 import ConferenceLoader from './components/conference/ConferenceLoader';
 import ConferencePreviewLoader from './components/conference/ConferencePreviewLoader';
-import RegistrationPage from './pages/RegistrationPage';
-import RegistrationSuccessPage from './pages/RegistrationSuccessPage';
-import RegistrationFailPage from './pages/RegistrationFailPage';
-import AbstractSubmissionPage from './pages/AbstractSubmissionPage';
-import ProgramPage from './pages/ProgramPage';
 import PaymentSuccessHandler from './components/payment/PaymentSuccessHandler';
 import AccountRecoveryPage from './pages/auth/AccountRecoveryPage';
-import TermsPage from './pages/TermsPage';
-import PrivacyPage from './pages/PrivacyPage';
 import NotFoundPage from './pages/NotFoundPage';
-// import ManualAdminWrapper from './components/admin/ManualAdminWrapper';
-
-import SocietyDashboardPage from './pages/admin/SocietyDashboardPage';
-import InfraPage from './pages/admin/InfraPage';
-import IdentityPage from './pages/admin/IdentityPage';
-import TemplatesPage from './pages/admin/TemplatesPage';
-import MemberManagerPage from './pages/admin/MemberManagerPage';
-import MembershipFeeSettingsPage from './pages/admin/MembershipFeeSettingsPage';
-import AdminUsersPage from './pages/admin/AdminUsersPage';
-import SocietyContentManagementPage from './pages/admin/SocietyContentManagementPage';
-import DashboardPage from './pages/admin/DashboardPage';
-import ConferenceSettingsPage from './pages/admin/ConferenceSettingsPage';
-import RegistrationSettingsPage from './pages/admin/RegistrationSettingsPage';
-import AttendanceSettingsPage from './pages/admin/AttendanceSettingsPage';
-import StatisticsPage from './pages/admin/StatisticsPage';
-import AttendanceLivePage from './pages/admin/AttendanceLivePage';
-import InfodeskPage from './pages/admin/conf/InfodeskPage';
-import GatePage from './pages/admin/conf/GatePage';
-import StampTourDrawPage from './pages/admin/conf/StampTourDrawPage';
-import AgendaManager from './pages/admin/AgendaManager';
-import SponsorManager from './pages/admin/SponsorManager';
-import ModeratorLinksPage from './pages/admin/ModeratorLinksPage';
-import RegistrationListPage from './pages/admin/RegistrationListPage';
-import RegistrationDetailPage from './pages/admin/RegistrationDetailPage';
-import PageEditor from './pages/admin/PageEditor';
-import BadgeEditorPage from './pages/admin/BadgeEditorPage';
-import BadgeManagementPage from './pages/admin/BadgeManagementPage';
-import AdminRefundPage from './pages/admin/AdminRefundPage';
-import AbstractManagerPage from './pages/admin/AbstractManagerPage';
-import ExternalAttendeePage from './pages/admin/ExternalAttendeePage';
-import CertificateManagementPage from './pages/admin/CertificateManagementPage';
-import { NoticesManager } from './pages/admin/notices/NoticesManager';
-import { OptionsManagementPage } from './pages/admin/OptionsManagementPage';
 import SocietyLoginPage from './pages/SocietyLoginPage';
-import MembershipPaymentPage from './pages/MembershipPaymentPage';
 import MembershipPaymentLayout from './layouts/MembershipPaymentLayout';
 import { ConferenceMyPageRedirect } from '@/components/common/ConferenceMyPageRedirect';
 import { Toaster } from 'react-hot-toast';
 import { GlobalErrorBoundary } from './components/common/GlobalErrorBoundary';
 import { FeatureFlagProvider } from './contexts/FeatureFlagContext';
+import LoadingSpinner from './components/common/LoadingSpinner';
 
-import LandingPage from './pages/LandingPage';
-import ModeratorLivePage from './pages/ModeratorLivePage';
-import SocietyLandingPage from './pages/SocietyLandingPage';
-import VendorDashboard from './pages/vendor/VendorDashboard';
-import VendorIntroPage from './pages/conference/VendorIntroPage';
-
-import SecurityPolicyManager from './components/admin/SecurityPolicyManager';
-import GlobalExpertManagerPage from './pages/admin/GlobalExpertManagerPage';
-
-// New Layouts
+// Layouts (static — needed before routes render)
 import SuperLayout from './layouts/SuperLayout';
 import SocietyLayout from './layouts/SocietyLayout';
 import ConfLayout from './layouts/ConfLayout';
 import VendorLayout from './layouts/VendorLayout';
 import VendorPortalLayout from './layouts/VendorPortalLayout';
-import VendorLoginPage from './pages/vendor/VendorLoginPage';
-import VendorDashboardPage from './pages/vendor/VendorDashboardPage';
-import VendorScannerPage from './pages/vendor/VendorScannerPage';
-import VendorScannerIntroPage from './pages/vendor/VendorScannerIntroPage';
-import VendorSettingsPage from './pages/vendor/VendorSettingsPage';
-import VendorStaffPage from './pages/vendor/VendorStaffPage';
-import PartnerNotificationSettingsPage from './pages/vendor/PartnerNotificationSettingsPage';
-import VendorAuditLogsPage from './pages/vendor/VendorAuditLogsPage';
+
+// Lazy-loaded admin pages
+const SuperAdminPage = React.lazy(() => import('./pages/admin/SuperAdminPage'));
+const SecurityPolicyManager = React.lazy(() => import('./components/admin/SecurityPolicyManager'));
+const GlobalExpertManagerPage = React.lazy(() => import('./pages/admin/GlobalExpertManagerPage'));
+const SocietyDashboardPage = React.lazy(() => import('./pages/admin/SocietyDashboardPage'));
+const InfraPage = React.lazy(() => import('./pages/admin/InfraPage'));
+const IdentityPage = React.lazy(() => import('./pages/admin/IdentityPage'));
+const TemplatesPage = React.lazy(() => import('./pages/admin/TemplatesPage'));
+const MemberManagerPage = React.lazy(() => import('./pages/admin/MemberManagerPage'));
+const MembershipFeeSettingsPage = React.lazy(() => import('./pages/admin/MembershipFeeSettingsPage'));
+const AdminUsersPage = React.lazy(() => import('./pages/admin/AdminUsersPage'));
+const SocietyContentManagementPage = React.lazy(() => import('./pages/admin/SocietyContentManagementPage'));
+const DashboardPage = React.lazy(() => import('./pages/admin/DashboardPage'));
+const ConferenceSettingsPage = React.lazy(() => import('./pages/admin/ConferenceSettingsPage'));
+const RegistrationSettingsPage = React.lazy(() => import('./pages/admin/RegistrationSettingsPage'));
+const AttendanceSettingsPage = React.lazy(() => import('./pages/admin/AttendanceSettingsPage'));
+const StatisticsPage = React.lazy(() => import('./pages/admin/StatisticsPage'));
+const AttendanceLivePage = React.lazy(() => import('./pages/admin/AttendanceLivePage'));
+const InfodeskPage = React.lazy(() => import('./pages/admin/conf/InfodeskPage'));
+const GatePage = React.lazy(() => import('./pages/admin/conf/GatePage'));
+const StampTourDrawPage = React.lazy(() => import('./pages/admin/conf/StampTourDrawPage'));
+const AgendaManager = React.lazy(() => import('./pages/admin/AgendaManager'));
+const SponsorManager = React.lazy(() => import('./pages/admin/SponsorManager'));
+const ModeratorLinksPage = React.lazy(() => import('./pages/admin/ModeratorLinksPage'));
+const RegistrationListPage = React.lazy(() => import('./pages/admin/RegistrationListPage'));
+const RegistrationDetailPage = React.lazy(() => import('./pages/admin/RegistrationDetailPage'));
+const PageEditor = React.lazy(() => import('./pages/admin/PageEditor'));
+const BadgeEditorPage = React.lazy(() => import('./pages/admin/BadgeEditorPage'));
+const BadgeManagementPage = React.lazy(() => import('./pages/admin/BadgeManagementPage'));
+const AdminRefundPage = React.lazy(() => import('./pages/admin/AdminRefundPage'));
+const AbstractManagerPage = React.lazy(() => import('./pages/admin/AbstractManagerPage'));
+const ExternalAttendeePage = React.lazy(() => import('./pages/admin/ExternalAttendeePage'));
+const CertificateManagementPage = React.lazy(() => import('./pages/admin/CertificateManagementPage'));
+const NoticesManager = React.lazy(() => import('./pages/admin/notices/NoticesManager').then(m => ({ default: m.NoticesManager })));
+const OptionsManagementPage = React.lazy(() => import('./pages/admin/OptionsManagementPage').then(m => ({ default: m.OptionsManagementPage })));
+
+// Lazy-loaded user pages
+const RegistrationPage = React.lazy(() => import('./pages/RegistrationPage'));
+const RegistrationSuccessPage = React.lazy(() => import('./pages/RegistrationSuccessPage'));
+const RegistrationFailPage = React.lazy(() => import('./pages/RegistrationFailPage'));
+const AbstractSubmissionPage = React.lazy(() => import('./pages/AbstractSubmissionPage'));
+const ProgramPage = React.lazy(() => import('./pages/ProgramPage'));
+const TermsPage = React.lazy(() => import('./pages/TermsPage'));
+const PrivacyPage = React.lazy(() => import('./pages/PrivacyPage'));
+const UserHubPage = React.lazy(() => import('./pages/UserHubPage'));
+const LandingPage = React.lazy(() => import('./pages/LandingPage'));
+const SocietyLandingPage = React.lazy(() => import('./pages/SocietyLandingPage'));
+const StandAloneBadgePage = React.lazy(() => import('./pages/StandAloneBadgePage'));
+const BadgePrepPage = React.lazy(() => import('./pages/BadgePrepPage'));
+const ModeratorLivePage = React.lazy(() => import('./pages/ModeratorLivePage'));
+const MembershipPaymentPage = React.lazy(() => import('./pages/MembershipPaymentPage'));
+
+// Lazy-loaded vendor pages
+const VendorDashboard = React.lazy(() => import('./pages/vendor/VendorDashboard'));
+const VendorIntroPage = React.lazy(() => import('./pages/conference/VendorIntroPage'));
+const VendorLoginPage = React.lazy(() => import('./pages/vendor/VendorLoginPage'));
+const VendorDashboardPage = React.lazy(() => import('./pages/vendor/VendorDashboardPage'));
+const VendorScannerPage = React.lazy(() => import('./pages/vendor/VendorScannerPage'));
+const VendorScannerIntroPage = React.lazy(() => import('./pages/vendor/VendorScannerIntroPage'));
+const VendorSettingsPage = React.lazy(() => import('./pages/vendor/VendorSettingsPage'));
+const VendorStaffPage = React.lazy(() => import('./pages/vendor/VendorStaffPage'));
+const PartnerNotificationSettingsPage = React.lazy(() => import('./pages/vendor/PartnerNotificationSettingsPage'));
+const VendorAuditLogsPage = React.lazy(() => import('./pages/vendor/VendorAuditLogsPage'));
+
+/** Shorthand Suspense wrapper with LoadingSpinner fallback */
+const LS = ({ children }: { children: React.ReactNode }) => (
+  <Suspense fallback={<LoadingSpinner />}>{children}</Suspense>
+);
 
 const App: React.FC = () => {
   const { subdomain } = useSubdomain();
@@ -151,64 +159,64 @@ const App: React.FC = () => {
 
                   {/* L0: Super Layout */}
                   <Route element={<SuperLayout />}>
-                    <Route path="/super" element={<SuperAdminPage />} />
-                    <Route path="/super/security" element={<SecurityPolicyManager />} />
-                    <Route path="/super/experts" element={<GlobalExpertManagerPage />} />
+                    <Route path="/super" element={<LS><SuperAdminPage /></LS>} />
+                    <Route path="/super/security" element={<LS><SecurityPolicyManager /></LS>} />
+                    <Route path="/super/experts" element={<LS><GlobalExpertManagerPage /></LS>} />
                   </Route>
 
                   {/* L1: Society Layout (DEV 환경에서 society 파라미터 사용) */}
                   <Route path="/admin/society" element={<SocietyLayout />}>
-                    <Route index element={<SocietyDashboardPage />} />
-                    <Route path="content" element={<SocietyContentManagementPage />} />
-                    <Route path="infra" element={<InfraPage />} />
-                    <Route path="identity" element={<IdentityPage />} />
-                    <Route path="templates" element={<TemplatesPage />} />
-                    <Route path="members" element={<MemberManagerPage />} />
-                    <Route path="membership-fees" element={<MembershipFeeSettingsPage />} />
-                    <Route path="users" element={<AdminUsersPage />} />
+                    <Route index element={<LS><SocietyDashboardPage /></LS>} />
+                    <Route path="content" element={<LS><SocietyContentManagementPage /></LS>} />
+                    <Route path="infra" element={<LS><InfraPage /></LS>} />
+                    <Route path="identity" element={<LS><IdentityPage /></LS>} />
+                    <Route path="templates" element={<LS><TemplatesPage /></LS>} />
+                    <Route path="members" element={<LS><MemberManagerPage /></LS>} />
+                    <Route path="membership-fees" element={<LS><MembershipFeeSettingsPage /></LS>} />
+                    <Route path="users" element={<LS><AdminUsersPage /></LS>} />
                   </Route>
 
                   <Route path="/admin/society/:sid" element={<SocietyLayout />}>
-                    <Route index element={<SocietyDashboardPage />} />
-                    <Route path="content" element={<SocietyContentManagementPage />} />
-                    <Route path="infra" element={<InfraPage />} />
-                    <Route path="identity" element={<IdentityPage />} />
-                    <Route path="templates" element={<TemplatesPage />} />
-                    <Route path="members" element={<MemberManagerPage />} />
-                    <Route path="membership-fees" element={<MembershipFeeSettingsPage />} />
-                    <Route path="users" element={<AdminUsersPage />} />
+                    <Route index element={<LS><SocietyDashboardPage /></LS>} />
+                    <Route path="content" element={<LS><SocietyContentManagementPage /></LS>} />
+                    <Route path="infra" element={<LS><InfraPage /></LS>} />
+                    <Route path="identity" element={<LS><IdentityPage /></LS>} />
+                    <Route path="templates" element={<LS><TemplatesPage /></LS>} />
+                    <Route path="members" element={<LS><MemberManagerPage /></LS>} />
+                    <Route path="membership-fees" element={<LS><MembershipFeeSettingsPage /></LS>} />
+                    <Route path="users" element={<LS><AdminUsersPage /></LS>} />
                   </Route>
 
                   {/* L2: Conference Layout (DEV 환경에서 society 파라미터로 학회 결정) */}
                   <Route path="/admin/conf/:cid" element={<ConfLayout />}>
-                    <Route index element={<DashboardPage />} />
-                    <Route path="settings" element={<ConferenceSettingsPage />} />
-                    <Route path="settings/registration" element={<RegistrationSettingsPage />} />
-                    <Route path="settings/options" element={<OptionsManagementPage />} />
-                    <Route path="options" element={<OptionsManagementPage />} />
-                    <Route path="attendance-settings" element={<AttendanceSettingsPage />} />
-                    <Route path="statistics" element={<StatisticsPage />} />
-                    <Route path="registrations" element={<RegistrationListPage />} />
-                    <Route path="registrations/:regId" element={<RegistrationDetailPage />} />
-                    <Route path="abstracts" element={<AbstractManagerPage />} />
-                    <Route path="notices" element={<NoticesManager />} />
-                    <Route path="agenda" element={<AgendaManager />} />
-                    <Route path="sponsors" element={<SponsorManager />} />
-                    <Route path="moderator-links" element={<ModeratorLinksPage />} />
+                    <Route index element={<LS><DashboardPage /></LS>} />
+                    <Route path="settings" element={<LS><ConferenceSettingsPage /></LS>} />
+                    <Route path="settings/registration" element={<LS><RegistrationSettingsPage /></LS>} />
+                    <Route path="settings/options" element={<LS><OptionsManagementPage /></LS>} />
+                    <Route path="options" element={<LS><OptionsManagementPage /></LS>} />
+                    <Route path="attendance-settings" element={<LS><AttendanceSettingsPage /></LS>} />
+                    <Route path="statistics" element={<LS><StatisticsPage /></LS>} />
+                    <Route path="registrations" element={<LS><RegistrationListPage /></LS>} />
+                    <Route path="registrations/:regId" element={<LS><RegistrationDetailPage /></LS>} />
+                    <Route path="abstracts" element={<LS><AbstractManagerPage /></LS>} />
+                    <Route path="notices" element={<LS><NoticesManager /></LS>} />
+                    <Route path="agenda" element={<LS><AgendaManager /></LS>} />
+                    <Route path="sponsors" element={<LS><SponsorManager /></LS>} />
+                    <Route path="moderator-links" element={<LS><ModeratorLinksPage /></LS>} />
                     <Route path="moderator" element={<Navigate to="moderator-links" replace />} />
-                    <Route path="page-editor" element={<PageEditor />} />
-                    <Route path="badge-editor" element={<BadgeEditorPage />} />
-                    <Route path="badge-management" element={<BadgeManagementPage />} />
-                    <Route path="refund" element={<AdminRefundPage />} />
-                    <Route path="external-attendees" element={<ExternalAttendeePage />} />
-                    <Route path="attendance-live" element={<AttendanceLivePage />} />
-                    <Route path="attendance-live/zone/:zoneId" element={<AttendanceLivePage />} />
-                    <Route path="certificates" element={<CertificateManagementPage />} />
+                    <Route path="page-editor" element={<LS><PageEditor /></LS>} />
+                    <Route path="badge-editor" element={<LS><BadgeEditorPage /></LS>} />
+                    <Route path="badge-management" element={<LS><BadgeManagementPage /></LS>} />
+                    <Route path="refund" element={<LS><AdminRefundPage /></LS>} />
+                    <Route path="external-attendees" element={<LS><ExternalAttendeePage /></LS>} />
+                    <Route path="attendance-live" element={<LS><AttendanceLivePage /></LS>} />
+                    <Route path="attendance-live/zone/:zoneId" element={<LS><AttendanceLivePage /></LS>} />
+                    <Route path="certificates" element={<LS><CertificateManagementPage /></LS>} />
                   </Route>
-                  <Route path="/admin/conf/:cid/gate" element={<GatePage />} />
-                  <Route path="/admin/conf/:cid/gate/zone/:zoneId" element={<GatePage />} />
-                  <Route path="/admin/conf/:cid/infodesk" element={<InfodeskPage />} />
-                  <Route path="/admin/conf/:cid/stamp-tour-draw" element={<StampTourDrawPage />} />
+                  <Route path="/admin/conf/:cid/gate" element={<LS><GatePage /></LS>} />
+                  <Route path="/admin/conf/:cid/gate/zone/:zoneId" element={<LS><GatePage /></LS>} />
+                  <Route path="/admin/conf/:cid/infodesk" element={<LS><InfodeskPage /></LS>} />
+                  <Route path="/admin/conf/:cid/stamp-tour-draw" element={<LS><StampTourDrawPage /></LS>} />
                   <Route path="*" element={<Navigate to={activeSocietyId ? `/admin/society` : "/super"} />} />
                 </Route>
                 <Route path="*" element={<Navigate to="/login" />} />
@@ -251,63 +259,63 @@ const App: React.FC = () => {
                 <Route element={<AdminGuard />}>
                   {/* L1: Society Layout (Subdomain Optimized) */}
                   <Route path="/admin/society" element={<SocietyLayout />}>
-                    <Route index element={<SocietyDashboardPage />} />
-                    <Route path="content" element={<SocietyContentManagementPage />} />
-                    <Route path="infra" element={<InfraPage />} />
-                    <Route path="identity" element={<IdentityPage />} />
-                    <Route path="templates" element={<TemplatesPage />} />
-                    <Route path="members" element={<MemberManagerPage />} />
-                    <Route path="membership-fees" element={<MembershipFeeSettingsPage />} />
-                    <Route path="users" element={<AdminUsersPage />} />
+                    <Route index element={<LS><SocietyDashboardPage /></LS>} />
+                    <Route path="content" element={<LS><SocietyContentManagementPage /></LS>} />
+                    <Route path="infra" element={<LS><InfraPage /></LS>} />
+                    <Route path="identity" element={<LS><IdentityPage /></LS>} />
+                    <Route path="templates" element={<LS><TemplatesPage /></LS>} />
+                    <Route path="members" element={<LS><MemberManagerPage /></LS>} />
+                    <Route path="membership-fees" element={<LS><MembershipFeeSettingsPage /></LS>} />
+                    <Route path="users" element={<LS><AdminUsersPage /></LS>} />
                   </Route>
 
                   {/* L1: Society Layout */}
                   <Route path="/admin/society/:sid" element={<SocietyLayout />}>
-                    <Route index element={<SocietyDashboardPage />} />
-                    <Route path="content" element={<SocietyContentManagementPage />} />
-                    <Route path="infra" element={<InfraPage />} />
-                    <Route path="identity" element={<IdentityPage />} />
-                    <Route path="templates" element={<TemplatesPage />} />
-                    <Route path="members" element={<MemberManagerPage />} />
-                    <Route path="membership-fees" element={<MembershipFeeSettingsPage />} />
-                    <Route path="users" element={<AdminUsersPage />} />
+                    <Route index element={<LS><SocietyDashboardPage /></LS>} />
+                    <Route path="content" element={<LS><SocietyContentManagementPage /></LS>} />
+                    <Route path="infra" element={<LS><InfraPage /></LS>} />
+                    <Route path="identity" element={<LS><IdentityPage /></LS>} />
+                    <Route path="templates" element={<LS><TemplatesPage /></LS>} />
+                    <Route path="members" element={<LS><MemberManagerPage /></LS>} />
+                    <Route path="membership-fees" element={<LS><MembershipFeeSettingsPage /></LS>} />
+                    <Route path="users" element={<LS><AdminUsersPage /></LS>} />
                   </Route>
 
                   {/* L2: Conference Layout */}
                   <Route path="/admin/conf/:cid" element={<ConfLayout />}>
-                    <Route index element={<DashboardPage />} />
-                    <Route path="settings" element={<ConferenceSettingsPage />} />
-                    <Route path="settings/registration" element={<RegistrationSettingsPage />} />
-                    <Route path="settings/options" element={<OptionsManagementPage />} />
-                    <Route path="attendance-settings" element={<AttendanceSettingsPage />} />
-                    <Route path="statistics" element={<StatisticsPage />} />
-                    <Route path="registrations" element={<RegistrationListPage />} />
-                    <Route path="options" element={<OptionsManagementPage />} />
-                    <Route path="registrations/:regId" element={<RegistrationDetailPage />} />
-                    <Route path="abstracts" element={<AbstractManagerPage />} />
-                    <Route path="notices" element={<NoticesManager />} />
-                    <Route path="agenda" element={<AgendaManager />} />
-                    <Route path="sponsors" element={<SponsorManager />} />
-                    <Route path="moderator-links" element={<ModeratorLinksPage />} />
+                    <Route index element={<LS><DashboardPage /></LS>} />
+                    <Route path="settings" element={<LS><ConferenceSettingsPage /></LS>} />
+                    <Route path="settings/registration" element={<LS><RegistrationSettingsPage /></LS>} />
+                    <Route path="settings/options" element={<LS><OptionsManagementPage /></LS>} />
+                    <Route path="attendance-settings" element={<LS><AttendanceSettingsPage /></LS>} />
+                    <Route path="statistics" element={<LS><StatisticsPage /></LS>} />
+                    <Route path="registrations" element={<LS><RegistrationListPage /></LS>} />
+                    <Route path="options" element={<LS><OptionsManagementPage /></LS>} />
+                    <Route path="registrations/:regId" element={<LS><RegistrationDetailPage /></LS>} />
+                    <Route path="abstracts" element={<LS><AbstractManagerPage /></LS>} />
+                    <Route path="notices" element={<LS><NoticesManager /></LS>} />
+                    <Route path="agenda" element={<LS><AgendaManager /></LS>} />
+                    <Route path="sponsors" element={<LS><SponsorManager /></LS>} />
+                    <Route path="moderator-links" element={<LS><ModeratorLinksPage /></LS>} />
                     <Route path="moderator" element={<Navigate to="moderator-links" replace />} />
-                    <Route path="page-editor" element={<PageEditor />} />
-                    <Route path="badge-editor" element={<BadgeEditorPage />} />
-                    <Route path="badge-management" element={<BadgeManagementPage />} />
-                    <Route path="refund" element={<AdminRefundPage />} />
-                    <Route path="external-attendees" element={<ExternalAttendeePage />} />
-                    <Route path="attendance-live" element={<AttendanceLivePage />} />
-                    <Route path="attendance-live/zone/:zoneId" element={<AttendanceLivePage />} />
-                    <Route path="certificates" element={<CertificateManagementPage />} />
+                    <Route path="page-editor" element={<LS><PageEditor /></LS>} />
+                    <Route path="badge-editor" element={<LS><BadgeEditorPage /></LS>} />
+                    <Route path="badge-management" element={<LS><BadgeManagementPage /></LS>} />
+                    <Route path="refund" element={<LS><AdminRefundPage /></LS>} />
+                    <Route path="external-attendees" element={<LS><ExternalAttendeePage /></LS>} />
+                    <Route path="attendance-live" element={<LS><AttendanceLivePage /></LS>} />
+                    <Route path="attendance-live/zone/:zoneId" element={<LS><AttendanceLivePage /></LS>} />
+                    <Route path="certificates" element={<LS><CertificateManagementPage /></LS>} />
                   </Route>
 
-                  <Route path="/admin/conf/:cid/gate" element={<GatePage />} />
-                  <Route path="/admin/conf/:cid/gate/zone/:zoneId" element={<GatePage />} />
-                  <Route path="/admin/conf/:cid/infodesk" element={<InfodeskPage />} />
-                  <Route path="/admin/conf/:cid/stamp-tour-draw" element={<StampTourDrawPage />} />
+                  <Route path="/admin/conf/:cid/gate" element={<LS><GatePage /></LS>} />
+                  <Route path="/admin/conf/:cid/gate/zone/:zoneId" element={<LS><GatePage /></LS>} />
+                  <Route path="/admin/conf/:cid/infodesk" element={<LS><InfodeskPage /></LS>} />
+                  <Route path="/admin/conf/:cid/stamp-tour-draw" element={<LS><StampTourDrawPage /></LS>} />
 
                   {/* L3: Vendor Layout */}
                   <Route path="/admin/vendor/:vid" element={<VendorLayout />}>
-                    <Route index element={<VendorDashboard />} />
+                    <Route index element={<LS><VendorDashboard /></LS>} />
                   </Route>
                 </Route>
 
@@ -317,33 +325,33 @@ const App: React.FC = () => {
                 <Route path="/auth/recovery" element={<AccountRecoveryPage />} />
 
                 {/* --- PRIORITY 2: MYPAGE (Hub) --- */}
-                <Route path="/mypage" element={<UserHubPage />} />
+                <Route path="/mypage" element={<LS><UserHubPage /></LS>} />
                 <Route path="/mypage/membership" element={
                   <MembershipPaymentLayout>
-                    <MembershipPaymentPage />
+                    <LS><MembershipPaymentPage /></LS>
                   </MembershipPaymentLayout>
                 } />
 
                 {/* --- PRIORITY 3: BADGE --- */}
-                <Route path="/:slug/badge" element={<StandAloneBadgePage />} />
-                <Route path="/:slug/badge-prep/:token" element={<BadgePrepPage />} />
-                <Route path="/:slug/moderator/:token" element={<ModeratorLivePage />} />
+                <Route path="/:slug/badge" element={<LS><StandAloneBadgePage /></LS>} />
+                <Route path="/:slug/badge-prep/:token" element={<LS><BadgePrepPage /></LS>} />
+                <Route path="/:slug/moderator/:token" element={<LS><ModeratorLivePage /></LS>} />
 
                 {/* --- PRIORITY 4: CONFERENCE-SPECIFIC ROUTES --- */}
                 <Route path="/:slug/mypage" element={<ConferenceMyPageRedirect />} />
                 <Route path="/:slug/mypage/*" element={<ConferenceMyPageRedirect />} />
                 <Route path="/:slug/auth" element={<NewAuthPortal />} />
-                <Route path="/:slug/register" element={<RegistrationPage />} />
-                <Route path="/:slug/register/success" element={<RegistrationSuccessPage />} />
-                <Route path="/:slug/register/fail" element={<RegistrationFailPage />} />
-                <Route path="/:slug/register/fail" element={<RegistrationFailPage />} />
-                <Route path="/:slug/abstracts" element={<AbstractSubmissionPage />} />
-                <Route path="/:slug/program" element={<ProgramPage />} />
-                <Route path="/:slug/agenda" element={<ProgramPage />} />
-                <Route path="/:slug/terms" element={<TermsPage />} />
-                <Route path="/:slug/privacy" element={<PrivacyPage />} />
+                <Route path="/:slug/register" element={<LS><RegistrationPage /></LS>} />
+                <Route path="/:slug/register/success" element={<LS><RegistrationSuccessPage /></LS>} />
+                <Route path="/:slug/register/fail" element={<LS><RegistrationFailPage /></LS>} />
+                <Route path="/:slug/register/fail" element={<LS><RegistrationFailPage /></LS>} />
+                <Route path="/:slug/abstracts" element={<LS><AbstractSubmissionPage /></LS>} />
+                <Route path="/:slug/program" element={<LS><ProgramPage /></LS>} />
+                <Route path="/:slug/agenda" element={<LS><ProgramPage /></LS>} />
+                <Route path="/:slug/terms" element={<LS><TermsPage /></LS>} />
+                <Route path="/:slug/privacy" element={<LS><PrivacyPage /></LS>} />
                 <Route path="/payment/success" element={<PaymentSuccessHandler />} />
-                <Route path="/:slug/vendors/:vid" element={<VendorIntroPage />} />
+                <Route path="/:slug/vendors/:vid" element={<LS><VendorIntroPage /></LS>} />
 
                 {/* --- PRIORITY 5: CONFERENCE LANDING (/2026spring, etc.) --- */}
                 {/* Preview route must come before general slug route */}
@@ -353,7 +361,7 @@ const App: React.FC = () => {
                 <Route path="/:slug" element={<ConferenceLoader />} />
 
                 {/* --- PRIORITY 6: SOCIETY LANDING (ROOT) --- */}
-                <Route path="/" element={<SocietyLandingPage />} />
+                <Route path="/" element={<LS><SocietyLandingPage /></LS>} />
               </Routes>
             </div>
           </Router>
@@ -387,27 +395,27 @@ const App: React.FC = () => {
               {/* --- PRIORITY 0: SUPER ADMIN (Global Match) --- */}
               <Route element={<AdminGuard />}>
                 <Route element={<SuperLayout />}>
-                  <Route path="/super" element={<SuperAdminPage />} />
-                  <Route path="/super/security" element={<SecurityPolicyManager />} />
-                  <Route path="/super/experts" element={<GlobalExpertManagerPage />} />
+                  <Route path="/super" element={<LS><SuperAdminPage /></LS>} />
+                  <Route path="/super/security" element={<LS><SecurityPolicyManager /></LS>} />
+                  <Route path="/super/experts" element={<LS><GlobalExpertManagerPage /></LS>} />
                 </Route>
               </Route>
 
               {/* --- PRIORITY 0.5: VENDOR PORTAL (L3) --- */}
-              <Route path="/partner/login" element={<VendorLoginPage />} />
+              <Route path="/partner/login" element={<LS><VendorLoginPage /></LS>} />
               <Route path="/partner" element={<VendorPortalLayout />}>
-                <Route index element={<VendorDashboardPage />} />
+                <Route index element={<LS><VendorDashboardPage /></LS>} />
                 <Route path=":vendorId">
-                  <Route index element={<VendorDashboardPage />} />
+                  <Route index element={<LS><VendorDashboardPage /></LS>} />
                   <Route path="scanner">
-                    <Route index element={<VendorScannerIntroPage />} />
-                    <Route path="camera" element={<VendorScannerPage mode="camera" />} />
-                    <Route path="external" element={<VendorScannerPage mode="external" />} />
+                    <Route index element={<LS><VendorScannerIntroPage /></LS>} />
+                    <Route path="camera" element={<LS><VendorScannerPage mode="camera" /></LS>} />
+                    <Route path="external" element={<LS><VendorScannerPage mode="external" /></LS>} />
                   </Route>
-                  <Route path="profile" element={<VendorSettingsPage />} />
-                  <Route path="staff" element={<VendorStaffPage />} />
-                   <Route path="notification" element={<PartnerNotificationSettingsPage />} />
-                   <Route path="audit-logs" element={<VendorAuditLogsPage />} />
+                  <Route path="profile" element={<LS><VendorSettingsPage /></LS>} />
+                  <Route path="staff" element={<LS><VendorStaffPage /></LS>} />
+                   <Route path="notification" element={<LS><PartnerNotificationSettingsPage /></LS>} />
+                   <Route path="audit-logs" element={<LS><VendorAuditLogsPage /></LS>} />
                  </Route>
               </Route>
 
@@ -417,20 +425,20 @@ const App: React.FC = () => {
               <Route path="/auth/recovery" element={<AccountRecoveryPage />} />
 
               {/* --- PRIORITY 2: MYPAGE (Hub) --- */}
-              <Route path="/mypage" element={<UserHubPage />} />
-              <Route path="/mypage/membership" element={<MembershipPaymentPage />} />
+              <Route path="/mypage" element={<LS><UserHubPage /></LS>} />
+              <Route path="/mypage/membership" element={<LS><MembershipPaymentPage /></LS>} />
 
               {/* PAYMENT SUCCESS */}
               <Route path="/payment/success" element={<PaymentSuccessHandler />} />
 
               {/* TERMS & PRIVACY */}
-              <Route path="/terms" element={<TermsPage />} />
-              <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/terms" element={<LS><TermsPage /></LS>} />
+              <Route path="/privacy" element={<LS><PrivacyPage /></LS>} />
 
               {/* --- PRIORITY 3: BADGE (Specific Route FIRST) --- */}
-              <Route path="/:slug/badge" element={<StandAloneBadgePage />} />
-              <Route path="/:slug/badge-prep/:token" element={<BadgePrepPage />} />
-              <Route path="/:slug/moderator/:token" element={<ModeratorLivePage />} />
+              <Route path="/:slug/badge" element={<LS><StandAloneBadgePage /></LS>} />
+              <Route path="/:slug/badge-prep/:token" element={<LS><BadgePrepPage /></LS>} />
+              <Route path="/:slug/moderator/:token" element={<LS><ModeratorLivePage /></LS>} />
 
               {/* [Fix-Step 416-Dev] Smart Redirect for Conference MyPage */}
               <Route path="/:slug/mypage" element={<ConferenceMyPageRedirect />} />
@@ -440,14 +448,14 @@ const App: React.FC = () => {
               <Route path="/:slug/auth" element={<NewAuthPortal />} />
 
               {/* --- PRIORITY 5: REGISTER --- */}
-              <Route path="/:slug/register" element={<RegistrationPage />} />
-              <Route path="/:slug/register/success" element={<RegistrationSuccessPage />} />
+              <Route path="/:slug/register" element={<LS><RegistrationPage /></LS>} />
+              <Route path="/:slug/register/success" element={<LS><RegistrationSuccessPage /></LS>} />
 
               {/* --- FALLBACK CONFERENCE ROUTES (Abstracts, Program) --- */}
-              <Route path="/:slug/abstracts" element={<AbstractSubmissionPage />} />
-              <Route path="/:slug/program" element={<ProgramPage />} />
-              <Route path="/:slug/agenda" element={<ProgramPage />} />
-              <Route path="/:slug/vendors/:vid" element={<VendorIntroPage />} />
+              <Route path="/:slug/abstracts" element={<LS><AbstractSubmissionPage /></LS>} />
+              <Route path="/:slug/program" element={<LS><ProgramPage /></LS>} />
+              <Route path="/:slug/agenda" element={<LS><ProgramPage /></LS>} />
+              <Route path="/:slug/vendors/:vid" element={<LS><VendorIntroPage /></LS>} />
 
               {/* --- PRIORITY 6: CONFERENCE LANDING (/2026spring, etc.) --- */}
               {/* Preview route must come before general slug route */}
@@ -457,7 +465,7 @@ const App: React.FC = () => {
               <Route path="/:slug" element={<ConferenceLoader />} />
 
               {/* --- FALLBACK --- */}
-              <Route path="/" element={<LandingPage />} />
+              <Route path="/" element={<LS><LandingPage /></LS>} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </div>
