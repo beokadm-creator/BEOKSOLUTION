@@ -191,6 +191,23 @@ service cloud.firestore {
         allow write: if isSuperAdmin();
       }
 
+      // Moderator tokens: public read (token is unguessable document ID)
+      match /moderator_tokens/{tokenId} {
+        allow read: if true;
+        allow write: if isSuperAdmin() || isConferenceAdmin(confId);
+      }
+
+      // Questions: moderator can toggle isAnswered without auth
+      match /questions/{questionId} {
+        allow read: if true;
+        allow create: if isAuthenticated();
+        allow update: if isSuperAdmin() || isConferenceAdmin(confId) ||
+          // Allow unauthenticated moderator to toggle isAnswered only
+          (request.resource.data.keys().hasOnly(['isAnswered']) &&
+           request.resource.data.isAnswered is bool);
+        allow delete: if isSuperAdmin() || isConferenceAdmin(confId);
+      }
+
       // Vendor sponsorship requests
       match /vendor_requests/{requestId} {
         allow read: if isSuperAdmin() || isVendorMember(resource.data.vendorId) || isConferenceAdmin(confId);
