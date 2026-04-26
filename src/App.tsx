@@ -42,7 +42,7 @@ import GatePage from './pages/admin/conf/GatePage';
 import StampTourDrawPage from './pages/admin/conf/StampTourDrawPage';
 import AgendaManager from './pages/admin/AgendaManager';
 import SponsorManager from './pages/admin/SponsorManager';
-import QnAModeratorPage from './pages/admin/QnAModeratorPage';
+import ModeratorLinksPage from './pages/admin/ModeratorLinksPage';
 import RegistrationListPage from './pages/admin/RegistrationListPage';
 import RegistrationDetailPage from './pages/admin/RegistrationDetailPage';
 import PageEditor from './pages/admin/PageEditor';
@@ -63,6 +63,7 @@ import { GlobalErrorBoundary } from './components/common/GlobalErrorBoundary';
 import { FeatureFlagProvider } from './contexts/FeatureFlagContext';
 
 import LandingPage from './pages/LandingPage';
+import ModeratorLivePage from './pages/ModeratorLivePage';
 import SocietyLandingPage from './pages/SocietyLandingPage';
 import VendorDashboard from './pages/vendor/VendorDashboard';
 import VendorIntroPage from './pages/conference/VendorIntroPage';
@@ -193,7 +194,8 @@ const App: React.FC = () => {
                     <Route path="notices" element={<NoticesManager />} />
                     <Route path="agenda" element={<AgendaManager />} />
                     <Route path="sponsors" element={<SponsorManager />} />
-                    <Route path="moderator" element={<QnAModeratorPage />} />
+                    <Route path="moderator-links" element={<ModeratorLinksPage />} />
+                    <Route path="moderator" element={<Navigate to="moderator-links" replace />} />
                     <Route path="page-editor" element={<PageEditor />} />
                     <Route path="badge-editor" element={<BadgeEditorPage />} />
                     <Route path="badge-management" element={<BadgeManagementPage />} />
@@ -286,6 +288,8 @@ const App: React.FC = () => {
                     <Route path="notices" element={<NoticesManager />} />
                     <Route path="agenda" element={<AgendaManager />} />
                     <Route path="sponsors" element={<SponsorManager />} />
+                    <Route path="moderator-links" element={<ModeratorLinksPage />} />
+                    <Route path="moderator" element={<Navigate to="moderator-links" replace />} />
                     <Route path="page-editor" element={<PageEditor />} />
                     <Route path="badge-editor" element={<BadgeEditorPage />} />
                     <Route path="badge-management" element={<BadgeManagementPage />} />
@@ -323,6 +327,7 @@ const App: React.FC = () => {
                 {/* --- PRIORITY 3: BADGE --- */}
                 <Route path="/:slug/badge" element={<StandAloneBadgePage />} />
                 <Route path="/:slug/badge-prep/:token" element={<BadgePrepPage />} />
+                <Route path="/:slug/moderator/:token" element={<ModeratorLivePage />} />
 
                 {/* --- PRIORITY 4: CONFERENCE-SPECIFIC ROUTES --- */}
                 <Route path="/:slug/mypage" element={<ConferenceMyPageRedirect />} />
@@ -425,6 +430,7 @@ const App: React.FC = () => {
               {/* --- PRIORITY 3: BADGE (Specific Route FIRST) --- */}
               <Route path="/:slug/badge" element={<StandAloneBadgePage />} />
               <Route path="/:slug/badge-prep/:token" element={<BadgePrepPage />} />
+              <Route path="/:slug/moderator/:token" element={<ModeratorLivePage />} />
 
               {/* [Fix-Step 416-Dev] Smart Redirect for Conference MyPage */}
               <Route path="/:slug/mypage" element={<ConferenceMyPageRedirect />} />
