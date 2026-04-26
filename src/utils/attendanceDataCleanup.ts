@@ -28,7 +28,7 @@ export class AttendanceDataCleanup {
       // 1. 현재 유효한 등록자 목록 가져오기
       const registrationsRef = collection(db, 'conferences', conferenceId, 'registrations');
       const registrationsSnap = await getDocs(registrationsRef);
-      const validRegistrationIds = new Set(
+      const _validRegistrationIds = new Set(
         registrationsSnap.docs.map(doc => doc.id)
       );
       

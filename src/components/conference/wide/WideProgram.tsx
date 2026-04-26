@@ -3,6 +3,7 @@ import { Agenda, Speaker } from '../../../types/schema';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
 import { MapPin, User, Mic2, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
+import { tryParseDate, hasToDate, hasSeconds } from '../../../utils/dateUtils';
 import {
     Dialog,
     DialogContent,
@@ -33,16 +34,15 @@ export const WideProgram = ({ agendas, speakers = [], lang = 'ko' }: { agendas?:
         const groups: Record<string, Agenda[]> = {};
 
         safeAgendas.forEach(agenda => {
-            // Handle various timestamp formats (Firestore Timestamp, Date, string)
             let date: Date | null = null;
             if (agenda.startTime) {
                 if (agenda.startTime instanceof Date) date = agenda.startTime;
-                // @ts-expect-error - Check for Firestore Timestamp toDate()
-                else if (agenda.startTime.toDate) date = agenda.startTime.toDate();
-                // @ts-expect-error - Check for seconds (Firestore serialized)
-                else if (agenda.startTime.seconds) date = new Date(agenda.startTime.seconds * 1000);
-                 
-                else date = new Date(agenda.startTime as string | number);
+                else if (hasToDate(agenda.startTime)) {
+                    const parsed = agenda.startTime.toDate();
+                    date = parsed instanceof Date ? parsed : null;
+                } else if (hasSeconds(agenda.startTime)) {
+                    date = new Date(agenda.startTime.seconds * 1000);
+                } else date = tryParseDate(agenda.startTime);
             }
 
             if (!date || isNaN(date.getTime())) return;
@@ -58,13 +58,15 @@ export const WideProgram = ({ agendas, speakers = [], lang = 'ko' }: { agendas?:
         // Sort items by time within each group
         Object.keys(groups).forEach(key => {
             groups[key].sort((a, b) => {
-                 
                 const getSeconds = (val: unknown) => {
                     if (!val) return 0;
-                    if (val.seconds) return val.seconds;
+                    if (hasSeconds(val)) return val.seconds;
                     if (val instanceof Date) return val.getTime() / 1000;
-                    if (val.toDate) return val.toDate().getTime() / 1000;
-                    return new Date(val).getTime() / 1000;
+                    if (hasToDate(val)) {
+                        const d = val.toDate();
+                        return d instanceof Date ? d.getTime() / 1000 : 0;
+                    }
+                    return 0;
                 };
                 return getSeconds(a.startTime) - getSeconds(b.startTime);
             });
@@ -82,11 +84,17 @@ export const WideProgram = ({ agendas, speakers = [], lang = 'ko' }: { agendas?:
         if (!val) return '';
         let date: Date;
         if (val instanceof Date) date = val;
-        // @ts-expect-error - Check for Firestore Timestamp
-        else if (val.toDate) date = val.toDate();
-        // @ts-expect-error - Check for seconds
-        else if (val.seconds) date = new Date(val.seconds * 1000);
-        else date = new Date(val);
+        else if (hasToDate(val)) {
+            const parsed = val.toDate();
+            if (!(parsed instanceof Date)) return '';
+            date = parsed;
+        } else if (hasSeconds(val)) {
+            date = new Date(val.seconds * 1000);
+        } else {
+            const parsed = tryParseDate(val as string | number);
+            if (!parsed) return '';
+            date = parsed;
+        }
 
         if (isNaN(date.getTime())) return '';
         return format(date, 'HH:mm');

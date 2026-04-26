@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { collection, doc, onSnapshot, Timestamp } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -342,7 +342,7 @@ export default function StampTourDrawPage() {
 
   /* -- Play result (wheel spin + reveal) ------------------------------------- */
 
-  const playResult = async (next: DrawResult) => {
+  const playResult = useCallback(async (next: DrawResult) => {
     const runId = Date.now();
     runRef.current = runId;
     setResult(null);
@@ -390,11 +390,9 @@ export default function StampTourDrawPage() {
       await wait(1200);
     }
     setPhase("done");
-  };
+  }, [drawSource, startDrumroll, playSound]);
 
-  /* -- Run draw ------------------------------------------------------------- */
-
-  const runDraw = async (mode: DrawMode) => {
+  const runDraw = useCallback(async (mode: DrawMode) => {
     if (mode !== "DEMO") {
       if (!cid || !config?.enabled || config.rewardFulfillmentMode !== "LOTTERY") {
         return setError("This page only works for lottery-based rewards.");
@@ -448,18 +446,16 @@ export default function StampTourDrawPage() {
       setPhase("idle");
       setError(e instanceof Error ? e.message : "Draw failed.");
     }
-  };
+  }, [cid, config, drawOpen, selectedSlots, eligible, selectableRewards, selectedCounts, playResult]);
 
-  /* -- Fullscreen ----------------------------------------------------------- */
-
-  const toggleFullscreen = async () => {
+  const toggleFullscreen = useCallback(async () => {
     if (!boxRef.current) return;
     if (document.fullscreenElement) {
       await document.exitFullscreen();
       return;
     }
     await boxRef.current.requestFullscreen();
-  };
+  }, []);
 
   /* -- Keyboard shortcuts --------------------------------------------------- */
 

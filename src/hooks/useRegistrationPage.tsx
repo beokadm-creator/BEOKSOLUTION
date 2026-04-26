@@ -646,7 +646,7 @@ export function useRegistrationPage(slug: string | undefined) {
 
             const regRef = doc(collection(db, `conferences/${confId}/registrations`));
 
-            const regData = {
+            const regData: Record<string, unknown> = {
                 id: regRef.id,
                 userId: auth.user?.id || firebaseAuth.currentUser?.uid || 'GUEST',
                 userInfo: {
@@ -707,8 +707,6 @@ export function useRegistrationPage(slug: string | undefined) {
                 return hasData ? candidate : null;
             })();
             if (mvFromURL) {
-                // Attach to regData so Cloud Functions can lock the member code after payment
-                // @ts-expect-error - memberVerificationData is added dynamically for Cloud Functions
                 regData.memberVerificationData = mvFromURL;
             }
 

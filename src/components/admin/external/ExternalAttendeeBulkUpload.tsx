@@ -26,7 +26,7 @@ interface ExternalAttendeeBulkUploadProps {
 }
 
 export const ExternalAttendeeBulkUpload: React.FC<ExternalAttendeeBulkUploadProps> = ({
-    bulkPreview, setBulkPreview, isProcessing, progress, handleFileUpload, handleBulkRegister, downloadTemplate, exporting
+    bulkPreview, _setBulkPreview, isProcessing, progress, handleFileUpload, handleBulkRegister, downloadTemplate, _exporting
 }) => {
     return (
         <Card>

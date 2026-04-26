@@ -348,7 +348,7 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ co
         </DialogHeader>
 
         <div className="mt-4">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+          <Tabs value={activeTab} onValueChange={(v: string) => setActiveTab(v as 'attendance' | 'completion')} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="attendance" disabled={!isAttendanceEnabled}>
                 참가확인서

@@ -19,15 +19,15 @@ export const getKstToday = (date: Date = new Date()): string => {
  */
 export type DateLike = Date | { toDate(): Date | unknown } | { seconds: number; nanoseconds?: number } | string | number;
 
-function hasToDate(d: DateLike): d is { toDate(): Date | unknown } & Record<string, unknown> {
+export function hasToDate(d: DateLike): d is { toDate(): Date | unknown } & Record<string, unknown> {
     return !!d && typeof d !== 'string' && typeof d !== 'number' && !Array.isArray(d) && typeof (d as Record<string, unknown>).toDate === 'function';
 }
 
-function hasSeconds(d: DateLike): d is { seconds: number; nanoseconds?: number } {
+export function hasSeconds(d: DateLike): d is { seconds: number; nanoseconds?: number } {
     return !!d && typeof d !== 'string' && typeof d !== 'number' && !Array.isArray(d) && typeof (d as Record<string, unknown>).seconds === 'number';
 }
 
-function tryParseDate(d: DateLike): Date | null {
+export function tryParseDate(d: DateLike): Date | null {
     if (d instanceof Date) return d;
     if (hasToDate(d)) {
         const val = d.toDate();

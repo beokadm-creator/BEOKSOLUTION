@@ -286,7 +286,7 @@ export const AdminCertificateDownloader: React.FC<AdminCertificateDownloaderProp
             [대회 관리] - [일반 설정]의 수료증 탭에서 기본 정보를 먼저 저장해주세요.
           </div>
         ) : (
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+          <Tabs value={activeTab} onValueChange={(v: string) => setActiveTab(v as 'attendance' | 'completion')} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="attendance" disabled={!config.attendanceEnabled && !config.enabled}>
                 참가확인서

@@ -302,8 +302,7 @@ const RegistrationDetailPage: React.FC = () => {
 
                     // [Fix] Map schema-defined userTier to tier if tier is missing
                     if (!flattened.tier && docData.userTier) {
-                        // @ts-expect-error - Dynamic key injection from Firestore
-                        (flattened as Record<string, unknown>).tier = docData.userTier;
+                        flattened.tier = docData.userTier as string;
                     }
 
                     // [Fix] Fallback for licenseNumber
