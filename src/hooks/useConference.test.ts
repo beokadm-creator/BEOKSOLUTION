@@ -16,7 +16,7 @@
 
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useConference, clearConferenceCache } from './useConference';
-import { doc, getDoc, collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { Timestamp } from 'firebase/firestore';
 import { useParams } from 'react-router-dom';
 

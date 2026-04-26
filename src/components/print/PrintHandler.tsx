@@ -14,10 +14,9 @@ const PrintHandler: React.FC<PrintHandlerProps> = ({
   onBeforePrint,
   onAfterPrint
 }) => {
-  const handlePrint = useReactToPrint({
+  const printOptions = {
     contentRef: contentRef,
-    // @ts-expect-error - useReactToPrint may not have this property typed correctly
-    onBeforeGetContent: onBeforePrint,
+    ...(onBeforePrint ? { onBeforeGetContent: onBeforePrint } : {}),
     onAfterPrint: onAfterPrint,
     pageStyle: `
       @page {
@@ -31,7 +30,9 @@ const PrintHandler: React.FC<PrintHandlerProps> = ({
         print-color-adjust: exact !important;
       }
     `
-  });
+  } as Parameters<typeof useReactToPrint>[0];
+
+  const handlePrint = useReactToPrint(printOptions);
 
   // Clone the trigger button to attach the onClick handler
   return React.cloneElement(triggerButton as React.ReactElement<Record<string, unknown>>, {

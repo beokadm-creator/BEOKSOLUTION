@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc, orderBy } from "firebase/firestore";
 import { db } from "@/firebase";
 import { Agenda, Speaker } from "@/types/schema";
@@ -30,7 +30,7 @@ export const QnAPanel: React.FC<QnAPanelProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [qnaEnabled, setQnaEnabled] = useState(false);
 
-  const t = (ko: string, en: string) => (badgeLang === "ko" ? ko : en);
+  const t = useCallback((ko: string, en: string) => (badgeLang === "ko" ? ko : en), [badgeLang]);
 
   useEffect(() => {
     const initQnA = async () => {
@@ -79,9 +79,8 @@ export const QnAPanel: React.FC<QnAPanelProps> = ({
     };
 
     initQnA();
-  }, [confId]);
+  }, [confId, t]);
 
-  // Load speakers when agenda changes
   useEffect(() => {
     if (!selectedAgendaId) {
       setSpeakers([]);
@@ -109,7 +108,7 @@ export const QnAPanel: React.FC<QnAPanelProps> = ({
     };
 
     fetchSpeakers();
-  }, [confId, selectedAgendaId]);
+  }, [confId, selectedAgendaId, t]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

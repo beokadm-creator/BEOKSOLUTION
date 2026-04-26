@@ -5,7 +5,7 @@ import { BadgeElement, Registration } from '../types/schema';
 import { clearConferenceCache } from './useConference';
 
 // Mock Toss Cancel
-const mockCancelPayment = async (amount: number, paymentKey: string): Promise<boolean> => {
+const mockCancelPayment = async (_amount: number, _paymentKey: string): Promise<boolean> => {
     return new Promise(resolve => setTimeout(() => resolve(true), 1000));
 };
 

@@ -140,7 +140,7 @@ const AdminGuard: React.FC = () => {
           const adminEmails = await getSocietyAdminEmails(currentSocietyId);
           const isAuthorized = adminEmails.includes(userEmail);
           setIsAdminAuthorized(isAuthorized);
-      } catch (error) {
+      } catch (_error) {
           setIsAdminAuthorized(false);
       }
   }, [isSuperAdmin, userEmail, currentSocietyId]);
@@ -148,10 +148,10 @@ const AdminGuard: React.FC = () => {
   useEffect(() => {
       
       // ✅ sessionStorage 체크 (로그인 직후 빠른 확인용)
-      const societyAdmin = sessionStorage.getItem('societyAdmin');
-      const storedSocietyId = sessionStorage.getItem('societyId');
-      const storedIsSuperAdmin = sessionStorage.getItem('isSuperAdmin');
-      const firebaseCurrentUser = auth.currentUser;
+      const _societyAdmin = sessionStorage.getItem('societyAdmin');
+      const _storedSocietyId = sessionStorage.getItem('societyId');
+      const _storedIsSuperAdmin = sessionStorage.getItem('isSuperAdmin');
+      const _firebaseCurrentUser = auth.currentUser;
       
       
       if (user && !loading && !isBypassing) {

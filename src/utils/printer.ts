@@ -4,15 +4,15 @@ export const printBadge = async (layout: { width: number; height: number; elemen
     
     layout.elements.forEach(el => {
         if (!el.isVisible) return;
-        let content = el.content;
         
-        // Dynamic content replacement
-        if (el.type === 'NAME') content = userData.name;
-        if (el.type === 'ORG') content = userData.organization || 'No Org'; // Assuming user has org
-        if (el.type === 'QR') content = userData.badgeQr;
-        if (el.type === 'LICENSE') content = userData.licenseNumber || '';
-        if (el.type === 'POSITION') content = userData.position || '';
-        if (el.type === 'PRICE') content = userData.price || '';
+        let _content = el.content;
+        
+        if (el.type === 'NAME') _content = userData.name;
+        if (el.type === 'ORG') _content = userData.organization || 'No Org';
+        if (el.type === 'QR') _content = userData.badgeQr;
+        if (el.type === 'LICENSE') _content = userData.licenseNumber || '';
+        if (el.type === 'POSITION') _content = userData.position || '';
+        if (el.type === 'PRICE') _content = userData.price || '';
     });
 
     // Simulate SDK delay
