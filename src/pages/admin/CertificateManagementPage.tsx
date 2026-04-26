@@ -7,6 +7,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../../firebase';
 import { Loader2, Search, Award, Ban, ShieldCheck, RefreshCw, Download } from 'lucide-react';
 import { Button } from '../../components/ui/button';
+import { AdminCertificateDownloader } from '../../components/admin/conference/AdminCertificateDownloader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import type { CertificateRecord, CertificateStatus } from '../../types/schema';
 import toast from 'react-hot-toast';
@@ -401,7 +402,19 @@ const CertificateManagementPage: React.FC = () => {
                                         </td>
                                         <td className="p-4 text-center whitespace-nowrap">
                                             {cert.status === 'ISSUED' && (
-                                                <>
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <AdminCertificateDownloader
+                                                        confId={cid || ''}
+                                                        ui={{
+                                                            name: cert.attendeeName,
+                                                            aff: cert.attendeeOrganization || '',
+                                                            license: cert.attendeeLicenseNumber,
+                                                            amount: cert.attendeeAmount
+                                                        }}
+                                                        certificateId={cert.id}
+                                                        certificateNumber={cert.certificateNumber}
+                                                        verificationToken={cert.verificationToken || ''}
+                                                    />
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
@@ -422,7 +435,7 @@ const CertificateManagementPage: React.FC = () => {
                                                         <Ban className="w-3.5 h-3.5 mr-1" />
                                                         폐기
                                                     </Button>
-                                                </>
+                                                </div>
                                             )}
                                         </td>
                                     </tr>

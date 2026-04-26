@@ -22,6 +22,7 @@ export const CertificateSettingsPanel = ({ confId }: { confId: string }) => {
     dateStr: '',
     location: '',
     stampImageUrl: '',
+    backgroundImageUrl: '',
     showPaymentAmount: true,
     showLicenseNumber: true
   });
@@ -42,21 +43,24 @@ export const CertificateSettingsPanel = ({ confId }: { confId: string }) => {
     if (confId) fetchConfig();
   }, [confId]);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'stamp' | 'background') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const fileExt = file.name.split('.').pop();
-    const fileName = `stamp_${Date.now()}.${fileExt}`;
+    const fileName = `${type}_${Date.now()}.${fileExt}`;
     const storageRef = ref(storage, `conferences/${confId}/assets/${fileName}`);
 
     try {
       setUploading(true);
-      toast.loading('직인 이미지 업로드 중...', { id: 'upload' });
+      toast.loading(`${type === 'stamp' ? '직인' : '배경'} 이미지 업로드 중...`, { id: 'upload' });
       const snapshot = await uploadBytes(storageRef, file);
       const url = await getDownloadURL(snapshot.ref);
       
-      setConfig(prev => ({ ...prev, stampImageUrl: url }));
+      setConfig(prev => ({ 
+        ...prev, 
+        [type === 'stamp' ? 'stampImageUrl' : 'backgroundImageUrl']: url 
+      }));
       toast.success('업로드 완료', { id: 'upload' });
     } catch (error) {
       console.error('Upload error:', error);
@@ -189,7 +193,24 @@ export const CertificateSettingsPanel = ({ confId }: { confId: string }) => {
               <Input 
                 type="file" 
                 accept="image/png, image/jpeg" 
-                onChange={handleFileUpload} 
+                onChange={(e) => handleFileUpload(e, 'stamp')} 
+                disabled={uploading}
+              />
+            </div>
+
+            <div className="space-y-2 mt-4">
+              <Label className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-slate-500" /> 배경 이미지 (A4 가로 사이즈 권장)
+              </Label>
+              {config.backgroundImageUrl && (
+                <div className="mb-3">
+                  <img src={config.backgroundImageUrl} alt="배경" className="w-48 h-32 object-cover border rounded-lg p-2 bg-white" />
+                </div>
+              )}
+              <Input 
+                type="file" 
+                accept="image/png, image/jpeg" 
+                onChange={(e) => handleFileUpload(e, 'background')} 
                 disabled={uploading}
               />
             </div>
