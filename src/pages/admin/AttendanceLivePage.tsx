@@ -70,7 +70,6 @@ interface LogEntry {
 
 const AttendanceLivePage: React.FC = () => {
     const { cid } = useParams<{ cid: string }>();
-    console.log('[AttendanceLive] Component rendered, cid:', cid);
 
     const [registrations, setRegistrations] = useState<Registration[]>([]);
     const [loading, setLoading] = useState(true);
@@ -141,7 +140,6 @@ const AttendanceLivePage: React.FC = () => {
     useEffect(() => {
         if (!cid) return;
 
-        console.log('[AttendanceLive] Setting up snapshot listeners for:', cid);
         // Defer loading state to avoid synchronous setState warning
         setTimeout(() => setLoading(true), 0);
 
@@ -271,8 +269,7 @@ const AttendanceLivePage: React.FC = () => {
 
     // Keep refreshData for manual button if needed, but it's now redundant
     const refreshData = useCallback(async () => {
-        // Just a dummy now as onSnapshot handles it, but keep signature to avoid breaking other calls
-        console.log('[AttendanceLive] Manual refresh requested (handled by onSnapshot)');
+        // onSnapshot handles real-time updates
     }, []);
 
     const getDateTimeKst = (dateStr: string, timeStr: string): Date | null => {

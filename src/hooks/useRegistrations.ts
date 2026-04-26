@@ -79,7 +79,6 @@ export const useRegistrations = (conferenceId: string) => {
     const processRefund = async (regId: string, amount: number) => {
         try {
             // Mock API Call
-            console.log(`[useRegistrations] Refund ${amount} for ${regId}`);
 
             const regRef = doc(db, `conferences/${conferenceId}/registrations/${regId}`);
             await updateDoc(regRef, {

@@ -118,7 +118,6 @@ export default function VendorLayout() {
                   config,
                   (decodedText) => {
                       // Success
-                      console.log("QR Scanned:", decodedText);
                       scanBadge(decodedText);
                       // Stop scanning immediately to prevent duplicate scans
                       html5QrCode.stop().then(() => {

@@ -6,7 +6,6 @@ import { clearConferenceCache } from './useConference';
 
 // Mock Toss Cancel
 const mockCancelPayment = async (amount: number, paymentKey: string): Promise<boolean> => {
-    console.log(`[TossPayment] Cancelling ${amount} for ${paymentKey}`);
     return new Promise(resolve => setTimeout(() => resolve(true), 1000));
 };
 

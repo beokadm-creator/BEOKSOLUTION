@@ -54,7 +54,6 @@ export const useAuth = () => {
                 // Prevents privacy leak from previous non-member session
                 try {
                     sessionStorage.removeItem('NON_MEMBER');
-                    console.log('[useAuth] Cleared non-member session on member login');
                 } catch (err) {
                     console.warn('[useAuth] Failed to clear non-member session:', err);
                 }
@@ -86,16 +85,12 @@ export const useAuth = () => {
                     if (docSnap.exists()) {
                         const userData = docSnap.data() as DocumentData;
 
-                        console.log('[useAuth] Raw Firestore userData:', userData);
-
                         // ✅ normalizeUserData를 사용하여 필드명 통일
                         const normalized = normalizeUserData({
                             ...userData,
                             id: currentUser.uid,
                             uid: currentUser.uid,
                         });
-
-                        console.log('[useAuth] Normalized userData:', normalized);
 
                         // ConferenceUser 타입으로 완전한 객체 생성
                         const userWithId: ConferenceUser = {
@@ -117,8 +112,6 @@ export const useAuth = () => {
                             createdAt: normalized.createdAt || null,
                             updatedAt: normalized.updatedAt || null,
                         };
-
-                        console.log('[useAuth] Final userWithId:', userWithId);
 
                         // [Fix] Value Comparison to prevent Loop
                         setAuth(prev => {

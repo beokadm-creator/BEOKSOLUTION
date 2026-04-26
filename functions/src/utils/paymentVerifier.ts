@@ -65,7 +65,6 @@ export async function verifyPaymentAmount(
         //    Admin sets dates in KST, so we compare KST date strings (YYYY-MM-DD).
         //    e.g. endDate "2026-03-06" means the entire day of March 6 KST is valid.
         const nowKSTDateStr = toKSTDateString(new Date());
-        console.log(`[PaymentVerifier] Now (KST): ${nowKSTDateStr}`);
 
         const periods = regSettings.periods || [];
 
@@ -86,7 +85,6 @@ export async function verifyPaymentAmount(
             const endKSTStr = toKSTDateString(endDate);
 
             const matches = nowKSTDateStr >= startKSTStr && nowKSTDateStr <= endKSTStr;
-            console.log(`[PaymentVerifier] Period "${JSON.stringify(p.name || p.label)}": ${startKSTStr} ~ ${endKSTStr} → ${matches ? '✅ Active' : '❌'}`);
             return matches;
         });
 
@@ -95,18 +93,14 @@ export async function verifyPaymentAmount(
             return { isValid: false, expectedAmount: 0, error: 'No active registration period' };
         }
 
-        console.log(`[PaymentVerifier] ✅ Active period: ${JSON.stringify(activePeriod.name || activePeriod.label)}`);
-
         // 3. Get Base Price for Tier
         const prices = activePeriod.totalPrices || activePeriod.prices || {};
         let basePrice = 0;
         
         if (isFreeAll) {
-            console.log(`[PaymentVerifier] FREE_ALL mode active for ${confId}. Base price forced to 0.`);
             basePrice = 0;
         } else {
             basePrice = prices[tierId] ?? 0;
-            console.log(`[PaymentVerifier] Tier: "${tierId}", Base price: ${basePrice}, Available: ${JSON.stringify(Object.keys(prices))}`);
 
             if (basePrice === 0 && Object.keys(prices).length > 0) {
                 console.warn(`[PaymentVerifier] Price is 0 for tier "${tierId}". Check tier key mapping.`);
@@ -129,7 +123,6 @@ export async function verifyPaymentAmount(
         }
 
         const expectedTotal = basePrice + optionsTotal;
-        console.log(`[PaymentVerifier] Expected: ${expectedTotal}, Claimed: ${claimedAmount}`);
 
         if (expectedTotal !== claimedAmount) {
             return {

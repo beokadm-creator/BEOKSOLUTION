@@ -116,7 +116,6 @@ export async function updateFeatureFlags(updates: Partial<FeatureFlags>): Promis
         cachedFlags = null;
         cacheTimestamp = 0;
 
-        console.log('Feature flags updated:', updates);
     } catch (error) {
         console.error('Failed to update feature flags:', error);
         throw error;
@@ -138,10 +137,6 @@ export async function initializeFeatureFlags(): Promise<void> {
                 .collection('_config')
                 .doc('feature_flags')
                 .set(DEFAULT_FLAGS);
-
-            console.log('Feature flags initialized with defaults');
-        } else {
-            console.log('Feature flags already exist');
         }
     } catch (error) {
         console.error('Failed to initialize feature flags:', error);

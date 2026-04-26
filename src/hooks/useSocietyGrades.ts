@@ -62,18 +62,11 @@ export const useSocietyGrades = (societyId: string | undefined) => {
                         }
                     });
 
-                    // Debug: Log loaded grade map
-                    console.log('[useSocietyGrades] Grade master data loaded:', {
-                        societyId: effectiveSocietyId,
-                        totalGrades: map.size,
-                        availableCodes: Array.from(map.keys()),
-                        allEntries: Array.from(map.entries())
-                    });
+                    setGradeMasterMap(map);
                 } else {
                     console.warn("[useSocietyGrades] Society Grade Master is Empty! (No docs in 'list' collection)");
                 }
 
-                setGradeMasterMap(map);
                 setGradesList(list);
             } catch (err: unknown) {
                 console.error("[useSocietyGrades] Error parsing data:", err);
@@ -101,18 +94,9 @@ export const useSocietyGrades = (societyId: string | undefined) => {
             return lang === 'ko' ? '평생회원' : 'Lifetime Member';
         }
 
-        // Debug: Log the code being looked up
-        console.log('[useSocietyGrades] getGradeLabel called with:', {
-            code,
-            codeType: typeof code,
-            availableCodes: Array.from(gradeMasterMap.keys()),
-            requestedLang: lang
-        });
-
         // 1. Try exact match (case-sensitive)
         if (gradeMasterMap.has(code)) {
             const entry = gradeMasterMap.get(code);
-            console.log('[useSocietyGrades] Exact match found:', entry);
             return entry?.[lang] || entry?.['ko'] || code;
         }
 
@@ -120,7 +104,6 @@ export const useSocietyGrades = (societyId: string | undefined) => {
         const lowerCode = code.toLowerCase();
         for (const [key, value] of gradeMasterMap.entries()) {
             if (key.toLowerCase() === lowerCode) {
-                console.log('[useSocietyGrades] Case-insensitive match found:', value);
                 return value[lang] || value['ko'] || code;
             }
         }
@@ -129,7 +112,6 @@ export const useSocietyGrades = (societyId: string | undefined) => {
         const trimmedCode = code.trim().toLowerCase();
         for (const [key, value] of gradeMasterMap.entries()) {
             if (key.trim().toLowerCase() === trimmedCode) {
-                console.log('[useSocietyGrades] Trimmed match found:', value);
                 return value[lang] || value['ko'] || code;
             }
         }
@@ -138,7 +120,6 @@ export const useSocietyGrades = (societyId: string | undefined) => {
         for (const [, value] of gradeMasterMap.entries()) {
             if (value.ko.toLowerCase().includes(lowerCode) ||
                 value.en.toLowerCase().includes(lowerCode)) {
-                console.log('[useSocietyGrades] Name match found:', value);
                 return value[lang] || value['ko'] || code;
             }
         }
@@ -162,7 +143,6 @@ export const useSocietyGrades = (societyId: string | undefined) => {
 
                 if (koName === normalizedName || enName === normalizedName ||
                     koName.includes(normalizedName) || enName.includes(normalizedName)) {
-                    console.log('[useSocietyGrades] getGradeCodeByName found:', code, 'for name:', name);
                     return code;
                 }
             }

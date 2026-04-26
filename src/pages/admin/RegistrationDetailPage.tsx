@@ -297,7 +297,6 @@ const RegistrationDetailPage: React.FC = () => {
                     const calculatedOptionsTotal = optionsList.reduce((sum: number, opt: unknown) => sum + ((opt as Record<string, unknown>).totalPrice || ((opt as Record<string, unknown>).price as number | undefined) * ((opt as Record<string, unknown>).quantity as number | undefined) || 0), 0);
 
                     if (calculatedOptionsTotal > 0 && (!flattened.optionsTotal || flattened.optionsTotal === 0)) {
-                        console.log('[RegistrationDetailPage] Correcting optionsTotal from array:', calculatedOptionsTotal);
                         flattened.optionsTotal = calculatedOptionsTotal;
                     }
 
@@ -532,7 +531,6 @@ const RegistrationDetailPage: React.FC = () => {
                             position: editData.position,
                             licenseNumber: editData.licenseNumber,
                         });
-                        console.log('User document successfully updated');
                     }
                 } catch (uErr) {
                     console.error('Failed to update user document:', uErr);

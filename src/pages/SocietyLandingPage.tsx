@@ -225,7 +225,6 @@ const SocietyLandingPage: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => {
-                            console.log('Hamburger clicked!');
                             setSidebarOpen(true);
                         }}
                         className={`p-3 rounded-xl transition-colors relative z-50 ${buttonGhostClass}`}

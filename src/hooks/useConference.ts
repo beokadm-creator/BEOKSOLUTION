@@ -72,7 +72,6 @@ export const useConference = (targetId?: string) => {
     useEffect(() => {
         // Support both 'slug' (from public routes) and 'cid' (from admin routes)
         const slug = targetId || params.slug?.toLowerCase() || params.cid?.toLowerCase();
-        console.log('[useConference] useEffect triggered, slug:', slug);
 
         let isMounted = true;
         const timeoutId = setTimeout(() => {
@@ -88,7 +87,6 @@ export const useConference = (targetId?: string) => {
         const fetchConferenceData = async () => {
             // Prevent duplicate requests for the same slug
             if (fetchingSlugRef.current === slug) {
-                console.log('[useConference] Skipping duplicate request for slug:', slug);
                 return;
             }
 
@@ -130,16 +128,6 @@ export const useConference = (targetId?: string) => {
                 const isFirebaseApp = hostname.includes('.web.app') || hostname.includes('firebaseapp.com');
                 const parts = hostname.split('.');
 
-                console.log('[useConference] Environment detection:', {
-                    hostname,
-                    isLocalhost,
-                    isFirebaseApp,
-                    parts,
-                    slug,
-                    societyId,
-                    societyParam
-                });
-
                 if (isLocalhost || isFirebaseApp) {
                     if (slug && slug !== 'admin' && slug !== 'login') {
                         isPlatform = false;
@@ -175,7 +163,6 @@ export const useConference = (targetId?: string) => {
                 const cached = conferenceCache.get(cacheKey);
                 const now = Date.now();
                 if (cached && (now - cached.timestamp < CACHE_TTL)) {
-                    console.log('[useConference] ✅ Using cached data for key:', cacheKey);
                     if (isMounted) {
                         setData(cached.data);
                         clearTimeout(timeoutId);
@@ -186,7 +173,6 @@ export const useConference = (targetId?: string) => {
                 // ✅ OPTIMIZATION: Check if request is already pending
                 const pending = pendingRequests.get(cacheKey);
                 if (pending) {
-                    console.log('[useConference] ⏳ Waiting for pending request for key:', cacheKey);
                     const result = await pending;
                     if (isMounted) {
                         setData(result);
@@ -213,7 +199,6 @@ export const useConference = (targetId?: string) => {
                         pathsToTry.push({ path: `conferences/${slug}`, type: 'root_simple' });
                     }
 
-                    console.log('[useConference] Searching paths:', pathsToTry);
 
                     for (const candidate of pathsToTry) {
                         try {
@@ -221,7 +206,6 @@ export const useConference = (targetId?: string) => {
                             const docSnap = await getDoc(docRef);
 
                             if (docSnap.exists()) {
-                                console.log(`[useConference] ✅ SUCCESS PATH: ${candidate.path}`);
                                 confId = docSnap.id;
                                 confData = { ...docSnap.data(), societyId: societyId || '' } as unknown as Conference & Record<string, unknown>;
                                 basePath = candidate.path;
@@ -238,7 +222,6 @@ export const useConference = (targetId?: string) => {
                         const q = query(collection(db, 'conferences'), where('slug', '==', slug), limit(1));
                         const querySnapshot = await getDocs(q);
                         if (!querySnapshot.empty) {
-                            console.log(`[useConference] ✅ SUCCESS QUERY: slug=${slug}`);
                             confId = querySnapshot.docs[0].id;
                             confData = querySnapshot.docs[0].data() as unknown as Conference & Record<string, unknown>;
                             basePath = `conferences/${confId}`;
@@ -250,13 +233,9 @@ export const useConference = (targetId?: string) => {
                         throw new Error('Conference not found');
                     }
 
-                    console.log('[useConference] Final Base Path:', basePath);
-                    console.log('[useConference] Conference ID:', confId);
-                    console.log('[useConference] Slug:', slug);
 
                     // ✅ CRITICAL FIX: Use actual societyId from conference data, not derived
                     const effectiveSocietyId = confData.societyId || societyId;
-                    console.log('[useConference] Effective Society ID for fetching identity:', effectiveSocietyId);
 
                     // Fetch all potential settings documents in parallel
                     const [infoSnap, basicSnap, identitySnap, visualSnap] = await Promise.all([

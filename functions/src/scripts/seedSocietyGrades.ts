@@ -20,15 +20,11 @@ const GRADES_DATA = {
 
 async function seed() {
     const societyId = 'kadd';
-    console.log(`Seeding society grades to 'societies/${societyId}/settings/grades'...`);
     
     try {
         await db.doc(`societies/${societyId}/settings/grades`).set(GRADES_DATA);
-        console.log("✅ Success! Society grades added.");
-        console.log(JSON.stringify(GRADES_DATA, null, 2));
     } catch (e) {
         console.error("❌ Error adding society grades:", e);
-        console.log("Hint: Check your credentials and permissions.");
     }
 }
 

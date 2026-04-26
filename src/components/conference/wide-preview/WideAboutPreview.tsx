@@ -58,14 +58,6 @@ export const WideAboutPreview: React.FC<WideAboutPreviewProps> = ({
 
   const cleanDescription = getBodyContent(safeDescription);
 
-  // Debug log
-  console.log('[WideAboutPreview] HTML Processing:', {
-    original: typeof safeDescription === 'string' ? safeDescription.substring(0, 100) : 'NOT_STRING',
-    cleaned: typeof cleanDescription === 'string' ? cleanDescription.substring(0, 100) : 'NOT_STRING',
-    originalLength: typeof safeDescription === 'string' ? safeDescription.length : -1,
-    cleanedLength: typeof cleanDescription === 'string' ? cleanDescription.length : -1
-  });
-
   return (
     <section className="max-w-7xl mx-auto px-4 md:px-6">
       {/* Title */}

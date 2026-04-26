@@ -51,12 +51,6 @@ export default function TermsAgreementModal({
   isLoading = false,
   terms
 }: TermsAgreementModalProps) {
-  // Debug: Log when terms prop changes
-  React.useEffect(() => {
-    console.log('[TermsAgreementModal] Terms prop received:', terms);
-    console.log('[TermsAgreementModal] Terms keys:', terms ? Object.keys(terms) : 'No terms');
-  }, [terms]);
-
   const [agreements, setAgreements] = React.useState<Record<string, boolean>>({});
   const [viewingTerm, setViewingTerm] = React.useState<{ title: string; content: string } | null>(null);
 
@@ -70,11 +64,9 @@ export default function TermsAgreementModal({
 
     if (lang === 'en') {
       const content = (hasEn || hasKo || '') as string;
-      console.log(`[TermsAgreementModal] EN term '${key}': hasEn=${!!hasEn}, hasKo=${!!hasKo}, contentLength=${content?.length}`);
       return content;
     }
     const content = (hasKo || hasEn || '') as string;
-    console.log(`[TermsAgreementModal] KO term '${key}': hasKo=${!!hasKo}, hasEn=${!!hasEn}, contentLength=${content?.length}`);
     return content;
   };
 
@@ -82,7 +74,6 @@ export default function TermsAgreementModal({
   const termExists = (key: string): boolean => {
     const content = getTermContent(key);
     const exists = content && typeof content === 'string' && content.trim().length > 0;
-    console.log(`[TermsAgreementModal] Term '${key}' exists=${exists}`);
     return exists;
   };
 

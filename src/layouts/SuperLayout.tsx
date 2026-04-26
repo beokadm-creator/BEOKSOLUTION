@@ -24,7 +24,6 @@ export default function SuperLayout() {
     if (loading) return; // Wait for auth to load
     
     if (!isSuper && !window.location.pathname.includes('/admin/login')) {
-      console.log('[SuperLayout] Not super admin, redirecting to login');
       navigate('/admin/login', { replace: true });
     }
   }, [isSuper, loading, navigate]);

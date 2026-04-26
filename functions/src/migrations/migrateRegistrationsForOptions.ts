@@ -47,8 +47,6 @@ export const migrateRegistrationsForOptions = functions
       // Get all registrations using collection group query
       const registrationsSnapshot = await db.collectionGroup('registrations').get();
 
-      console.log(`Found ${registrationsSnapshot.size} registrations to migrate`);
-
       // Process in batches
       for (let i = 0; i < registrationsSnapshot.docs.length; i += BATCH_SIZE) {
         const batch = db.batch();
@@ -81,7 +79,6 @@ export const migrateRegistrationsForOptions = functions
 
         // Commit batch
         await batch.commit();
-        console.log(`Processed batch ${Math.floor(i / BATCH_SIZE) + 1}, total: ${totalProcessed}`);
       }
 
       const result = {
@@ -94,8 +91,6 @@ export const migrateRegistrationsForOptions = functions
         timestamp: new Date().toISOString(),
       };
 
-      console.log('Migration complete:', result);
-      console.log('Migration complete:', result);
       res.status(200).json(result);
 
     } catch (error) {
@@ -137,7 +132,6 @@ export const migrateRegistrationsForOptionsCallable = functions
 
     try {
       const registrationsSnapshot = await db.collectionGroup('registrations').get();
-      console.log(`Found ${registrationsSnapshot.size} registrations to migrate`);
 
       for (let i = 0; i < registrationsSnapshot.docs.length; i += BATCH_SIZE) {
         const batch = db.batch();
@@ -164,7 +158,6 @@ export const migrateRegistrationsForOptionsCallable = functions
         }
 
         await batch.commit();
-        console.log(`Processed batch ${Math.floor(i / BATCH_SIZE) + 1}`);
       }
 
       return {

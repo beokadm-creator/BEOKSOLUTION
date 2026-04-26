@@ -373,7 +373,6 @@ const RegistrationListPage: React.FC = () => {
             let badgeLayout = null;
 
             if (conferenceId) {
-                console.log('[Bixolon] Fetching latest layout from settings/badge_config...');
                 try {
                     const cfgSnap = await getDoc(doc(db, `conferences/${conferenceId}/settings/badge_config`));
                     if (cfgSnap.exists()) {
@@ -386,7 +385,6 @@ const RegistrationListPage: React.FC = () => {
                                 elements: data.badgeLayout.elements || [],
                                 enableCutting: data.badgeLayout.enableCutting || false
                             };
-                            console.log('[Bixolon] 최신 로드 완료:', badgeLayout);
                         }
                     }
                 } catch (fetchErr) {

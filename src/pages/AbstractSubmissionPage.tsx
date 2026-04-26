@@ -39,18 +39,6 @@ const AbstractSubmissionPage: React.FC = () => {
     const [isRegistered, setIsRegistered] = useState<boolean | null>(null);
     const [checkingRegistration, setCheckingRegistration] = useState(true);
 
-    // 로그인 사용자 정보 로그
-    useEffect(() => {
-        if (auth.user) {
-            console.log('[AbstractSubmissionPage] Logged in user:', {
-                id: auth.user.id,
-                uid: auth.user.uid,
-                name: auth.user.name,
-                email: auth.user.email
-            });
-        }
-    }, [auth.user]);
-
     // 결제 완료 여부 확인 - users/{uid}/participations 확인
     useEffect(() => {
         const checkPaymentStatus = async () => {
@@ -69,10 +57,8 @@ const AbstractSubmissionPage: React.FC = () => {
                     const docData = snap.docs[0].data();
                     const paymentStatus = docData?.paymentStatus || docData?.status || 'PENDING';
                     isPaid = paymentStatus === 'PAID' || paymentStatus === 'COMPLETED';
-                    console.log('[AbstractSubmissionPage] Registration check:', { confId, paymentStatus, isPaid });
                 }
 
-                console.log('[AbstractSubmissionPage] Final registration status:', { isPaid });
                 setIsRegistered(isPaid);
             } catch (err) {
                 console.error('[AbstractSubmissionPage] 등록 상태 확인 오류:', err);

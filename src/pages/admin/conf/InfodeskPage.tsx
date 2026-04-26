@@ -235,7 +235,6 @@ const InfodeskPage: React.FC = () => {
             let isExternal = regId.startsWith('EXT-');
 
             if (!regData) {
-                console.log(`[Cache Miss] Fetching ${regId} from Firestore`);
                 if (isExternal) {
                     const extRef = doc(db, `conferences/${targetConferenceId}/external_attendees`, regId);
                     const extSnap = await getDoc(extRef);

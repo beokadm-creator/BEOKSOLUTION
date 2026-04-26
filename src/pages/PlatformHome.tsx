@@ -30,7 +30,6 @@ const PlatformHome: React.FC = () => {
             try {
                 // [Fix-Step 264] L3 Standard Fetch
                 // Fetch ALL conferences from root (Limit 50 to ensure KADD is found)
-                console.log("[PlatformHome] Fetching ALL conferences...");
 
                 // Note: We avoid complex server-side filtering to prevent index errors on 'status'
                 // We fetch everything and filter in memory.
@@ -40,7 +39,6 @@ const PlatformHome: React.FC = () => {
                 );
 
                 const snap = await getDocs(q);
-                console.log(`[PlatformHome] Found ${snap.size} conferences.`);
 
                 const list: ConfSummary[] = snap.docs.map(doc => {
                     const data = doc.data();
@@ -49,8 +47,6 @@ const PlatformHome: React.FC = () => {
                     // [Fix-Step 263] Normalize societyId
                     const rawSocId = data.societyId || 'kadd';
                     const normalizedSocId = typeof rawSocId === 'string' ? rawSocId.toLowerCase() : 'kadd';
-
-                    console.log(` - Conf: ${doc.id} / Society: ${normalizedSocId} / Status: ${data.status}`);
 
                     return {
                         id: doc.id,

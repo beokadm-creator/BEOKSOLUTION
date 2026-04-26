@@ -62,14 +62,10 @@ export default function SocietyLayout() {
       return;
     }
 
-    console.log('[SocietyLayout] Fetching society with sid:', stableSid);
-
     const fetchSociety = async () => {
       try {
         const resolved = await resolveSocietyByIdentifier(stableSid);
-        console.log('[SocietyLayout] Resolved society:', !!resolved);
         if (resolved) {
-          console.log('[SocietyLayout] Society data:', resolved.data);
           setSociety({ id: resolved.id, ...resolved.data });
         } else {
           console.error('[SocietyLayout] Society not found for sid:', stableSid);

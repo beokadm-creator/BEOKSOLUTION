@@ -20,7 +20,6 @@ export const clearTestData = functions.https.onCall(async (data: unknown, contex
     const { conferenceSlug } = requestData;
     const targetConfId = conferenceSlug || 'kadd_2026spring';
 
-    console.log(`[TestData Cleanup] Starting cleanup for conference: ${targetConfId}`);
     const result = {
         registrationsDeleted: 0,
         participationsDeleted: 0,
@@ -29,7 +28,6 @@ export const clearTestData = functions.https.onCall(async (data: unknown, contex
 
     try {
         // 1. Registrations 삭제
-        console.log(`[TestData Cleanup] Deleting registrations from conferences/${targetConfId}/registrations`);
         const registrationsRef = db.collection(`conferences/${targetConfId}/registrations`);
         const registrationsSnap = await registrationsRef.get();
 
@@ -40,15 +38,9 @@ export const clearTestData = functions.https.onCall(async (data: unknown, contex
             });
             await batch.commit();
             result.registrationsDeleted = registrationsSnap.size;
-            console.log(`[TestData Cleanup] Deleted ${registrationsSnap.size} registrations`);
-        } else {
-            console.log('[TestData Cleanup] No registrations found');
         }
 
         // 2. Participations 삭제
-        console.log(`[TestData Cleanup] Deleting participations for conference ${targetConfId}`);
-
-        // Collection group query로 모든 participations 검색
         const participationsRef = db.collectionGroup('participations');
         const participationsQuery = participationsRef.where('conferenceId', '==', targetConfId);
         const participationsSnap = await participationsQuery.get();
@@ -79,23 +71,17 @@ export const clearTestData = functions.https.onCall(async (data: unknown, contex
             // 모든 batch 실행
             for (let i = 0; i < batches.length; i++) {
                 await batches[i].commit();
-                console.log(`[TestData Cleanup] Batch ${i + 1}/${batches.length} committed`);
             }
 
             result.participationsDeleted = participationsSnap.size;
-            console.log(`[TestData Cleanup] Deleted ${participationsSnap.size} participations in ${batches.length} batches`);
-        } else {
-            console.log('[TestData Cleanup] No participations found');
         }
 
         // 3. Member 코드 사용 기록 복구 (선택사항)
-        console.log(`[TestData Cleanup] Checking member codes to unlock`);
         const membersRef = db.collectionGroup('members');
         const membersQuery = membersRef.where('used', '==', true);
         const membersSnap = await membersQuery.get();
 
         if (!membersSnap.empty) {
-            console.log(`[TestData Cleanup] Found ${membersSnap.size} used member codes`);
             // 테스트 데이터니까 전부 해제
             const batch = db.batch();
             membersSnap.docs.forEach(doc => {
@@ -113,10 +99,8 @@ export const clearTestData = functions.https.onCall(async (data: unknown, contex
                 }
             });
             await batch.commit();
-            console.log('[TestData Cleanup] Unlocked recently used member codes');
         }
 
-        console.log('[TestData Cleanup] Cleanup completed', result);
         return {
             success: true,
             message: '테스트 데이터 삭제 완료',

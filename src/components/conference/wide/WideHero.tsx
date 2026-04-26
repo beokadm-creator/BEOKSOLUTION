@@ -120,10 +120,8 @@ export const WideHero: React.FC<WideHeroProps> = ({
           const reg = snap.docs[0].data();
           // 결제가 완료된(PAID) 경우만 등록 완료로 간주
           const isPaid = reg.paymentStatus === 'PAID';
-          console.log('[WideHero] Found registration:', reg.paymentStatus, 'isPaid:', isPaid);
           setIsRegistered(isPaid);
         } else {
-          console.log('[WideHero] No registration found');
           setIsRegistered(false);
         }
       } catch (error) {

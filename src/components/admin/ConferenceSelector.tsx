@@ -69,7 +69,6 @@ const ConferenceSelector: React.FC = () => {
     const handleConferenceChange = (conferenceId: string) => {
         const conference = availableConferences.find(c => c.id === conferenceId);
         if (conference) {
-            console.log(`[ConferenceSelector] Selected conference:`, conference);
             selectConference(conference.id, conference.slug, conference.societyId);
         }
     };

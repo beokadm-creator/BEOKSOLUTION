@@ -142,7 +142,6 @@ export default function VendorScannerPage({ mode }: { mode: 'camera' | 'external
                     { facingMode: "environment" },
                     { fps: 10, qrbox: { width: 250, height: 250 } },
                     (decodedText) => {
-                        console.log("QR Scanned via camera:", decodedText);
                         scanBadge(decodedText);
                         stopScanner(); // Stop after successful scan
                     },

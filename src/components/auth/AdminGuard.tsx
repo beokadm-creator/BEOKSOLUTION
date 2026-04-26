@@ -125,42 +125,27 @@ const AdminGuard: React.FC = () => {
   }, [authParam, location.pathname, isBypassing, searchParams, setSearchParams]);
 
   const checkSocietyAdminCallback = useCallback(async () => {
-      console.log(`🛡️ [AdminGuard] Checking admin access...`);
-      console.log(`🛡️ [AdminGuard] currentSocietyId: ${currentSocietyId}`);
-      console.log(`🛡️ [AdminGuard] userEmail: ${userEmail}`);
-      console.log(`🛡️ [AdminGuard] isSuperAdmin: ${isSuperAdmin}`);
       
       if (isSuperAdmin) {
-          console.log(`🛡️ [AdminGuard] ✅ Super Admin bypass`);
           setIsAdminAuthorized(true);
           return;
       }
 
       if (!currentSocietyId || !userEmail) {
-          console.log(`🛡️ [AdminGuard] ❌ Missing societyId or email`);
           setIsAdminAuthorized(false);
           return;
       }
 
       try {
-          console.log(`🛡️ [AdminGuard] Fetching admin config for: ${currentSocietyId}`);
           const adminEmails = await getSocietyAdminEmails(currentSocietyId);
-          console.log(`🛡️ [AdminGuard] adminEmails:`, adminEmails);
-          console.log(`🛡️ [AdminGuard] Checking if ${userEmail} in adminEmails`);
           const isAuthorized = adminEmails.includes(userEmail);
-          console.log(`🛡️ [AdminGuard] isAuthorized: ${isAuthorized}`);
           setIsAdminAuthorized(isAuthorized);
       } catch (error) {
-          console.log(`🛡️ [AdminGuard] ❌ Exception:`, error);
           setIsAdminAuthorized(false);
       }
   }, [isSuperAdmin, userEmail, currentSocietyId]);
 
   useEffect(() => {
-      console.log(`🛡️ [AdminGuard] useEffect triggered`);
-      console.log(`🛡️ [AdminGuard] user:`, user);
-      console.log(`🛡️ [AdminGuard] loading:`, loading);
-      console.log(`🛡️ [AdminGuard] isBypassing:`, isBypassing);
       
       // ✅ sessionStorage 체크 (로그인 직후 빠른 확인용)
       const societyAdmin = sessionStorage.getItem('societyAdmin');
@@ -168,29 +153,21 @@ const AdminGuard: React.FC = () => {
       const storedIsSuperAdmin = sessionStorage.getItem('isSuperAdmin');
       const firebaseCurrentUser = auth.currentUser;
       
-      console.log(`🛡️ [AdminGuard] sessionStorage societyAdmin: ${societyAdmin}`);
-      console.log(`🛡️ [AdminGuard] sessionStorage societyId: ${storedSocietyId}`);
-      console.log(`🛡️ [AdminGuard] sessionStorage isSuperAdmin: ${storedIsSuperAdmin}`);
-      console.log(`🛡️ [AdminGuard] auth.currentUser:`, firebaseCurrentUser);
       
       if (user && !loading && !isBypassing) {
-          console.log(`🛡️ [AdminGuard] Calling checkSocietyAdminCallback...`);
           checkSocietyAdminCallback();
       } else if (!loading && !user && hasStoredAdminBypass) {
           console.warn(`🛡️ [AdminGuard] Stale sessionStorage admin bypass detected; clearing cached admin flags`);
           sessionStorage.removeItem('societyAdmin');
           sessionStorage.removeItem('societyId');
           sessionStorage.removeItem('isSuperAdmin');
-          setIsAdminAuthorized(false);
-      } else {
-          console.log(`🛡️ [AdminGuard] Skipped: user=${!!user}, loading=${loading}, isBypassing=${isBypassing}`);
-      }
-  }, [user, loading, isBypassing, checkSocietyAdminCallback, currentSocietyId, hasStoredAdminBypass]);
+           setIsAdminAuthorized(false);
+       }
+   }, [user, loading, isBypassing, checkSocietyAdminCallback, currentSocietyId, hasStoredAdminBypass]);
 
   if (loading || bypassLoading) return <LoadingSpinner />;
   
   if (isBypassing) {
-      console.log(`🛡️ [AdminGuard] Bypass token active - allowing access`);
       return <Outlet />;
   }
 

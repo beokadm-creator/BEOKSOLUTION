@@ -80,7 +80,6 @@ const VendorDashboard: React.FC<Props> = ({ confId: initialConfId }) => {
                     { facingMode: "environment" },
                     { fps: 10, qrbox: { width: 250, height: 250 } },
                     (decodedText) => {
-                        console.log("QR Scanned via camera:", decodedText);
                         scanBadge(decodedText);
                         // Stop immediately
                         stopScanner();

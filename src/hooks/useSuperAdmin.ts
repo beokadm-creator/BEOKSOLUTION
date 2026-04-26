@@ -53,13 +53,11 @@ export const useSuperAdmin = () => {
         nameEn: string,
         adminEmail: string
     ) => {
-        console.log('[createSociety] Starting:', { id, nameKo, nameEn, adminEmail });
         setLoading(true);
         setError(null);
         try {
             const societyRef = doc(db, 'societies', id);
             const snap = await getDoc(societyRef);
-            console.log('[createSociety] Document exists check:', snap.exists());
             if (snap.exists()) {
                 const error = "Society ID already exists";
                 console.error('[createSociety] Error:', error);
@@ -73,15 +71,11 @@ export const useSuperAdmin = () => {
                 aliases: Array.from(new Set([id, getNameInitials(nameEn)].filter(Boolean))),
                 createdAt: Timestamp.now()
             };
-            console.log('[createSociety] Writing document:', dataToSet);
             await setDoc(societyRef, dataToSet);
             
             await writeSocietyAdminEmails(id, [adminEmail]);
-            console.log('[createSociety] Private admin doc written successfully');
-            console.log('[createSociety] Document written successfully');
             
             await fetchSocieties(); // Refresh list
-            console.log('[createSociety] Societies fetched');
             setLoading(false);
             return true;
         } catch (err) {

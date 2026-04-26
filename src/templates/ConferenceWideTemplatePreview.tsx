@@ -48,7 +48,6 @@ export const ConferenceWideTemplatePreview = ({ slug }: Props) => {
 
         if (docSnap.exists()) {
           const data = docSnap.data();
-          console.log('[ConferenceWideTemplatePreview] Terms loaded:', Object.keys(data));
           setTerms(data);
         } else {
           console.warn('[ConferenceWideTemplatePreview] No terms document found');

@@ -3,7 +3,6 @@ import { db } from '../firebase';
 import { Submission, Registration } from '../types/schema';
 
 export const fixBrokenSubmissions = async (conferenceId: string) => {
-    console.log(`Starting data fix for conference: ${conferenceId}`);
     
     try {
         // 1. Fetch all submissions
@@ -85,9 +84,6 @@ export const fixBrokenSubmissions = async (conferenceId: string) => {
 
         if (fixedCount > 0) {
             await batch.commit();
-            console.log(`Successfully fixed ${fixedCount} submissions.`);
-        } else {
-            console.log("No submissions needed fixing.");
         }
         
         return { success: true, fixedCount, logs };

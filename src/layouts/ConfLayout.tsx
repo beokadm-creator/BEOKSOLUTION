@@ -71,7 +71,6 @@ export default function ConfLayout() {
                         const docRef = doc(db, candidate.path);
                         const docSnap = await getDoc(docRef);
                         if (docSnap.exists()) {
-                            console.log(`[ConfLayout] Found conference at ${candidate.path}`);
                             confData = { id: docSnap.id, ...docSnap.data() } as Conference;
                             found = true;
                             break;
@@ -89,7 +88,6 @@ export default function ConfLayout() {
                         const docData = querySnapshot.docs[0];
                         confData = { id: docData.id, ...docData.data() } as Conference;
                         found = true;
-                        console.log(`[ConfLayout] Found conference by slug query: ${cid}`);
                     }
                 }
 
@@ -103,7 +101,6 @@ export default function ConfLayout() {
                             const docData = querySnapshot.docs[0];
                             confData = { id: docData.id, ...docData.data() } as Conference;
                             found = true;
-                            console.log(`[ConfLayout] Found conference by slugPart query: ${slugPart}`);
                         }
                     }
                 }
