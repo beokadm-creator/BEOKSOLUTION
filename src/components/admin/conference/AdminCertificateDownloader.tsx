@@ -125,8 +125,23 @@ export const AdminCertificateDownloader: React.FC<AdminCertificateDownloaderProp
   };
 
   const autoConferenceName = confInfo?.title?.ko || '';
+
+  const formatDateString = (dateVal: any) => {
+    if (!dateVal) return '';
+    if (typeof dateVal === 'object' && dateVal.seconds !== undefined) {
+      // Handle Firestore Timestamp or serialized Timestamp
+      const d = new Date(dateVal.seconds * 1000);
+      const offset = d.getTimezoneOffset() * 60000;
+      return new Date(d.getTime() - offset).toISOString().split('T')[0];
+    }
+    if (typeof dateVal === 'string') {
+      return dateVal.includes('T') ? dateVal.split('T')[0] : dateVal;
+    }
+    return String(dateVal);
+  };
+
   const autoDateStr = (confInfo?.dates?.start && confInfo?.dates?.end) 
-    ? `${typeof confInfo.dates.start === 'string' && confInfo.dates.start.includes('T') ? confInfo.dates.start.split('T')[0] : confInfo.dates.start} ~ ${typeof confInfo.dates.end === 'string' && confInfo.dates.end.includes('T') ? confInfo.dates.end.split('T')[0] : confInfo.dates.end}` 
+    ? `${formatDateString(confInfo.dates.start)} ~ ${formatDateString(confInfo.dates.end)}` 
     : '';
   const autoLocation = confInfo?.venue?.name?.ko || '';
 

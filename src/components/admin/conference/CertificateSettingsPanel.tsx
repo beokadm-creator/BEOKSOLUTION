@@ -126,8 +126,23 @@ export const CertificateSettingsPanel = ({ confId, data }: { confId: string, dat
   }
 
   const autoConferenceName = data?.title?.ko || '';
+  
+  const formatDateString = (dateVal: any) => {
+    if (!dateVal) return '';
+    if (typeof dateVal === 'object' && dateVal.seconds !== undefined) {
+      // Handle Firestore Timestamp or serialized Timestamp
+      const d = new Date(dateVal.seconds * 1000);
+      const offset = d.getTimezoneOffset() * 60000;
+      return new Date(d.getTime() - offset).toISOString().split('T')[0];
+    }
+    if (typeof dateVal === 'string') {
+      return dateVal.includes('T') ? dateVal.split('T')[0] : dateVal;
+    }
+    return String(dateVal);
+  };
+
   const autoDateStr = (data?.dates?.start && data?.dates?.end) 
-    ? `${data.dates.start.includes('T') ? data.dates.start.split('T')[0] : data.dates.start} ~ ${data.dates.end.includes('T') ? data.dates.end.split('T')[0] : data.dates.end}` 
+    ? `${formatDateString(data.dates.start)} ~ ${formatDateString(data.dates.end)}` 
     : '';
   const autoLocation = data?.venue?.name?.ko || '';
 
