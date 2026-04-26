@@ -43,7 +43,7 @@ export const AdminCertificateDownloader: React.FC<AdminCertificateDownloaderProp
     const fetchConfig = async () => {
       try {
         const snap = await getDoc(doc(db, `conferences/${confId}/settings/certificate_config`));
-        if (snap.exists() && snap.data().enabled) {
+        if (snap.exists()) {
           setConfig(snap.data());
         }
       } catch (err) {
@@ -111,7 +111,10 @@ export const AdminCertificateDownloader: React.FC<AdminCertificateDownloaderProp
         {loading ? (
           <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>
         ) : !config ? (
-          <div className="p-8 text-center text-slate-500">참가확인서 설정이 비활성화되어 있거나 로드할 수 없습니다.</div>
+          <div className="p-8 text-center text-slate-500">
+            수료증/참가확인서 설정이 아직 저장되지 않았습니다.<br />
+            [대회 관리] - [일반 설정]의 수료증 탭에서 기본 정보를 먼저 저장해주세요.
+          </div>
         ) : (
           <>
             <div className="bg-slate-100 p-4 sm:p-8 rounded-xl overflow-x-auto flex justify-center">

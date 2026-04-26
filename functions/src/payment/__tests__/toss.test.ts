@@ -81,8 +81,8 @@ describe('approveTossPayment', () => {
 
     await approveTossPayment(paymentKey, orderId, amount, secretKey, null);
 
-    const callArgs = mockedAxios.post.mock.calls[0];
-    const body = callArgs[1];
+    const callArgs = mockedAxios.post.mock.calls[0]!;
+    const body = callArgs[1] as Record<string, unknown>;
 
     expect(body).not.toHaveProperty('storeId');
   });
@@ -92,7 +92,7 @@ describe('approveTossPayment', () => {
 
     await approveTossPayment(paymentKey, orderId, amount, secretKey);
 
-    const callArgs = mockedAxios.post.mock.calls[0];
+    const callArgs = mockedAxios.post.mock.calls[0]!;
     expect(callArgs[0]).toBe('https://api.tosspayments.com/v1/payments/confirm');
   });
 
@@ -101,7 +101,7 @@ describe('approveTossPayment', () => {
 
     await approveTossPayment(paymentKey, orderId, amount, secretKey);
 
-    const callArgs = mockedAxios.post.mock.calls[0];
+    const callArgs = mockedAxios.post.mock.calls[0]!;
     const config = callArgs[2] as { headers: Record<string, string> };
     expect(config.headers['Content-Type']).toBe('application/json');
   });
@@ -177,7 +177,7 @@ describe('cancelTossPayment', () => {
 
     await cancelTossPayment(paymentKey, cancelReason, secretKey);
 
-    const callArgs = mockedAxios.post.mock.calls[0];
+    const callArgs = mockedAxios.post.mock.calls[0]!;
     expect(callArgs[0]).toBe(`https://api.tosspayments.com/v1/payments/${paymentKey}/cancel`);
   });
 
@@ -186,7 +186,7 @@ describe('cancelTossPayment', () => {
 
     await cancelTossPayment(paymentKey, cancelReason, secretKey);
 
-    const callArgs = mockedAxios.post.mock.calls[0];
+    const callArgs = mockedAxios.post.mock.calls[0]!;
     const body = callArgs[1];
 
     expect(body).toEqual({ cancelReason });
@@ -197,7 +197,7 @@ describe('cancelTossPayment', () => {
 
     await cancelTossPayment(paymentKey, cancelReason, secretKey);
 
-    const callArgs = mockedAxios.post.mock.calls[0];
+    const callArgs = mockedAxios.post.mock.calls[0]!;
     const config = callArgs[2] as { headers: Record<string, string> };
     const authHeader = config.headers['Authorization'];
     const expected = `Basic ${Buffer.from(secretKey + ':').toString('base64')}`;
@@ -210,7 +210,7 @@ describe('cancelTossPayment', () => {
 
     await cancelTossPayment(paymentKey, cancelReason, secretKey);
 
-    const callArgs = mockedAxios.post.mock.calls[0];
+    const callArgs = mockedAxios.post.mock.calls[0]!;
     const config = callArgs[2] as { headers: Record<string, string> };
     expect(config.headers['Content-Type']).toBe('application/json');
   });
@@ -258,7 +258,7 @@ describe('cancelTossPayment', () => {
 
     await cancelTossPayment(paymentKey, '', secretKey);
 
-    const body = mockedAxios.post.mock.calls[0][1];
+    const body = mockedAxios.post.mock.calls[0]![1] as { cancelReason: string };
     expect(body).toEqual({ cancelReason: '' });
   });
 });
