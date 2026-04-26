@@ -72,6 +72,7 @@ export const QnAPanel: React.FC<QnAPanelProps> = ({
         }
       } catch (err) {
         console.error("Failed to init QnA", err);
+        toast.error(t("Q&A를 초기화하지 못했습니다.", "Failed to initialize Q&A."));
       } finally {
         setLoading(false);
       }
@@ -103,6 +104,7 @@ export const QnAPanel: React.FC<QnAPanelProps> = ({
         }
       } catch (err) {
         console.error("Failed to load speakers", err);
+        toast.error(t("연자 정보를 불러오지 못했습니다.", "Failed to load speakers."));
       }
     };
 

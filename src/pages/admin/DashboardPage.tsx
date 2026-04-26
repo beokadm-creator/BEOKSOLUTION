@@ -8,6 +8,7 @@ import { collection, query, getDocs, doc, getDoc, where } from 'firebase/firesto
 import { db } from '../../firebase';
 import { safeText } from '../../utils/safeText';
 import { Button } from '../../components/ui/button';
+import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
 interface RegistrationData {
@@ -94,6 +95,7 @@ export default function DashboardPage() {
                 });
             } catch (error) {
                 console.error("Error fetching dashboard stats:", error);
+                toast.error('대시보드 통계를 불러오지 못했습니다.');
             }
         };
 

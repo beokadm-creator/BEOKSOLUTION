@@ -54,6 +54,7 @@ const PaymentSuccessHandler: React.FC = () => {
                         regData = JSON.parse(pendingDataStr);
                     } catch (e) {
                         console.error("Failed to parse pending data", e);
+                        toast.error('결제 정보를 불러오지 못했습니다.');
                     }
                 }
 
@@ -104,6 +105,7 @@ const PaymentSuccessHandler: React.FC = () => {
                         }
                     } catch (infraErr) {
                         console.warn("Failed to fetch infrastructure settings:", infraErr);
+                        toast.error('결제 설정을 불러오지 못했습니다.');
                     }
                 }
 

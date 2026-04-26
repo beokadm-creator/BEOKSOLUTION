@@ -17,6 +17,7 @@ import {
   getDocs,
 } from "firebase/firestore"; // RAW SDK
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { SESSION_KEYS } from "../utils/cookie";
 import {
   Loader2,
@@ -210,6 +211,7 @@ const StandAloneBadgePage: React.FC = () => {
             }
           } catch (e) {
             console.error("Failed to load rules and badge config", e);
+            toast.error('명찰 설정을 불러오지 못했습니다.');
           }
         });
 
@@ -319,6 +321,7 @@ const StandAloneBadgePage: React.FC = () => {
           );
           setStatus("NO_DATA");
           setMsg("?곗씠?곕? 遺덈윭?ㅻ뒗 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.");
+          toast.error('명찰 데이터를 불러오지 못했습니다.');
         }
       } else {
         // No Firebase user - check for non-member session
@@ -351,6 +354,7 @@ const StandAloneBadgePage: React.FC = () => {
               "[StandAloneBadgePage] Failed to parse non-member session:",
               err,
             );
+            toast.error('세션 정보를 불러오지 못했습니다.');
           }
         } else {
           setStatus("NO_AUTH");

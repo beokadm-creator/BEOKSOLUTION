@@ -250,6 +250,7 @@ export const useVendor = (vid: string | undefined) => {
             setVisits(list);
         } catch (e) {
             console.error('Error fetching leads:', e);
+            setError('방문 기록을 불러오지 못했습니다.');
         }
     };
 
@@ -278,6 +279,7 @@ export const useVendor = (vid: string | undefined) => {
             setGuestbookEntries(list);
         } catch (e) {
             console.error('Error fetching guestbook entries:', e);
+            setError('방명록을 불러오지 못했습니다.');
         }
     };
 
@@ -298,6 +300,7 @@ export const useVendor = (vid: string | undefined) => {
             setAvailableConferences(list);
         } catch (e) {
             console.error('Error fetching public conferences:', e);
+            setError('참여 가능 학회 목록을 불러오지 못했습니다.');
         }
     };
 
@@ -319,6 +322,7 @@ export const useVendor = (vid: string | undefined) => {
             setVendorRequests(map);
         } catch (e) {
             console.error('Error fetching vendor requests:', e);
+            setError('협력사 요청 상태를 불러오지 못했습니다.');
         }
     };
 

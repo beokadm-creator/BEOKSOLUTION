@@ -448,12 +448,14 @@ const UserHubPage: React.FC = () => {
                     }
                 } catch (partErr) {
                     logger.warn('UserHub', 'Could not get participation data', partErr);
+                    toast.error('참가 정보를 불러오지 못했습니다.');
                 }
             }
         } catch (docErr) {
             const errorCode = docErr instanceof Error && 'code' in docErr ? (docErr as { code?: string }).code : undefined;
             const errorMessage = docErr instanceof Error ? docErr.message : String(docErr);
             logger.error('UserHub', 'Error accessing users/{uid}', { code: errorCode, message: errorMessage });
+            toast.error('사용자 정보를 불러오지 못했습니다.');
         }
 
         logger.debug('UserHub', 'Final profile data', profileData);
@@ -464,6 +466,7 @@ const UserHubPage: React.FC = () => {
             setSocieties(snapSoc.docs.map(d => ({ id: d.id, ...d.data() })));
         } catch (socErr) {
             logger.error('UserHub', 'Societies fetch error', socErr);
+            toast.error('학회 정보를 불러오지 못했습니다.');
         }
 
         try {
@@ -608,6 +611,7 @@ const UserHubPage: React.FC = () => {
         } catch (guestErr) {
             logger.error('UserHub', 'Guestbook fetch error', guestErr);
             setGuestbookEntries([]);
+            toast.error('방명록 데이터를 불러오지 못했습니다.');
         }
 
         setLoading(false);
@@ -1064,6 +1068,7 @@ const UserHubPage: React.FC = () => {
                 } catch (processError) {
                     logger.error('UserHub', 'Data processing error', processError);
                     setSyncStatus('disconnected');
+                    toast.error('데이터 처리 중 오류가 발생했습니다.');
                 }
             }, (error) => {
                 logger.error('UserHub', 'Snapshot listener error', error);

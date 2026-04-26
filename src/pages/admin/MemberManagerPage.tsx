@@ -130,6 +130,7 @@ const MemberManagerPage: React.FC = () => {
             }
         } catch (error) {
             console.error("Error fetching grades:", error);
+            toast.error('회원 등급을 불러오지 못했습니다.');
         }
     }, [targetId, newGrade]);
 
