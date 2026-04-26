@@ -125,7 +125,9 @@ export const AdminCertificateDownloader: React.FC<AdminCertificateDownloaderProp
   };
 
   const autoConferenceName = confInfo?.title?.ko || '';
-  const autoDateStr = (confInfo?.dates?.start && confInfo?.dates?.end) ? `${confInfo.dates.start} ~ ${confInfo.dates.end}` : '';
+  const autoDateStr = (confInfo?.dates?.start && confInfo?.dates?.end) 
+    ? `${typeof confInfo.dates.start === 'string' && confInfo.dates.start.includes('T') ? confInfo.dates.start.split('T')[0] : confInfo.dates.start} ~ ${typeof confInfo.dates.end === 'string' && confInfo.dates.end.includes('T') ? confInfo.dates.end.split('T')[0] : confInfo.dates.end}` 
+    : '';
   const autoLocation = confInfo?.venue?.name?.ko || '';
 
   const renderCertificate = (type: 'attendance' | 'completion') => {

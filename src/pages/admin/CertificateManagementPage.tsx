@@ -408,8 +408,6 @@ const CertificateManagementPage: React.FC = () => {
                                                         ui={{
                                                             name: cert.attendeeName,
                                                             aff: cert.attendeeOrganization || '',
-                                                            license: cert.attendeeLicenseNumber,
-                                                            amount: cert.attendeeAmount
                                                         }}
                                                         certificateId={cert.id}
                                                         certificateNumber={cert.certificateNumber}

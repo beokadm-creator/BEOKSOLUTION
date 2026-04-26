@@ -126,7 +126,9 @@ export const CertificateSettingsPanel = ({ confId, data }: { confId: string, dat
   }
 
   const autoConferenceName = data?.title?.ko || '';
-  const autoDateStr = (data?.dates?.start && data?.dates?.end) ? `${data.dates.start} ~ ${data.dates.end}` : '';
+  const autoDateStr = (data?.dates?.start && data?.dates?.end) 
+    ? `${data.dates.start.includes('T') ? data.dates.start.split('T')[0] : data.dates.start} ~ ${data.dates.end.includes('T') ? data.dates.end.split('T')[0] : data.dates.end}` 
+    : '';
   const autoLocation = data?.venue?.name?.ko || '';
 
   return (

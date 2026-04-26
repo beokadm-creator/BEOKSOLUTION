@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '@/firebase';
@@ -140,7 +140,9 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ co
     : null;
 
   const autoConferenceName = confInfo?.title?.ko || '';
-  const autoDateStr = (confInfo?.dates?.start && confInfo?.dates?.end) ? `${confInfo.dates.start} ~ ${confInfo.dates.end}` : '';
+  const autoDateStr = (confInfo?.dates?.start && confInfo?.dates?.end) 
+    ? `${typeof confInfo.dates.start === 'string' && confInfo.dates.start.includes('T') ? confInfo.dates.start.split('T')[0] : confInfo.dates.start} ~ ${typeof confInfo.dates.end === 'string' && confInfo.dates.end.includes('T') ? confInfo.dates.end.split('T')[0] : confInfo.dates.end}` 
+    : '';
   const autoLocation = confInfo?.venue?.name?.ko || '';
 
   const handleDownload = async (type: 'attendance' | 'completion') => {
