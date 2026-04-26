@@ -1374,3 +1374,24 @@ export interface AuditLog {
   ipAddress?: string;
   userAgent?: string;
 }
+
+// ==========================================
+// 11. Q&A Moderator (NEW)
+// ==========================================
+
+/**
+ * Collection: `moderator_tokens`
+ * Path: `conferences/{confId}/moderator_tokens/{token}`
+ */
+export interface ModeratorToken {
+  token: string;                    // URL-safe 랜덤 토큰 (예: "mod_abc123def456")
+  label: string;                    // 관리자가 지정하는 이름 (예: "개막식 좌장", "Session A 좌장")
+  agendaIds: string[];              // 이 토큰으로 볼 수 있는 아젠다 ID 목록
+  speakerIds?: string[];            // 선택: 특정 연자만 필터링 (비어있으면 해당 아젠다 전체)
+  createdAt: Timestamp;
+  createdBy: string;                // 관리자 UID
+  expiresAt?: Timestamp;            // 선택: 만료 시간
+  isActive: boolean;                // 활성/비활성 토글
+  lastAccessedAt?: Timestamp;       // 마지막 접속 시간 (통계용)
+}
+
