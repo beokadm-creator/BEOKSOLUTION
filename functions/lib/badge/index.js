@@ -227,7 +227,6 @@ exports.validateBadgePrepToken = functions
     enforceAppCheck: false,
     ingressSettings: 'ALLOW_ALL'
 })
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     .https.onCall(async (data, _context) => {
     var _a, _b, _c, _d, _e, _f;
     const { confId, token } = data;
@@ -379,7 +378,6 @@ exports.issueDigitalBadge = functions
     enforceAppCheck: false,
     ingressSettings: 'ALLOW_ALL'
 })
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     .https.onCall(async (data, _context) => {
     const { confId, regId, issueOption } = data;
     if (!confId || !regId) {
@@ -553,7 +551,7 @@ exports.bulkSendNotifications = functions
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onCall(async (data) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
     const { confId, regIds } = data;
     if (!confId || !Array.isArray(regIds) || regIds.length === 0) {
         throw new functions.https.HttpsError('invalid-argument', 'confId and regIds[] are required');
@@ -600,11 +598,12 @@ exports.bulkSendNotifications = functions
     const startDate = rawStart && typeof rawStart.toDate === 'function'
         ? (0, date_fns_tz_1.formatInTimeZone)(rawStart.toDate(), timeZone, 'yyyy-MM-dd HH:mm', { locale: locale_1.ko })
         : '';
-    const venueName = typeof ((_k = conference.venue) === null || _k === void 0 ? void 0 : _k.name) === 'object'
-        ? (conference.venue.name.ko || conference.venue.name.en || '')
-        : (((_l = conference.venue) === null || _l === void 0 ? void 0 : _l.name) || '');
+    const venueNameVal = (_k = conference.venue) === null || _k === void 0 ? void 0 : _k.name;
+    const venueName = typeof venueNameVal === 'object' && venueNameVal !== null
+        ? (venueNameVal.ko || venueNameVal.en || '')
+        : (venueNameVal || '');
     let expiresAt;
-    if ((_m = conference.dates) === null || _m === void 0 ? void 0 : _m.end) {
+    if ((_l = conference.dates) === null || _l === void 0 ? void 0 : _l.end) {
         expiresAt = admin.firestore.Timestamp.fromMillis(conference.dates.end.toMillis() + 48 * 3600 * 1000);
     }
     else {
@@ -700,7 +699,7 @@ exports.bulkSendNotifications = functions
     }
     functions.logger.info(`[BulkSend] Tokens ready: ${tokenGenerated}, skipped: ${skipped}, errors: ${tokenErrors}`);
     // 6. NHN Cloud 배치 발송 (최대 1,000명씩)
-    const { sendAlimTalkBatch } = require('../utils/nhnCloud');
+    const { sendAlimTalkBatch } = await Promise.resolve().then(() => __importStar(require('../utils/nhnCloud')));
     let totalSent = 0;
     let totalFailed = 0;
     const NHN_CHUNK = 1000;

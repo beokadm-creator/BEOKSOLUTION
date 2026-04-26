@@ -151,17 +151,17 @@ exports.withdrawConsent = functions.https.onCall(async (data, context) => {
             entityId: visitorId,
             details: {
                 visitorId: visitorId,
-                error: error.message
+                error: error instanceof Error ? error.message : String(error)
             },
             result: 'FAILURE',
-            errorMessage: error.message,
+            errorMessage: error instanceof Error ? error.message : String(error),
             actorId: context.auth.uid,
             actorEmail: (_b = context.auth.token) === null || _b === void 0 ? void 0 : _b.email,
             actorType: 'PARTICIPANT',
         }).catch(logError => {
             functions.logger.error('[Audit Log] Failed to create audit log:', logError);
         });
-        throw new functions.https.HttpsError('internal', error.message || 'Failed to withdraw consent');
+        throw new functions.https.HttpsError('internal', error instanceof Error ? error.message : 'Failed to withdraw consent');
     }
 });
 /**
@@ -194,7 +194,7 @@ exports.withdrawConsentHttp = functions.https.onRequest(async (req, res) => {
     }
     catch (error) {
         functions.logger.error('[HTTP Consent Withdrawal] Failed:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
 });
 //# sourceMappingURL=withdrawConsent.js.map

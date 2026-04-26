@@ -51,7 +51,7 @@ const logAuditEvent_1 = require("../audit/logAuditEvent");
 exports.scheduledDataCleanup = functions.pubsub
     .schedule('0 3 * * *')
     .timeZone('Asia/Seoul')
-    .onRun(async (context) => {
+    .onRun(async (_context) => {
     const db = admin.firestore();
     const now = admin.firestore.Timestamp.now();
     const threeYearsAgo = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() - 1095 * 24 * 60 * 60 * 1000));
@@ -137,10 +137,10 @@ exports.scheduledDataCleanup = functions.pubsub
             entityType: 'LEAD',
             entityId: 'scheduled-cleanup-failed',
             details: {
-                error: error.message,
+                error: error instanceof Error ? error.message : String(error),
             },
             result: 'FAILURE',
-            errorMessage: error.message,
+            errorMessage: error instanceof Error ? error.message : String(error),
             actorId: 'system',
             actorType: 'SYSTEM',
         }).catch(logError => {
@@ -222,7 +222,7 @@ exports.manualDataCleanup = functions.https.onCall(async (data, context) => {
     }
     catch (error) {
         functions.logger.error('[Manual Data Cleanup] Failed:', error);
-        throw new functions.https.HttpsError('internal', error.message || 'Failed to run data cleanup');
+        throw new functions.https.HttpsError('internal', error instanceof Error ? error.message : 'Failed to run data cleanup');
     }
 });
 //# sourceMappingURL=dataCleanup.js.map

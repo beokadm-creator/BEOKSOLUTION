@@ -124,7 +124,7 @@ exports.sendVendorAlimTalk = functions.https.onCall(async (data, context) => {
     }
     catch (error) {
         functions.logger.error('Error sending vendor AlimTalk:', error);
-        throw new functions.https.HttpsError('internal', error.message || 'Failed to send AlimTalk');
+        throw new functions.https.HttpsError('internal', error instanceof Error ? error.message : 'Failed to send AlimTalk');
     }
 });
 //# sourceMappingURL=sendAlimTalk.js.map

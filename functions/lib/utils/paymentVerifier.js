@@ -60,11 +60,11 @@ async function verifyPaymentAmount(confId, tierId, selectedOptions, claimedAmoun
             return { isValid: true, expectedAmount: claimedAmount };
         }
         const regSettings = regSettingsSnap.data() || {};
+        const isFreeAll = regSettings.paymentMode === 'FREE_ALL';
         // 2. Identify Active Period using KST date comparison
         //    Admin sets dates in KST, so we compare KST date strings (YYYY-MM-DD).
         //    e.g. endDate "2026-03-06" means the entire day of March 6 KST is valid.
         const nowKSTDateStr = toKSTDateString(new Date());
-        console.log(`[PaymentVerifier] Now (KST): ${nowKSTDateStr}`);
         const periods = regSettings.periods || [];
         if (periods.length === 0) {
             console.warn(`[PaymentVerifier] No periods defined for ${confId}.`);
@@ -75,25 +75,28 @@ async function verifyPaymentAmount(confId, tierId, selectedOptions, claimedAmoun
             const e = p.endDate || p.end;
             if (!s || !e)
                 return false;
-            const startDate = s.toDate ? s.toDate() : new Date(s);
-            const endDate = e.toDate ? e.toDate() : new Date(e);
+            const startDate = s.toDate();
+            const endDate = e.toDate();
             const startKSTStr = toKSTDateString(startDate);
             const endKSTStr = toKSTDateString(endDate);
             const matches = nowKSTDateStr >= startKSTStr && nowKSTDateStr <= endKSTStr;
-            console.log(`[PaymentVerifier] Period "${JSON.stringify(p.name || p.label)}": ${startKSTStr} ~ ${endKSTStr} → ${matches ? '✅ Active' : '❌'}`);
             return matches;
         });
         if (!activePeriod) {
             console.error(`[PaymentVerifier] No active period for ${confId}. Today (KST): ${nowKSTDateStr}`);
             return { isValid: false, expectedAmount: 0, error: 'No active registration period' };
         }
-        console.log(`[PaymentVerifier] ✅ Active period: ${JSON.stringify(activePeriod.name || activePeriod.label)}`);
-        // 3. Get Base Price for Tier (supports both 'totalPrices' and 'prices' field names)
+        // 3. Get Base Price for Tier
         const prices = activePeriod.totalPrices || activePeriod.prices || {};
-        const basePrice = (_a = prices[tierId]) !== null && _a !== void 0 ? _a : 0;
-        console.log(`[PaymentVerifier] Tier: "${tierId}", Base price: ${basePrice}, Available: ${JSON.stringify(Object.keys(prices))}`);
-        if (basePrice === 0 && Object.keys(prices).length > 0) {
-            console.warn(`[PaymentVerifier] Price is 0 for tier "${tierId}". Check tier key mapping.`);
+        let basePrice = 0;
+        if (isFreeAll) {
+            basePrice = 0;
+        }
+        else {
+            basePrice = (_a = prices[tierId]) !== null && _a !== void 0 ? _a : 0;
+            if (basePrice === 0 && Object.keys(prices).length > 0) {
+                console.warn(`[PaymentVerifier] Price is 0 for tier "${tierId}". Check tier key mapping.`);
+            }
         }
         // 4. Calculate Options Total
         let optionsTotal = 0;
@@ -109,7 +112,6 @@ async function verifyPaymentAmount(confId, tierId, selectedOptions, claimedAmoun
             }
         }
         const expectedTotal = basePrice + optionsTotal;
-        console.log(`[PaymentVerifier] Expected: ${expectedTotal}, Claimed: ${claimedAmount}`);
         if (expectedTotal !== claimedAmount) {
             return {
                 isValid: false,

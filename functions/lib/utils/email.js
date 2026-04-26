@@ -88,7 +88,6 @@ async function sendEmail({ to, subject, html, text, }) {
             html: html || text,
             text: text || (html === null || html === void 0 ? void 0 : html.replace(/<[^>]*>/g, '')), // Strip HTML if text not provided
         });
-        console.log(`[Email] Sent to: ${Array.isArray(to) ? to.join(', ') : to}`);
     }
     catch (error) {
         console.error('[Email] Failed to send:', error);

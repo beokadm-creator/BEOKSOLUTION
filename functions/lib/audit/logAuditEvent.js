@@ -122,7 +122,7 @@ exports.logAuditEvent = functions.https.onCall(async (data, context) => {
         // Don't throw - audit logging should not block operations
         return {
             success: false,
-            error: error.message || 'Failed to create audit log',
+            error: error instanceof Error ? error.message : 'Failed to create audit log',
         };
     }
 });

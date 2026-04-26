@@ -230,7 +230,6 @@ async function createExitLog(confId, registrationId, zoneId, exitTime, isExterna
                 && newTotalMinutes >= (resolvedZoneConfig.cumulativeGoalMinutes || 0);
             const newIsCompleted = anyZoneCompleted || !!cumulativeCompleted || (registration.isCompleted || false);
             if (dryRun) {
-                console.log(`[DRY-RUN] Would create EXIT for ${registrationId} in ${zoneId} at ${exitTime.toISOString()}, +${recognizedMinutes}min, total=${newTotalMinutes}, completed=${newIsCompleted}`);
                 return { success: true, reason: 'DRY_RUN', registrationId, zoneId, exitTime };
             }
             const exitTimestamp = firestore_1.Timestamp.fromDate(exitTime);

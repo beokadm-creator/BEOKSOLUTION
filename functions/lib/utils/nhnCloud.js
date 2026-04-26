@@ -14,7 +14,7 @@ const axios_1 = __importDefault(require("axios"));
  * Send AlimTalk message via NHN Cloud
  */
 async function sendAlimTalk(config, params) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
     try {
         const url = `https://api-alimtalk.cloud.toast.com/alimtalk/v2.3/appkeys/${config.appKey}/messages`;
         const requestBody = {
@@ -55,11 +55,15 @@ async function sendAlimTalk(config, params) {
         }
     }
     catch (error) {
-        console.error('[NHN Cloud AlimTalk] Send error:', ((_j = error.response) === null || _j === void 0 ? void 0 : _j.data) || error.message);
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        const responseData = error && typeof error === 'object' && 'response' in error
+            ? (_j = error.response) === null || _j === void 0 ? void 0 : _j.data
+            : undefined;
+        console.error('[NHN Cloud AlimTalk] Send error:', responseData || message);
         return {
             success: false,
-            error: ((_m = (_l = (_k = error.response) === null || _k === void 0 ? void 0 : _k.data) === null || _l === void 0 ? void 0 : _l.header) === null || _m === void 0 ? void 0 : _m.resultMessage) || error.message || 'Unknown error occurred',
-            rawResponse: (_o = error.response) === null || _o === void 0 ? void 0 : _o.data
+            error: ((_k = responseData === null || responseData === void 0 ? void 0 : responseData.header) === null || _k === void 0 ? void 0 : _k.resultMessage) || message || 'Unknown error occurred',
+            rawResponse: responseData
         };
     }
 }
@@ -68,7 +72,7 @@ async function sendAlimTalk(config, params) {
  * NHN Cloud supports up to 1,000 recipients per request, each with individual templateParameter
  */
 async function sendAlimTalkBatch(config, recipients, templateCode) {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d;
     if (recipients.length === 0) {
         return { success: true, totalCount: 0, successCount: 0, failCount: 0 };
     }
@@ -92,7 +96,7 @@ async function sendAlimTalkBatch(config, recipients, templateCode) {
         });
         if (response.data.header.isSuccessful) {
             const sendResults = ((_a = response.data.message) === null || _a === void 0 ? void 0 : _a.sendResults) || [];
-            const successCount = sendResults.filter((r) => r.resultCode === 0).length;
+            const successCount = sendResults.filter(r => r.resultCode === 0).length;
             const failCount = sendResults.length - successCount;
             return {
                 success: true,
@@ -115,14 +119,18 @@ async function sendAlimTalkBatch(config, recipients, templateCode) {
         }
     }
     catch (error) {
-        console.error('[NHN Cloud AlimTalk] Batch send error:', ((_c = error.response) === null || _c === void 0 ? void 0 : _c.data) || error.message);
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        const responseData = error && typeof error === 'object' && 'response' in error
+            ? (_c = error.response) === null || _c === void 0 ? void 0 : _c.data
+            : undefined;
+        console.error('[NHN Cloud AlimTalk] Batch send error:', responseData || message);
         return {
             success: false,
             totalCount: recipients.length,
             successCount: 0,
             failCount: recipients.length,
-            error: ((_f = (_e = (_d = error.response) === null || _d === void 0 ? void 0 : _d.data) === null || _e === void 0 ? void 0 : _e.header) === null || _f === void 0 ? void 0 : _f.resultMessage) || error.message || 'Unknown error',
-            rawResponse: (_g = error.response) === null || _g === void 0 ? void 0 : _g.data
+            error: ((_d = responseData === null || responseData === void 0 ? void 0 : responseData.header) === null || _d === void 0 ? void 0 : _d.resultMessage) || message || 'Unknown error',
+            rawResponse: responseData
         };
     }
 }
@@ -130,10 +138,9 @@ async function sendAlimTalkBatch(config, recipients, templateCode) {
  * Get AlimTalk template list
  */
 async function getTemplateList(config) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e;
     try {
         const url = `https://api-alimtalk.cloud.toast.com/alimtalk/v2.3/appkeys/${config.appKey}/senders/${config.senderKey}/templates`;
-        console.log(`[NHN API] Request URL: ${url}`);
         const response = await axios_1.default.get(url, {
             headers: {
                 'Content-Type': 'application/json;charset=UTF-8',
@@ -144,7 +151,6 @@ async function getTemplateList(config) {
                 pageSize: 1000
             }
         });
-        console.log('[NHN API] Response:', JSON.stringify(response.data, null, 2));
         if (response.data.header && response.data.header.isSuccessful) {
             // API 응답 구조: templateListResponse.templates
             const templates = ((_a = response.data.templateListResponse) === null || _a === void 0 ? void 0 : _a.templates) || ((_b = response.data.body) === null || _b === void 0 ? void 0 : _b.data) || [];
@@ -165,11 +171,15 @@ async function getTemplateList(config) {
         }
     }
     catch (error) {
-        console.error('[NHN Cloud AlimTalk] Get templates error:', ((_d = error.response) === null || _d === void 0 ? void 0 : _d.data) || error.message);
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        const responseData = error && typeof error === 'object' && 'response' in error
+            ? (_d = error.response) === null || _d === void 0 ? void 0 : _d.data
+            : undefined;
+        console.error('[NHN Cloud AlimTalk] Get templates error:', responseData || message);
         return {
             success: false,
-            error: ((_g = (_f = (_e = error.response) === null || _e === void 0 ? void 0 : _e.data) === null || _f === void 0 ? void 0 : _f.header) === null || _g === void 0 ? void 0 : _g.resultMessage) || error.message || 'Unknown error occurred',
-            details: (_h = error.response) === null || _h === void 0 ? void 0 : _h.data
+            error: ((_e = responseData === null || responseData === void 0 ? void 0 : responseData.header) === null || _e === void 0 ? void 0 : _e.resultMessage) || message || 'Unknown error occurred',
+            details: responseData
         };
     }
 }
@@ -180,14 +190,12 @@ async function getTemplate(config, templateCode) {
     var _a, _b, _c;
     try {
         const url = `https://api-alimtalk.cloud.toast.com/alimtalk/v2.3/appkeys/${config.appKey}/senders/${config.senderKey}/templates/${templateCode}`;
-        console.log(`[NHN API] Get Template Request: ${url}`);
         const response = await axios_1.default.get(url, {
             headers: {
                 'Content-Type': 'application/json;charset=UTF-8',
                 'X-Secret-Key': config.secretKey
             }
         });
-        console.log('[NHN API] Get Template Response:', JSON.stringify(response.data, null, 2));
         if (response.data.header && response.data.header.isSuccessful) {
             return {
                 success: true,
@@ -205,10 +213,14 @@ async function getTemplate(config, templateCode) {
     }
     catch (error) {
         console.error('[NHN API] Get template error:', error);
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        const responseData = error && typeof error === 'object' && 'response' in error
+            ? (_c = error.response) === null || _c === void 0 ? void 0 : _c.data
+            : undefined;
         return {
             success: false,
-            error: error.message,
-            details: (_c = error.response) === null || _c === void 0 ? void 0 : _c.data
+            error: message,
+            details: responseData
         };
     }
 }
@@ -216,7 +228,7 @@ async function getTemplate(config, templateCode) {
  * Get AlimTalk send history
  */
 async function getSendHistory(config, requestId) {
-    var _a, _b, _c, _d;
+    var _a, _b;
     try {
         const url = `https://api-alimtalk.cloud.toast.com/alimtalk/v2.3/appkeys/${config.appKey}/messages/${requestId}`;
         const response = await axios_1.default.get(url, {
@@ -239,10 +251,14 @@ async function getSendHistory(config, requestId) {
         }
     }
     catch (error) {
-        console.error('[NHN Cloud AlimTalk] Get send history error:', ((_a = error.response) === null || _a === void 0 ? void 0 : _a.data) || error.message);
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        const responseData = error && typeof error === 'object' && 'response' in error
+            ? (_a = error.response) === null || _a === void 0 ? void 0 : _a.data
+            : undefined;
+        console.error('[NHN Cloud AlimTalk] Get send history error:', responseData || message);
         return {
             success: false,
-            error: ((_d = (_c = (_b = error.response) === null || _b === void 0 ? void 0 : _b.data) === null || _c === void 0 ? void 0 : _c.header) === null || _d === void 0 ? void 0 : _d.resultMessage) || error.message || 'Unknown error occurred'
+            error: ((_b = responseData === null || responseData === void 0 ? void 0 : responseData.header) === null || _b === void 0 ? void 0 : _b.resultMessage) || message || 'Unknown error occurred'
         };
     }
 }
@@ -261,7 +277,7 @@ async function validateConfig(config) {
     catch (error) {
         return {
             valid: false,
-            error: error.message
+            error: error instanceof Error ? error.message : 'Unknown error'
         };
     }
 }

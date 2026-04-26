@@ -124,7 +124,6 @@ async function updateFeatureFlags(updates) {
         // 캐시 무효화
         cachedFlags = null;
         cacheTimestamp = 0;
-        console.log('Feature flags updated:', updates);
     }
     catch (error) {
         console.error('Failed to update feature flags:', error);
@@ -145,10 +144,6 @@ async function initializeFeatureFlags() {
                 .collection('_config')
                 .doc('feature_flags')
                 .set(DEFAULT_FLAGS);
-            console.log('Feature flags initialized with defaults');
-        }
-        else {
-            console.log('Feature flags already exist');
         }
     }
     catch (error) {
