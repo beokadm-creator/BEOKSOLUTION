@@ -63,8 +63,6 @@ export const useSocietyGrades = (societyId: string | undefined) => {
                     });
 
                     setGradeMasterMap(map);
-                } else {
-                    console.warn("[useSocietyGrades] Society Grade Master is Empty! (No docs in 'list' collection)");
                 }
 
                 setGradesList(list);
