@@ -62,8 +62,7 @@ export {
     verifyCertificatePublic,
     revokeCertificate,
     logCertificateDownload,
-    reissueCertificate,
-    lookupRegistrationByEmail
+    reissueCertificate
 };
 
 import { generateFirebaseAuthUserForExternalAttendee } from './auth/external';
