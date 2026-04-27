@@ -196,6 +196,8 @@ export const useTranslation = (slug: string): UseTranslationResult => {
                 const infoSnap = infoRes.status === 'fulfilled' ? infoRes.value : null;
                 const regSnap = regRes.status === 'fulfilled' ? regRes.value : null;
 
+                const registrationSettings = regSnap?.exists() ? regSnap.data() : null;
+
                 const baseConfig = {
                     ...confData,
                     id: confId,
@@ -204,7 +206,10 @@ export const useTranslation = (slug: string): UseTranslationResult => {
                     society: societySnap?.exists() ? societySnap.data() : null,
                     visualAssets: confData.visualAssets || (visualSnap?.exists() ? visualSnap.data() : null),
                     info: infoSnap?.exists() ? infoSnap.data() : null,
-                    pricing: regSnap?.exists() ? ((regSnap.data() as { periods?: unknown[] })?.periods || []) : [],
+                    registrationSettings,
+                    paymentMode: (registrationSettings as { paymentMode?: string } | null)?.paymentMode,
+                    fieldSettings: (registrationSettings as { fieldSettings?: unknown } | null)?.fieldSettings,
+                    pricing: (registrationSettings as { periods?: unknown[] } | null)?.periods || [],
                     pages: [],
                     agendas: [],
                     speakers: [],

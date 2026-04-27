@@ -198,9 +198,30 @@ export function useRegistrationPage(slug: string | undefined) {
         const initializeRegistration = async () => {
             setIsInitializing(true);
             try {
+                const registrationSettingsPaths = [
+                    `conferences/${confId}/settings/registration`,
+                    ...(societyId && slug && !slug.includes('_')
+                        ? [`conferences/${societyId}_${slug}/settings/registration`]
+                        : []),
+                    ...(societyId && slug
+                        ? [
+                            `societies/${societyId}/conferences/${slug}/settings/registration`,
+                            `societies/${societyId}/conferences/${confId}/settings/registration`
+                        ]
+                        : [])
+                ].filter((path, index, paths) => paths.indexOf(path) === index);
+
+                const getRegistrationSettings = async () => {
+                    for (const path of registrationSettingsPaths) {
+                        const snap = await getDoc(doc(db, path));
+                        if (snap.exists()) return snap;
+                    }
+                    return null;
+                };
+
                 // 1. Load Settings (including footer info)
                 const [regSnap, gradesSnap, infraSnap, societySnap] = await Promise.all([
-                    getDoc(doc(db, `conferences/${confId}/settings/registration`)),
+                    getRegistrationSettings(),
                     getDocs(collection(db, `societies/${societyId}/settings/grades/list`)),
                     getDoc(doc(db, `societies/${societyId}/settings/infrastructure`)),
                     getDoc(doc(db, 'societies', societyId))
@@ -214,7 +235,7 @@ export function useRegistrationPage(slug: string | undefined) {
                 }
 
                 // Registration Settings
-                if (regSnap.exists()) {
+                if (regSnap?.exists()) {
                     const data = regSnap.data() as RegistrationSettings;
                     setRegSettings(data);
                     const now = new Date();
@@ -276,7 +297,7 @@ export function useRegistrationPage(slug: string | undefined) {
         };
 
         initializeRegistration();
-    }, [confId, info?.societyId, language, auth.loading, auth.user]);
+    }, [confId, info?.societyId, language, auth.loading, auth.user, slug]);
 
     // Calculate Price based on Grade
     useEffect(() => {
