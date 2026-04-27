@@ -2,6 +2,7 @@
 import { doc, getDoc, getDocs, collection, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { DOMAIN_CONFIG, extractSocietyFromHost } from '../utils/domainHelper';
+import { safeText } from '../utils/safeText';
 
 const translationCache = new Map<string, { data: unknown; timestamp: number }>();
 const pendingTranslations = new Map<string, Promise<unknown>>();
@@ -48,7 +49,8 @@ const toLocalizedText = (obj: unknown, lang: string) => {
     if (!obj) return '';
     if (typeof obj === 'string') return obj;
     const localized = obj as Record<string, string>;
-    return localized[lang === 'en' ? 'en' : 'ko'] || localized.ko || localized.en || '';
+    const currentLang = lang === 'en' ? 'en' : 'ko';
+    return safeText(localized[currentLang] || localized.ko || localized.en || '', currentLang);
 };
 
 export const useTranslation = (slug: string): UseTranslationResult => {
