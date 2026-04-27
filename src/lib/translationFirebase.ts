@@ -1,19 +1,24 @@
 import { initializeApp } from "firebase/app";
-import { getDatabase } from "firebase/database";
+import { getDatabase, type Database } from "firebase/database";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAc52CFyXU3BxI-yrORBb5asxsH5EEFnnU",
-  authDomain: "translation-comm.firebaseapp.com",
-  projectId: "translation-comm",
-  storageBucket: "translation-comm.firebasestorage.app",
-  messagingSenderId: "485369200558",
-  appId: "1:485369200558:web:1950dea22543d266b2923f",
-  measurementId: "G-BJS1NMLHC4",
-  databaseURL: "https://translation-comm-default-rtdb.firebaseio.com"
+  apiKey: import.meta.env.VITE_TRANSLATION_FIREBASE_API_KEY ?? import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_TRANSLATION_FIREBASE_AUTH_DOMAIN ?? import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_TRANSLATION_FIREBASE_PROJECT_ID ?? import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_TRANSLATION_FIREBASE_STORAGE_BUCKET ?? import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_TRANSLATION_FIREBASE_MESSAGING_SENDER_ID ?? import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_TRANSLATION_FIREBASE_APP_ID ?? import.meta.env.VITE_FIREBASE_APP_ID,
+  databaseURL: import.meta.env.VITE_TRANSLATION_FIREBASE_DATABASE_URL ?? import.meta.env.VITE_FIREBASE_DATABASE_URL,
 };
 
-// 기존 BEOKSOLUTION Firebase 앱과 충돌하지 않도록 'translationApp' 이라는 이름을 지정
-const translationApp = initializeApp(firebaseConfig, "translationApp");
+const requiredKeys = ['apiKey', 'projectId', 'appId', 'databaseURL'] as const;
+const hasAllRequired = requiredKeys.every((key) => !!firebaseConfig[key]);
 
-// 번역 서비스는 Realtime Database(rtdb)를 사용하므로 rtdb 인스턴스만 export
-export const translationDb = getDatabase(translationApp);
+let translationDb: Database | null = null;
+
+if (hasAllRequired) {
+  const translationApp = initializeApp(firebaseConfig, "translationApp");
+  translationDb = getDatabase(translationApp);
+}
+
+export { translationDb };

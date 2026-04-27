@@ -23,7 +23,7 @@ export const useProjectStream = (projectIdOrSlug: string | undefined, activeSess
   const oldestTimestampRef = useRef<number | null>(null);
 
   const loadOlderMessages = async () => {
-    if (!realProjectId || !hasMore || !oldestTimestampRef.current) return;
+    if (!rtdb || !realProjectId || !hasMore || !oldestTimestampRef.current) return;
     
     try {
       const olderQuery = query(
@@ -68,6 +68,12 @@ export const useProjectStream = (projectIdOrSlug: string | undefined, activeSess
     let unsubscribeStream: (() => void) | null = null;
 
     const resolveAndSubscribe = async () => {
+      if (!rtdb) {
+        setLoading(false);
+        setError('Translation service is not configured');
+        return;
+      }
+
       try {
         setLoading(true);
         const resolvedId = projectIdOrSlug;
