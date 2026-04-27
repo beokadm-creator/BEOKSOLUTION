@@ -2,6 +2,7 @@ import React from 'react';
 import { useSocietyGrades } from '../../../hooks/useSocietyGrades';
 
 type LocalizedString = { [lang: string]: string } | string;
+type DateLike = Date | string | { toDate: () => Date };
 
 export interface PricingPeriod {
     id: string;
@@ -19,11 +20,11 @@ interface WidePricingPreviewProps {
     currency?: string;
     lang: string;
     labels?: {
-        category: string;
-        amount: string;
-        bestValue?: string;
-        save?: string;
-        refundPolicyTitle?: string;
+        category: LocalizedString;
+        amount: LocalizedString;
+        bestValue?: LocalizedString;
+        save?: LocalizedString;
+        refundPolicyTitle?: LocalizedString;
     };
     refundPolicy?: string;
     societyId?: string;
@@ -61,6 +62,12 @@ export const WidePricingPreview: React.FC<WidePricingPreviewProps> = ({
         return (lang === 'en' ? val.en : val.ko) || val.ko || '';
     };
 
+    const labelText = (val: unknown, fallback: string) => {
+        if (!val) return fallback;
+        if (typeof val === 'string') return val;
+        return t(val as LocalizedString) || fallback;
+    };
+
     const translateGrade = (name: string): string => {
         if (lang !== 'ko') return name;
 
@@ -84,9 +91,15 @@ export const WidePricingPreview: React.FC<WidePricingPreviewProps> = ({
         return name.replace(/_/g, ' ');
     };
 
-    const formatDate = (dateVal: Date | { toDate: () => Date } | string | undefined) => {
+    const toDate = (dateVal: DateLike): Date => {
+        if (dateVal instanceof Date) return dateVal;
+        if (typeof dateVal === 'object' && 'toDate' in dateVal) return dateVal.toDate();
+        return new Date(dateVal);
+    };
+
+    const formatDate = (dateVal: DateLike | undefined) => {
         if (!dateVal) return '';
-        const d = dateVal instanceof Date ? dateVal : (typeof dateVal === 'object' && 'toDate' in dateVal ? dateVal.toDate() : new Date(dateVal));
+        const d = toDate(dateVal);
         if (isNaN(d.getTime())) return '';
         const y = d.getFullYear();
         const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -105,8 +118,8 @@ export const WidePricingPreview: React.FC<WidePricingPreviewProps> = ({
         if (!start || !end) return false;
 
         const now = new Date();
-        const s = start instanceof Date ? start : (start.toDate ? start.toDate() : new Date(start));
-        const e = end instanceof Date ? end : (end.toDate ? end.toDate() : new Date(end));
+        const s = toDate(start);
+        const e = toDate(end);
 
         // End of day adjustment
         e.setHours(23, 59, 59, 999);
@@ -123,7 +136,7 @@ export const WidePricingPreview: React.FC<WidePricingPreviewProps> = ({
                 const rawName = t(p.name);
                 return {
                     name: translateGrade(rawName),
-                    amount: Number(p.amount || p.price || 0)
+                    amount: Number(p.amount || 0)
                 };
             });
         } else if (typeof prices === 'object') {
@@ -192,7 +205,7 @@ export const WidePricingPreview: React.FC<WidePricingPreviewProps> = ({
                                                     )}
                                                     {isActive && (
                                                         <div className="mt-2 inline-flex items-center bg-white/20 text-white text-[10px] font-bold px-3 py-1 rounded-full">
-                                                            {labels.bestValue || 'CURRENT'}
+                                                            {labelText(labels.bestValue, 'CURRENT')}
                                                         </div>
                                                     )}
                                                 </th>
@@ -261,7 +274,7 @@ export const WidePricingPreview: React.FC<WidePricingPreviewProps> = ({
                                             </div>
                                             {isActive && (
                                                 <div className="inline-flex items-center bg-white/20 text-white text-[10px] font-bold px-3 py-1 rounded-full">
-                                                    {labels.bestValue || 'CURRENT'}
+                                                    {labelText(labels.bestValue, 'CURRENT')}
                                                 </div>
                                             )}
                                         </div>
@@ -298,7 +311,7 @@ export const WidePricingPreview: React.FC<WidePricingPreviewProps> = ({
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
                                 >
-                                    <title>{labels.refundPolicyTitle}</title>
+                                    <title>{labelText(labels.refundPolicyTitle, lang === 'ko' ? '환불 규정' : 'Refund Policy')}</title>
                                     <path
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
@@ -308,7 +321,7 @@ export const WidePricingPreview: React.FC<WidePricingPreviewProps> = ({
                                 </svg>
                                 <div>
                                     <h3 className="text-base font-bold text-slate-800 mb-2">
-                                        {labels.refundPolicyTitle}
+                                        {labelText(labels.refundPolicyTitle, lang === 'ko' ? '환불 규정' : 'Refund Policy')}
                                     </h3>
                                     <p className="text-sm text-slate-600 leading-relaxed">{refundPolicy}</p>
                                 </div>
