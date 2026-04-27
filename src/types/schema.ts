@@ -361,6 +361,17 @@ export interface ConferenceUser {
   updatedAt: Timestamp;
 }
 
+export interface AgreementDetails {
+  termsOfService: boolean;
+  thirdPartySystem: boolean;
+  thirdPartyPG: boolean;
+  infoConsent?: boolean;
+  marketingConsent?: boolean;
+  refundPolicy?: boolean;
+  agreedAt: Timestamp; // serverTimestamp
+  termsVersion?: string;
+}
+
 export type PaymentStatus = 'PAID' | 'REFUND_REQUESTED' | 'REFUNDED' | 'PARTIAL_REFUNDED' | 'PENDING' | 'FAILED';
 export type PaymentMethod = 'CARD' | 'VIRTUAL' | 'CASH' | 'ADMIN_FREE' | 'FREE';
 
@@ -398,6 +409,7 @@ export interface Registration {
   licenseNumber?: string; // Snapshot of license number
 
   status?: string; // Added for status checking
+  agreementDetails?: AgreementDetails; // Added for terms agreement tracking
 
   // Two-Step QR Logic
   confirmationQr: string;

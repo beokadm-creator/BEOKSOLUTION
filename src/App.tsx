@@ -65,6 +65,7 @@ const OptionsManagementPage = React.lazy(() => import('./pages/admin/OptionsMana
 const RegistrationPage = React.lazy(() => import('./pages/RegistrationPage'));
 const RegistrationSuccessPage = React.lazy(() => import('./pages/RegistrationSuccessPage'));
 const RegistrationFailPage = React.lazy(() => import('./pages/RegistrationFailPage'));
+const CheckStatusPage = React.lazy(() => import('./pages/CheckStatusPage'));
 const AbstractSubmissionPage = React.lazy(() => import('./pages/AbstractSubmissionPage'));
 const ProgramPage = React.lazy(() => import('./pages/ProgramPage'));
 const TermsPage = React.lazy(() => import('./pages/TermsPage'));
@@ -346,6 +347,7 @@ const App: React.FC = () => {
                 <Route path="/:slug/register/fail" element={<LS><RegistrationFailPage /></LS>} />
                 <Route path="/:slug/register/fail" element={<LS><RegistrationFailPage /></LS>} />
                 <Route path="/:slug/abstracts" element={<LS><AbstractSubmissionPage /></LS>} />
+                <Route path="/:slug/check-status" element={<LS><CheckStatusPage /></LS>} />
                 <Route path="/:slug/program" element={<LS><ProgramPage /></LS>} />
                 <Route path="/:slug/agenda" element={<LS><ProgramPage /></LS>} />
                 <Route path="/:slug/terms" element={<LS><TermsPage /></LS>} />
@@ -453,6 +455,7 @@ const App: React.FC = () => {
 
               {/* --- FALLBACK CONFERENCE ROUTES (Abstracts, Program) --- */}
               <Route path="/:slug/abstracts" element={<LS><AbstractSubmissionPage /></LS>} />
+              <Route path="/:slug/check-status" element={<LS><CheckStatusPage /></LS>} />
               <Route path="/:slug/program" element={<LS><ProgramPage /></LS>} />
               <Route path="/:slug/agenda" element={<LS><ProgramPage /></LS>} />
               <Route path="/:slug/vendors/:vid" element={<LS><VendorIntroPage /></LS>} />

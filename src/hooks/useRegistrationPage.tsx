@@ -710,6 +710,11 @@ export function useRegistrationPage(slug: string | undefined) {
                 regData.memberVerificationData = mvFromURL;
             }
 
+            // Include agreement details from state if available
+            if (state.agreementDetails) {
+                regData.agreementDetails = state.agreementDetails;
+            }
+
             // [Modified] Do NOT save to Firestore yet (Prevent Garbage)
             // Save to sessionStorage to retrieve after success
             sessionStorage.setItem(`pending_reg_${orderId}`, JSON.stringify(regData));
@@ -746,7 +751,8 @@ export function useRegistrationPage(slug: string | undefined) {
                                 price: o.option.price,
                                 quantity: o.quantity,
                                 totalPrice: o.option.price * o.quantity
-                            }))
+                            })),
+                            agreementDetails: state.agreementDetails || {}
                         })
                     }
                 );

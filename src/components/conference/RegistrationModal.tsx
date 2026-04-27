@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { CheckCircle, ShieldCheck, User, AlertCircle, LogIn } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LegalAgreementModal from './LegalAgreementModal';
+import type { AgreementDetails } from '@/types/schema';
 
 interface RegistrationModalProps {
     isOpen: boolean;
@@ -44,8 +45,8 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
     const { verifyMember, loading: verifyLoading } = useMemberVerification();
     const { getGradeLabel, getGradeCodeByName, gradesList } = useSocietyGrades(societyId);
 
-    // Modal mode: 'member-auth' | 'non-member' | 'registration-check'
-    const [mode, setMode] = useState<'member-auth' | 'non-member' | 'registration-check'>(initialMode || 'member-auth');
+    // Modal mode: 'member-auth' | 'non-member' | 'registration-check' | 'free-all'
+    const [mode, setMode] = useState<'member-auth' | 'non-member' | 'registration-check' | 'free-all'>(initialMode || 'member-auth');
 
     // Sync mode with initialMode prop
     useEffect(() => {
@@ -63,17 +64,8 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 if (regDoc.exists()) {
                     const regData = regDoc.data();
                     if (regData.paymentMode === 'FREE_ALL') {
-                        // Bypass directly to registration page
-                        onClose();
-                        navigate(`/${confId.split('_')[1]}/register`, {
-                            state: {
-                                memberVerified: true,
-                                memberName: '',
-                                memberGrade: 'FREE_ATTENDEE',
-                                memberCode: '', // 면허번호 입력창에 하드코딩되지 않도록 빈 값으로 전달
-                                calculatedPrice: 0,
-                            }
-                        });
+                        setMode('free-all');
+                        setShowTermsModal(true);
                     }
                 }
             } catch (error) {
@@ -82,7 +74,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
             }
         };
         checkSettings();
-    }, [isOpen, confId, navigate, onClose]);
+    }, [isOpen, confId]);
 
     // Non-member selection
     const [selectedNonMemberType, setSelectedNonMemberType] = useState<string>('');
@@ -274,7 +266,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         setShowTermsModal(true);
     };
 
-    const handleTermsAgree = () => {
+    const handleTermsAgree = (agreementDetails?: AgreementDetails) => {
         // Calculate the price before navigating
         let calculatedPrice = 0;
         let calculatedGradeCode = '';
@@ -287,6 +279,9 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
             // Non-member - calculate price for selected type
             calculatedGradeCode = selectedNonMemberType;
             calculatedPrice = getGradePrice(calculatedGradeCode);
+        } else if (mode === 'free-all') {
+            calculatedGradeCode = 'FREE_ATTENDEE';
+            calculatedPrice = 0;
         }
 
         // Build registration state for RegistrationPage
@@ -297,11 +292,13 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
             memberCode: string;
             memberVerificationId?: string;
             calculatedPrice?: number; // Add calculated price
+            agreementDetails?: AgreementDetails;
         } = {
             memberVerified: false,
             memberName: '',
             memberGrade: '',
-            memberCode: ''
+            memberCode: '',
+            agreementDetails
         };
 
         if (mode === 'member-auth' && isVerified && verifiedMemberData) {
@@ -334,6 +331,11 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 grade: selectedNonMemberType,
                 calculatedPrice: calculatedPrice
             }));
+        } else if (mode === 'free-all') {
+            registrationState.memberVerified = true;
+            registrationState.memberGrade = 'FREE_ATTENDEE';
+            registrationState.calculatedPrice = 0;
+            registrationState.memberCode = '';
         }
 
         // Navigate to registration page with state (clean URL)
