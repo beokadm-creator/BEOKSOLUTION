@@ -55,6 +55,7 @@ export interface UserReg {
         dueDate?: string;
     };
     names?: unknown;
+    hasAbstracts?: boolean;
 }
 
 export interface Affiliation {
@@ -86,6 +87,7 @@ interface FirestoreConferenceData {
     venueAddress?: unknown;
     slug?: string;
     receipt?: unknown;
+    abstractSubmissionDeadline?: unknown;
     [key: string]: unknown;
 }
 
@@ -923,7 +925,8 @@ export function useUserHub(): UseUserHubReturn {
                                 receiptConfig,
                                 userName: data.userName || user.name || (user as { displayName?: string }).displayName,
                                 status: currentStatus,
-                                virtualAccount: data.virtualAccount
+                                virtualAccount: data.virtualAccount,
+                                hasAbstracts: !!cData?.abstractSubmissionDeadline
                             } as UserReg;
                         });
 
@@ -1063,7 +1066,8 @@ export function useUserHub(): UseUserHubReturn {
                             receiptConfig,
                             userName: data.userName || user.name || (user as { displayName?: string }).displayName,
                             status: data.status,
-                            virtualAccount: data.virtualAccount
+                            virtualAccount: data.virtualAccount,
+                            hasAbstracts: !!cData?.abstractSubmissionDeadline
                         } as UserReg;
                     });
 

@@ -255,6 +255,8 @@ export const useConference = (targetId?: string) => {
                         title: confData.title,
                         dates: confData.dates,
                         societyId: effectiveSocietyId,
+                        abstractSubmissionDeadline: confData.abstractSubmissionDeadline,
+                        abstractEditDeadline: confData.abstractEditDeadline,
                         ...infoGeneralData,
                         venueName: basicData.venueName || confData.venueName,
                         venueAddress: basicData.venueAddress || confData.venueAddress,

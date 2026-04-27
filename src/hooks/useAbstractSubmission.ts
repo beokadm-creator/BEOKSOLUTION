@@ -35,8 +35,8 @@ export const useAbstractSubmission = () => {
     const now = new Date();
     const submissionDeadline = conferenceInfo?.abstractSubmissionDeadline?.toDate();
     const editDeadline = conferenceInfo?.abstractEditDeadline?.toDate();
-    const isSubmissionOpen = submissionDeadline ? now <= submissionDeadline : true;
-    const isEditOpen = editDeadline ? now <= editDeadline : true;
+    const isSubmissionOpen = submissionDeadline ? now <= submissionDeadline : false;
+    const isEditOpen = editDeadline ? now <= editDeadline : false;
 
     const [isRegistered, setIsRegistered] = useState<boolean | null>(null);
     const [checkingRegistration, setCheckingRegistration] = useState(true);
