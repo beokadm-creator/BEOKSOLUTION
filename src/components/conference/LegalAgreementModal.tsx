@@ -4,11 +4,13 @@ import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { ShieldCheck, FileText } from 'lucide-react';
+import { serverTimestamp, Timestamp } from 'firebase/firestore';
+import type { AgreementDetails } from '@/types/schema';
 
 interface LegalAgreementModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onAgree: () => void;
+    onAgree: (agreements?: AgreementDetails) => void;
     lang?: 'ko' | 'en';
     terms?: {
         infoConsentText?: string;
@@ -83,7 +85,19 @@ export default function LegalAgreementModal({
 
     const handleAgree = () => {
         if (!canProceed) return;
-        onAgree();
+        
+        const agreementDetails: AgreementDetails = {
+            termsOfService: agreements.termsOfService,
+            thirdPartySystem: agreements.thirdPartySystem,
+            thirdPartyPG: agreements.thirdPartyPG,
+            infoConsent: agreements.infoConsent,
+            marketingConsent: agreements.marketingConsent,
+            refundPolicy: agreements.refundPolicy,
+            agreedAt: serverTimestamp() as Timestamp,
+            termsVersion: '1.0' // Can be updated if versioning is supported
+        };
+        
+        onAgree(agreementDetails);
     };
 
     const handleAllAgree = (checked: boolean) => {

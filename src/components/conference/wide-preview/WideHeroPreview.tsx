@@ -23,6 +23,7 @@ interface WideHeroPreviewProps {
   bgImage?: string;
   lang: string;
   hasAbstracts?: boolean;
+  paymentMode?: string;
   labels?: {
     register: string;
     abstracts: string;
@@ -47,6 +48,7 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
     bgImage,
     lang,
     hasAbstracts = true,
+    paymentMode,
   } = props;
 
   const navigate = useNavigate();
@@ -181,28 +183,66 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
                   onClick={() => navigate(`/${targetSlug}/badge?lang=${lang}`)}
                   className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-emerald-900/30 hover:shadow-emerald-900/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98]"
                 >
-                  {lang === 'ko' ? '등록확인' : 'Registration Check'}
+                  {lang === 'ko' ? '등록확인/QR' : 'Registration/QR'}
                 </button>
               ) : (
-                // 아직 등록하지 않은 회원: 등록(조회)하기 버튼 -> 모달 표시
+                // 아직 등록하지 않은 회원
+                paymentMode === 'FREE_ALL' ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setShowModal(true)}
+                      className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-blue-900/30 hover:shadow-blue-900/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98]"
+                    >
+                      {lang === 'ko' ? '등록하기' : 'Register'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/${targetSlug}/check-status?lang=${lang}`)}
+                      className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/30 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-black/10 hover:shadow-black/20 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98]"
+                    >
+                      {lang === 'ko' ? '등록조회' : 'Check Status'}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowModal(true)}
+                    className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-blue-900/30 hover:shadow-blue-900/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98]"
+                  >
+                    {lang === 'ko' ? '등록(조회)하기' : 'Register / Check'}
+                  </button>
+                )
+              )}
+            </>
+          ) : (
+            // 비로그인
+            paymentMode === 'FREE_ALL' ? (
+              <>
                 <button
                   type="button"
                   onClick={() => setShowModal(true)}
                   className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-blue-900/30 hover:shadow-blue-900/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98]"
                 >
-                  {lang === 'ko' ? '등록(조회)하기' : 'Register / Check'}
+                  {lang === 'ko' ? '등록하기' : 'Register'}
                 </button>
-              )}
-            </>
-          ) : (
-            // 비로그인: 등록(조회)하기 버튼 (클릭 시 모달 표시)
-            <button
-              type="button"
-              onClick={() => setShowModal(true)}
-              className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-blue-900/30 hover:shadow-blue-900/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98]"
-            >
-              {lang === 'ko' ? '등록(조회)하기' : 'Register / Check'}
-            </button>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/${targetSlug}/check-status?lang=${lang}`)}
+                  className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/30 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-black/10 hover:shadow-black/20 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98]"
+                >
+                  {lang === 'ko' ? '등록조회' : 'Check Status'}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowModal(true)}
+                className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-blue-900/30 hover:shadow-blue-900/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98]"
+              >
+                {lang === 'ko' ? '등록(조회)하기' : 'Register / Check'}
+              </button>
+            )
           )}
 
           {hasAbstracts && (

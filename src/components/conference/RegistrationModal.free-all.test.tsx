@@ -50,7 +50,7 @@ describe('RegistrationModal FREE_ALL flow', () => {
     });
   });
 
-  it('closes the modal and navigates directly to the registration page when FREE_ALL is active', async () => {
+  it('opens terms modal when FREE_ALL is active', async () => {
     const onClose = jest.fn();
 
     render(
@@ -67,18 +67,11 @@ describe('RegistrationModal FREE_ALL flow', () => {
       ),
     );
 
+    // Wait for the modal state to change to free-all and open terms modal
     await waitFor(() => {
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    expect(mockNavigate).toHaveBeenCalledWith('/2026spring/register', {
-      state: {
-        memberVerified: true,
-        memberName: '',
-        memberGrade: 'FREE_ATTENDEE',
-        memberCode: '',
-        calculatedPrice: 0,
-      },
+      // It shouldn't close automatically anymore
+      expect(onClose).not.toHaveBeenCalled();
+      expect(mockNavigate).not.toHaveBeenCalled();
     });
   });
 });

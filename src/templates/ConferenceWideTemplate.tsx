@@ -117,6 +117,7 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
         period={config.dates || config.period}
         societyName={typeof societyName === 'string' ? societyName : (currentLang === 'ko' ? societyName?.ko : societyName?.en) || societyId}
         hasAbstracts={!!(config as Record<string, unknown>)?.abstractSubmissionDeadline}
+        paymentMode={config.paymentMode as string | undefined}
       />
 
       {/* 3. Main Content Area */}

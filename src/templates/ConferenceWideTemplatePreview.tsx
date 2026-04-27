@@ -136,6 +136,7 @@ export const ConferenceWideTemplatePreview = ({ slug }: Props) => {
         period={config.dates || config.period}
         societyName={societyName}
         hasAbstracts={!!(config as Record<string, unknown>)?.abstractSubmissionDeadline}
+        paymentMode={config.paymentMode as string | undefined}
       />
 
       {/* 3. Main Content Area */}
