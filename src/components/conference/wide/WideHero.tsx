@@ -21,6 +21,7 @@ interface WideHeroProps {
   societyName?: LocalizedString;
   bgImage?: string;
   lang: string;
+  hasAbstracts?: boolean;
   labels?: {
     register: string;
     abstracts: string;
@@ -44,6 +45,7 @@ export const WideHero: React.FC<WideHeroProps> = ({
   societyName,
   bgImage,
   lang,
+  hasAbstracts = true,
 }) => {
   const navigate = useNavigate();
   const { auth } = useAuth();
@@ -222,12 +224,14 @@ export const WideHero: React.FC<WideHeroProps> = ({
             </button>
           )}
 
-          <a
-            href={`/${targetSlug}/abstracts?lang=${lang}`}
-            className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-teal-900/30 hover:shadow-teal-900/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98] text-center"
-          >
-            {lang === 'ko' ? '초록 접수' : 'Abstract Submission'}
-          </a>
+          {hasAbstracts && (
+            <a
+              href={`/${targetSlug}/abstracts?lang=${lang}`}
+              className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-teal-900/30 hover:shadow-teal-900/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98] text-center"
+            >
+              {lang === 'ko' ? '초록 접수' : 'Abstract Submission'}
+            </a>
+          )}
         </div>
 
         {/* Chip Info - Better Mobile Stack */}

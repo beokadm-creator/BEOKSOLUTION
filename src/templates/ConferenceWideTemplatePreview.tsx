@@ -135,6 +135,7 @@ export const ConferenceWideTemplatePreview = ({ slug }: Props) => {
         bgImage={t((config as Record<string, unknown>)?.visualAssets?.banner) || (typeof (config as Record<string, unknown>)?.bannerUrl === 'string' ? (config as Record<string, unknown>)?.bannerUrl : t((config as Record<string, unknown>)?.bannerUrl)) || ''}
         period={config.dates || config.period}
         societyName={societyName}
+        hasAbstracts={!!(config as Record<string, unknown>)?.abstractSubmissionDeadline}
       />
 
       {/* 3. Main Content Area */}

@@ -22,6 +22,7 @@ interface WideHeroPreviewProps {
   societyName?: LocalizedString;
   bgImage?: string;
   lang: string;
+  hasAbstracts?: boolean;
   labels?: {
     register: string;
     abstracts: string;
@@ -45,6 +46,7 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
     societyName,
     bgImage,
     lang,
+    hasAbstracts = true,
   } = props;
 
   const navigate = useNavigate();
@@ -203,21 +205,23 @@ export const WideHeroPreview: React.FC<WideHeroPreviewProps> = (props) => {
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={() => {
-              if (auth.user) {
-                navigate(`/${targetSlug}/abstracts?lang=${lang}`);
-              } else {
-                setModalInitialMode('registration-check');
-                setModalRedirectUrl(`/${targetSlug}/abstracts?lang=${lang}`);
-                setShowModal(true);
-              }
-            }}
-            className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-teal-900/30 hover:shadow-teal-900/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98] text-center"
-          >
-            {lang === 'ko' ? '초록 접수' : 'Abstract Submission'}
-          </button>
+          {hasAbstracts && (
+            <button
+              type="button"
+              onClick={() => {
+                if (auth.user) {
+                  navigate(`/${targetSlug}/abstracts?lang=${lang}`);
+                } else {
+                  setModalInitialMode('registration-check');
+                  setModalRedirectUrl(`/${targetSlug}/abstracts?lang=${lang}`);
+                  setShowModal(true);
+                }
+              }}
+              className="w-full sm:w-auto px-6 sm:px-8 py-4 md:py-4.5 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-white text-base md:text-lg lg:text-xl font-bold rounded-xl shadow-xl shadow-teal-900/30 hover:shadow-teal-900/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98] text-center"
+            >
+              {lang === 'ko' ? '초록 접수' : 'Abstract Submission'}
+            </button>
+          )}
         </div>
 
         {/* Chip Info - Better Mobile Stack */}
