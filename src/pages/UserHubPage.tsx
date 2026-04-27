@@ -170,23 +170,25 @@ const UserHubPage: React.FC = () => {
                                                 `[STATUS] ${r.paymentStatus || r.status}`}
                                     </span>
                                     <div className="flex flex-wrap gap-2">
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                const currentLang = searchParams.get('lang') || 'ko';
-                                                const safeSlug = getSafeConferenceSlug(r.slug);
-                                                if (!safeSlug) {
-                                                    toast.error('학술대회 정보가 없어 초록 페이지로 이동할 수 없습니다.');
-                                                    return;
-                                                }
-                                                navigate(`/${safeSlug}/abstracts?lang=${currentLang}`);
-                                            }}
-                                            className="w-full sm:w-auto justify-center bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs gap-1.5 shadow-sm border border-slate-200"
-                                        >
-                                            <FileText size={14} /> 초록 접수/확인
-                                        </Button>
+                                        {r.hasAbstracts && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const currentLang = searchParams.get('lang') || 'ko';
+                                                    const safeSlug = getSafeConferenceSlug(r.slug);
+                                                    if (!safeSlug) {
+                                                        toast.error('학술대회 정보가 없어 초록 페이지로 이동할 수 없습니다.');
+                                                        return;
+                                                    }
+                                                    navigate(`/${safeSlug}/abstracts?lang=${currentLang}`);
+                                                }}
+                                                className="w-full sm:w-auto justify-center bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs gap-1.5 shadow-sm border border-slate-200"
+                                            >
+                                                <FileText size={14} /> 초록 접수/확인
+                                            </Button>
+                                        )}
                                         <Button
                                             size="sm"
                                             variant="outline"

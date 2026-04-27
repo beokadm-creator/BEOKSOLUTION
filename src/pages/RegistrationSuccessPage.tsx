@@ -195,14 +195,16 @@ const RegistrationSuccessPage: React.FC = () => {
                             </Button>
                         )}
 
-                        <Button
-                            variant="outline"
-                            onClick={() => navigate(`/${finalSlug}/abstracts`)}
-                            className="h-14 border-2 border-gray-200 hover:border-[#003366]/20 text-[#003366] hover:bg-blue-50 font-bold rounded-2xl text-lg transition-all"
-                        >
-                            <FileText className="w-5 h-5 mr-2" />
-                            {language === 'ko' ? '초록 제출' : 'Submit Abstract'}
-                        </Button>
+                        {conference.info?.abstractSubmissionDeadline && (
+                            <Button
+                                variant="outline"
+                                onClick={() => navigate(`/${finalSlug}/abstracts`)}
+                                className="h-14 border-2 border-gray-200 hover:border-[#003366]/20 text-[#003366] hover:bg-blue-50 font-bold rounded-2xl text-lg transition-all"
+                            >
+                                <FileText className="w-5 h-5 mr-2" />
+                                {language === 'ko' ? '초록 제출' : 'Submit Abstract'}
+                            </Button>
+                        )}
                     </div>
 
                     <div className="pt-6 border-t border-gray-100 flex justify-center w-full">
