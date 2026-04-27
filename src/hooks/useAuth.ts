@@ -4,13 +4,9 @@ import { onSnapshot, doc, DocumentData, Timestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { auth as firebaseAuth, db, functions } from '../firebase';
 import { ConferenceUser } from '../types/schema';
-import { getRootCookie, removeRootCookie, clearAllSessions } from '../utils/cookie';
+import { removeRootCookie, clearAllSessions } from '../utils/cookie';
 import { getSessionToken } from '../utils/sessionManager';
 import { normalizeUserData } from '../utils/userDataMapper';
-
-// [Step 412-D] 물리적 쿨다운 강제
-const GLOBAL_SYNC_LOCK = false;
-const LAST_SYNC_TIME = 0;
 
 export interface AuthState {
     user: ConferenceUser | null;
@@ -27,9 +23,6 @@ export const useAuth = () => {
         step: 'IDLE',
         error: null,
     });
-
-    // const isSyncing = useRef(false); // [Step 412-D] Replaced by GLOBAL_SYNC_LOCK
-    // const lastMintAttempt = useRef<number>(0); 
 
     useEffect(() => {
         // 1. Safety Timeout (Fix for infinite loading)
@@ -56,22 +49,6 @@ export const useAuth = () => {
                     sessionStorage.removeItem('NON_MEMBER');
                 } catch (err) {
                     console.warn('[useAuth] Failed to clear non-member session:', err);
-                }
-
-                // [Step 413-D] Silent & Robust Patch: Block sync if already authenticated
-                // Note: currentUser is truthy here, so we are authenticated in Firebase.
-                // If we also have a session cookie, we definitely skip.
-                const existingToken = getRootCookie('eregi_session');
-
-                if (!existingToken) {
-                    const now = Date.now();
-
-                    // Check Global Lock and Cooldown
-                    if (GLOBAL_SYNC_LOCK || (now - LAST_SYNC_TIME < 60000)) {
-                        // Silent return (no warning logs to keep console clean)
-                    } else {
-                        // [Surgical Extraction] Sync logic physically removed
-                    }
                 }
 
                 // [Step 403-A] Prevent loading flash during sync

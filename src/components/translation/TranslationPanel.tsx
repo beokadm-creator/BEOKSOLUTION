@@ -27,6 +27,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
 
   // Load available halls (projects)
   useEffect(() => {
+    if (!rtdb) return;
     const projectsRef = ref(rtdb, 'projects');
     const unsubscribe = onValue(projectsRef, (projSnap) => {
       if (projSnap.exists()) {
@@ -73,7 +74,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
 
   // Subscribe to active session for selected project
   useEffect(() => {
-    if (!selectedProjectId) {
+    if (!rtdb || !selectedProjectId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveSessionId(null);
       setActiveSessionInfo(null);
@@ -144,7 +145,7 @@ export const TranslationPanel: React.FC<{ defaultConferenceId?: string }> = ({ d
     return () => clearInterval(timer);
   }, []);
 
-  if (!selectedProjectId) {
+  if (!rtdb || !selectedProjectId) {
     return (
       <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200 mt-4">
         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
