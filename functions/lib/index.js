@@ -36,8 +36,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.logError = exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.processFreeRegistrationHttp = exports.confirmTossPaymentHttp = exports.reissueCertificate = exports.logCertificateDownload = exports.revokeCertificate = exports.verifyCertificatePublic = exports.verifyCertificate = exports.issueCertificate = exports.runStampRewardLottery = exports.adminDrawStampReward = exports.requestStampReward = exports.manualDataCleanup = exports.scheduledDataCleanup = exports.withdrawConsent = exports.logAuditEvent = exports.processVendorVisit = exports.resolveVendorBadgeScan = exports.sendVendorAlimTalk = exports.manualAutoCheckout = exports.scheduledAutoCheckout = exports.resolveDataIntegrityAlert = exports.manualHealthCheck = exports.scheduledHealthCheck = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.bulkSendNotifications = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.corsHandler = void 0;
-exports.healthCheck = exports.onTossWebhook = exports.logPerformance = void 0;
+exports.checkNonMemberEmailExists = exports.generateAccessLink = exports.verifyAccessLink = exports.mintCrossDomainToken = exports.deleteUserAccount = exports.checkEmailExists = exports.verifyMemberIdentity = exports.sendAuthCode = exports.removeSocietyAdminUser = exports.createSocietyAdminUser = exports.getNhnAlimTalkTemplates = exports.cancelTossPayment = exports.processFreeRegistrationHttp = exports.lookupRegistrationByEmail = exports.confirmTossPaymentHttp = exports.reissueCertificate = exports.logCertificateDownload = exports.revokeCertificate = exports.verifyCertificatePublic = exports.verifyCertificate = exports.issueCertificate = exports.runStampRewardLottery = exports.adminDrawStampReward = exports.requestStampReward = exports.manualDataCleanup = exports.scheduledDataCleanup = exports.withdrawConsent = exports.logAuditEvent = exports.processVendorVisit = exports.resolveVendorBadgeScan = exports.sendVendorAlimTalk = exports.manualAutoCheckout = exports.scheduledAutoCheckout = exports.resolveDataIntegrityAlert = exports.manualHealthCheck = exports.scheduledHealthCheck = exports.weeklyPerformanceReport = exports.dailyErrorReport = exports.monitorMemberCodeIntegrity = exports.monitorRegistrationIntegrity = exports.migrateRegistrationsForOptionsCallable = exports.migrateRegistrationsForOptions = exports.generateFirebaseAuthUserForExternalAttendee = exports.bulkSendNotifications = exports.resendBadgePrepToken = exports.issueDigitalBadge = exports.validateBadgePrepToken = exports.onExternalAttendeeCreated = exports.onRegistrationCreated = exports.corsHandler = void 0;
+exports.healthCheck = exports.onTossWebhook = exports.logPerformance = exports.logError = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const cors_1 = __importDefault(require("cors"));
@@ -119,7 +119,7 @@ exports.confirmTossPaymentHttp = functions
             res.status(405).json({ error: 'Method not allowed' });
             return;
         }
-        const { paymentKey, orderId, amount, regId, confId, secretKey, userData, baseAmount, optionsTotal, selectedOptions } = req.body;
+        const { paymentKey, orderId, amount, regId, confId, secretKey, userData, baseAmount, optionsTotal, selectedOptions, agreementDetails } = req.body;
         if (!paymentKey || !orderId || !amount || !confId) { // Added confId to required check
             res.status(400).json({ error: 'Missing required parameters' });
             return;
@@ -220,7 +220,7 @@ exports.confirmTossPaymentHttp = functions
                     categoryName: userData.categoryName || null,
                     memberVerificationData: null,
                     isAnonymous: userData.isAnonymous || false,
-                    agreementDetails: {},
+                    agreementDetails: agreementDetails || {},
                     paymentDetails: approvalResult,
                     virtualAccount: approvalResult.virtualAccount || null,
                     receiptNumber: `${dateStr}-${rand}`,
@@ -321,6 +321,90 @@ exports.confirmTossPaymentHttp = functions
     });
 });
 // --------------------------------------------------------------------------
+// REGISTRATION LOOKUP (Email + Password)
+// --------------------------------------------------------------------------
+exports.lookupRegistrationByEmail = functions
+    .runWith({
+    enforceAppCheck: false,
+    ingressSettings: 'ALLOW_ALL'
+})
+    .https.onRequest(async (req, res) => {
+    return (0, exports.corsHandler)(req, res, async () => {
+        var _a;
+        if (req.method === 'OPTIONS') {
+            res.status(204).end();
+            return;
+        }
+        if (req.method !== 'POST') {
+            res.status(405).json({ error: 'Method not allowed' });
+            return;
+        }
+        const { email, password, confId } = req.body;
+        if (!email || !password || !confId) {
+            res.status(400).json({ error: 'Missing required parameters' });
+            return;
+        }
+        try {
+            const db = admin.firestore();
+            const normalizedEmail = email.toLowerCase().trim();
+            // 1. Find registration by email and confId
+            const regsSnap = await db.collection(`conferences/${confId}/registrations`)
+                .where('email', '==', normalizedEmail)
+                .orderBy('createdAt', 'desc')
+                .limit(1)
+                .get();
+            if (regsSnap.empty) {
+                res.status(404).json({ error: 'Registration not found' });
+                return;
+            }
+            const regDoc = regsSnap.docs[0];
+            const regData = regDoc.data();
+            const userId = regData.userId;
+            if (!userId || userId === 'GUEST') {
+                // Registration exists but has no user ID to verify against
+                res.status(404).json({ error: 'User account not found' });
+                return;
+            }
+            // 2. Fetch user to verify password
+            const userDoc = await db.collection('users').doc(userId).get();
+            if (!userDoc.exists) {
+                res.status(404).json({ error: 'User account not found' });
+                return;
+            }
+            const userData = userDoc.data();
+            const storedPassword = userData === null || userData === void 0 ? void 0 : userData.simplePassword;
+            if (!storedPassword) {
+                res.status(404).json({ error: 'No password set for this registration' });
+                return;
+            }
+            // 3. Verify password
+            const inputPasswordBase64 = Buffer.from(password).toString('base64');
+            if (storedPassword !== inputPasswordBase64) {
+                res.status(401).json({ error: 'Incorrect password' });
+                return;
+            }
+            // 4. Return safe data (No PII)
+            res.status(200).json({
+                found: true,
+                registration: {
+                    id: regDoc.id,
+                    status: regData.status,
+                    paymentStatus: regData.paymentStatus,
+                    userName: regData.name || ((_a = regData.userInfo) === null || _a === void 0 ? void 0 : _a.name),
+                    createdAt: regData.createdAt,
+                    confirmationQr: regData.confirmationQr,
+                    slug: confId.split('_').slice(1).join('_')
+                }
+            });
+        }
+        catch (error) {
+            functions.logger.error("Error in lookupRegistrationByEmail:", error);
+            const errorMessage = error instanceof Error ? error.message : 'Lookup failed';
+            res.status(500).json({ error: errorMessage });
+        }
+    });
+});
+// --------------------------------------------------------------------------
 // FREE REGISTRATION (0 KRW)
 // --------------------------------------------------------------------------
 exports.processFreeRegistrationHttp = functions
@@ -339,7 +423,7 @@ exports.processFreeRegistrationHttp = functions
             res.status(405).json({ error: 'Method not allowed' });
             return;
         }
-        const { regId, confId, userData, amount, baseAmount, optionsTotal, selectedOptions } = req.body;
+        const { regId, confId, userData, amount, baseAmount, optionsTotal, selectedOptions, agreementDetails } = req.body;
         if (!regId || !confId || !userData || amount === undefined) {
             res.status(400).json({ error: 'Missing required parameters' });
             return;
@@ -402,7 +486,7 @@ exports.processFreeRegistrationHttp = functions
                 categoryName: userData.categoryName || null,
                 memberVerificationData: null,
                 isAnonymous: userData.isAnonymous || false,
-                agreementDetails: {},
+                agreementDetails: agreementDetails || {},
                 paymentDetails: { status: 'DONE', method: 'FREE' },
                 receiptNumber: `${dateStr}-${rand}`,
                 confirmationQr: regId,
