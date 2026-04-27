@@ -266,6 +266,14 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         setShowTermsModal(true);
     };
 
+    const handleTermsClose = () => {
+        setShowTermsModal(false);
+
+        if (mode === 'free-all') {
+            onClose();
+        }
+    };
+
     const handleTermsAgree = (agreementDetails?: AgreementDetails) => {
         // Calculate the price before navigating
         let calculatedPrice = 0;
@@ -815,7 +823,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 showTermsModal && (
                     <LegalAgreementModal
                         isOpen={showTermsModal}
-                        onClose={() => setShowTermsModal(false)}
+                        onClose={handleTermsClose}
                         onAgree={handleTermsAgree}
                         lang={lang}
                         terms={info as Conference} // Pass conference info which contains terms

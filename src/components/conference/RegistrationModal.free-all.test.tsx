@@ -1,10 +1,11 @@
 import React from 'react';
-import { render, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { doc, getDoc } from 'firebase/firestore';
 import { MemoryRouter } from 'react-router-dom';
 import { RegistrationModal } from './RegistrationModal';
 
 const mockNavigate = jest.fn();
+const mockReact = React;
 
 jest.mock('../../firebase', () => ({
   db: {},
@@ -14,6 +15,18 @@ jest.mock('../../firebase', () => ({
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: () => mockNavigate,
+}));
+
+jest.mock('./LegalAgreementModal', () => ({
+  __esModule: true,
+  default: ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
+    return isOpen ? mockReact.createElement(
+      'div',
+      null,
+      mockReact.createElement('h2', null, '이용약관 동의'),
+      mockReact.createElement('button', { type: 'button', onClick: onClose }, '취소'),
+    ) : null;
+  },
 }));
 
 jest.mock('../../hooks/useConference', () => ({
@@ -73,5 +86,31 @@ describe('RegistrationModal FREE_ALL flow', () => {
       expect(onClose).not.toHaveBeenCalled();
       expect(mockNavigate).not.toHaveBeenCalled();
     });
+  });
+
+  it('closes the whole registration flow when FREE_ALL terms are cancelled', async () => {
+    const onClose = jest.fn();
+
+    render(
+      React.createElement(
+        MemoryRouter,
+        null,
+        React.createElement(RegistrationModal, {
+          isOpen: true,
+          onClose,
+          societyId: 'kap',
+          societyName: 'KAP',
+          confId: 'kap_2026spring',
+        }),
+      ),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('이용약관 동의')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('취소')[0]);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
