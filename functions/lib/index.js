@@ -95,6 +95,42 @@ Object.defineProperty(exports, "logCertificateDownload", { enumerable: true, get
 Object.defineProperty(exports, "reissueCertificate", { enumerable: true, get: function () { return index_2.reissueCertificate; } });
 exports.corsHandler = (0, cors_1.default)({ origin: true });
 admin.initializeApp();
+function isSuperAdminToken(token) {
+    if (!token)
+        return false;
+    if (token.admin === true || token.super === true)
+        return true;
+    const email = typeof token.email === "string" ? token.email : "";
+    return email === "aaron@beoksolution.com" || email === "test@eregi.co.kr";
+}
+async function isSocietyAdminEmail(societyId, email) {
+    var _a;
+    const doc = await admin.firestore().doc(`societies/${societyId}/private/admin`).get();
+    const emails = (_a = doc.data()) === null || _a === void 0 ? void 0 : _a.adminEmails;
+    return Array.isArray(emails) && emails.includes(email);
+}
+async function isConferenceAdminEmail(confId, email) {
+    var _a;
+    const confSnap = await admin.firestore().collection("conferences").doc(confId).get();
+    const societyId = (_a = confSnap.data()) === null || _a === void 0 ? void 0 : _a.societyId;
+    if (!societyId)
+        return false;
+    return isSocietyAdminEmail(societyId, email);
+}
+function requireAuth(context) {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
+    }
+    const email = typeof context.auth.token.email === "string" ? context.auth.token.email : "";
+    return { uid: context.auth.uid, email, token: context.auth.token };
+}
+function requireSuperAdmin(context) {
+    const auth = requireAuth(context);
+    if (!isSuperAdminToken(auth.token)) {
+        throw new functions.https.HttpsError("permission-denied", "Super admin permission required.");
+    }
+    return auth;
+}
 const external_1 = require("./auth/external");
 Object.defineProperty(exports, "generateFirebaseAuthUserForExternalAttendee", { enumerable: true, get: function () { return external_1.generateFirebaseAuthUserForExternalAttendee; } });
 // --------------------------------------------------------------------------
@@ -103,7 +139,7 @@ Object.defineProperty(exports, "generateFirebaseAuthUserForExternalAttendee", { 
 // 1. Confirm TossPayment (HTTP Endpoint with CORS for custom domains)
 exports.confirmTossPaymentHttp = functions
     .runWith({
-    enforceAppCheck: false, // Keep false as it might be used for external integrations/webhooks
+    enforceAppCheck: true,
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onRequest(async (req, res) => {
@@ -119,7 +155,7 @@ exports.confirmTossPaymentHttp = functions
             res.status(405).json({ error: 'Method not allowed' });
             return;
         }
-        const { paymentKey, orderId, amount, regId, confId, secretKey, userData, baseAmount, optionsTotal, selectedOptions, agreementDetails } = req.body;
+        const { paymentKey, orderId, amount, regId, confId, userData, baseAmount, optionsTotal, selectedOptions, agreementDetails } = req.body;
         if (!paymentKey || !orderId || !amount || !confId) { // Added confId to required check
             res.status(400).json({ error: 'Missing required parameters' });
             return;
@@ -150,11 +186,22 @@ exports.confirmTossPaymentHttp = functions
             }
         }
         try {
+            if (confId) {
+                const existingPaymentSnap = await admin.firestore()
+                    .collection(`conferences/${confId}/registrations`)
+                    .where("paymentKey", "==", paymentKey)
+                    .limit(1)
+                    .get();
+                if (!existingPaymentSnap.empty && existingPaymentSnap.docs[0].id !== regId) {
+                    res.status(409).json({ error: "이미 처리된 결제입니다. 새로고침 후 다시 시도해주세요." });
+                    return;
+                }
+            }
             // [Modified] Fetch Secret Key from DB (Secure)
             const db = admin.firestore();
             const confSnap = await db.collection('conferences').doc(confId).get();
             const societyId = (_a = confSnap.data()) === null || _a === void 0 ? void 0 : _a.societyId;
-            let finalSecretKey = secretKey; // Fallback
+            let finalSecretKey = '';
             let finalStoreId = null;
             if (societyId) {
                 const infraSnap = await db.collection('societies').doc(societyId).collection('settings').doc('infrastructure').get();
@@ -163,7 +210,7 @@ exports.confirmTossPaymentHttp = functions
                     if ((_c = (_b = infraData === null || infraData === void 0 ? void 0 : infraData.payment) === null || _b === void 0 ? void 0 : _b.domestic) === null || _c === void 0 ? void 0 : _c.secretKey) {
                         finalSecretKey = infraData.payment.domestic.secretKey;
                         finalStoreId = infraData.payment.domestic.storeId || null;
-                        functions.logger.info(`[TossPaymentHttp] Loaded Secure Key for ${societyId} (Starts with: ${finalSecretKey.substring(0, 5)}...) StoreId: ${finalStoreId}`);
+                        functions.logger.info(`[TossPaymentHttp] Loaded payment config for ${societyId} StoreId: ${finalStoreId}`);
                     }
                 }
             }
@@ -409,7 +456,7 @@ exports.lookupRegistrationByEmail = functions
 // --------------------------------------------------------------------------
 exports.processFreeRegistrationHttp = functions
     .runWith({
-    enforceAppCheck: false,
+    enforceAppCheck: true,
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onRequest(async (req, res) => {
@@ -716,18 +763,15 @@ exports.getNhnAlimTalkTemplates = functions
 // --------------------------------------------------------------------------
 exports.createSocietyAdminUser = functions
     .runWith({
-    enforceAppCheck: false, // Disable AppCheck for debugging
+    enforceAppCheck: true,
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onCall(async (data, context) => {
     // 0. ENTRY LOG
     functions.logger.info(">>> FUNCTION HIT: createSocietyAdminUser", { structuredData: true });
-    // 1. Guard: Check if requester is Authenticated
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
-    }
+    const { uid: callerUid } = requireSuperAdmin(context);
     // Log the incoming data for debugging
-    functions.logger.info("createSocietyAdminUser called by:", context.auth.uid, "with data:", data);
+    functions.logger.info("createSocietyAdminUser called by:", callerUid, "with data:", data);
     const { email, password, name, societyId, forceLink } = data;
     // 2. Validation
     if (!email || !societyId) {
@@ -801,14 +845,12 @@ exports.createSocietyAdminUser = functions
 // --------------------------------------------------------------------------
 exports.removeSocietyAdminUser = functions
     .runWith({
-    enforceAppCheck: false,
+    enforceAppCheck: true,
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onCall(async (data, context) => {
     functions.logger.info(">>> FUNCTION HIT: removeSocietyAdminUser", { structuredData: true });
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
-    }
+    requireSuperAdmin(context);
     const { email, societyId } = data;
     if (!email || !societyId) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing email or societyId');
@@ -912,7 +954,7 @@ exports.verifyMemberIdentity = functions
             // [Security] Used Check - One-Time Use Only
             // Once a code is used, it cannot be reused by anyone
             if (member.used === true) {
-                return { success: false, message: "Code Already Used" };
+                return { success: false, message: "회원 정보를 확인할 수 없습니다." };
             }
             // [Security] Expiry Check - Return isExpired flag instead of failing
             // Expired members should be able to verify, but register at non-member price
@@ -937,6 +979,18 @@ exports.verifyMemberIdentity = functions
                 });
             }
             const finalExpiry = member.expiryDate || member.expiry || null;
+            const expiryDisplay = (() => {
+                if (!finalExpiry)
+                    return null;
+                if (typeof finalExpiry === "string")
+                    return finalExpiry;
+                if (typeof finalExpiry === "object" && finalExpiry !== null && "toDate" in finalExpiry && typeof finalExpiry.toDate === "function") {
+                    return finalExpiry.toDate().toISOString().slice(0, 10);
+                }
+                if (finalExpiry instanceof Date)
+                    return finalExpiry.toISOString().slice(0, 10);
+                return null;
+            })();
             // [FIX-DISCOUNT] Generate normalized price key for frontend matching
             const serverGrade = member.grade || member.category || 'Member';
             const priceKey = String(serverGrade)
@@ -948,17 +1002,14 @@ exports.verifyMemberIdentity = functions
                 isExpired: isExpired, // ??[FIX] 嶺뚮씭??쭩???? ????뗥윜??怨뺣뼺?
                 memberData: {
                     id: memberDoc.id, // [Critical] Return Doc ID for Locking
-                    name: member.name,
-                    grade: serverGrade, // ??[FIX] ?繹먭퍗???筌먲퐢沅??怨뺣뼺?
-                    priceKey: priceKey, // ??[FIX] ?筌????븐뼔彛??띠럾??????怨뺣뼺?
-                    licenseNumber: member.licenseNumber || member.code,
-                    societyId: societyId, // Pass back for context
-                    expiryDate: finalExpiry,
-                    expiry: finalExpiry // ?熬곣뫁夷?筌? 嶺뚢돦堉???熬곣뫀援??띠룆踰???낅슣???
+                    grade: serverGrade,
+                    priceKey: priceKey,
+                    code: code,
+                    expiry: expiryDisplay
                 }
             };
         }
-        return { success: false, message: "Member not found. Please check your name and license number." };
+        return { success: false, message: "회원 정보를 확인할 수 없습니다." };
     }
     catch (e) {
         functions.logger.error("Verify Member Error:", e);
@@ -1001,21 +1052,21 @@ exports.checkEmailExists = functions
 // --------------------------------------------------------------------------
 exports.deleteUserAccount = functions
     .runWith({
-    enforceAppCheck: false,
+    enforceAppCheck: true,
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onCall(async (data, context) => {
     // 1. Security Check
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'Must be logged in.');
+    const { uid: callerUid, email, token } = requireAuth(context);
+    const isSuper = isSuperAdminToken(token);
+    if (!isSuper) {
+        throw new functions.https.HttpsError("permission-denied", "Super admin permission required.");
     }
-    // Check for Super Admin Claim or specific email (fallback)
-    const isSuper = context.auth.token.super === true || context.auth.token.email === 'admin@eregi.com' || context.auth.token.email === 'super@eregi.com';
     const { uid } = data;
     if (!uid) {
         throw new functions.https.HttpsError('invalid-argument', 'UID is required');
     }
-    functions.logger.warn(`[NUCLEAR DELETE] Initiated by ${context.auth.uid} (Super: ${isSuper}) for target ${uid}`);
+    functions.logger.warn(`[NUCLEAR DELETE] Initiated by ${callerUid} (${email}) for target ${uid}`);
     // 2. Auth Delete (Try-Catch for Robustness)
     try {
         await admin.auth().deleteUser(uid);
@@ -1050,6 +1101,17 @@ exports.deleteUserAccount = functions
 let cachedAllowedOrigins = [];
 let lastCacheTime = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+function isAllowedOrigin(origin, allowedOrigins) {
+    if (!origin)
+        return false;
+    if (allowedOrigins.includes('*'))
+        return true;
+    if (allowedOrigins.includes(origin))
+        return true;
+    if (allowedOrigins.includes('https://*.eregi.co.kr') && /^https:\/\/[a-z0-9-]+\.eregi\.co\.kr$/i.test(origin))
+        return true;
+    return false;
+}
 const getAllowedDomains = async () => {
     var _a;
     // 1. Check Cache
@@ -1065,9 +1127,9 @@ const getAllowedDomains = async () => {
         }
         else {
             // Fallback / Auto-Seed
-            cachedAllowedOrigins = ['*'];
+            cachedAllowedOrigins = ['https://eregi.co.kr', 'https://*.eregi.co.kr'];
             await settingsRef.set({ allowedOrigins: cachedAllowedOrigins }, { merge: true });
-            functions.logger.warn("[Security] 'globalSettings/security' missing. Created default with ['*'].");
+            functions.logger.warn("[Security] 'globalSettings/security' missing. Created default allowlist.");
         }
         // [Step 512-D] Explicitly ensure Root Domain is allowed
         if (!cachedAllowedOrigins.includes('https://eregi.co.kr')) {
@@ -1078,7 +1140,7 @@ const getAllowedDomains = async () => {
     }
     catch (e) {
         functions.logger.error("Failed to fetch allowed origins:", e);
-        return ['*']; // Fail open or closed depending on policy. Here failing open for reliability.
+        return ['https://eregi.co.kr', 'https://*.eregi.co.kr'];
     }
 };
 exports.mintCrossDomainToken = functions
@@ -1089,8 +1151,7 @@ exports.mintCrossDomainToken = functions
         const origin = context.rawRequest.headers.origin;
         // [Step 512-D] Use Cached Domain List
         const allowedOrigins = await getAllowedDomains();
-        // Allow if '*' is present OR origin is in the list
-        const isAllowed = allowedOrigins.includes('*') || (origin && allowedOrigins.includes(origin));
+        const isAllowed = isAllowedOrigin(origin, allowedOrigins);
         if (!isAllowed) {
             functions.logger.warn(`[CORS Block] Origin ${origin} not in allowed list.`);
             throw new functions.https.HttpsError('permission-denied', 'CORS Policy: Origin not allowed');
@@ -1134,10 +1195,13 @@ exports.mintCrossDomainToken = functions
 // SECURITY: Admin Link Verification (HMAC + TTL)
 // --------------------------------------------------------------------------
 const crypto = __importStar(require("crypto"));
-const LINK_SECRET = process.env.LINK_SECRET || 'eregi_v2_secure_link_key_2026';
+const LINK_SECRET = process.env.LINK_SECRET;
 exports.verifyAccessLink = functions
     .runWith({ enforceAppCheck: false, ingressSettings: 'ALLOW_ALL' })
     .https.onCall(async (data, _context) => {
+    if (!LINK_SECRET) {
+        throw new functions.https.HttpsError("failed-precondition", "LINK_SECRET is not configured.");
+    }
     const { token } = data;
     if (!token)
         throw new functions.https.HttpsError('invalid-argument', 'Token required');
@@ -1150,7 +1214,9 @@ exports.verifyAccessLink = functions
         // 1. Verify Signature
         const expectedSig = crypto.createHmac('sha256', LINK_SECRET).update(payloadB64).digest('hex');
         // Constant time comparison to prevent timing attacks (optional but good)
-        if (expectedSig !== signature) {
+        const a = Buffer.from(signature, "utf8");
+        const b = Buffer.from(expectedSig, "utf8");
+        if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
             throw new Error('Invalid signature');
         }
         // 2. Decode Payload
@@ -1171,22 +1237,36 @@ exports.verifyAccessLink = functions
 exports.generateAccessLink = functions
     .runWith({ enforceAppCheck: false, ingressSettings: 'ALLOW_ALL' })
     .https.onCall(async (data, context) => {
-    // [Security] Only authenticated users (Admins) can generate links
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'Authentication required to generate links');
+    if (!LINK_SECRET) {
+        throw new functions.https.HttpsError("failed-precondition", "LINK_SECRET is not configured.");
     }
+    const { uid, email, token: authToken } = requireAuth(context);
     const { cid, role = 'OPERATOR', expiresIn = 3600 } = data; // Default 1 hour
+    if (!cid || typeof cid !== "string") {
+        throw new functions.https.HttpsError("invalid-argument", "cid is required.");
+    }
+    const allowedRoles = new Set(["OPERATOR", "ADMIN"]);
+    if (!allowedRoles.has(String(role))) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid role.");
+    }
+    if (typeof expiresIn !== "number" || !Number.isFinite(expiresIn) || expiresIn <= 0 || expiresIn > 7 * 24 * 60 * 60) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid expiresIn.");
+    }
+    const isAllowed = isSuperAdminToken(authToken) || await isConferenceAdminEmail(cid, email);
+    if (!isAllowed) {
+        throw new functions.https.HttpsError("permission-denied", "Admin permission required to generate links.");
+    }
     const payload = {
         cid,
         role,
         exp: Date.now() + (expiresIn * 1000),
         iat: Date.now(),
-        generatedBy: context.auth.uid
+        generatedBy: uid
     };
     const payloadB64 = Buffer.from(JSON.stringify(payload)).toString('base64');
     const signature = crypto.createHmac('sha256', LINK_SECRET).update(payloadB64).digest('hex');
-    const token = `${payloadB64}.${signature}`;
-    return { token };
+    const accessToken = `${payloadB64}.${signature}`;
+    return { token: accessToken };
 });
 // --------------------------------------------------------------------------
 // GUEST REGISTRATION: Email & Password Management
@@ -1417,7 +1497,7 @@ exports.onTossWebhook = functions
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onRequest(async (req, res) => {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
     // Log webhook payload
     functions.logger.info(">>> [Toss Webhook] Received:", req.body);
     try {
@@ -1465,6 +1545,46 @@ exports.onTossWebhook = functions
         const confId = regData.conferenceId;
         const userId = regData.userId; // e.g. 'GUEST' or uid
         functions.logger.info(`[Toss Webhook] Processing ${status} for Registration ${regRef.path}`);
+        try {
+            const confSnap = await db.collection("conferences").doc(confId).get();
+            const societyId = (_a = confSnap.data()) === null || _a === void 0 ? void 0 : _a.societyId;
+            if (!societyId) {
+                functions.logger.warn("[Toss Webhook] Missing societyId on conference", { confId });
+                res.status(200).json({ message: "Missing config" });
+                return;
+            }
+            const infraSnap = await db.collection("societies").doc(societyId).collection("settings").doc("infrastructure").get();
+            const infraData = infraSnap.data();
+            const secretKey = (_c = (_b = infraData === null || infraData === void 0 ? void 0 : infraData.payment) === null || _b === void 0 ? void 0 : _b.domestic) === null || _c === void 0 ? void 0 : _c.secretKey;
+            if (!secretKey || typeof secretKey !== "string") {
+                functions.logger.warn("[Toss Webhook] Missing Toss secretKey", { societyId });
+                res.status(200).json({ message: "Missing config" });
+                return;
+            }
+            const paymentKey = regData.paymentKey;
+            if (!paymentKey || typeof paymentKey !== "string") {
+                functions.logger.warn("[Toss Webhook] Missing paymentKey on registration", { orderId });
+                res.status(200).json({ message: "Missing paymentKey" });
+                return;
+            }
+            const payment = await (0, toss_1.getTossPayment)(paymentKey, secretKey);
+            if ((payment === null || payment === void 0 ? void 0 : payment.orderId) !== orderId) {
+                functions.logger.warn("[Toss Webhook] orderId mismatch", { orderId, paymentOrderId: payment === null || payment === void 0 ? void 0 : payment.orderId });
+                res.status(403).json({ message: "Invalid webhook" });
+                return;
+            }
+            const paymentStatus = payment === null || payment === void 0 ? void 0 : payment.status;
+            if (typeof paymentStatus === "string" && paymentStatus !== status) {
+                functions.logger.warn("[Toss Webhook] status mismatch", { status, paymentStatus });
+                res.status(403).json({ message: "Invalid webhook" });
+                return;
+            }
+        }
+        catch (verifyError) {
+            functions.logger.error("[Toss Webhook] Payment verification failed", verifyError);
+            res.status(500).json({ message: "Verification failed" });
+            return;
+        }
         if (status === 'DONE') {
             // Payment Completed (Deposit Confirmed)
             if (regData.status === 'PAID') {
@@ -1488,7 +1608,7 @@ exports.onTossWebhook = functions
                 const confSnap = await db.collection('conferences').doc(confId).get();
                 const conference = confSnap.data();
                 const societyId = conference === null || conference === void 0 ? void 0 : conference.societyId;
-                if (societyId && ((_a = regData.memberVerificationData) === null || _a === void 0 ? void 0 : _a.id)) {
+                if (societyId && ((_d = regData.memberVerificationData) === null || _d === void 0 ? void 0 : _d.id)) {
                     const memberId = regData.memberVerificationData.id;
                     await db.collection('societies').doc(societyId).collection('members').doc(memberId).update({
                         used: true,
@@ -1535,7 +1655,7 @@ exports.onTossWebhook = functions
                         const newToken = (0, index_1.generateBadgePrepToken)();
                         // Expiry Logic
                         let expiresAt;
-                        if ((_b = conference === null || conference === void 0 ? void 0 : conference.dates) === null || _b === void 0 ? void 0 : _b.end) {
+                        if ((_e = conference === null || conference === void 0 ? void 0 : conference.dates) === null || _e === void 0 ? void 0 : _e.end) {
                             expiresAt = admin.firestore.Timestamp.fromMillis(conference.dates.end.toMillis() + (48 * 60 * 60 * 1000));
                         }
                         else {
@@ -1575,7 +1695,7 @@ exports.onTossWebhook = functions
                 status: 'CANCELED',
                 paymentStatus: 'CANCELED',
                 canceledAt: admin.firestore.FieldValue.serverTimestamp(),
-                cancelReason: (((_e = (_d = (_c = req.body.data) === null || _c === void 0 ? void 0 : _c.cancels) === null || _d === void 0 ? void 0 : _d[0]) === null || _e === void 0 ? void 0 : _e.cancelReason) || ((_g = (_f = req.body.cancels) === null || _f === void 0 ? void 0 : _f[0]) === null || _g === void 0 ? void 0 : _g.cancelReason) || 'Webhook Cancellation')
+                cancelReason: (((_h = (_g = (_f = req.body.data) === null || _f === void 0 ? void 0 : _f.cancels) === null || _g === void 0 ? void 0 : _g[0]) === null || _h === void 0 ? void 0 : _h.cancelReason) || ((_k = (_j = req.body.cancels) === null || _j === void 0 ? void 0 : _j[0]) === null || _k === void 0 ? void 0 : _k.cancelReason) || 'Webhook Cancellation')
             });
             // Add Log
             await regRef.collection('logs').add({

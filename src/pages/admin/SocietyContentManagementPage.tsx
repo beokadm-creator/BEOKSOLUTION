@@ -8,6 +8,7 @@ import { Timestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import type { Language } from '../../hooks/useLanguage';
 import { safeFormatDate } from '../../utils/dateUtils';
+import { sanitizeHtml } from '../../utils/sanitizeHtml';
 import RichTextEditor from '../../components/ui/RichTextEditor';
 
 const SocietyContentManagementPage: React.FC = () => {
@@ -118,6 +119,18 @@ const SocietyContentManagementPage: React.FC = () => {
     setSaving(true);
     try {
       const societyRef = doc(db, 'societies', societyId);
+      const sanitizedNotices = notices.map((notice) => {
+        const contentKo = typeof notice?.content?.ko === 'string' ? notice.content.ko : '';
+        const contentEn = typeof notice?.content?.en === 'string' ? notice.content.en : '';
+        return {
+          ...notice,
+          content: {
+            ...(notice?.content || {}),
+            ko: sanitizeHtml(contentKo),
+            en: sanitizeHtml(contentEn),
+          },
+        };
+      });
 
       // Use new format with message and images
       const updateData: {
@@ -128,16 +141,16 @@ const SocietyContentManagementPage: React.FC = () => {
       } = {
         presidentGreeting: {
           message: {
-            ko: presidentGreetingKO,
-            en: presidentGreetingEN || presidentGreetingKO,
+            ko: sanitizeHtml(presidentGreetingKO),
+            en: sanitizeHtml(presidentGreetingEN || presidentGreetingKO),
           },
           images: greetingImagesKO.length > 0 ? greetingImagesKO : greetingImagesEN,
         },
         introduction: {
-          ko: introKO,
-          en: introEN || introKO,
+          ko: sanitizeHtml(introKO),
+          en: sanitizeHtml(introEN || introKO),
         },
-        notices: notices,
+        notices: sanitizedNotices,
         updatedAt: Timestamp.now(),
       };
 

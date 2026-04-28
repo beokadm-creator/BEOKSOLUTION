@@ -49,6 +49,12 @@ exports.clearTestData = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', '인증이 필요합니다');
     }
+    const token = context.auth.token;
+    const email = typeof token.email === "string" ? token.email : "";
+    const isSuper = token.admin === true || token.super === true || email === "aaron@beoksolution.com" || email === "test@eregi.co.kr";
+    if (!isSuper) {
+        throw new functions.https.HttpsError("permission-denied", "권한이 없습니다");
+    }
     const requestData = data;
     const { conferenceSlug } = requestData;
     const targetConfId = conferenceSlug || 'kadd_2026spring';

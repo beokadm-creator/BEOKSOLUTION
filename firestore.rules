@@ -102,7 +102,7 @@ service cloud.firestore {
 
     // Support Logging
     match /logs/{logId} {
-      allow write: if true;
+      allow write: if isAuthenticated();
       allow read: if isSuperAdmin();
     }
 
@@ -117,9 +117,11 @@ service cloud.firestore {
       // Restricted collections are handled by dedicated rules below.
       match /{subCollection}/{docPath=**} {
         allow read: if !(subCollection in [
+          'certificates',
           'registrations',
           'external_attendees',
           'guestbook_entries',
+          'notices',
           'vendor_requests',
           'stamp_tour_progress',
           'stamps',
@@ -135,6 +137,11 @@ service cloud.firestore {
           'vendors'
         ]);
         allow write: if isSuperAdmin();
+      }
+
+      match /notices/{noticeId} {
+        allow get, list: if resource.data.status == 'PUBLISHED' || isSuperAdmin() || isConferenceAdmin(confId);
+        allow write: if isSuperAdmin() || isConferenceAdmin(confId);
       }
 
       // Sponsors: Allow collection group queries
@@ -203,7 +210,8 @@ service cloud.firestore {
         allow create: if isAuthenticated();
         allow update: if isSuperAdmin() || isConferenceAdmin(confId) ||
           // Allow unauthenticated moderator to toggle isAnswered only
-          (request.resource.data.keys().hasOnly(['isAnswered']) &&
+          (isAuthenticated() &&
+           request.resource.data.keys().hasOnly(['isAnswered']) &&
            request.resource.data.isAnswered is bool);
         allow delete: if isSuperAdmin() || isConferenceAdmin(confId);
       }
@@ -246,7 +254,9 @@ service cloud.firestore {
     // Global Collections
     match /booth_visits/{visitId} {
        allow read: if isAuthenticated() && (resource.data.vendorId == request.auth.uid || resource.data.vendorId == request.auth.token.vendorId);
-       allow write: if isAuthenticated();
+       allow create: if isAuthenticated() &&
+         (request.resource.data.vendorId == request.auth.uid || request.resource.data.vendorId == request.auth.token.vendorId);
+       allow update, delete: if isSuperAdmin();
     }
 
     // Vendors (Partners/Sponsors)
@@ -276,7 +286,8 @@ service cloud.firestore {
       // Audit logs for vendor operations
       match /audit_logs/{logId} {
         allow read: if isSuperAdmin() || isVendorMember(vendorId);
-        allow create: if isAuthenticated();
+        allow create: if (isSuperAdmin() || isVendorMember(vendorId)) &&
+          request.resource.data.vendorId == vendorId;
         allow update, delete: if isSuperAdmin();
       }
     }

@@ -24,10 +24,53 @@ service firebase.storage {
       allow read, write: if isOwner(userId) || isSuperAdmin();
     }
 
-    // Default Storage Rule
+    match /public/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /conferences/{confId}/welcome/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /conferences/{confId}/assets/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /conferences/{confId}/notices/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /conferences/{confId}/speakers/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /conferences/{confId}/sponsors/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /societies/{societyId}/logo/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /societies/{societyId}/greeting/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /experts/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
     match /{allPaths=**} {
-      allow read: if true; // Public assets
-      allow write: if isSuperAdmin(); // Restrict generic writing to super admins
+      allow read, write: if isSuperAdmin();
     }
   }
 }

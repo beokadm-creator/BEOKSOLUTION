@@ -36,6 +36,25 @@ export const approveTossPayment = async (paymentKey: string, orderId: string, am
     }
 };
 
+export const getTossPayment = async (paymentKey: string, secretKey: string) => {
+    try {
+        const encryptedSecretKey = `Basic ${Buffer.from(secretKey + ':').toString('base64')}`;
+        const response = await axios.get(`https://api.tosspayments.com/v1/payments/${paymentKey}`, {
+            headers: {
+                'Authorization': encryptedSecretKey
+            }
+        });
+        return response.data;
+    } catch (error: unknown) {
+        const errorData = error && typeof error === 'object' && 'response' in error
+            ? (error as { response?: { data?: { message?: string;[key: string]: unknown } } }).response?.data
+            : undefined;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('Toss Payments Get Error:', errorData || errorMessage);
+        throw new Error(errorData?.message || 'Payment Lookup Failed');
+    }
+};
+
 /**
  * Cancel Payment via Toss Payments API
  * API: https://api.tosspayments.com/v1/payments/{paymentKey}/cancel

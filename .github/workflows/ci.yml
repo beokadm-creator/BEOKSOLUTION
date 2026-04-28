@@ -20,7 +20,7 @@ jobs:
       - name: Node.js 설치
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
       
       - name: 의존성 설치
@@ -28,7 +28,6 @@ jobs:
       
       - name: ESLint 실행
         run: npm run lint
-        continue-on-error: true # 린트 실패 시에도 계속 진행
 
   # 작업 2: TypeScript 타입 체크
   typecheck:
@@ -42,7 +41,7 @@ jobs:
       - name: Node.js 설치
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
       
       - name: 의존성 설치
@@ -64,7 +63,7 @@ jobs:
       - name: Node.js 설치
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
       
       - name: 의존성 설치

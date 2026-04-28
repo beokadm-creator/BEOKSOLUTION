@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Notice, NoticeStatus } from '../types/schema';
+import { sanitizeHtml } from '../utils/sanitizeHtml';
 
 // Collection path: conferences/{confId}/notices
 
@@ -90,8 +91,12 @@ export async function createNotice(
   confId: string,
   data: Omit<Notice, 'id' | 'conferenceId' | 'createdAt' | 'updatedAt' | 'readCount'>
 ): Promise<string> {
+  const sanitized = data.content?.html
+    ? { ...data, content: { ...data.content, html: sanitizeHtml(data.content.html) } }
+    : data;
+
   const noticeData = {
-    ...data,
+    ...sanitized,
     conferenceId: confId,
     readCount: 0,
     createdAt: Timestamp.now(),
@@ -111,8 +116,11 @@ export async function updateNotice(
   data: Partial<Omit<Notice, 'id' | 'conferenceId' | 'createdAt' | 'authorId'>>
 ): Promise<void> {
   const docRef = doc(db, 'conferences', confId, 'notices', noticeId);
+  const sanitized = data.content?.html
+    ? { ...data, content: { ...data.content, html: sanitizeHtml(data.content.html) } }
+    : data;
   await updateDoc(docRef, {
-    ...data,
+    ...sanitized,
     updatedAt: Timestamp.now()
   });
 }

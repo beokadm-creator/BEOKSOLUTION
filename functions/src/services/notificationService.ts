@@ -84,9 +84,12 @@ class NHNProvider implements IAlimTalkProvider {
             const infraData = infraSnap.data();
             const nhnConfig = infraData?.notification?.nhnAlimTalk;
 
-            // NHN Cloud 공통 설정 (모든 학회 동일)
-            const appKey = 'Ik6GEBC22p5Qliqk';
-            const secretKey = 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme';
+            const appKey = process.env.NHN_APP_KEY;
+            const secretKey = process.env.NHN_SECRET_KEY;
+
+            if (!appKey || !secretKey) {
+                throw new Error('NHN Cloud credentials are not configured');
+            }
 
             // senderKey만 entity별로 상이 (Firestore에서 조회)
             if (!nhnConfig?.senderKey) {

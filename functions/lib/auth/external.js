@@ -48,10 +48,13 @@ exports.generateFirebaseAuthUserForExternalAttendee = functions
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onCall(async (data, context) => {
-    // 1. Guard: Check if requester is Authenticated (Admin)
+    var _a, _b;
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
+    const token = context.auth.token;
+    const callerEmail = typeof token.email === "string" ? token.email : "";
+    const isSuper = token.admin === true || token.super === true || callerEmail === "aaron@beoksolution.com" || callerEmail === "test@eregi.co.kr";
     const { confId, externalId, password, email, name, phone, organization, licenseNumber, amount } = data;
     if (!confId || !externalId) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing confId or externalId');
@@ -59,6 +62,19 @@ exports.generateFirebaseAuthUserForExternalAttendee = functions
     try {
         const db = admin.firestore();
         const auth = admin.auth();
+        if (!isSuper) {
+            const confSnap = await db.collection("conferences").doc(confId).get();
+            const societyId = (_a = confSnap.data()) === null || _a === void 0 ? void 0 : _a.societyId;
+            if (!societyId) {
+                throw new functions.https.HttpsError("permission-denied", "Not authorized");
+            }
+            const adminSnap = await db.doc(`societies/${societyId}/private/admin`).get();
+            const adminEmails = (_b = adminSnap.data()) === null || _b === void 0 ? void 0 : _b.adminEmails;
+            const isSocietyAdmin = Array.isArray(adminEmails) && callerEmail && adminEmails.includes(callerEmail);
+            if (!isSocietyAdmin) {
+                throw new functions.https.HttpsError("permission-denied", "Not authorized");
+            }
+        }
         // Fetch External Attendee Doc if details not provided
         let attendeeData = { email, name, phone, organization, licenseNumber, password };
         const attendeeRef = db.collection(`conferences/${confId}/external_attendees`).doc(externalId);
