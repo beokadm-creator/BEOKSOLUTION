@@ -201,6 +201,81 @@ export async function sendDailyErrorReport({
     });
 }
 
+export async function sendBadgeTokenEmail({
+    to,
+    userName,
+    societyName,
+    eventName,
+    badgePrepUrl,
+    startDate,
+    venueName,
+    isEmailFallback = false,
+}: {
+    to: string;
+    userName: string;
+    societyName: string;
+    eventName: string;
+    badgePrepUrl: string;
+    startDate?: string;
+    venueName?: string;
+    isEmailFallback?: boolean;
+}): Promise<void> {
+    const subject = isEmailFallback
+        ? `[${societyName}] 배지 준비 안내 (알림톡 발송 실패 재발송)`
+        : `[${societyName}] 배지 준비 안내`;
+
+    const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1f2937;">
+            <div style="background: #1d4ed8; padding: 24px; border-radius: 8px 8px 0 0;">
+                <h1 style="color: white; margin: 0; font-size: 20px;">${societyName}</h1>
+                <p style="color: #bfdbfe; margin: 4px 0 0 0; font-size: 14px;">학술대회 배지 준비 안내</p>
+            </div>
+
+            <div style="background: #ffffff; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+                ${isEmailFallback ? `
+                <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; padding: 12px 16px; margin-bottom: 24px;">
+                    <p style="margin: 0; color: #c2410c; font-size: 13px;">
+                        ⚠️ 카카오 알림톡 발송에 실패하여 이메일로 재발송되었습니다.
+                    </p>
+                </div>` : ''}
+
+                <p style="font-size: 16px; margin-top: 0;">안녕하세요, <strong>${userName}</strong>님.</p>
+
+                <p style="color: #374151; line-height: 1.6;">
+                    <strong>${eventName}</strong> 참가 등록이 완료되었습니다.<br>
+                    아래 버튼을 눌러 배지 준비 페이지에서 등록 정보를 확인하고 배지를 준비하세요.
+                </p>
+
+                ${startDate || venueName ? `
+                <div style="background: #f9fafb; border-radius: 6px; padding: 16px; margin: 20px 0;">
+                    ${startDate ? `<p style="margin: 0 0 8px 0; color: #374151;"><strong>📅 일시:</strong> ${startDate}</p>` : ''}
+                    ${venueName ? `<p style="margin: 0; color: #374151;"><strong>📍 장소:</strong> ${venueName}</p>` : ''}
+                </div>` : ''}
+
+                <div style="text-align: center; margin: 32px 0;">
+                    <a href="${badgePrepUrl}"
+                       style="background: #1d4ed8; color: white; padding: 14px 32px; border-radius: 6px;
+                              text-decoration: none; font-size: 16px; font-weight: bold; display: inline-block;">
+                        배지 준비하기
+                    </a>
+                </div>
+
+                <div style="border-top: 1px solid #e5e7eb; margin-top: 24px; padding-top: 16px;">
+                    <p style="color: #6b7280; font-size: 13px; margin: 0; line-height: 1.6;">
+                        버튼이 클릭되지 않을 경우 아래 링크를 복사하여 브라우저에 붙여넣기 하세요:<br>
+                        <a href="${badgePrepUrl}" style="color: #1d4ed8; word-break: break-all;">${badgePrepUrl}</a>
+                    </p>
+                    <p style="color: #9ca3af; font-size: 12px; margin: 12px 0 0 0;">
+                        본 메일은 발신 전용입니다. 문의는 학회 사무국으로 연락해 주세요.
+                    </p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    await sendEmail({ to, subject, html });
+}
+
 /**
  * Send weekly performance report
  */
