@@ -26,7 +26,12 @@ const joinFirestorePath = (...segments: unknown[]) => segments
 
 jest.mock('../firebase', () => ({
   db: {},
-  auth: {},
+  auth: {
+    currentUser: {
+      uid: 'user-123',
+      getIdToken: jest.fn(async () => 'test-id-token'),
+    },
+  },
 }));
 
 jest.mock('firebase/firestore', () => ({

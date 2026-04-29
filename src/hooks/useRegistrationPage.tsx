@@ -742,18 +742,28 @@ export function useRegistrationPage(slug: string | undefined) {
 
             if (totalPrice === 0) {
                 // Call our new Cloud Function for free registration
+                const currentUser = firebaseAuth.currentUser;
+                if (!currentUser) {
+                    throw new Error(language === 'ko' ? '로그인이 필요합니다.' : 'Login required.');
+                }
+                const idToken = typeof currentUser.getIdToken === 'function' ? await currentUser.getIdToken() : null;
+                if (!idToken) {
+                    throw new Error(language === 'ko' ? '인증 토큰을 가져오지 못했습니다.' : 'Failed to get auth token.');
+                }
+
                 const response = await fetch(
                     `https://us-central1-eregi-8fc1e.cloudfunctions.net/processFreeRegistrationHttp`,
                     {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${idToken}`,
                         },
                         body: JSON.stringify({
                             regId: regRef.id,
                             confId: confId,
                             userData: {
-                                userId: auth.user?.id || firebaseAuth.currentUser?.uid || 'GUEST',
+                                userId: currentUser.uid,
                                 name: formData.name,
                                 email: formData.email,
                                 phone: formData.phone,
@@ -786,7 +796,7 @@ export function useRegistrationPage(slug: string | undefined) {
                 }
 
                 const pureSlug = confId.includes('_') ? confId.split('_').slice(1).join('_') : confId;
-                window.location.href = `/${pureSlug}/register/success?orderId=${orderId}&name=${encodeURIComponent(formData.name)}`;
+                window.location.href = `/${pureSlug}/register/success?regId=${regRef.id}&name=${encodeURIComponent(formData.name)}`;
                 return;
             }
 

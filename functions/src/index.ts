@@ -487,6 +487,32 @@ export const processFreeRegistrationHttp = functions
                 return;
             }
 
+            const authHeader = req.headers.authorization || '';
+            if (!authHeader.startsWith('Bearer ')) {
+                res.status(401).json({ error: 'Unauthorized' });
+                return;
+            }
+            const idToken = authHeader.slice('Bearer '.length).trim();
+            if (!idToken) {
+                res.status(401).json({ error: 'Unauthorized' });
+                return;
+            }
+
+            let decodedUid = '';
+            try {
+                const decoded = await admin.auth().verifyIdToken(idToken);
+                decodedUid = decoded.uid;
+            } catch (e) {
+                functions.logger.warn('[processFreeRegistrationHttp] Invalid token', e);
+                res.status(401).json({ error: 'Unauthorized' });
+                return;
+            }
+
+            if (userData.userId && userData.userId !== decodedUid) {
+                res.status(403).json({ error: 'User mismatch' });
+                return;
+            }
+
             if (Number(amount) !== 0) {
                 res.status(400).json({ error: 'Amount must be 0 for free registration' });
                 return;
@@ -500,15 +526,15 @@ export const processFreeRegistrationHttp = functions
                 return;
             }
 
-            if (userData.userId && userData.userId !== 'GUEST' && confId) {
+            if (decodedUid && confId) {
                 const existingRegsSnap = await admin.firestore()
                     .collection(`conferences/${confId}/registrations`)
-                    .where('userId', '==', userData.userId)
+                    .where('userId', '==', decodedUid)
                     .where('status', '==', 'PAID')
                     .limit(1)
                     .get();
                 if (!existingRegsSnap.empty) {
-                    functions.logger.warn(`[DuplicateBlock-HTTP] userId=${userData.userId} already has PAID registration in ${confId}`);
+                    functions.logger.warn(`[DuplicateBlock-HTTP] userId=${decodedUid} already has PAID registration in ${confId}`);
                     res.status(409).json({ error: '이미 해당 학술대회에 등록이 완료된 계정입니다. 동일 계정으로 중복 등록은 불가합니다.' });
                     return;
                 }
@@ -525,7 +551,7 @@ export const processFreeRegistrationHttp = functions
 
                 await regRef.set({
                     id: regId,
-                    userId: userData.userId || 'GUEST',
+                    userId: decodedUid,
                     userInfo: {
                         name: userData.name,
                         email: userData.email,
@@ -566,20 +592,36 @@ export const processFreeRegistrationHttp = functions
                     if (societyId && userData.memberVerificationData && userData.memberVerificationData.id) {
                         const memberId = userData.memberVerificationData.id;
                         const memberRef = db.collection('societies').doc(societyId).collection('members').doc(memberId);
-                        await memberRef.update({
-                            used: true,
-                            usedBy: userData.userId || 'unknown',
-                            usedAt: admin.firestore.FieldValue.serverTimestamp()
-                        });
+                        try {
+                            const memberSnap = await memberRef.get();
+                            if (memberSnap.exists) {
+                                const member = memberSnap.data() || {};
+                                const memberCode = String(member.licenseNumber || member.code || '');
+                                const claimedCode = String(userData.memberVerificationData.code || '');
+                                const used = member.used === true;
+                                const usedBy = String(member.usedBy || '');
+                                const codeMatches = !claimedCode || !memberCode ? false : memberCode === claimedCode;
+
+                                if ((!used || usedBy === decodedUid) && codeMatches) {
+                                    await memberRef.update({
+                                        used: true,
+                                        usedBy: decodedUid,
+                                        usedAt: admin.firestore.FieldValue.serverTimestamp()
+                                    });
+                                }
+                            }
+                        } catch (e) {
+                            functions.logger.warn('[processFreeRegistrationHttp] Failed to lock member code', e);
+                        }
                     }
 
-                    if (userData.userId && userData.userId !== 'GUEST') {
-                        const userRef = db.collection('users').doc(userData.userId);
+                    if (decodedUid) {
+                        const userRef = db.collection('users').doc(decodedUid);
                         const userSnap = await userRef.get();
 
                         if (!userSnap.exists) {
                             await userRef.set({
-                                uid: userData.userId,
+                                uid: decodedUid,
                                 email: userData.email,
                                 name: userData.name,
                                 phone: userData.phone,
@@ -606,7 +648,7 @@ export const processFreeRegistrationHttp = functions
                             });
                         }
 
-                        await db.collection('users').doc(userData.userId).collection('participations').doc(regId).set({
+                        await db.collection('users').doc(decodedUid).collection('participations').doc(regId).set({
                             conferenceId: confId,
                             conferenceName: '', 
                             registrationId: regId,
