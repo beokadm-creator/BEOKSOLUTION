@@ -1,4 +1,5 @@
 import { initializeApp } from "firebase/app";
+import { initializeAppCheck, ReCaptchaV3Provider, getToken } from "firebase/app-check";
 import { getAuth, browserSessionPersistence, setPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
@@ -43,5 +44,29 @@ export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const analytics = typeof window !== "undefined" ? getAnalytics(app) : null;
 export const functions = getFunctions(app, 'us-central1');
+
+const appCheckSiteKey = import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY as string | undefined;
+const appCheckDebugToken = import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN as string | undefined;
+
+if (import.meta.env.PROD && !appCheckSiteKey) {
+  throw new Error("Missing Firebase App Check site key (VITE_FIREBASE_APPCHECK_SITE_KEY)");
+}
+
+if (typeof window !== "undefined" && appCheckDebugToken) {
+  (self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: string }).FIREBASE_APPCHECK_DEBUG_TOKEN = appCheckDebugToken;
+}
+
+export const appCheck = typeof window !== "undefined" && appCheckSiteKey
+  ? initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(appCheckSiteKey),
+    isTokenAutoRefreshEnabled: true
+  })
+  : null;
+
+export async function getAppCheckToken(): Promise<string | null> {
+  if (!appCheck) return null;
+  const result = await getToken(appCheck, false);
+  return result.token || null;
+}
 
 export default app;

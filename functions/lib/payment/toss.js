@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.cancelTossPayment = exports.approveTossPayment = void 0;
+exports.cancelTossPayment = exports.getTossPayment = exports.approveTossPayment = void 0;
 const axios_1 = __importDefault(require("axios"));
 /**
  * Approve Payment via Toss Payments API
@@ -39,6 +39,27 @@ const approveTossPayment = async (paymentKey, orderId, amount, secretKey, storeI
     }
 };
 exports.approveTossPayment = approveTossPayment;
+const getTossPayment = async (paymentKey, secretKey) => {
+    var _a;
+    try {
+        const encryptedSecretKey = `Basic ${Buffer.from(secretKey + ':').toString('base64')}`;
+        const response = await axios_1.default.get(`https://api.tosspayments.com/v1/payments/${paymentKey}`, {
+            headers: {
+                'Authorization': encryptedSecretKey
+            }
+        });
+        return response.data;
+    }
+    catch (error) {
+        const errorData = error && typeof error === 'object' && 'response' in error
+            ? (_a = error.response) === null || _a === void 0 ? void 0 : _a.data
+            : undefined;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('Toss Payments Get Error:', errorData || errorMessage);
+        throw new Error((errorData === null || errorData === void 0 ? void 0 : errorData.message) || 'Payment Lookup Failed');
+    }
+};
+exports.getTossPayment = getTossPayment;
 /**
  * Cancel Payment via Toss Payments API
  * API: https://api.tosspayments.com/v1/payments/{paymentKey}/cancel

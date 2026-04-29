@@ -1,17 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { db, getAppCheckToken } from '../../firebase';
 import { Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-interface InfraSettings {
-    payment: {
-        domestic: {
-            secretKey: string;
-        };
-    };
-}
 
 const PaymentSuccessHandler: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -32,7 +24,6 @@ const PaymentSuccessHandler: React.FC = () => {
 
             // Context Params passed from RegistrationPage
             const slug = searchParams.get('slug');
-            const societyId = searchParams.get('societyId');
             const confId = searchParams.get('confId');
             const regId = searchParams.get('regId');
 
@@ -93,44 +84,22 @@ const PaymentSuccessHandler: React.FC = () => {
                     memberVerificationData: regData.memberVerificationData || null
                 };
 
-                // 1. FETCH SOCIETY INFRASTRUCTURE SETTINGS FOR PAYMENT KEYS
-                let widgetSecretKey = "";
-                if (societyId) {
-                    try {
-                        const infraRef = doc(db, 'societies', societyId, 'settings', 'infrastructure');
-                        const infraSnap = await getDoc(infraRef);
-                        if (infraSnap.exists()) {
-                            const infraData = infraSnap.data() as InfraSettings;
-                            widgetSecretKey = infraData.payment?.domestic?.secretKey || "";
-                        }
-                    } catch (infraErr) {
-                        console.warn("Failed to fetch infrastructure settings:", infraErr);
-                        toast.error('결제 설정을 불러오지 못했습니다.');
-                    }
-                }
-
-                if (!widgetSecretKey) {
-                    console.error("No payment secret key configured for this society");
-                    toast.error("결제 설정이 올바르지 않습니다. 관리자에게 문의해주세요.");
-                    setIsProcessing(false);
-                    return;
-                }
-
                 // 2. CALL CLOUD FUNCTION TO CONFIRM PAYMENT AND CREATE REGISTRATION
                 // [FIX-20250124-01] CloudFunction handles both payment confirmation and registration creation
                 // [FIX-20250124-CORS] Use HTTP POST endpoint with CORS support instead of callable
                 // This ensures only paid registrations are stored in the DB
                 const functionUrl = 'https://us-central1-eregi-8fc1e.cloudfunctions.net/confirmTossPaymentHttp';
+                const appCheckToken = typeof getAppCheckToken === "function" ? await getAppCheckToken() : null;
                 const response = await fetch(functionUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        ...(appCheckToken ? { 'X-Firebase-AppCheck': appCheckToken } : {}),
                     },
                     body: JSON.stringify({
                         paymentKey,
                         orderId,
                         amount,
-                        secretKey: widgetSecretKey,
                         regId,
                         confId,
                         userData,

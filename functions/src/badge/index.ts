@@ -234,8 +234,18 @@ export async function sendBadgeNotification(
           price: (regData.amount || 0).toLocaleString() + '원',
         };
 
-        // Send (NHN AlimTalk via NotificationService)
         const recipientPhone = regData.phone || regData.userInfo?.phone;
+        const recipientEmail = regData.email || regData.userInfo?.email;
+
+        const emailParams = {
+          userName: variables.userName,
+          societyName: variables.society,
+          eventName: variables.eventName,
+          badgePrepUrl: variables.badgePrepUrl,
+          startDate: variables.startDate || undefined,
+          venueName: variables.venue || undefined,
+        };
+
         if (recipientPhone) {
           const cleanPhone = recipientPhone.replace(/-/g, '');
 
@@ -243,11 +253,31 @@ export async function sendBadgeNotification(
             phone: cleanPhone,
             templateCode: kakaoConfig.kakaoTemplateCode,
             variables: variables
-            // NotificationService already formats and sends these variables properly as templateParameter
-            // We omit buttons parameter as NHN AlimTalk uses the template variables to auto-fill button urls
           }, conference.societyId);
 
           functions.logger.info(`[BadgeNotification] AlimTalk call result to ${cleanPhone}:`, JSON.stringify(alimTalkResult));
+
+          if (!alimTalkResult.success && recipientEmail) {
+            functions.logger.info(`[BadgeNotification] AlimTalk failed, falling back to email for ${regId}`);
+            try {
+              const { sendBadgeTokenEmail } = await import('../utils/email');
+              await sendBadgeTokenEmail({ to: recipientEmail, ...emailParams, isEmailFallback: true });
+              functions.logger.info(`[BadgeNotification] Email fallback sent to ${recipientEmail}`);
+            } catch (emailError) {
+              functions.logger.error(`[BadgeNotification] Email fallback also failed for ${regId}:`, emailError);
+            }
+          }
+        } else if (recipientEmail) {
+          functions.logger.info(`[BadgeNotification] No phone number, sending email directly to ${recipientEmail} for ${regId}`);
+          try {
+            const { sendBadgeTokenEmail } = await import('../utils/email');
+            await sendBadgeTokenEmail({ to: recipientEmail, ...emailParams, isEmailFallback: false });
+            functions.logger.info(`[BadgeNotification] Email sent to ${recipientEmail}`);
+          } catch (emailError) {
+            functions.logger.error(`[BadgeNotification] Email send failed for ${regId}:`, emailError);
+          }
+        } else {
+          functions.logger.warn(`[BadgeNotification] No phone or email for ${regId} — notification not sent`);
         }
       }
     } else {
@@ -683,9 +713,13 @@ export const bulkSendNotifications = functions
     // 3. NHN Cloud 설정 조회
     const infraSnap = await db.collection('societies').doc(conference.societyId).collection('settings').doc('infrastructure').get();
     const nhnConfig = infraSnap.data()?.notification;
-    const appKey = nhnConfig?.appKey || 'Ik6GEBC22p5Qliqk';
-    const secretKey = nhnConfig?.secretKey || 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme';
-    const senderKey = nhnConfig?.senderKey;
+    const appKey = process.env.NHN_APP_KEY;
+    const secretKey = process.env.NHN_SECRET_KEY;
+    if (!appKey || !secretKey) {
+      throw new functions.https.HttpsError('failed-precondition', 'NHN Cloud credentials (NHN_APP_KEY / NHN_SECRET_KEY) not configured in environment');
+    }
+    // senderKey는 학회별로 상이 — Firestore에서 조회
+    const senderKey = nhnConfig?.nhnAlimTalk?.senderKey || nhnConfig?.senderKey;
     if (!senderKey) throw new functions.https.HttpsError('failed-precondition', 'NHN senderKey not configured');
 
     // 4. Society / Conference 메타데이터  

@@ -137,7 +137,7 @@ exports.onRegistrationCreated = functions.firestore
  * Helper: Send Badge Notification (AlimTalk)
  */
 async function sendBadgeNotification(db, conference, regId, regData, token) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q;
     if (!conference.societyId)
         return;
     try {
@@ -194,18 +194,49 @@ async function sendBadgeNotification(db, conference, regId, regData, token) {
                     amount: (regData.amount || 0).toLocaleString() + '원',
                     price: (regData.amount || 0).toLocaleString() + '원',
                 };
-                // Send (NHN AlimTalk via NotificationService)
                 const recipientPhone = regData.phone || ((_p = regData.userInfo) === null || _p === void 0 ? void 0 : _p.phone);
+                const recipientEmail = regData.email || ((_q = regData.userInfo) === null || _q === void 0 ? void 0 : _q.email);
+                const emailParams = {
+                    userName: variables.userName,
+                    societyName: variables.society,
+                    eventName: variables.eventName,
+                    badgePrepUrl: variables.badgePrepUrl,
+                    startDate: variables.startDate || undefined,
+                    venueName: variables.venue || undefined,
+                };
                 if (recipientPhone) {
                     const cleanPhone = recipientPhone.replace(/-/g, '');
                     const alimTalkResult = await (0, notificationService_1.sendAlimTalk)({
                         phone: cleanPhone,
                         templateCode: kakaoConfig.kakaoTemplateCode,
                         variables: variables
-                        // NotificationService already formats and sends these variables properly as templateParameter
-                        // We omit buttons parameter as NHN AlimTalk uses the template variables to auto-fill button urls
                     }, conference.societyId);
                     functions.logger.info(`[BadgeNotification] AlimTalk call result to ${cleanPhone}:`, JSON.stringify(alimTalkResult));
+                    if (!alimTalkResult.success && recipientEmail) {
+                        functions.logger.info(`[BadgeNotification] AlimTalk failed, falling back to email for ${regId}`);
+                        try {
+                            const { sendBadgeTokenEmail } = await Promise.resolve().then(() => __importStar(require('../utils/email')));
+                            await sendBadgeTokenEmail({ to: recipientEmail, ...emailParams, isEmailFallback: true });
+                            functions.logger.info(`[BadgeNotification] Email fallback sent to ${recipientEmail}`);
+                        }
+                        catch (emailError) {
+                            functions.logger.error(`[BadgeNotification] Email fallback also failed for ${regId}:`, emailError);
+                        }
+                    }
+                }
+                else if (recipientEmail) {
+                    functions.logger.info(`[BadgeNotification] No phone number, sending email directly to ${recipientEmail} for ${regId}`);
+                    try {
+                        const { sendBadgeTokenEmail } = await Promise.resolve().then(() => __importStar(require('../utils/email')));
+                        await sendBadgeTokenEmail({ to: recipientEmail, ...emailParams, isEmailFallback: false });
+                        functions.logger.info(`[BadgeNotification] Email sent to ${recipientEmail}`);
+                    }
+                    catch (emailError) {
+                        functions.logger.error(`[BadgeNotification] Email send failed for ${regId}:`, emailError);
+                    }
+                }
+                else {
+                    functions.logger.warn(`[BadgeNotification] No phone or email for ${regId} — notification not sent`);
                 }
             }
         }
@@ -551,7 +582,7 @@ exports.bulkSendNotifications = functions
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onCall(async (data) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
     const { confId, regIds } = data;
     if (!confId || !Array.isArray(regIds) || regIds.length === 0) {
         throw new functions.https.HttpsError('invalid-argument', 'confId and regIds[] are required');
@@ -582,28 +613,32 @@ exports.bulkSendNotifications = functions
     // 3. NHN Cloud 설정 조회
     const infraSnap = await db.collection('societies').doc(conference.societyId).collection('settings').doc('infrastructure').get();
     const nhnConfig = (_b = infraSnap.data()) === null || _b === void 0 ? void 0 : _b.notification;
-    const appKey = (nhnConfig === null || nhnConfig === void 0 ? void 0 : nhnConfig.appKey) || 'Ik6GEBC22p5Qliqk';
-    const secretKey = (nhnConfig === null || nhnConfig === void 0 ? void 0 : nhnConfig.secretKey) || 'ajFUrusk8I7tgBQdrztuQvcf6jgWWcme';
-    const senderKey = nhnConfig === null || nhnConfig === void 0 ? void 0 : nhnConfig.senderKey;
+    const appKey = process.env.NHN_APP_KEY;
+    const secretKey = process.env.NHN_SECRET_KEY;
+    if (!appKey || !secretKey) {
+        throw new functions.https.HttpsError('failed-precondition', 'NHN Cloud credentials (NHN_APP_KEY / NHN_SECRET_KEY) not configured in environment');
+    }
+    // senderKey는 학회별로 상이 — Firestore에서 조회
+    const senderKey = ((_c = nhnConfig === null || nhnConfig === void 0 ? void 0 : nhnConfig.nhnAlimTalk) === null || _c === void 0 ? void 0 : _c.senderKey) || (nhnConfig === null || nhnConfig === void 0 ? void 0 : nhnConfig.senderKey);
     if (!senderKey)
         throw new functions.https.HttpsError('failed-precondition', 'NHN senderKey not configured');
     // 4. Society / Conference 메타데이터  
     const societySnap = await db.collection('societies').doc(conference.societyId).get();
-    const societyName = ((_d = (_c = societySnap.data()) === null || _c === void 0 ? void 0 : _c.name) === null || _d === void 0 ? void 0 : _d.ko) || ((_f = (_e = societySnap.data()) === null || _e === void 0 ? void 0 : _e.name) === null || _f === void 0 ? void 0 : _f.en) || conference.societyId;
-    const eventName = ((_g = conference.title) === null || _g === void 0 ? void 0 : _g.ko) || ((_h = conference.title) === null || _h === void 0 ? void 0 : _h.en) || '';
+    const societyName = ((_e = (_d = societySnap.data()) === null || _d === void 0 ? void 0 : _d.name) === null || _e === void 0 ? void 0 : _e.ko) || ((_g = (_f = societySnap.data()) === null || _f === void 0 ? void 0 : _f.name) === null || _g === void 0 ? void 0 : _g.en) || conference.societyId;
+    const eventName = ((_h = conference.title) === null || _h === void 0 ? void 0 : _h.ko) || ((_j = conference.title) === null || _j === void 0 ? void 0 : _j.en) || '';
     const domain = `https://${conference.societyId}.eregi.co.kr`;
     const redirectSlug = conference.id || conference.slug || conference.conferenceId;
     const timeZone = 'Asia/Seoul';
-    const rawStart = ((_j = conference.dates) === null || _j === void 0 ? void 0 : _j.start) || conference.startDate;
+    const rawStart = ((_k = conference.dates) === null || _k === void 0 ? void 0 : _k.start) || conference.startDate;
     const startDate = rawStart && typeof rawStart.toDate === 'function'
         ? (0, date_fns_tz_1.formatInTimeZone)(rawStart.toDate(), timeZone, 'yyyy-MM-dd HH:mm', { locale: locale_1.ko })
         : '';
-    const venueNameVal = (_k = conference.venue) === null || _k === void 0 ? void 0 : _k.name;
+    const venueNameVal = (_l = conference.venue) === null || _l === void 0 ? void 0 : _l.name;
     const venueName = typeof venueNameVal === 'object' && venueNameVal !== null
         ? (venueNameVal.ko || venueNameVal.en || '')
         : (venueNameVal || '');
     let expiresAt;
-    if ((_l = conference.dates) === null || _l === void 0 ? void 0 : _l.end) {
+    if ((_m = conference.dates) === null || _m === void 0 ? void 0 : _m.end) {
         expiresAt = admin.firestore.Timestamp.fromMillis(conference.dates.end.toMillis() + 48 * 3600 * 1000);
     }
     else {
