@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
-import { db, getAppCheckToken } from '../../firebase';
+import { db } from '../../firebase';
 import { Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -89,12 +89,10 @@ const PaymentSuccessHandler: React.FC = () => {
                 // [FIX-20250124-CORS] Use HTTP POST endpoint with CORS support instead of callable
                 // This ensures only paid registrations are stored in the DB
                 const functionUrl = 'https://us-central1-eregi-8fc1e.cloudfunctions.net/confirmTossPaymentHttp';
-                const appCheckToken = typeof getAppCheckToken === "function" ? await getAppCheckToken() : null;
                 const response = await fetch(functionUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        ...(appCheckToken ? { 'X-Firebase-AppCheck': appCheckToken } : {}),
                     },
                     body: JSON.stringify({
                         paymentKey,

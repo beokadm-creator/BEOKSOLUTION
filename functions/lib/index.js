@@ -139,7 +139,7 @@ Object.defineProperty(exports, "generateFirebaseAuthUserForExternalAttendee", { 
 // 1. Confirm TossPayment (HTTP Endpoint with CORS for custom domains)
 exports.confirmTossPaymentHttp = functions
     .runWith({
-    enforceAppCheck: true,
+    enforceAppCheck: false,
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onRequest(async (req, res) => {
@@ -456,7 +456,7 @@ exports.lookupRegistrationByEmail = functions
 // --------------------------------------------------------------------------
 exports.processFreeRegistrationHttp = functions
     .runWith({
-    enforceAppCheck: true,
+    enforceAppCheck: false,
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onRequest(async (req, res) => {
@@ -763,7 +763,7 @@ exports.getNhnAlimTalkTemplates = functions
 // --------------------------------------------------------------------------
 exports.createSocietyAdminUser = functions
     .runWith({
-    enforceAppCheck: true,
+    enforceAppCheck: false,
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onCall(async (data, context) => {
@@ -845,7 +845,7 @@ exports.createSocietyAdminUser = functions
 // --------------------------------------------------------------------------
 exports.removeSocietyAdminUser = functions
     .runWith({
-    enforceAppCheck: true,
+    enforceAppCheck: false,
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onCall(async (data, context) => {
@@ -1052,7 +1052,7 @@ exports.checkEmailExists = functions
 // --------------------------------------------------------------------------
 exports.deleteUserAccount = functions
     .runWith({
-    enforceAppCheck: true,
+    enforceAppCheck: false,
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onCall(async (data, context) => {

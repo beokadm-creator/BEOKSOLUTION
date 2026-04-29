@@ -6,7 +6,7 @@ import { useRegistration } from './useRegistration';
 import { useUserStore } from '../store/userStore';
 import { usePricing } from './usePricing';
 import { doc, setDoc, getDoc, Timestamp, getDocs, collection } from 'firebase/firestore';
-import { db, auth as firebaseAuth, getAppCheckToken } from '../firebase';
+import { db, auth as firebaseAuth } from '../firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { loadPaymentWidget, PaymentWidgetInstance } from '@tosspayments/payment-widget-sdk';
 import { v4 as uuidv4 } from 'uuid';
@@ -742,14 +742,12 @@ export function useRegistrationPage(slug: string | undefined) {
 
             if (totalPrice === 0) {
                 // Call our new Cloud Function for free registration
-                const appCheckToken = typeof getAppCheckToken === "function" ? await getAppCheckToken() : null;
                 const response = await fetch(
                     `https://us-central1-eregi-8fc1e.cloudfunctions.net/processFreeRegistrationHttp`,
                     {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            ...(appCheckToken ? { 'X-Firebase-AppCheck': appCheckToken } : {}),
                         },
                         body: JSON.stringify({
                             regId: regRef.id,
