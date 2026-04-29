@@ -197,6 +197,11 @@ describe('userDataMapper', () => {
       const result = extractName({});
       expect(result).toBe('');
     });
+
+    it('객체 형태의 name(ko/en)에서 문자열을 선택한다', () => {
+      const result = extractName({ name: { ko: '홍길동', en: 'Hong' } });
+      expect(result).toBe('홍길동');
+    });
   });
 
   describe('toFirestoreUserData', () => {

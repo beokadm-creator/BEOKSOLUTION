@@ -53,6 +53,16 @@ export interface RawUserData {
     [key: string]: unknown;
 }
 
+function asText(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return String(value);
+    if (!value || typeof value !== 'object') return '';
+    const obj = value as Record<string, unknown>;
+    const ko = typeof obj.ko === 'string' ? obj.ko : '';
+    const en = typeof obj.en === 'string' ? obj.en : '';
+    return ko || en || '';
+}
+
 /**
  * Normalize user data to match ConferenceUser schema
  * 
@@ -68,19 +78,21 @@ export function normalizeUserData(raw: RawUserData): Partial<ConferenceUser> {
         uid: raw.uid || raw.id || raw.userId || '',
 
         // Name (required)
-        name: raw.name || raw.userName || raw.displayName || '',
+        name: extractName(raw),
 
         // Email (required)
-        email: raw.email || '',
+        email: typeof raw.email === 'string' ? raw.email : '',
 
         // Phone (required) - 통일: phone 사용
-        phone: raw.phone || raw.phoneNumber || '',
+        phone: typeof raw.phone === 'string' ? raw.phone : (typeof raw.phoneNumber === 'string' ? raw.phoneNumber : ''),
 
         // Organization (optional) - 통일: organization 사용
-        organization: raw.organization || raw.affiliation || raw.org || '',
+        organization: extractOrganization(raw),
 
         // License Number (optional)
-        licenseNumber: raw.licenseNumber || raw.licenseId || '',
+        licenseNumber: typeof raw.licenseNumber === 'string'
+            ? raw.licenseNumber
+            : (typeof raw.licenseId === 'string' ? raw.licenseId : ''),
 
         // Tier (required)
         tier: (raw.tier as 'MEMBER' | 'NON_MEMBER') || 'NON_MEMBER',
@@ -115,14 +127,14 @@ export function extractPhone(data: RawUserData): string {
  * Extract organization from any user data format
  */
 export function extractOrganization(data: RawUserData): string {
-    return data.organization || data.affiliation || data.org || '';
+    return asText(data.organization) || asText(data.affiliation) || asText(data.org);
 }
 
 /**
  * Extract name from any user data format
  */
 export function extractName(data: RawUserData): string {
-    return data.name || data.userName || data.displayName || '';
+    return asText(data.name) || asText(data.userName) || asText(data.displayName);
 }
 
 /**
