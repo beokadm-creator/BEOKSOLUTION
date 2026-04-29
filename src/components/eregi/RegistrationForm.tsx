@@ -26,6 +26,7 @@ interface RegistrationFormProps {
     isProcessing: boolean;
     memberVerified: boolean;
     paramMemberCode: string;
+    showLoadExistingInfo: boolean;
     handleLoginAndLoad: () => Promise<void>;
     handleSaveBasicInfo: () => Promise<void>;
 }
@@ -41,6 +42,7 @@ export default function RegistrationForm({
     isProcessing,
     memberVerified,
     paramMemberCode,
+    showLoadExistingInfo,
     handleLoginAndLoad,
     handleSaveBasicInfo,
 }: RegistrationFormProps) {
@@ -84,14 +86,16 @@ export default function RegistrationForm({
                                                     {language === 'ko' ? '비밀번호' : 'Password'} <span className="text-red-500">*</span>
                                                 </span>
                                                 {/* Load Button for Guests */}
-                                                <button
-                                                    type="button"
-                                                    onClick={handleLoginAndLoad}
-                                                    className="text-xs text-blue-600 hover:underline font-medium"
-                                                    disabled={isProcessing}
-                                                >
-                                                    {language === 'ko' ? '기존 정보 불러오기' : 'Load Existing Info'}
-                                                </button>
+                                                {showLoadExistingInfo && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleLoginAndLoad}
+                                                        className="text-xs text-blue-600 hover:underline font-medium"
+                                                        disabled={isProcessing}
+                                                    >
+                                                        {language === 'ko' ? '기존 정보 불러오기' : 'Load Existing Info'}
+                                                    </button>
+                                                )}
                                             </Label>
                                             <Input
                                                 type="password"
@@ -102,7 +106,13 @@ export default function RegistrationForm({
                                                 placeholder={language === 'ko' ? '비밀번호를 입력하세요' : 'Enter password'}
                                             />
                                             <p className="text-xs text-gray-500">
-                                                * {language === 'ko' ? '기존 가입자는 정보를 불러오고, 처음 등록하는 경우에는 계정이 자동 생성됩니다.' : 'Existing users: info auto-loads. New users: account created.'}
+                                                * {showLoadExistingInfo
+                                                    ? (language === 'ko'
+                                                        ? '기존 가입자는 정보를 불러오고, 처음 등록하는 경우에는 계정이 자동 생성됩니다.'
+                                                        : 'Existing users: info auto-loads. New users: account created.')
+                                                    : (language === 'ko'
+                                                        ? '등록을 진행하면 계정이 생성됩니다.'
+                                                        : 'An account will be created when you proceed.')}
                                             </p>
                                         </div>
                                     )}

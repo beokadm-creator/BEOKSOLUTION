@@ -130,6 +130,7 @@ export default function RegistrationPage() {
                         isProcessing={isProcessing}
                         memberVerified={memberVerified}
                         paramMemberCode={paramMemberCode}
+                        showLoadExistingInfo={regSettings?.paymentMode !== 'FREE_ALL'}
                         handleLoginAndLoad={handleLoginAndLoad}
                         handleSaveBasicInfo={handleSaveBasicInfo}
                     />
