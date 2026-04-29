@@ -11,38 +11,11 @@ export default defineConfig({
     }
   },
   build: {
-    chunkSizeWarningLimit: 1600, // 경고 기준을 1600kB로 상향 (선택 사항)
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          // ── node_modules ──────────────────────────────────────────────
-          // 1. React 관련 라이브러리 분리
-          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) {
-            return 'react-vendor';
-          }
-          // 2. Firebase 관련 라이브러리 분리 (덩치가 큼)
-          if (id.includes('node_modules/firebase')) {
-            return 'firebase-vendor';
-          }
-          // 3. 무거운 출력 관련 라이브러리 분리 (html2canvas, jspdf 등)
-          if (id.includes('node_modules/html2canvas') || id.includes('node_modules/jspdf')) {
-            return 'print-vendor';
-          }
-          // 4. Charts — only loaded on statistics page
-          if (id.includes('node_modules/recharts/')) {
-            return 'chart-vendor';
-          }
-          // 5. UI primitives
-          if (id.includes('node_modules/@radix-ui/')) {
-            return 'ui-vendor';
-          }
-          // 6. 나머지 node_modules는 vendor로 묶음
-          if (id.includes('node_modules')) {
-            return 'vendor';
-          }
-
-        },
-      },
-    },
+    chunkSizeWarningLimit: 1600,
+    // manualChunks를 사용하지 않음 — Rollup 자동 코드 분할에 위임.
+    // manualChunks로 vendor를 수동 분리하면 React가 아직 초기화되기 전에
+    // React에 의존하는 라이브러리가 실행되는 청크 초기화 순서 문제가 발생함.
+    // (TypeError: Cannot read properties of undefined (reading 'forwardRef') 등)
+    // React.lazy로 52+ 페이지가 분리되어 있으므로 Rollup이 알아서 최적 분할함.
   }
 })
