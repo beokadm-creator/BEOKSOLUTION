@@ -198,21 +198,33 @@ export default function RegistrationPage() {
                                         navigate(btn.actionValue);
                                         return;
                                     }
-                                    const url = btn.actionValue;
-                                    if (!/^https?:\/\//i.test(url)) return;
-                                    if (btn.openInNewTab !== false) window.open(url, '_blank', 'noopener,noreferrer');
-                                    else window.location.assign(url);
                                 };
+
+                                const className = `h-10 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap max-w-[140px] truncate ${btn.variant === 'secondary'
+                                    ? 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                                    }`;
+
+                                if (btn.actionType === 'EXTERNAL_URL' && /^https?:\/\//i.test(btn.actionValue)) {
+                                    return (
+                                        <a
+                                            key={idx}
+                                            href={btn.actionValue}
+                                            target={btn.openInNewTab !== false ? '_blank' : '_self'}
+                                            rel={btn.openInNewTab !== false ? 'noopener noreferrer' : undefined}
+                                            className={className}
+                                        >
+                                            {label}
+                                        </a>
+                                    );
+                                }
 
                                 return (
                                     <button
                                         key={idx}
                                         type="button"
                                         onClick={handleClick}
-                                        className={`h-10 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${btn.variant === 'secondary'
-                                            ? 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-                                            : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
-                                            }`}
+                                        className={className}
                                     >
                                         {label}
                                     </button>
