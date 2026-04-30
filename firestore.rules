@@ -185,13 +185,16 @@ service cloud.firestore {
       }
 
       // Registrations: Restricted read/write
-      match /registrations/{userId} {
-        allow read: if isOwner(userId) || isSuperAdmin() || isConferenceAdmin(confId);
-        allow write: if isOwner(userId) || isSuperAdmin() || isConferenceAdmin(confId) || 
-                     (isAuthenticated() && request.resource.data.userId == request.auth.uid);
+      match /registrations/{regId} {
+        allow read: if isSuperAdmin() || isConferenceAdmin(confId) ||
+          (isAuthenticated() && resource.data.userId == request.auth.uid);
+        allow write: if isSuperAdmin() || isConferenceAdmin(confId) ||
+          (isAuthenticated() && request.resource.data.userId == request.auth.uid);
         
          match /logs/{logId} {
-           allow read, write: if isOwner(userId) || isConferenceAdmin(confId); 
+           allow read, write: if isSuperAdmin() || isConferenceAdmin(confId) ||
+             (isAuthenticated() &&
+              get(/databases/$(database)/documents/conferences/$(confId)/registrations/$(regId)).data.userId == request.auth.uid);
          }
       }
 

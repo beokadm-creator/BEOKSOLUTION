@@ -763,6 +763,7 @@ export function useRegistrationPage(slug: string | undefined) {
                         body: JSON.stringify({
                             regId: regRef.id,
                             confId: confId,
+                            orderId: orderId,
                             userData: {
                                 userId: currentUser.uid,
                                 name: formData.name,
@@ -797,7 +798,7 @@ export function useRegistrationPage(slug: string | undefined) {
                 }
 
                 const pureSlug = confId.includes('_') ? confId.split('_').slice(1).join('_') : confId;
-                window.location.href = `/${pureSlug}/register/success?regId=${regRef.id}&name=${encodeURIComponent(formData.name)}`;
+                window.location.href = `/${pureSlug}/register/success?orderId=${orderId}&name=${encodeURIComponent(formData.name)}`;
                 return;
             }
 

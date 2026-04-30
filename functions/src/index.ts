@@ -480,7 +480,7 @@ export const processFreeRegistrationHttp = functions
                 return;
             }
 
-            const { regId, confId, userData, amount, baseAmount, optionsTotal, selectedOptions, agreementDetails } = req.body;
+            const { regId, confId, orderId, userData, amount, baseAmount, optionsTotal, selectedOptions, agreementDetails } = req.body;
 
             if (!regId || !confId || !userData || amount === undefined) {
                 res.status(400).json({ error: 'Missing required parameters' });
@@ -567,7 +567,7 @@ export const processFreeRegistrationHttp = functions
                     paymentStatus: 'PAID',
                     paymentMethod: 'FREE',
                     paymentKey: 'FREE',
-                    orderId: `FREE-${regId}`,
+                    orderId: orderId || `FREE-${regId}`,
                     amount: 0,
                     baseAmount: baseAmount || 0,
                     optionsTotal: optionsTotal || 0,
