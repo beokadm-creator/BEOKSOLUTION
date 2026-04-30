@@ -1,5 +1,5 @@
 import React from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { CheckCircle2, Download, Home, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -37,6 +37,7 @@ type RegistrationSuccessData = {
 const RegistrationSuccessPage: React.FC = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
+    const { slug: routeSlug } = useParams<{ slug: string }>();
     const { language } = useUserStore();
     const conference = useConference();
     const [certificateEnabled, setCertificateEnabled] = React.useState(false);
@@ -47,12 +48,13 @@ const RegistrationSuccessPage: React.FC = () => {
 
     // Determine targetSlug
     const finalSlug = (() => {
+        if (routeSlug) return routeSlug;
         if (conference.slug) return conference.slug;
         if (conference.id) {
             const parts = conference.id.split('_');
             if (parts.length > 1) return parts.slice(1).join('_');
         }
-        return 'home';
+        return '';
     })();
 
     const orderId = searchParams.get('orderId');
@@ -236,7 +238,7 @@ const RegistrationSuccessPage: React.FC = () => {
                         {isPending && (
                             <Button
                                 variant="outline"
-                                onClick={() => navigate(`/${finalSlug}/check-status`)}
+                                onClick={() => navigate(finalSlug ? `/${finalSlug}/check-status` : '/')}
                                 className="h-14 border-2 border-gray-200 bg-white text-gray-700 font-bold rounded-2xl text-lg transition-all"
                             >
                                 <Download className="w-5 h-5 mr-2" />
@@ -247,7 +249,7 @@ const RegistrationSuccessPage: React.FC = () => {
                         {conference.info?.abstractSubmissionDeadline && (
                             <Button
                                 variant="outline"
-                                onClick={() => navigate(`/${finalSlug}/abstracts`)}
+                                onClick={() => navigate(finalSlug ? `/${finalSlug}/abstracts` : '/')}
                                 className="h-14 border-2 border-gray-200 hover:border-[#003366]/20 text-[#003366] hover:bg-blue-50 font-bold rounded-2xl text-lg transition-all"
                             >
                                 <FileText className="w-5 h-5 mr-2" />
@@ -257,7 +259,7 @@ const RegistrationSuccessPage: React.FC = () => {
                     </div>
 
                     <div className="pt-6 border-t border-gray-100 flex justify-center w-full">
-                        <Button variant="ghost" onClick={() => navigate(`/${finalSlug}`)} className="text-gray-400 hover:text-gray-600 font-medium">
+                        <Button variant="ghost" onClick={() => navigate(finalSlug ? `/${finalSlug}` : '/')} className="text-gray-400 hover:text-gray-600 font-medium">
                             <Home className="w-4 h-4 mr-2" />
                             {language === 'ko' ? '메인 화면으로 돌아가기' : 'Return to Home'}
                         </Button>
