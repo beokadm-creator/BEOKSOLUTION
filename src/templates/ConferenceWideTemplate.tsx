@@ -62,10 +62,7 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
 
   const paymentMode = typeof config?.paymentMode === 'string' ? config.paymentMode : '';
   const isFreeAll = paymentMode === 'FREE_ALL';
-
-  useEffect(() => {
-    if (isFreeAll && activeSection === 'pricing') setActiveSection('welcome');
-  }, [isFreeAll, activeSection]);
+  const effectiveActiveSection = isFreeAll && activeSection === 'pricing' ? 'welcome' : activeSection;
 
   // Tab items configuration
   const tabItems = [
@@ -133,7 +130,7 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
           config={config}
           lang={currentLang}
           t={t}
-          activeSection={activeSection}
+          activeSection={effectiveActiveSection}
         />
       </div>
 
@@ -145,7 +142,7 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
             <div className="flex justify-around sm:justify-center sm:gap-8 flex-1 overflow-x-auto scrollbar-hide">
               {tabItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = activeSection === item.id;
+                const isActive = effectiveActiveSection === item.id;
 
                 return (
                   <button

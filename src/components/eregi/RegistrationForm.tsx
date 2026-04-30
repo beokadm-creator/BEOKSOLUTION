@@ -134,7 +134,7 @@ export default function RegistrationForm({
                                             onChange={e => setFormData({ ...formData, name: e.target.value })}
                                             readOnly={isInfoSaved || lockNameField}
                                             className={isInfoSaved || lockNameField ? 'bg-gray-100' : ''}
-                                            placeholder="이름을 입력하세요"
+                                            placeholder={language === 'ko' ? '이름을 입력하세요' : 'Enter your name'}
                                         />
                                     </div>
                                 )}
@@ -149,7 +149,7 @@ export default function RegistrationForm({
                                             onChange={e => setFormData({ ...formData, affiliation: e.target.value })}
                                             readOnly={isInfoSaved}
                                             className={isInfoSaved ? 'bg-gray-100' : ''}
-                                            placeholder="소속을 입력하세요"
+                                            placeholder={language === 'ko' ? '소속을 입력하세요' : 'Enter your affiliation'}
                                         />
                                     </div>
                                 )}
@@ -164,7 +164,7 @@ export default function RegistrationForm({
                                             onChange={e => setFormData({ ...formData, position: e.target.value })}
                                             readOnly={isInfoSaved}
                                             className={isInfoSaved ? 'bg-gray-100' : ''}
-                                            placeholder="직급을 입력하세요"
+                                            placeholder={language === 'ko' ? '직급을 입력하세요' : 'Enter your position'}
                                         />
                                     </div>
                                 )}
@@ -172,14 +172,16 @@ export default function RegistrationForm({
                                     <div className="space-y-2">
                                         <Label>
                                             {language === 'ko' ? '면허번호' : 'License Number'} 
-                                            {fieldSettings.licenseNumber.required ? <span className="text-red-500">*</span> : <span className="text-slate-400 text-xs font-normal ml-1">(선택)</span>}
+                                            {fieldSettings.licenseNumber.required
+                                                ? <span className="text-red-500">*</span>
+                                                : <span className="text-slate-400 text-xs font-normal ml-1">{language === 'ko' ? '(선택)' : '(Optional)'}</span>}
                                         </Label>
                                         <Input
                                             value={formData.licenseNumber}
                                             onChange={e => setFormData({ ...formData, licenseNumber: e.target.value })}
                                             readOnly={isInfoSaved || (memberVerified && !!paramMemberCode)}
                                             className={isInfoSaved || (memberVerified && !!paramMemberCode) ? 'bg-gray-100' : ''}
-                                            placeholder="면허번호를 입력하세요"
+                                            placeholder={language === 'ko' ? '면허번호를 입력하세요' : 'Enter your license number'}
                                         />
                                     </div>
                                 )}

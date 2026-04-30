@@ -24,7 +24,7 @@ export function AddonSelector({
     return (
       <Card>
         <CardContent className="p-6">
-          <div className="text-sm text-gray-500">로딩 중...</div>
+          <div className="text-sm text-gray-500">{language === 'ko' ? '로딩 중...' : 'Loading...'}</div>
         </CardContent>
       </Card>
     );

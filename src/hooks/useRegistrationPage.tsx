@@ -291,7 +291,7 @@ export function useRegistrationPage(slug: string | undefined) {
                 }
             } catch (error) {
                 console.error("Init failed:", error);
-                toast.error("초기화에 실패했습니다.");
+                toast.error(language === 'ko' ? '초기화에 실패했습니다.' : 'Initialization failed.');
             } finally {
                 setIsInitializing(false);
             }
@@ -492,11 +492,13 @@ export function useRegistrationPage(slug: string | undefined) {
                     setPaymentWidget(widget);
                 } catch (error) {
                     console.error("Failed to load payment widget:", error);
-                    toast.error('결제 위젯을 불러오지 못했습니다. 페이지를 새로고침해주세요.');
+                    toast.error(language === 'ko'
+                        ? '결제 위젯을 불러오지 못했습니다. 페이지를 새로고침해주세요.'
+                        : 'Failed to load the payment widget. Please refresh the page.');
                 }
             })();
         }
-    }, [isInfoSaved, auth.user, tossClientKey]);
+    }, [isInfoSaved, auth.user, tossClientKey, language]);
 
     useEffect(() => {
         if (paymentWidget && paymentMethodsWidgetRef.current && totalPrice >= 0) {
@@ -794,7 +796,7 @@ export function useRegistrationPage(slug: string | undefined) {
 
                 if (!response.ok) {
                     const errData = await response.json();
-                    throw new Error(errData.error || '무료 등록 처리에 실패했습니다.');
+                    throw new Error(errData.error || (language === 'ko' ? '무료 등록 처리에 실패했습니다.' : 'Free registration failed.'));
                 }
 
                 const pureSlug = confId.includes('_') ? confId.split('_').slice(1).join('_') : confId;
@@ -817,13 +819,13 @@ export function useRegistrationPage(slug: string | undefined) {
                     failUrl,
                 });
             } else {
-                toast.error("Payment widget is not ready.");
+                toast.error(language === 'ko' ? '결제 위젯이 준비되지 않았습니다.' : 'Payment widget is not ready.');
                 setIsProcessing(false);
             }
 
         } catch (error) {
             console.error("Payment Error:", error);
-            toast.error("결제 시작 실패");
+            toast.error(language === 'ko' ? '결제 시작 실패' : 'Payment failed to start.');
             setIsProcessing(false);
         }
     };

@@ -30,6 +30,11 @@ export default function RegistrationPaymentSection({
     isProcessing,
     handlePayment,
 }: RegistrationPaymentSectionProps) {
+    const formatCurrency = (amount: number) => {
+        if (language === 'ko') return `${amount.toLocaleString()}원`;
+        return `₩${amount.toLocaleString()}`;
+    };
+
     return (
         <Card id="payment-section" className="shadow-lg border-blue-200 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <CardHeader>
@@ -47,12 +52,12 @@ export default function RegistrationPaymentSection({
                 <div className="bg-slate-50 p-6 rounded-xl border">
                     <div className="flex justify-between items-center mb-2">
                         <div>
-                            <p className="text-sm text-gray-500">Registration Type</p>
+                            <p className="text-sm text-gray-500">{language === 'ko' ? '등록 구분' : 'Registration Type'}</p>
                             <p className="font-bold text-lg text-slate-900">{finalCategory}</p>
                         </div>
                         <div className="text-right">
-                            <p className="text-sm text-gray-500">Base Fee</p>
-                            <p className="text-lg font-semibold text-slate-700">{basePrice.toLocaleString()}원</p>
+                            <p className="text-sm text-gray-500">{language === 'ko' ? '기본 등록비' : 'Base Fee'}</p>
+                            <p className="text-lg font-semibold text-slate-700">{formatCurrency(basePrice)}</p>
                         </div>
                     </div>
 
@@ -69,11 +74,11 @@ export default function RegistrationPaymentSection({
                                             {item.option.name[language] || item.option.name.ko}
                                         </span>
                                         <span className="text-[11px] text-slate-500">
-                                            {item.option.price.toLocaleString()}원 x {item.quantity}
+                                            {formatCurrency(item.option.price)} x {item.quantity}
                                         </span>
                                     </div>
                                     <span className="font-semibold text-slate-800">
-                                        {(item.option.price * item.quantity).toLocaleString()}원
+                                        {formatCurrency(item.option.price * item.quantity)}
                                     </span>
                                 </div>
                             ))}
@@ -82,7 +87,7 @@ export default function RegistrationPaymentSection({
                                     {language === 'ko' ? '옵션 합계' : 'Options Subtotal'}
                                 </span>
                                 <span className="text-sm font-bold text-blue-600">
-                                    + {optionsTotal.toLocaleString()}원
+                                    + {formatCurrency(optionsTotal)}
                                 </span>
                             </div>
                         </div>
@@ -94,7 +99,7 @@ export default function RegistrationPaymentSection({
                         <p className="text-sm font-medium text-slate-700">{language === 'ko' ? '총 결제 금액' : 'Total Amount'}</p>
                     </div>
                     <div className="text-right">
-                        <p className="text-2xl font-bold text-blue-600">{totalPrice.toLocaleString()}원</p>
+                        <p className="text-2xl font-bold text-blue-600">{formatCurrency(totalPrice)}</p>
                     </div>
                 </div>
             </div>

@@ -33,7 +33,9 @@ export default function RegistrationRefundModal({
                         <DialogTitle>{language === 'ko' ? '환불 규정' : 'Refund Policy'}</DialogTitle>
                     </DialogHeader>
                     <div className="mt-4 whitespace-pre-wrap text-sm text-slate-600 leading-relaxed">
-                        {refundPolicy || "등록 이후 환불 규정은 학회 운영 방침을 따릅니다. 자세한 사항은 사무국으로 문의해주세요."}
+                        {refundPolicy || (language === 'ko'
+                            ? '등록 이후 환불 규정은 학회 운영 방침을 따릅니다. 자세한 사항은 사무국으로 문의해주세요.'
+                            : 'Refund policy follows the society policy after registration. Please contact the secretariat for details.')}
 
                     </div>
                     <div className="mt-6 flex justify-end">
