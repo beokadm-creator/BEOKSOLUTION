@@ -605,12 +605,12 @@ export function useRegistrationPage(slug: string | undefined) {
                             toast.success(language === 'ko' ? "로그인되었습니다." : "Logged in successfully.");
                         } catch (loginError: unknown) {
                             const err = loginError as { code?: string };
-                            if (err.code === 'auth/wrong-password') {
+                            if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
                                 toast.error(language === 'ko' ? "이미 가입된 이메일입니다. 비밀번호를 확인해주세요." : "Email already exists. Please check your password.");
                                 setIsProcessing(false);
                                 return;
                             } else {
-                                throw authError; // Throw original error if not wrong password
+                                throw loginError;
                             }
                         }
                     } else {
