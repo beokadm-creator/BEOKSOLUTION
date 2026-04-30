@@ -148,14 +148,33 @@ exports.issueCertificate = functions
     ingressSettings: 'ALLOW_ALL',
 })
     .https.onCall(async (data, context) => {
-    const { confId, regId, badgeToken } = data;
+    var _a;
+    const { confId, regId, badgeToken, allowBeforeCheckIn } = data;
     if (!confId || !regId) {
         throw new functions.https.HttpsError('invalid-argument', 'confId and regId are required');
     }
     const db = admin.firestore();
     const authResult = await resolveIssueAuthorization(db, confId, regId, badgeToken, context.auth);
     if (authResult.mode !== 'ADMIN') {
-        await assertCheckedIn(db, confId, regId);
+        const canBypassCheckIn = authResult.mode === 'OWNER' && allowBeforeCheckIn === true;
+        if (canBypassCheckIn) {
+            const [confSnap, attendee] = await Promise.all([
+                db.collection('conferences').doc(confId).get(),
+                resolveAttendee(db, confId, regId),
+            ]);
+            const features = (_a = confSnap.data()) === null || _a === void 0 ? void 0 : _a.features;
+            const certEnabled = !!(features === null || features === void 0 ? void 0 : features.certificateEnabled);
+            const reg = attendee === null || attendee === void 0 ? void 0 : attendee.data;
+            const status = String((reg === null || reg === void 0 ? void 0 : reg.status) || '');
+            const paymentStatus = String((reg === null || reg === void 0 ? void 0 : reg.paymentStatus) || '');
+            const paid = status === 'PAID' || paymentStatus === 'PAID';
+            if (!certEnabled || !paid) {
+                throw new functions.https.HttpsError('failed-precondition', 'Certificate not available');
+            }
+        }
+        else {
+            await assertCheckedIn(db, confId, regId);
+        }
     }
     const attendee = await resolveAttendee(db, confId, regId);
     if (!attendee) {

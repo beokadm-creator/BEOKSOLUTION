@@ -176,7 +176,7 @@ export const issueCertificate = functions
     ingressSettings: 'ALLOW_ALL',
   })
   .https.onCall(async (data, context) => {
-    const { confId, regId, badgeToken } = data;
+    const { confId, regId, badgeToken, allowBeforeCheckIn } = data;
     if (!confId || !regId) {
       throw new functions.https.HttpsError('invalid-argument', 'confId and regId are required');
     }
@@ -186,7 +186,24 @@ export const issueCertificate = functions
   const authResult = await resolveIssueAuthorization(db, confId, regId, badgeToken, context.auth);
 
   if (authResult.mode !== 'ADMIN') {
-    await assertCheckedIn(db, confId, regId);
+    const canBypassCheckIn = authResult.mode === 'OWNER' && allowBeforeCheckIn === true;
+    if (canBypassCheckIn) {
+      const [confSnap, attendee] = await Promise.all([
+        db.collection('conferences').doc(confId).get(),
+        resolveAttendee(db, confId, regId),
+      ]);
+      const features = confSnap.data()?.features as Record<string, unknown> | undefined;
+      const certEnabled = !!features?.certificateEnabled;
+      const reg = attendee?.data as Record<string, unknown> | undefined;
+      const status = String(reg?.status || '');
+      const paymentStatus = String(reg?.paymentStatus || '');
+      const paid = status === 'PAID' || paymentStatus === 'PAID';
+      if (!certEnabled || !paid) {
+        throw new functions.https.HttpsError('failed-precondition', 'Certificate not available');
+      }
+    } else {
+      await assertCheckedIn(db, confId, regId);
+    }
   }
 
     const attendee = await resolveAttendee(db, confId, regId);

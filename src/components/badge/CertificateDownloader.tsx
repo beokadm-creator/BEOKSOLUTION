@@ -21,12 +21,13 @@ interface CertificateDownloaderProps {
   ui: BadgeUiState;
   badgeLang: "ko" | "en";
   badgeToken?: string;
+  allowBeforeCheckIn?: boolean;
 }
 
 const VERIFICATION_BASE_URL =
   'https://us-central1-eregi-8fc1e.cloudfunctions.net/verifyCertificatePublic';
 
-export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ confId, ui, badgeLang, badgeToken }) => {
+export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ confId, ui, badgeLang, badgeToken, allowBeforeCheckIn }) => {
   const [config, setConfig] = useState<Record<string, any> | null>(null);
   const [confInfo, setConfInfo] = useState<Record<string, any> | null>(null);
   const [societyName, setSocietyName] = useState('');
@@ -77,7 +78,7 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ co
   const isAttendanceEnabled = config?.attendanceEnabled ?? config?.enabled ?? false;
   const isCompletionEnabled = config?.completionEnabled ?? false;
   
-  const canDownloadAttendance = isAttendanceEnabled && !!ui.isCheckedIn;
+  const canDownloadAttendance = isAttendanceEnabled && (!!ui.isCheckedIn || !!allowBeforeCheckIn);
   const canDownloadCompletion = isCompletionEnabled && !!ui.isCheckedIn && (ui.baseMinutes || 0) >= (config?.completionRequiredMinutes || 0);
 
   const showButton = isAttendanceEnabled || isCompletionEnabled;
@@ -96,13 +97,14 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ co
     issuanceAttempted.current = true;
     setIssuing(true);
     try {
-      const issueFn = httpsCallable<{ confId: string; regId: string; badgeToken?: string }, { success: boolean; certificateId: string; certificateNumber: string; verificationToken: string; message?: string }>(
+      const issueFn = httpsCallable<{ confId: string; regId: string; badgeToken?: string; allowBeforeCheckIn?: boolean }, { success: boolean; certificateId: string; certificateNumber: string; verificationToken: string; message?: string }>(
         functions,
         'issueCertificate'
       );
       const result = await issueFn({
         confId,
         regId: ui.id,
+        ...(allowBeforeCheckIn ? { allowBeforeCheckIn: true } : {}),
         ...(badgeToken ? { badgeToken } : {}),
       });
       if (result.data.success) {
@@ -123,7 +125,7 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ co
     } finally {
       setIssuing(false);
     }
-  }, [confId, ui.id, badgeToken, issuing, t]);
+  }, [confId, ui.id, badgeToken, issuing, t, allowBeforeCheckIn]);
 
   useEffect(() => {
     if (isOpen && (canDownloadAttendance || canDownloadCompletion) && !certMeta) {
