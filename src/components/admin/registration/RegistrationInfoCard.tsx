@@ -190,10 +190,12 @@ export const RegistrationInfoCard: React.FC<RegistrationInfoCardProps> = ({
                                             {typeof opt.name === 'string' ? opt.name : (opt.name.ko || opt.name.en || 'Option')}
                                         </span>
                                         <span className="text-xs text-gray-500">
-                                            {opt.price.toLocaleString()}원 × {opt.quantity}
+                                            {Number(opt.price || 0).toLocaleString()}원 × {opt.quantity ?? 1}
                                         </span>
                                     </div>
-                                    <span className="font-medium">{(opt.totalPrice || (opt.price * opt.quantity)).toLocaleString()}원</span>
+                                    <span className="font-medium">
+                                        {Number(opt.totalPrice || (Number(opt.price || 0) * Number(opt.quantity ?? 1))).toLocaleString()}원
+                                    </span>
                                 </div>
                             ))}
                         </div>

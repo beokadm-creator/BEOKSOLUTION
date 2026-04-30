@@ -37,6 +37,26 @@ export const RegistrationTable: React.FC<RegistrationTableProps> = ({
 }) => {
     const navigate = useNavigate();
 
+    const getOptionName = (opt: unknown): string => {
+        if (!opt || typeof opt !== 'object') return '';
+        const o = opt as Record<string, unknown>;
+        const name = o.name;
+        if (typeof name === 'string') return name;
+        if (name && typeof name === 'object') {
+            const n = name as Record<string, unknown>;
+            if (typeof n.ko === 'string') return n.ko;
+            if (typeof n.en === 'string') return n.en;
+        }
+        return '';
+    };
+
+    const getOptionQty = (opt: unknown): number => {
+        if (!opt || typeof opt !== 'object') return 1;
+        const o = opt as Record<string, unknown>;
+        const q = o.quantity;
+        return typeof q === 'number' && Number.isFinite(q) && q > 0 ? q : 1;
+    };
+
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden overflow-x-auto">
             <table className="w-full text-left min-w-[1000px]">
@@ -94,10 +114,32 @@ export const RegistrationTable: React.FC<RegistrationTableProps> = ({
                             <td className="p-4 text-sm font-medium text-[#1b4d77]">
                                 <div>{(r.amount || 0).toLocaleString()}원</div>
                                 {r.options && r.options.length > 0 && (
-                                    <div className="text-[10px] mt-1">
-                                        <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-bold">
-                                            + 옵션 ({r.options.length})
-                                        </span>
+                                    <div className="text-[10px] mt-1 space-y-1">
+                                        <div>
+                                            <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-bold">
+                                                옵션 {r.options.length}종 / {r.options.reduce((acc, opt) => acc + getOptionQty(opt), 0)}개
+                                            </span>
+                                        </div>
+                                        <div
+                                            className="text-gray-500 max-w-[220px] truncate"
+                                            title={r.options
+                                                .map((opt) => {
+                                                    const name = getOptionName(opt) || 'Option';
+                                                    const qty = getOptionQty(opt);
+                                                    return qty > 1 ? `${name}×${qty}` : name;
+                                                })
+                                                .join(', ')
+                                            }
+                                        >
+                                            {r.options
+                                                .map((opt) => {
+                                                    const name = getOptionName(opt) || 'Option';
+                                                    const qty = getOptionQty(opt);
+                                                    return qty > 1 ? `${name}×${qty}` : name;
+                                                })
+                                                .join(', ')
+                                            }
+                                        </div>
                                     </div>
                                 )}
                             </td>
