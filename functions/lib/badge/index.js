@@ -259,7 +259,7 @@ exports.validateBadgePrepToken = functions
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onCall(async (data, _context) => {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g;
     const { confId, token } = data;
     if (!confId || !token) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing confId or token');
@@ -384,7 +384,8 @@ exports.validateBadgePrepToken = functions
                 email: regData.email || ((_c = regData.userInfo) === null || _c === void 0 ? void 0 : _c.email),
                 phone: regData.phone || ((_d = regData.userInfo) === null || _d === void 0 ? void 0 : _d.phone),
                 affiliation: regData.affiliation || regData.organization || ((_e = regData.userInfo) === null || _e === void 0 ? void 0 : _e.affiliation) || '',
-                licenseNumber: regData.licenseNumber || ((_f = regData.userInfo) === null || _f === void 0 ? void 0 : _f.licenseNumber) || '',
+                position: regData.position || ((_f = regData.userInfo) === null || _f === void 0 ? void 0 : _f.position) || '',
+                licenseNumber: regData.licenseNumber || ((_g = regData.userInfo) === null || _g === void 0 ? void 0 : _g.licenseNumber) || '',
                 confirmationQr: regData.confirmationQr || regSnap.id, // fallback to regId for external_attendees without confirmationQr
                 badgeQr: regData.badgeQr,
                 badgeIssued: !!regData.badgeIssued,

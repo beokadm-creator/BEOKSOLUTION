@@ -450,6 +450,7 @@ export const validateBadgePrepToken = functions
           email: regData.email || regData.userInfo?.email,
           phone: regData.phone || regData.userInfo?.phone,
           affiliation: regData.affiliation || regData.organization || regData.userInfo?.affiliation || '',
+          position: regData.position || regData.userInfo?.position || '',
           licenseNumber: regData.licenseNumber || regData.userInfo?.licenseNumber || '',
           confirmationQr: regData.confirmationQr || regSnap.id,  // fallback to regId for external_attendees without confirmationQr
           badgeQr: regData.badgeQr,
