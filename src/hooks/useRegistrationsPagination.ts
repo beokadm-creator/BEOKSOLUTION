@@ -22,6 +22,7 @@ export interface RootRegistration {
     status: string; // 'PAID'
     paymentKey?: string;
     licenseNumber?: string; // Added
+    position?: string; // 직급
     paymentType?: string; // Added (e.g., '카드', '계좌이체')
     method?: string; // Fallback for payment method
     paymentMethod?: string; // Direct field from Firestore
@@ -105,6 +106,7 @@ export function useRegistrationsPagination({
                         flattened.userEmail = docData.userInfo.email || docData.userEmail;
                         flattened.userPhone = docData.userInfo.phone || docData.userPhone;
                         flattened.affiliation = docData.userInfo.affiliation || docData.affiliation;
+                        flattened.position = docData.userInfo.position || docData.position;
                         flattened.licenseNumber = docData.userInfo.licenseNumber || docData.licenseNumber;
                         if (!flattened.tier && docData.userInfo.grade) flattened.tier = docData.userInfo.grade;
                     }

@@ -114,6 +114,7 @@ export type BadgeUiState = {
   paymentStatus?: string;
   amount?: number;
   license?: string;
+  position?: string;
   zone?: string;
   time?: string;
   dailyMinutes?: Record<string, number>;

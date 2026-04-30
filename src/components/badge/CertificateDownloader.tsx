@@ -261,6 +261,12 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({ co
                     <td className="py-4 font-semibold text-slate-900 border-b border-slate-200 text-xl">{ui.name}</td>
                     <td className="w-32 py-4 font-bold text-slate-600 border-b border-slate-200">소속</td>
                     <td className="py-4 font-semibold text-slate-900 border-b border-slate-200 text-xl">{ui.aff}</td>
+                    {ui.position && (
+                      <>
+                        <td className="w-32 py-4 font-bold text-slate-600 border-b border-slate-200">직급</td>
+                        <td className="py-4 font-semibold text-slate-900 border-b border-slate-200 text-xl">{ui.position}</td>
+                      </>
+                    )}
                   </tr>
                   {(config.showLicenseNumber || config.showPaymentAmount) && (
                     <tr>

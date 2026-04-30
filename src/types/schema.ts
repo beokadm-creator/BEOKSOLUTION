@@ -344,6 +344,7 @@ export interface ConferenceUser {
   isForeigner: boolean;
   organization?: string; // Added
   licenseNumber?: string; // Added
+  position?: string; // 직급
   tier: UserTier;
   authStatus: {
     emailVerified: boolean;
@@ -407,6 +408,7 @@ export interface Registration {
   affiliation?: string; // Legacy support (DB field)
   organization?: string; // New standard
   licenseNumber?: string; // Snapshot of license number
+  position?: string; // 직급 (Snapshot of position at registration time)
 
   status?: string; // Added for status checking
   agreementDetails?: AgreementDetails; // Added for terms agreement tracking
@@ -774,6 +776,7 @@ export interface ExternalAttendee {
   phone: string;
   organization: string;
   licenseNumber?: string; // Optional
+  position?: string; // 직급 (Optional)
   password?: string; // Optional - password for Firebase Auth (only stored temporarily until user creation)
 
   // Registration snapshot for compatibility

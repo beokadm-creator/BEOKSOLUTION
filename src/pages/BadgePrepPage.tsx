@@ -33,7 +33,7 @@ import {
   resolveConferenceIdFromRoute,
   resolvePublicSlugFromConferenceId,
 } from "../utils/conferenceRoute";
-import { getBadgeDisplayName, getBadgeDisplayAffiliation } from "../utils/badgeRecord";
+import { getBadgeDisplayName, getBadgeDisplayAffiliation, getBadgeDisplayPosition } from "../utils/badgeRecord";
 import { TranslationPanel } from "../components/translation/TranslationPanel";
 import type {
   AttendanceZone,
@@ -393,6 +393,7 @@ const BadgePrepPage: React.FC = () => {
         issued: false,
         status: "OUTSIDE",
         badgeQr: null,
+        position: "",
       };
     }
     return {
@@ -408,6 +409,7 @@ const BadgePrepPage: React.FC = () => {
       paymentStatus: liveAttendance?.paymentStatus ?? String(reg.paymentStatus || ""),
       amount: liveAttendance?.amount ?? (reg.amount || 0),
       license: String(reg.licenseNumber || "-"),
+      position: getBadgeDisplayPosition(reg),
     };
   }, [result?.registration, liveAttendance]);
 

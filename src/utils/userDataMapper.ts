@@ -38,6 +38,7 @@ export interface RawUserData {
     email?: string;
     licenseNumber?: string;
     licenseId?: string;
+    position?: string;
     tier?: string;
     country?: string;
     isForeigner?: boolean;
@@ -94,6 +95,8 @@ export function normalizeUserData(raw: RawUserData): Partial<ConferenceUser> {
             ? raw.licenseNumber
             : (typeof raw.licenseId === 'string' ? raw.licenseId : ''),
 
+        position: typeof raw.position === 'string' ? raw.position : '',
+
         // Tier (required)
         tier: (raw.tier as 'MEMBER' | 'NON_MEMBER') || 'NON_MEMBER',
 
@@ -148,6 +151,7 @@ export function toFirestoreUserData(user: Partial<ConferenceUser>) {
         phone: user.phone || '', // ✅ 통일된 필드명
         organization: user.organization || '', // ✅ 통일된 필드명
         licenseNumber: user.licenseNumber || '',
+        position: user.position || '',
         tier: user.tier || 'NON_MEMBER',
         country: user.country || 'KR',
         isForeigner: user.isForeigner || false,

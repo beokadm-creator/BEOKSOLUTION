@@ -191,6 +191,11 @@ export const UnifiedBadgeView: React.FC<UnifiedBadgeViewProps> = ({
                   <p className="text-sm font-semibold uppercase tracking-[0.26em] text-slate-400 break-keep">
                     {ui.aff || "-"}
                   </p>
+                  {ui.position && (
+                    <p className="mt-2 text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
+                      {ui.position}
+                    </p>
+                  )}
                   <h2 className="mt-3 text-3xl font-display font-semibold tracking-tight text-slate-950">
                     {ui.name}
                   </h2>
@@ -299,6 +304,11 @@ export const UnifiedBadgeView: React.FC<UnifiedBadgeViewProps> = ({
               <p className="text-sm font-semibold uppercase tracking-[0.28em] text-slate-400 break-keep">
                 {ui.aff || "-"}
               </p>
+              {ui.position && (
+                <p className="mt-2 text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
+                  {ui.position}
+                </p>
+              )}
               <h3 className="mt-3 text-3xl font-display font-semibold tracking-tight text-slate-950">
                 {ui.name}
               </h3>

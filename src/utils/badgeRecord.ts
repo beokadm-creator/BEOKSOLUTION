@@ -8,10 +8,12 @@ type BadgeRecordLike = {
     userInfo?: {
         name?: string | null;
         affiliation?: string | null;
+        position?: string | null;
     } | null;
     affiliation?: string | null;
     organization?: string | null;
     userAffiliation?: string | null;
+    position?: string | null;
 };
 
 export const isBadgeIssued = (
@@ -38,4 +40,8 @@ export const getBadgeDisplayAffiliation = (record: BadgeRecordLike): string => (
         || record.userInfo?.affiliation
         || "소속 없음"
     )
+);
+
+export const getBadgeDisplayPosition = (record: BadgeRecordLike): string => (
+    String(record.position || record.userInfo?.position || "")
 );

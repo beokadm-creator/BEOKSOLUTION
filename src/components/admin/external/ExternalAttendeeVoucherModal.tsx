@@ -44,6 +44,10 @@ export const ExternalAttendeeVoucherModal: React.FC<ExternalAttendeeVoucherModal
                                     <p className="font-bold text-gray-900">{selectedAttendee.organization}</p>
                                 </div>
                                 <div>
+                                    <span className="text-gray-500">직급</span>
+                                    <p className="font-bold text-gray-900">{selectedAttendee.position || '-'}</p>
+                                </div>
+                                <div>
                                     <span className="text-gray-500">이메일</span>
                                     <p className="font-medium">{selectedAttendee.email}</p>
                                 </div>

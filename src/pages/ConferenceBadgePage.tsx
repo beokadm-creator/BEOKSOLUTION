@@ -271,6 +271,7 @@ const ConferenceBadgePage: React.FC = () => {
         paymentStatus: String(registration.paymentStatus || ""),
         amount: registration.amount || 0,
         license: String(registration.licenseNumber || "-"),
+        position: String(registration.position || registration.userInfo?.position || ""),
         badgeQr: registration.badgeQr || null,
         dailyMinutes: registration.dailyMinutes || {},
         zoneMinutes: registration.zoneMinutes || {},

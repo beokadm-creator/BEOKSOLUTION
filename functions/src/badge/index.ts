@@ -386,6 +386,7 @@ export const validateBadgePrepToken = functions
             email: '',
             phone: '',
             affiliation: '',
+            position: '',
             licenseNumber: '',
             confirmationQr: '',
             badgeQr: null,
@@ -417,7 +418,7 @@ export const validateBadgePrepToken = functions
             redirectRequired: true,
             registration: {
               id: tokenData.registrationId,
-              name: '', email: '', phone: '', affiliation: '', licenseNumber: '',
+              name: '', email: '', phone: '', affiliation: '', position: '', licenseNumber: '',
               confirmationQr: '', badgeQr: null, badgeIssued: false, attendanceStatus: 'OUTSIDE',
               currentZone: null, totalMinutes: 0, receiptNumber: ''
             }

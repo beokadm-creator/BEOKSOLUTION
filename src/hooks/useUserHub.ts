@@ -218,7 +218,7 @@ interface UseUserHubReturn {
     // State
     loading: boolean;
     auth: ReturnType<typeof useAuth>['auth'];
-    profile: { displayName: string; phoneNumber: string; affiliation: string; licenseNumber: string; email: string };
+    profile: { displayName: string; phoneNumber: string; affiliation: string; position: string; licenseNumber: string; email: string };
     regs: UserReg[];
     abstracts: Submission[];
     guestbookEntries: ConsentHistoryEntry[];
@@ -256,7 +256,7 @@ interface UseUserHubReturn {
     handleReceiptClick: (e: React.MouseEvent, r: UserReg) => void;
     handleOpenModal: () => void;
     handleVerify: () => void;
-    handleProfileFieldChange: (field: 'displayName' | 'phoneNumber' | 'affiliation' | 'licenseNumber', value: string) => void;
+    handleProfileFieldChange: (field: 'displayName' | 'phoneNumber' | 'affiliation' | 'position' | 'licenseNumber', value: string) => void;
     handleSaveProfile: () => void;
     handleAbstractAction: (abs: Submission, action: 'edit' | 'withdraw') => void;
 }
@@ -302,7 +302,7 @@ export function useUserHub(): UseUserHubReturn {
     const [societies, setSocieties] = useState<Array<{ id: string; name?: string | { ko?: string; en?: string }; [key: string]: unknown }>>([]);
 
     // Profile
-    const [profile, setProfile] = useState({ displayName: '', phoneNumber: '', affiliation: '', licenseNumber: '', email: '' });
+    const [profile, setProfile] = useState({ displayName: '', phoneNumber: '', affiliation: '', position: '', licenseNumber: '', email: '' });
     const [profileSaving, setProfileSaving] = useState(false);
 
     // Modal State
@@ -421,6 +421,7 @@ export function useUserHub(): UseUserHubReturn {
             displayName: u.name,
             phoneNumber: u.phone,
             affiliation: u.organization,
+            position: u.position || '',
             licenseNumber: u.licenseNumber || '',
             email: u.email
         };
@@ -441,6 +442,7 @@ export function useUserHub(): UseUserHubReturn {
                     displayName: normalized.name || profileData.displayName,
                     phoneNumber: normalized.phone || profileData.phoneNumber,
                     affiliation: normalized.organization || profileData.affiliation,
+                    position: normalized.position || profileData.position,
                     licenseNumber: normalized.licenseNumber || profileData.licenseNumber,
                     email: normalized.email || profileData.email
                 };
@@ -467,6 +469,7 @@ export function useUserHub(): UseUserHubReturn {
                             displayName: normalizedPart.name || profileData.displayName,
                             phoneNumber: normalizedPart.phone || profileData.phoneNumber,
                             affiliation: normalizedPart.organization || profileData.affiliation,
+                            position: normalizedPart.position || profileData.position,
                             licenseNumber: normalizedPart.licenseNumber || profileData.licenseNumber,
                             email: normalizedPart.email || profileData.email
                         };
@@ -1228,7 +1231,7 @@ export function useUserHub(): UseUserHubReturn {
         }
     };
 
-    const handleProfileFieldChange = (field: 'displayName' | 'phoneNumber' | 'affiliation' | 'licenseNumber', value: string) => {
+    const handleProfileFieldChange = (field: 'displayName' | 'phoneNumber' | 'affiliation' | 'position' | 'licenseNumber', value: string) => {
         setProfile(prev => ({ ...prev, [field]: value }));
     };
 
@@ -1243,6 +1246,7 @@ export function useUserHub(): UseUserHubReturn {
                 phone: profile.phoneNumber || '',
                 organization: profile.affiliation || '',
                 licenseNumber: profile.licenseNumber || '',
+                position: profile.position || '',
                 email: profile.email || user.email || '',
                 updatedAt: serverTimestamp()
             }, { merge: true });

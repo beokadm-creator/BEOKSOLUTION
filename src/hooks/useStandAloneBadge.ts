@@ -249,6 +249,7 @@ export const useStandAloneBadge = (slug: string | undefined) => {
             zone: uiZone,
             time: uiTime,
             license: uiLicense,
+            position: String(d.position || d.userInfo?.position || ""),
             status: uiStatus,
             badgeQr: uiBadgeQr,
             receiptNumber: uiReceiptNumber,
