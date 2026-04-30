@@ -77,6 +77,7 @@ const PaymentSuccessHandler: React.FC = () => {
                     email: regData.userInfo?.email || regData.email,
                     phone: regData.userInfo?.phone || regData.phone,
                     affiliation: regData.userInfo?.affiliation || regData.affiliation,
+                    position: regData.userInfo?.position || regData.position || '',
                     userId: regData.userId || 'GUEST',
                     tier: regData.tier,
                     categoryName: regData.categoryName,

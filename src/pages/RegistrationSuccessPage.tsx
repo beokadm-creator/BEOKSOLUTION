@@ -5,17 +5,30 @@ import { CheckCircle2, Download, Home, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { useUserStore } from '../store/userStore';
 import { useConference } from '../hooks/useConference';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
+import ReceiptTemplate from '../components/print/ReceiptTemplate';
+import PrintHandler from '../components/print/PrintHandler';
+import { safeFormatDate } from '../utils/dateUtils';
+import type { ReceiptConfig, PaymentData } from '../types/print';
 
 type RegistrationSuccessData = {
     name?: string;
     userName?: string;
     userInfo?: {
         name?: string;
+        position?: string;
     };
+    position?: string;
     status?: string;
     paymentStatus?: string;
+    amount?: number;
+    baseAmount?: number;
+    options?: Array<{ name?: unknown; totalPrice?: number; amount?: number }>;
+    orderId?: string;
+    receiptNumber?: string;
+    paidAt?: unknown;
+    createdAt?: unknown;
     virtualAccount?: {
         bank?: string;
         accountNumber?: string;
@@ -29,6 +42,8 @@ const RegistrationSuccessPage: React.FC = () => {
     const navigate = useNavigate();
     const { language } = useUserStore();
     const conference = useConference();
+    const receiptRef = React.useRef<HTMLDivElement | null>(null);
+    const [receiptConfig, setReceiptConfig] = React.useState<ReceiptConfig | null>(null);
 
     // State for registration data
     const [regData, setRegData] = React.useState<RegistrationSuccessData | null>(null);
@@ -79,17 +94,81 @@ const RegistrationSuccessPage: React.FC = () => {
 
         fetchRegistration();
     }, [conference.id, orderId, regId, setLoading]);
-    const handlePrint = () => {
-        window.print();
-    };
+
+    React.useEffect(() => {
+        const loadReceiptConfig = async () => {
+            if (!conference.id) return;
+            try {
+                const snap = await getDoc(doc(db, 'conferences', conference.id));
+                if (!snap.exists()) return;
+                const data = snap.data() as Record<string, unknown>;
+                const receipt = data.receipt as ReceiptConfig | undefined;
+                if (receipt) setReceiptConfig(receipt);
+            } catch {
+                return;
+            }
+        };
+        loadReceiptConfig();
+    }, [conference.id]);
 
     // const isVirtualAccount = regData?.paymentMethod === 'VIRTUAL_ACCOUNT' || regData?.virtualAccount;
     const isPending = regData?.status === 'PENDING_PAYMENT' || regData?.paymentStatus === 'WAITING_FOR_DEPOSIT' || searchParams.get('status') === 'virtual_account';
 
     const userName = regData?.name || regData?.userInfo?.name || searchParams.get('name') || 'Guest';
+    const userPosition = regData?.position || regData?.userInfo?.position || '';
+
+    const effectiveReceiptConfig: ReceiptConfig = receiptConfig || {
+        issuerInfo: {
+            name: '',
+            registrationNumber: '',
+            address: '',
+            ceo: ''
+        },
+        stampUrl: ''
+    };
+
+    const safeText = (v: unknown): string => {
+        if (typeof v === 'string') return v;
+        if (!v || typeof v !== 'object') return '';
+        const obj = v as Record<string, unknown>;
+        const ko = typeof obj.ko === 'string' ? obj.ko : '';
+        const en = typeof obj.en === 'string' ? obj.en : '';
+        return ko || en || '';
+    };
+
+    const paymentData: PaymentData = React.useMemo(() => {
+        const baseAmount = Number(regData?.baseAmount ?? regData?.amount ?? 0);
+        const optionItems = (regData?.options || [])
+            .map((o) => ({
+                name: safeText(o.name) || 'Option',
+                amount: Number(o.totalPrice ?? o.amount ?? 0)
+            }))
+            .filter((it) => it.amount > 0);
+
+        const totalAmount = Number(regData?.amount ?? baseAmount + optionItems.reduce((acc, it) => acc + it.amount, 0));
+        const paymentDateLike = (regData?.paidAt || regData?.createdAt || new Date()) as Parameters<typeof safeFormatDate>[0];
+        const receiptNumber = regData?.receiptNumber || regData?.orderId || orderId || regId || '';
+
+        return {
+            registrationId: regId || undefined,
+            receiptNumber,
+            paymentDate: safeFormatDate(paymentDateLike),
+            payerName: userName,
+            totalAmount,
+            items: [
+                { name: language === 'ko' ? '등록비' : 'Registration Fee', amount: baseAmount },
+                ...optionItems
+            ]
+        };
+    }, [language, orderId, regData, regId, userName]);
 
     return (
         <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-[#f0f5fa] via-[#dbeafe] to-[#d1fae5]">
+            <div style={{ position: 'fixed', left: '-10000px', top: 0 }}>
+                <div ref={receiptRef}>
+                    <ReceiptTemplate data={paymentData} config={effectiveReceiptConfig} />
+                </div>
+            </div>
             <Card className="w-full max-w-2xl shadow-2xl bg-white border border-gray-100 rounded-[32px] overflow-hidden animate-in fade-in zoom-in duration-500 relative">
                 {/* Top Decor */}
                 <div className={`absolute top-0 left-0 w-full h-2 bg-gradient-to-r ${isPending ? 'from-orange-400 to-red-500' : 'from-[#003366] to-[#24669e]'}`}></div>
@@ -132,6 +211,12 @@ const RegistrationSuccessPage: React.FC = () => {
                                 <span className="text-gray-500 font-medium text-sm md:text-base">Name</span>
                                 <span className="font-bold text-gray-900 text-base md:text-lg">{userName}</span>
                             </div>
+                            {userPosition && (
+                                <div className="flex justify-between items-center border-b border-gray-200 pb-3">
+                                    <span className="text-gray-500 font-medium text-sm md:text-base">{language === 'ko' ? '직급' : 'Position'}</span>
+                                    <span className="font-bold text-gray-900 text-base md:text-lg">{userPosition}</span>
+                                </div>
+                            )}
 
                             {/* Virtual Account Info */}
                             {isPending && regData?.virtualAccount && (
@@ -175,13 +260,15 @@ const RegistrationSuccessPage: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {!isPending && (
-                            <Button
-                                onClick={handlePrint}
-                                className="bg-[#003366] hover:bg-[#002244] h-14 text-lg font-bold rounded-2xl shadow-lg shadow-blue-900/20 hover:shadow-xl hover:-translate-y-0.5 transition-all text-white"
-                            >
-                                <Download className="w-5 h-5 mr-2" />
-                                {language === 'ko' ? '접수증 출력' : 'Print Receipt'}
-                            </Button>
+                            <PrintHandler
+                                contentRef={receiptRef}
+                                triggerButton={
+                                    <Button className="bg-[#003366] hover:bg-[#002244] h-14 text-lg font-bold rounded-2xl shadow-lg shadow-blue-900/20 hover:shadow-xl hover:-translate-y-0.5 transition-all text-white">
+                                        <Download className="w-5 h-5 mr-2" />
+                                        {language === 'ko' ? '접수증 출력' : 'Print Receipt'}
+                                    </Button>
+                                }
+                            />
                         )}
 
                         {isPending && (

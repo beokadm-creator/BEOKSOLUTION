@@ -241,11 +241,13 @@ export const confirmTossPaymentHttp = functions
                             email: userData.email,
                             phone: userData.phone,
                             affiliation: userData.affiliation,
+                            position: userData.position || '',
                             licenseNumber: userData.licenseNumber || ''
                         },
                         email: userData.email,
                         phone: userData.phone,
                         name: userData.name,
+                        position: userData.position || '',
                         conferenceId: confId,
                         status: status,
                         paymentStatus: dbPaymentStatus,
@@ -301,6 +303,7 @@ export const confirmTossPaymentHttp = functions
                                         name: userData.name,
                                         phone: userData.phone,
                                         affiliation: userData.affiliation,
+                                        position: userData.position || '',
                                         organization: userData.affiliation, // Standard field
                                         licenseNumber: userData.licenseNumber || '',
                                         tier: userData.tier || 'NON_MEMBER',
@@ -323,6 +326,7 @@ export const confirmTossPaymentHttp = functions
                                         name: userData.name,
                                         phone: userData.phone,
                                         affiliation: userData.affiliation,
+                                        position: userData.position || '',
                                         organization: userData.affiliation,
                                         updatedAt: admin.firestore.FieldValue.serverTimestamp()
                                     });
@@ -557,11 +561,13 @@ export const processFreeRegistrationHttp = functions
                         email: userData.email,
                         phone: userData.phone,
                         affiliation: userData.affiliation,
+                        position: userData.position || '',
                         licenseNumber: userData.licenseNumber || ''
                     },
                     email: userData.email,
                     phone: userData.phone,
                     name: userData.name,
+                    position: userData.position || '',
                     conferenceId: confId,
                     status: 'PAID',
                     paymentStatus: 'PAID',
@@ -626,6 +632,7 @@ export const processFreeRegistrationHttp = functions
                                 name: userData.name,
                                 phone: userData.phone,
                                 affiliation: userData.affiliation,
+                                position: userData.position || '',
                                 organization: userData.affiliation,
                                 licenseNumber: userData.licenseNumber || '',
                                 tier: userData.tier || 'NON_MEMBER',
@@ -643,6 +650,7 @@ export const processFreeRegistrationHttp = functions
                                 name: userData.name,
                                 phone: userData.phone,
                                 affiliation: userData.affiliation,
+                                position: userData.position || '',
                                 organization: userData.affiliation,
                                 updatedAt: admin.firestore.FieldValue.serverTimestamp()
                             });
