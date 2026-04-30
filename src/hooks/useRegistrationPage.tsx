@@ -316,7 +316,7 @@ export function useRegistrationPage(slug: string | undefined) {
             // Determine category name
             let categoryPrefix = 'Registration';
             if (activePeriod) {
-                categoryPrefix = activePeriod.name.ko;
+                categoryPrefix = activePeriod.name[language] || activePeriod.name.ko || activePeriod.name.en;
             } else {
                 categoryPrefix = language === 'ko' ? '\uD559\uC220\uB300\uD68C \uB4F1\uB85D' : 'Conference Registration';
             }
@@ -473,7 +473,7 @@ export function useRegistrationPage(slug: string | undefined) {
 
             const p = activePeriod.totalPrices[targetGradeId] ?? 0;
             updateBasePrice(p);
-            setFinalCategory(`${activePeriod.name.ko} - ${gradeName}`);
+            setFinalCategory(`${activePeriod.name[language] || activePeriod.name.ko || activePeriod.name.en} - ${gradeName}`);
         }
 
         // [Fix-Step 156] Update selectedTier state
