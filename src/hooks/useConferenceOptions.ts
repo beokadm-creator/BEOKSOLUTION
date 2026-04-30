@@ -30,6 +30,25 @@ export const useConferenceOptions = (conferenceId?: string): UseConferenceOption
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  const stripUndefined = <T,>(input: T): T => {
+    const walk = (value: unknown): unknown => {
+      if (value === undefined) return undefined;
+      if (value === null) return null;
+      if (value instanceof Date) return value;
+      if (value instanceof Timestamp) return value;
+      if (Array.isArray(value)) return value.map(walk);
+      if (typeof value !== 'object') return value;
+      const obj = value as Record<string, unknown>;
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(obj)) {
+        const next = walk(v);
+        if (next !== undefined) out[k] = next;
+      }
+      return out;
+    };
+    return walk(input) as T;
+  };
+
   // Fetch all options for a conference
   const fetchOptions = useCallback(async () => {
     if (!conferenceId) {
@@ -73,10 +92,11 @@ export const useConferenceOptions = (conferenceId?: string): UseConferenceOption
     }
 
     try {
+      const cleaned = stripUndefined(optionData);
       const docRef = await addDoc(
         collection(db, `conferences/${conferenceId}/conference_options`),
         {
-          ...optionData,
+          ...cleaned,
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
         }
@@ -103,7 +123,7 @@ export const useConferenceOptions = (conferenceId?: string): UseConferenceOption
       const docRef = doc(db, `conferences/${conferenceId}/conference_options`, id);
 
       await updateDoc(docRef, {
-        ...updates,
+        ...stripUndefined(updates),
         updatedAt: Timestamp.now(),
       });
 
