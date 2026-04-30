@@ -13,7 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 import toast from 'react-hot-toast';
 import { toFirestoreUserData } from '../utils/userDataMapper';
 import { normalizeFieldSettings } from '../utils/registrationFieldSettings';
-import type { RegistrationFieldSettings } from '../types/schema';
+import type { RegistrationFieldSettings, ConferenceCtaButton } from '../types/schema';
 
 // Dynamic Types based on DB
 interface RegistrationPeriod {
@@ -70,6 +70,7 @@ export function useRegistrationPage(slug: string | undefined) {
     const { auth } = useAuth();
 
     const { language, setLanguage } = useUserStore();
+    const [ctaButtons, setCtaButtons] = useState<ConferenceCtaButton[]>([]);
     const [searchParams] = useSearchParams();
     const location = useLocation();
     const state = location.state as {
@@ -90,6 +91,53 @@ export function useRegistrationPage(slug: string | undefined) {
     const paramMemberGrade = state.memberGrade || searchParams.get('memberGrade') || '';
     const paramMemberCode = state.memberCode || searchParams.get('memberCode') || '';
     const lockNameField = memberVerified && !!paramMemberName;
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadCtaButtons = async () => {
+            const societyId = info?.societyId || (confId ? confId.split('_')[0] : undefined);
+            const slugValue = slug || '';
+            const compositeId = societyId && slugValue && !slugValue.includes('_') ? `${societyId}_${slugValue}` : '';
+            const candidates = [
+                ...(societyId && slugValue ? [`societies/${societyId}/conferences/${slugValue}/settings/ui`] : []),
+                ...(compositeId ? [`conferences/${compositeId}/settings/ui`] : []),
+                ...(confId ? [`conferences/${confId}/settings/ui`] : []),
+                ...(slugValue ? [`conferences/${slugValue}/settings/ui`] : []),
+            ];
+
+            for (const path of candidates) {
+                try {
+                    const snap = await getDoc(doc(db, path));
+                    if (!snap.exists()) continue;
+                    const data = snap.data() as { ctaButtons?: unknown };
+                    const rawButtons = Array.isArray(data.ctaButtons) ? data.ctaButtons : [];
+                    const normalized = rawButtons.slice(0, 2).map((b) => {
+                        const btn = (b || {}) as Record<string, unknown>;
+                        const label = (btn.label || {}) as Record<string, unknown>;
+                        return {
+                            enabled: btn.enabled === true,
+                            label: { ko: String(label.ko || ''), en: String(label.en || '') },
+                            actionType: (btn.actionType === 'INTERNAL_ROUTE' || btn.actionType === 'SCROLL_SECTION') ? btn.actionType : 'EXTERNAL_URL',
+                            actionValue: String(btn.actionValue || ''),
+                            openInNewTab: btn.openInNewTab !== false,
+                            variant: btn.variant === 'secondary' ? 'secondary' : 'primary'
+                        } as ConferenceCtaButton;
+                    });
+
+                    if (isMounted) setCtaButtons(normalized);
+                    return;
+                } catch (_e) {
+                    continue;
+                }
+            }
+
+            if (isMounted) setCtaButtons([]);
+        };
+
+        if (confId || slug) loadCtaButtons();
+        return () => { isMounted = false; };
+    }, [confId, info?.societyId, slug]);
 
     // Try to get calculated totalPrice - sessionStorage FIRST for reliability
     let paramCalculatedPrice: number | undefined = undefined;
@@ -843,6 +891,8 @@ export function useRegistrationPage(slug: string | undefined) {
         // Language
         language,
         setLanguage,
+
+        ctaButtons,
 
         // Auth
         auth,

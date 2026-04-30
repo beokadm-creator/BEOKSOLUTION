@@ -9,7 +9,7 @@ import { AddonSelector } from '@/components/eregi/AddonSelector';
 import RegistrationForm from '@/components/eregi/RegistrationForm';
 import RegistrationPaymentSection from '@/components/eregi/RegistrationPaymentSection';
 import RegistrationRefundModal from '@/components/eregi/RegistrationRefundModal';
-import type { ConferenceOption } from '@/types/schema';
+import type { ConferenceOption, ConferenceCtaButton } from '@/types/schema';
 
 function AddonSelectorWrapper({
     conferenceId,
@@ -80,6 +80,7 @@ export default function RegistrationPage() {
         handleSaveBasicInfo,
         handlePayment,
         regSettings,
+        ctaButtons,
     } = useRegistrationPage(slug);
 
     if (confLoading || isInitializing) {
@@ -99,7 +100,7 @@ export default function RegistrationPage() {
                 </button>
             </header>
 
-            <main className="flex-grow py-12 px-4 sm:px-6 lg:px-8">
+            <main className={`flex-grow py-12 px-4 sm:px-6 lg:px-8 ${ctaButtons?.some(b => b.enabled) ? 'pb-32' : ''}`}>
                 {isProcessing && (
                     <div className="fixed inset-0 z-[9999] bg-white/80 backdrop-blur-sm flex items-center justify-center">
                         <LoadingSpinner />
@@ -176,7 +177,50 @@ export default function RegistrationPage() {
                 setShowRefundModal={setShowRefundModal}
                 refundPolicy={regSettings?.refundPolicy}
                 language={language}
+                hasBottomBar={ctaButtons?.some(b => b.enabled) || false}
             />
+
+            {Array.isArray(ctaButtons) && ctaButtons.filter(b => b.enabled && b.actionValue && (b.label?.ko || b.label?.en)).length > 0 && (
+                <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-lg z-40 safe-area-inset-bottom">
+                    <div className="max-w-3xl mx-auto px-4 py-3 flex justify-end gap-2">
+                        {ctaButtons
+                            .filter(b => b.enabled && b.actionValue && (b.label?.ko || b.label?.en))
+                            .slice(0, 2)
+                            .map((btn: ConferenceCtaButton, idx: number) => {
+                                const label = (language === 'en' ? btn.label.en : btn.label.ko) || btn.label.ko || btn.label.en || '';
+                                const handleClick = () => {
+                                    if (btn.actionType === 'SCROLL_SECTION') {
+                                        const el = document.getElementById(btn.actionValue) || document.getElementById(`section-${btn.actionValue}`);
+                                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                        return;
+                                    }
+                                    if (btn.actionType === 'INTERNAL_ROUTE') {
+                                        navigate(btn.actionValue);
+                                        return;
+                                    }
+                                    const url = btn.actionValue;
+                                    if (!/^https?:\/\//i.test(url)) return;
+                                    if (btn.openInNewTab !== false) window.open(url, '_blank', 'noopener,noreferrer');
+                                    else window.location.assign(url);
+                                };
+
+                                return (
+                                    <button
+                                        key={idx}
+                                        type="button"
+                                        onClick={handleClick}
+                                        className={`h-10 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${btn.variant === 'secondary'
+                                            ? 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                                            : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                                            }`}
+                                    >
+                                        {label}
+                                    </button>
+                                );
+                            })}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

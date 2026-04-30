@@ -7,6 +7,7 @@ interface RegistrationRefundModalProps {
     setShowRefundModal: (value: boolean) => void;
     refundPolicy?: string;
     language: 'ko' | 'en';
+    hasBottomBar?: boolean;
 }
 
 export default function RegistrationRefundModal({
@@ -14,6 +15,7 @@ export default function RegistrationRefundModal({
     setShowRefundModal,
     refundPolicy,
     language,
+    hasBottomBar = false,
 }: RegistrationRefundModalProps) {
     return (
         <>
@@ -21,7 +23,7 @@ export default function RegistrationRefundModal({
             <button
                 type="button"
                 onClick={() => setShowRefundModal(true)}
-                className="fixed bottom-4 right-4 z-40 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-bold transition-colors"
+                className={`fixed ${hasBottomBar ? 'bottom-20' : 'bottom-4'} right-4 z-40 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-bold transition-colors`}
             >
                 {language === 'ko' ? '환불 규정' : 'Refund Policy'}
             </button>
