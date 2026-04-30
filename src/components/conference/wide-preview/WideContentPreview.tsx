@@ -4,6 +4,7 @@ import { WideSpeakersPreview } from './WideSpeakersPreview';
 import { WidePricingPreview } from './WidePricingPreview';
 import { WideLocationPreview } from './WideLocationPreview';
 import { WideAboutPreview } from './WideAboutPreview';
+import { WideGreetingsPreview } from './WideGreetingsPreview';
 import { WideSponsors } from '../wide/WideSponsors';
 
 type LocalizedString = { [lang: string]: string } | string;
@@ -13,6 +14,7 @@ interface WideContentPreviewProps {
     societyId: string;
     welcomeMessageTitle?: LocalizedString;
     welcomeMessage?: LocalizedString;
+    welcomeGreetings?: unknown[];
     welcomeMessageImages?: string[];
     agendas?: unknown[];
     speakers?: unknown[];
@@ -45,6 +47,18 @@ export const WideContentPreview: React.FC<WideContentPreviewProps> = ({
   const renderContent = () => {
     switch (activeSection) {
       case 'welcome':
+        if (Array.isArray(config.welcomeGreetings) && config.welcomeGreetings.length > 0) {
+          return (
+            <section id="section-welcome" className="animate-fade-in space-y-16">
+              <WideGreetingsPreview
+                title={t(config.welcomeMessageTitle) || (lang === 'ko' ? '환영사' : 'Welcome Message')}
+                greetings={config.welcomeGreetings as unknown[] as any[]}
+                lang={lang}
+                t={t}
+              />
+            </section>
+          );
+        }
         return (
           <section id="section-welcome" className="animate-fade-in space-y-16">
             <WideAboutPreview

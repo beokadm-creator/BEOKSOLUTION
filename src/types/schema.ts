@@ -24,6 +24,16 @@ export interface ConferenceUiSettings {
   ctaButtons?: ConferenceCtaButton[];
 }
 
+export interface WelcomeGreeting {
+  id: string;
+  role: LocalizedText;
+  name: string;
+  affiliation?: LocalizedText;
+  message: LocalizedText;
+  photoUrl?: string;
+  order?: number;
+}
+
 export type BadgeElementType = 'NAME' | 'ORG' | 'QR' | 'CUSTOM' | 'CATEGORY' | 'LICENSE' | 'PRICE' | 'AFFILIATION' | 'POSITION' | 'IMAGE';
 
 export interface BadgeElement {
@@ -195,6 +205,7 @@ export interface ConferenceInfo {
   };
 
   welcomeMessage?: LocalizedText;
+  welcomeGreetings?: WelcomeGreeting[];
   greetings?: LocalizedText; // Added fallback
   externalLinks?: {
     website?: string;

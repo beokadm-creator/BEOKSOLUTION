@@ -15,6 +15,19 @@ service firebase.storage {
       );
     }
 
+    function isSocietyAdmin(societyId) {
+      let adminDoc = firestore.get(/databases/(default)/documents/societies/$(societyId)/private/admin);
+      return isAuthenticated() &&
+        adminDoc.data != null &&
+        adminDoc.data.adminEmails != null &&
+        request.auth.token.email in adminDoc.data.adminEmails;
+    }
+
+    function isConferenceAdmin(confId) {
+      let conf = firestore.get(/databases/(default)/documents/conferences/$(confId)).data;
+      return conf != null && isSocietyAdmin(conf.societyId);
+    }
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
@@ -31,7 +44,7 @@ service firebase.storage {
 
     match /conferences/{confId}/welcome/{allPaths=**} {
       allow read: if true;
-      allow write: if isSuperAdmin();
+      allow write: if isSuperAdmin() || isConferenceAdmin(confId);
     }
 
     match /conferences/{confId}/assets/{allPaths=**} {

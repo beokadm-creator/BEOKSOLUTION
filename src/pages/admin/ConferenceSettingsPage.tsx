@@ -44,6 +44,7 @@ interface ConferenceData {
     };
     welcomeMessage: { ko: string; en: string };
     welcomeMessageImages?: string[]; // Array of image URLs
+    welcomeGreetings?: unknown[];
     abstractDeadlines: {
         submissionDeadline?: string;
         editDeadline?: string;
@@ -81,6 +82,7 @@ const defaultData: ConferenceData = {
     },
     welcomeMessage: { ko: '', en: '' },
     welcomeMessageImages: [],
+    welcomeGreetings: [],
     abstractDeadlines: {
         submissionDeadline: '',
         editDeadline: ''
@@ -205,6 +207,7 @@ export default function ConferenceSettingsPage() {
                             en: snapData.welcomeMessage?.en || ''
                         },
                         welcomeMessageImages: snapData.welcomeMessageImages || [],
+                        welcomeGreetings: Array.isArray(snapData.welcomeGreetings) ? snapData.welcomeGreetings : [],
                         features: {
                             guestbookEnabled: snapData.features?.guestbookEnabled ?? true,
                             stampTourEnabled: snapData.features?.stampTourEnabled ?? false,
@@ -398,6 +401,7 @@ export default function ConferenceSettingsPage() {
                 visualAssets: data.visualAssets,
                 welcomeMessage: data.welcomeMessage,
                 welcomeMessageImages: data.welcomeMessageImages || [],
+                welcomeGreetings: data.welcomeGreetings || [],
                 abstractSubmissionDeadline: data.abstractDeadlines.submissionDeadline ? Timestamp.fromDate(parseDatetimeLocal(data.abstractDeadlines.submissionDeadline)) : null,
                 abstractEditDeadline: data.abstractDeadlines.editDeadline ? Timestamp.fromDate(parseDatetimeLocal(data.abstractDeadlines.editDeadline)) : null,
                 features: {

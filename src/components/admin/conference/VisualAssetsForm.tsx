@@ -1,9 +1,14 @@
 import React from 'react';
 import { Card, CardContent } from '../../ui/card';
 import { Label } from '../../ui/label';
-import { Image as ImageIcon, FileText, X } from 'lucide-react';
+import { Image as ImageIcon, FileText, X, Plus, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
 import BilingualImageUpload from '../../ui/bilingual-image-upload';
 import RichTextEditor from '../../ui/RichTextEditor';
+import BilingualInput from '../../ui/bilingual-input';
+import { Input } from '../../ui/input';
+import { Button } from '../../ui/button';
+import ImageUpload from '../../ui/ImageUpload';
+import { v4 as uuidv4 } from 'uuid';
 
 import { ConferenceInfo } from '../../../types/conference';
 
@@ -24,6 +29,52 @@ export const VisualAssetsForm: React.FC<VisualAssetsFormProps> = ({
     handleAddImage,
     handleRemoveImage
 }) => {
+    const greetings = Array.isArray((data as unknown as { welcomeGreetings?: unknown }).welcomeGreetings)
+        ? ((data as unknown as { welcomeGreetings: unknown[] }).welcomeGreetings as unknown[])
+        : [];
+
+    const setGreetings = (next: unknown[]) => {
+        setData((prev: ConferenceInfo) => ({
+            ...prev,
+            welcomeGreetings: next
+        }));
+    };
+
+    const addGreeting = () => {
+        if (greetings.length >= 5) return;
+        const id = uuidv4();
+        setGreetings([
+            ...greetings,
+            {
+                id,
+                role: { ko: '', en: '' },
+                name: '',
+                affiliation: { ko: '', en: '' },
+                message: { ko: '', en: '' },
+                photoUrl: '',
+                order: greetings.length
+            }
+        ]);
+    };
+
+    const removeGreeting = (index: number) => {
+        setGreetings(greetings.filter((_, i) => i !== index));
+    };
+
+    const moveGreeting = (index: number, dir: -1 | 1) => {
+        const target = index + dir;
+        if (target < 0 || target >= greetings.length) return;
+        const next = [...greetings];
+        const tmp = next[index];
+        next[index] = next[target];
+        next[target] = tmp;
+        setGreetings(next);
+    };
+
+    const updateGreeting = (index: number, patch: Record<string, unknown>) => {
+        setGreetings(greetings.map((g, i) => (i === index ? { ...(g as Record<string, unknown>), ...patch } : g)));
+    };
+
     return (
         <div className="space-y-12">
             {/* 3. Visual Assets Section */}
@@ -114,6 +165,122 @@ export const VisualAssetsForm: React.FC<VisualAssetsFormProps> = ({
                 </div>
 
                 <div className="lg:col-span-8 space-y-6">
+                    <Card className="border-0 shadow-sm ring-1 ring-slate-200 bg-white overflow-hidden rounded-2xl">
+                        <CardContent className="p-6 md:p-8 space-y-6">
+                            <div className="flex items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                    <h3 className="text-base font-bold text-slate-800">복수 인사말</h3>
+                                    <p className="text-sm text-slate-500">최대 5개까지 등록할 수 있으며, 사용자 페이지에서 직함+이름 버튼으로 전환됩니다.</p>
+                                </div>
+                                <Button
+                                    type="button"
+                                    onClick={addGreeting}
+                                    disabled={greetings.length >= 5}
+                                    className="gap-2"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    인사말 추가
+                                </Button>
+                            </div>
+
+                            {greetings.length === 0 && (
+                                <div className="text-sm text-slate-500 bg-slate-50 border border-slate-100 rounded-xl p-4">
+                                    등록된 복수 인사말이 없습니다. 필요 시 “인사말 추가”로 여러 명의 인사말을 구성하세요.
+                                </div>
+                            )}
+
+                            {greetings.map((g, idx) => {
+                                const gg = g as Record<string, any>;
+                                const role = (gg.role && typeof gg.role === 'object') ? gg.role : { ko: '', en: '' };
+                                const affiliation = (gg.affiliation && typeof gg.affiliation === 'object') ? gg.affiliation : { ko: '', en: '' };
+                                const message = (gg.message && typeof gg.message === 'object') ? gg.message : { ko: '', en: '' };
+                                const gid = String(gg.id || '');
+
+                                return (
+                                    <div key={gid || idx} className="border border-slate-200 rounded-2xl p-5 md:p-6 space-y-6">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="space-y-0.5">
+                                                <div className="text-sm font-bold text-slate-800">인사말 {idx + 1}</div>
+                                                <div className="text-xs text-slate-500">버튼 라벨: 직함 + 이름</div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Button type="button" variant="outline" size="icon" onClick={() => moveGreeting(idx, -1)} disabled={idx === 0}>
+                                                    <ArrowUp className="w-4 h-4" />
+                                                </Button>
+                                                <Button type="button" variant="outline" size="icon" onClick={() => moveGreeting(idx, 1)} disabled={idx === greetings.length - 1}>
+                                                    <ArrowDown className="w-4 h-4" />
+                                                </Button>
+                                                <Button type="button" variant="destructive" size="icon" onClick={() => removeGreeting(idx)}>
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <BilingualInput
+                                                label="직함 (Role)"
+                                                valueKO={String(role.ko || '')}
+                                                valueEN={String(role.en || '')}
+                                                onChangeKO={(value) => updateGreeting(idx, { role: { ...role, ko: value } })}
+                                                onChangeEN={(value) => updateGreeting(idx, { role: { ...role, en: value } })}
+                                                placeholderKO="예: 회장"
+                                                placeholderEN="e.g. President"
+                                                required
+                                            />
+
+                                            <div className="space-y-2">
+                                                <Label className="text-sm font-bold text-slate-700">이름 (Name)</Label>
+                                                <Input
+                                                    value={String(gg.name || '')}
+                                                    onChange={(e) => updateGreeting(idx, { name: e.target.value })}
+                                                    placeholder="예: 홍길동"
+                                                    className="h-10 border-slate-200 rounded-md"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <BilingualInput
+                                            label="소속 (Affiliation)"
+                                            valueKO={String(affiliation.ko || '')}
+                                            valueEN={String(affiliation.en || '')}
+                                            onChangeKO={(value) => updateGreeting(idx, { affiliation: { ...affiliation, ko: value } })}
+                                            onChangeEN={(value) => updateGreeting(idx, { affiliation: { ...affiliation, en: value } })}
+                                            placeholderKO="예: RCA"
+                                            placeholderEN="e.g. RCA"
+                                        />
+
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            <div className="space-y-2">
+                                                <Label className="text-base font-medium text-slate-700 mb-2 block">한국어 인사말 / Korean</Label>
+                                                <RichTextEditor
+                                                    value={String(message.ko || '')}
+                                                    onChange={(value) => updateGreeting(idx, { message: { ...message, ko: value } })}
+                                                    placeholder="환영사를 작성해주세요..."
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label className="text-base font-medium text-slate-700 mb-2 block">영어 인사말 / English</Label>
+                                                <RichTextEditor
+                                                    value={String(message.en || '')}
+                                                    onChange={(value) => updateGreeting(idx, { message: { ...message, en: value } })}
+                                                    placeholder="e.g. Dear Colleagues and Friends..."
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <ImageUpload
+                                            path={`conferences/${cid}/welcome/greetings/${gid || idx}`}
+                                            previewUrl={gg.photoUrl ? String(gg.photoUrl) : undefined}
+                                            onUploadComplete={(url) => updateGreeting(idx, { photoUrl: url })}
+                                            label="프로필 사진 (1장)"
+                                        />
+                                    </div>
+                                );
+                            })}
+                        </CardContent>
+                    </Card>
+
                     <Card className="border-0 shadow-sm ring-1 ring-slate-200 bg-white overflow-hidden rounded-2xl">
                         <CardContent className="p-6 md:p-8 space-y-8">
                             {/* Korean Editor */}
