@@ -125,6 +125,9 @@ export function useRegistrationPage(slug: string | undefined) {
                         } as ConferenceCtaButton;
                     });
 
+                    const hasRenderable = normalized.some(b => b.enabled && (b.label.ko || b.label.en) && b.actionValue);
+                    if (!hasRenderable) continue;
+
                     if (isMounted) setCtaButtons(normalized);
                     return;
                 } catch (_e) {

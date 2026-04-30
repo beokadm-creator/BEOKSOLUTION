@@ -198,13 +198,33 @@ export const useTranslation = (slug: string): UseTranslationResult => {
                     return null;
                 };
 
+                const readUiDoc = async () => {
+                    let firstExisting: any = null;
+
+                    for (const p of allBasePaths) {
+                        try {
+                            const snap = await getDoc(doc(db, `${p}/settings/ui`));
+                            if (!snap.exists()) continue;
+                            if (!firstExisting) firstExisting = snap;
+
+                            const data = snap.data() as { ctaButtons?: unknown };
+                            const rawButtons = Array.isArray(data?.ctaButtons) ? data.ctaButtons : [];
+                            if (rawButtons.length > 0) return snap;
+                        } catch (err) {
+                            console.warn('[useTranslation] doc read failed:', `${p}/settings/ui`, err);
+                        }
+                    }
+
+                    return firstExisting;
+                };
+
                 const [identityRes, societyRes, visualRes, infoRes, regRes, uiRes] = await Promise.allSettled([
                     readFirstExistingDoc('settings/identity'),
                     getDoc(doc(db, 'societies', societyId)),
                     readFirstExistingDoc('settings/visual'),
                     readFirstExistingDoc('info/general'),
                     readFirstExistingDoc('settings/registration'),
-                    readFirstExistingDoc('settings/ui')
+                    readUiDoc()
                 ]);
 
                 const identitySnap = identityRes.status === 'fulfilled' ? identityRes.value : null;
