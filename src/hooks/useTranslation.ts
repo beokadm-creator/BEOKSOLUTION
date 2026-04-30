@@ -1,8 +1,9 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { doc, getDoc, getDocs, collection, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { DOMAIN_CONFIG, extractSocietyFromHost } from '../utils/domainHelper';
 import { safeText } from '../utils/safeText';
+import { useUserStore } from '../store/userStore';
 
 const translationCache = new Map<string, { data: unknown; timestamp: number }>();
 const pendingTranslations = new Map<string, Promise<unknown>>();
@@ -54,19 +55,32 @@ const toLocalizedText = (obj: unknown, lang: string) => {
 };
 
 export const useTranslation = (slug: string): UseTranslationResult => {
+    const userLanguage = useUserStore(s => s.language);
+    const setUserLanguage = useUserStore(s => s.setLanguage);
     const [config, setConfig] = useState<TranslationConfig | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-    const [currentLang, setCurrentLang] = useState<string>(localStorage.getItem('preferredLanguage') || 'ko');
+    const [currentLang, setCurrentLang] = useState<string>(() => {
+        if (typeof window === 'undefined') return 'ko';
+        return localStorage.getItem('preferredLanguage') || localStorage.getItem('preferred-language') || 'ko';
+    });
     const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
     const setLanguage = (lang: string) => {
         setCurrentLang(lang);
-        localStorage.setItem('preferredLanguage', lang);
+        if (lang === 'ko' || lang === 'en') setUserLanguage(lang);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('preferredLanguage', lang);
+            localStorage.setItem('preferred-language', lang);
+        }
     };
 
     const t = (obj: unknown) => toLocalizedText(obj, currentLang);
     const refresh = () => setRefreshTrigger(prev => prev + 1);
+
+    useEffect(() => {
+        if (userLanguage && userLanguage !== currentLang) setCurrentLang(userLanguage);
+    }, [userLanguage, currentLang]);
 
     useEffect(() => {
         if (!slug) return;
