@@ -399,16 +399,44 @@ exports.lookupRegistrationByEmail = functions
             const db = admin.firestore();
             const normalizedEmail = email.toLowerCase().trim();
             // 1. Find registration by email and confId
-            const regsSnap = await db.collection(`conferences/${confId}/registrations`)
-                .where('email', '==', normalizedEmail)
-                .orderBy('createdAt', 'desc')
-                .limit(1)
-                .get();
-            if (regsSnap.empty) {
+            let regDoc = null;
+            try {
+                const regsSnap = await db.collection(`conferences/${confId}/registrations`)
+                    .where('email', '==', normalizedEmail)
+                    .orderBy('createdAt', 'desc')
+                    .limit(1)
+                    .get();
+                if (!regsSnap.empty) {
+                    regDoc = regsSnap.docs[0];
+                }
+            }
+            catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                const code = err === null || err === void 0 ? void 0 : err.code;
+                const isIndexError = code === 9 || msg.includes('requires an index') || msg.includes('FAILED_PRECONDITION');
+                if (!isIndexError)
+                    throw err;
+                const regsSnap = await db.collection(`conferences/${confId}/registrations`)
+                    .where('email', '==', normalizedEmail)
+                    .get();
+                if (!regsSnap.empty) {
+                    const docs = [...regsSnap.docs];
+                    const toMillis = (v) => {
+                        if (!v)
+                            return 0;
+                        if (typeof v === 'object' && v !== null && 'toMillis' in v && typeof v.toMillis === 'function') {
+                            return v.toMillis();
+                        }
+                        return 0;
+                    };
+                    docs.sort((a, b) => toMillis(b.data().createdAt) - toMillis(a.data().createdAt));
+                    regDoc = docs[0] || null;
+                }
+            }
+            if (!regDoc) {
                 res.status(404).json({ error: 'Registration not found' });
                 return;
             }
-            const regDoc = regsSnap.docs[0];
             const regData = regDoc.data();
             const userId = regData.userId;
             if (!userId || userId === 'GUEST') {
