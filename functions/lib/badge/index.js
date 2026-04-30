@@ -410,6 +410,7 @@ exports.issueDigitalBadge = functions
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onCall(async (data, _context) => {
+    var _a;
     const { confId, regId, issueOption } = data;
     if (!confId || !regId) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing confId or regId');
@@ -429,6 +430,8 @@ exports.issueDigitalBadge = functions
         if (!regSnap.exists) {
             throw new Error('Registration not found');
         }
+        const regData = regSnap.data();
+        const position = ((regData === null || regData === void 0 ? void 0 : regData.position) || ((_a = regData === null || regData === void 0 ? void 0 : regData.userInfo) === null || _a === void 0 ? void 0 : _a.position) || '');
         await regRef.update({
             badgeIssued: true,
             badgeIssuedAt: now,
@@ -460,7 +463,7 @@ exports.issueDigitalBadge = functions
             option: issueOption || 'DIGITAL_PRINT'
         });
         functions.logger.info(`[BadgeToken] Digital badge issued for ${regId}, QR: ${badgeQr}`);
-        return { success: true, badgeQr };
+        return { success: true, badgeQr, position };
     }
     catch (error) {
         functions.logger.error('[BadgeToken] Issue badge error:', error);

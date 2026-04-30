@@ -27,12 +27,14 @@ export interface Registration {
   phone?: string;
   affiliation?: string;
   organization?: string;
+  position?: string;
   licenseNumber?: string;
   userInfo?: {
     name?: string;
     email?: string;
     phone?: string;
     affiliation?: string;
+    position?: string;
     licenseNumber?: string;
   };
   badgeIssued?: boolean;
@@ -501,6 +503,9 @@ export const issueDigitalBadge = functions
         throw new Error('Registration not found');
       }
 
+      const regData = regSnap.data() as Registration;
+      const position = (regData?.position || regData?.userInfo?.position || '') as string;
+
       await regRef.update({
         badgeIssued: true,
         badgeIssuedAt: now,
@@ -537,7 +542,7 @@ export const issueDigitalBadge = functions
 
       functions.logger.info(`[BadgeToken] Digital badge issued for ${regId}, QR: ${badgeQr}`);
 
-      return { success: true, badgeQr };
+      return { success: true, badgeQr, position };
     } catch (error) {
       functions.logger.error('[BadgeToken] Issue badge error:', error);
       throw new functions.https.HttpsError('internal', 'Failed to issue digital badge');
