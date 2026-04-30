@@ -11,6 +11,7 @@ import { AdminCertificateDownloader } from '../../components/admin/conference/Ad
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import type { CertificateRecord, CertificateStatus } from '../../types/schema';
 import toast from 'react-hot-toast';
+import { flattenRegistrationFields } from '../../utils/registrationMapper';
 
 interface EligibleAttendee {
     id: string;
@@ -18,6 +19,7 @@ interface EligibleAttendee {
     name: string;
     email?: string;
     organization?: string;
+    position?: string;
     isCheckedIn: boolean;
     badgeIssued?: boolean;
 }
@@ -81,14 +83,16 @@ const CertificateManagementPage: React.FC = () => {
                     const isCheckedIn = !!(r.isCheckedIn || r.badgeIssued);
                     if (!isCheckedIn) continue;
                     if (issuedSourceIds.has(d.id)) continue;
-                    const name = r.userName || r.userInfo?.name || '';
+                    const norm = flattenRegistrationFields(r);
+                    const name = norm.userName || '';
                     if (!name) continue;
                     eligible.push({
                         id: d.id,
                         sourceType: 'registration',
                         name,
-                        email: r.userEmail || r.userInfo?.email,
-                        organization: r.userOrg || r.affiliation || r.userInfo?.affiliation,
+                        email: norm.userEmail || r.email,
+                        organization: norm.affiliation || '',
+                        position: norm.position || '',
                         isCheckedIn: !!r.isCheckedIn,
                         badgeIssued: !!r.badgeIssued,
                     });
@@ -101,12 +105,14 @@ const CertificateManagementPage: React.FC = () => {
                     if (!isCheckedIn) continue;
                     if (issuedSourceIds.has(d.id)) continue;
                     if (!e.name) continue;
+                    const extNorm = flattenRegistrationFields(e);
                     eligible.push({
                         id: d.id,
                         sourceType: 'external_attendee',
-                        name: e.name,
-                        email: e.email,
-                        organization: e.organization,
+                        name: extNorm.userName || e.name,
+                        email: extNorm.userEmail || e.email,
+                        organization: extNorm.affiliation || e.organization,
+                        position: extNorm.position || '',
                         isCheckedIn: !!e.isCheckedIn,
                         badgeIssued: !!e.badgeIssued,
                     });

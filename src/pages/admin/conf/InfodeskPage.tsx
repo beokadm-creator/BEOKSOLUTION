@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import { useBixolon } from '../../../hooks/useBixolon';
 import { BadgeElement } from '../../../types/schema';
 import type { PrintLayout } from '../../../types/print';
+import { flattenRegistrationFields } from '../../../utils/registrationMapper';
 
 // Types
 interface AttendeeRecord {
@@ -50,6 +51,7 @@ interface ScannerState {
     userData?: {
         name: string;
         affiliation: string;
+        position?: string;
     };
 }
 
@@ -260,15 +262,10 @@ const InfodeskPage: React.FC = () => {
                 throw new Error("이미 발급된 명찰입니다. 데스크에서 명찰을 수령해주세요");
             }
 
-            let userName = isExternal ? (regData?.name || 'Unknown') : (regData?.userName || regData?.name || regData?.userInfo?.name || 'Unknown');
-            let userAffiliation = regData?.userOrg || regData?.organization || regData?.affiliation || regData?.userInfo?.affiliation || regData?.userInfo?.organization || regData?.userEmail || '';
-
-            // [Fix] Ensure we check all possible nested locations for affiliation
-            if (!userAffiliation || userAffiliation.includes('@')) {
-                if (!isExternal && regData?.userInfo) {
-                    userAffiliation = regData.userInfo.organization || regData.userInfo.affiliation || userAffiliation;
-                }
-            }
+            const norm = flattenRegistrationFields(regData || {});
+            let userName = isExternal ? (regData?.name || 'Unknown') : (norm.userName || 'Unknown');
+            let userAffiliation = norm.affiliation || '';
+            const userPosition = norm.position || '';
 
             // Fallback: Fetch from user document if internal and missing affiliation
             if (!isExternal && (!userAffiliation || userAffiliation.includes('@')) && regData?.userId) {
@@ -356,7 +353,7 @@ const InfodeskPage: React.FC = () => {
                 message: '명찰이 정상적으로 발급되었습니다.',
                 subMessage: userName,
                 lastScanned: code,
-                userData: { name: userName, affiliation: userAffiliation }
+                userData: { name: userName, affiliation: userAffiliation, position: userPosition }
             });
 
         } catch (e) {
@@ -589,7 +586,7 @@ const InfodeskPage: React.FC = () => {
                         {scannerState.userData && (
                             <div className="mt-8 w-full max-w-5xl rounded-[2.5rem] border border-white/20 bg-white/10 p-16 text-center shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-xl">
                                 <div className="mb-6 mt-4 text-7xl font-black tracking-tight text-white drop-shadow-md">{scannerState.userData.name}</div>
-                                <div className="text-4xl font-medium text-sky-200 opacity-90">{scannerState.userData.affiliation}</div>
+                                <div className="text-4xl font-medium text-sky-200 opacity-90">{scannerState.userData.affiliation}{scannerState.userData.position ? ` · ${scannerState.userData.position}` : ''}</div>
                             </div>
                         )}
 

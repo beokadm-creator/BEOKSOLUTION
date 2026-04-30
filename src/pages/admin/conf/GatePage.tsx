@@ -7,6 +7,7 @@ import { Button } from '../../../components/ui/button';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { getKstToday } from '../../../utils/dateUtils';
+import { flattenRegistrationFields } from '../../../utils/registrationMapper';
 import type { AttendanceZone, AttendanceRulesMap, BreakTime } from '../../../types/attendance';
 
 interface ScannerState {
@@ -17,6 +18,7 @@ interface ScannerState {
     userData?: {
         name: string;
         affiliation: string;
+        position?: string;
     };
     actionType?: 'ENTER' | 'EXIT';
     recognizedMinutes?: number;
@@ -188,7 +190,7 @@ const GatePage: React.FC = () => {
                 message: res.actionText,
                 subMessage: res.userName,
                 lastScanned: parsedIdForDebounce,
-                userData: { name: res.userName, affiliation: res.affiliation },
+                userData: { name: res.userName, affiliation: res.affiliation, position: res.position },
                 actionType: res.actionType,
                 recognizedMinutes: res.recognizedMinutes,
                 totalMinutes: res.totalMinutes,
@@ -219,8 +221,10 @@ const GatePage: React.FC = () => {
 
             if (data.status !== 'PAID' && data.paymentStatus !== 'PAID') throw new Error("결제 미완료");
 
-            const name = data.userName || data.name || data.userInfo?.name || 'Unknown';
-            const aff = data.userOrg || data.organization || data.affiliation || data.userInfo?.affiliation || data.userInfo?.organization || data.userEmail || '';
+            const norm = flattenRegistrationFields(data);
+            const name = norm.userName || 'Unknown';
+            const aff = norm.affiliation || '';
+            const position = norm.position || '';
             const status = data.attendanceStatus || 'OUTSIDE';
             const curZoneId = data.currentZone;
             const lastIn = data.lastCheckIn?.toDate();
@@ -416,6 +420,7 @@ const GatePage: React.FC = () => {
                 actionType: action,
                 userName: name,
                 affiliation: aff,
+                position,
                 recognizedMinutes: minsToAdd,
                 totalMinutes: newTotal,
                 todayMinutes: dailyMinutes[statsDateStr] || 0,
@@ -594,7 +599,7 @@ const GatePage: React.FC = () => {
                         )}
 
                         {scannerState.subMessage && <p className="text-4xl font-bold text-white drop-shadow-md mb-2">{scannerState.subMessage}</p>}
-                        {scannerState.userData && <p className="text-2xl font-medium text-sky-200 opacity-90 mb-10">{scannerState.userData.affiliation}</p>}
+                        {scannerState.userData && <p className="text-2xl font-medium text-sky-200 opacity-90 mb-10">{scannerState.userData.affiliation}{scannerState.userData.position ? ` · ${scannerState.userData.position}` : ''}</p>}
 
                         {scannerState.status === 'SUCCESS' && typeof scannerState.totalMinutes === 'number' && (
                             <div className="w-full max-w-5xl rounded-[2.5rem] border border-white/20 bg-white/10 p-10 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-xl">

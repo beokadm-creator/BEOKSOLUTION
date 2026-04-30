@@ -439,6 +439,73 @@ export interface Registration {
   updatedAt: Timestamp;
 }
 
+/**
+ * Flattened registration type for admin list views.
+ * Consolidates root-level and userInfo fields into a single flat shape.
+ * Used by useRegistrationList and useRegistrationsPagination hooks.
+ */
+export interface RootRegistration {
+  id: string;
+  orderId?: string;
+  originalRegId?: string;
+  slug?: string;
+  societyId?: string;
+  conferenceId: string;
+  userId: string;
+  // Normalized user fields (from flattenRegistrationFields)
+  userName?: string;
+  userEmail?: string;
+  userPhone?: string;
+  affiliation?: string;
+  position?: string;
+  licenseNumber?: string;
+  tier?: string;
+  categoryName?: string;
+  userOrg?: string; // Legacy field — still present in some Firestore docs
+  // Payment fields
+  amount: number;
+  baseAmount?: number;
+  optionsTotal?: number;
+  status?: string;
+  paymentStatus?: string;
+  paymentKey?: string;
+  paymentMethod?: string;
+  paymentType?: string;
+  method?: string;
+  refundAmount?: number;
+  receiptNumber?: string;
+  // Badge & Check-in
+  badgeIssued?: boolean;
+  badgeIssuedAt?: Timestamp;
+  badgeQr?: string | null;
+  isCheckedIn?: boolean;
+  checkInTime?: Timestamp | null;
+  confirmationQr?: string;
+  // Attendance tracking
+  attendanceStatus?: string;
+  currentZone?: string | null;
+  totalMinutes?: number;
+  dailyMinutes?: Record<string, number>;
+  zoneMinutes?: Record<string, number>;
+  zoneCompleted?: Record<string, boolean>;
+  isCompleted?: boolean;
+  // Options
+  options?: unknown[];
+  selectedOptions?: unknown[];
+  // Virtual account
+  virtualAccount?: {
+    bank: string;
+    accountNumber: string;
+    customerName?: string;
+    dueDate?: string;
+  };
+  // Timestamps
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
+  // External attendee flag
+  isExternal?: boolean;
+}
+
 // ------------------------------------------
 // D. Content (CMS)
 // ------------------------------------------

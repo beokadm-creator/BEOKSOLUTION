@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getKstToday } from '../utils/dateUtils';
+import { flattenRegistrationFields } from '../utils/registrationMapper';
 import * as XLSX from 'xlsx';
 
 // --- Types for Settings ---
@@ -39,6 +40,7 @@ export interface ParticipantRecord {
     userEmail: string;
     licenseNumber: string;
     affiliation?: string;
+    position?: string;
     memberGrade: string;
     targetTier?: string;
     tier?: string;
@@ -192,15 +194,17 @@ export function useStatistics(conferenceId: string | undefined) {
             const regParticipants: ParticipantRecord[] = regSnap.docs.map(d => {
                 const data = d.data();
                 const times = userTimes[d.id] || (data.badgeQr && userTimes[data.badgeQr]) || (data.userId && userTimes[data.userId]) || {};
+                const norm = flattenRegistrationFields(data);
                 return {
                     id: d.id,
                     userId: data.userId || d.id,
-                    userName: data.userName || data.name || data.userInfo?.name || 'Unknown',
-                    userPhone: data.phone || data.mobile || data.userInfo?.phone || data.userInfo?.mobile || '',
-                    userEmail: data.userEmail || data.email || data.userInfo?.email || '',
-                    licenseNumber: data.licenseNumber || data.license || data.userInfo?.licenseNumber || data.userInfo?.license || '',
-                    affiliation: data.affiliation || data.organization || data.userOrg || data.userInfo?.affiliation || '',
-                    memberGrade: data.memberGrade || data.tier || data.userTier || data.grade || data.categoryName || data.userInfo?.grade || data.userInfo?.memberGrade || '',
+                    userName: norm.userName || 'Unknown',
+                    userPhone: data.phone || data.mobile || norm.userPhone || '',
+                    userEmail: norm.userEmail || '',
+                    licenseNumber: norm.licenseNumber || '',
+                    affiliation: norm.affiliation || '',
+                    position: norm.position || '',
+                    memberGrade: data.memberGrade || norm.tier || data.userInfo?.memberGrade || '',
                     paymentAmount: Number(data.amount) || Number(data.paymentAmount) || 0,
                     badgeQr: data.badgeQr || null,
                     badgeIssued: !!data.badgeIssued,
@@ -228,15 +232,17 @@ export function useStatistics(conferenceId: string | undefined) {
             const extParticipants: ParticipantRecord[] = extSnap.docs.map(d => {
                 const data = d.data();
                 const times = userTimes[d.id] || (data.badgeQr && userTimes[data.badgeQr]) || (data.userId && userTimes[data.userId]) || (data.uid && userTimes[data.uid]) || {};
+                const extNorm = flattenRegistrationFields(data);
                 return {
                     id: d.id,
                     userId: data.userId || data.uid || d.id,
-                    userName: data.name || 'Unknown',
-                    userPhone: data.phone || data.mobile || '',
-                    userEmail: data.email || '',
-                    licenseNumber: data.licenseNumber || data.license || '',
-                    affiliation: data.organization || data.affiliation || '',
-                    memberGrade: data.memberGrade || data.tier || data.userTier || data.grade || data.categoryName || '비회원 (외부)',
+                    userName: extNorm.userName || 'Unknown',
+                    userPhone: data.phone || data.mobile || extNorm.userPhone || '',
+                    userEmail: extNorm.userEmail || '',
+                    licenseNumber: extNorm.licenseNumber || '',
+                    affiliation: extNorm.affiliation || '',
+                    position: extNorm.position || '',
+                    memberGrade: data.memberGrade || extNorm.tier || '비회원 (외부)',
                     paymentAmount: Number(data.amount) || 0,
                     badgeQr: data.badgeQr || null,
                     badgeIssued: !!data.badgeIssued,

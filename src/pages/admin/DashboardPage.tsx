@@ -7,6 +7,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { collection, query, getDocs, doc, getDoc, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { safeText } from '../../utils/safeText';
+import { flattenRegistrationFields } from '../../utils/registrationMapper';
 import { Button } from '../../components/ui/button';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -212,13 +213,15 @@ export default function DashboardPage() {
                     return acc;
                 }, {} as Record<string, unknown>);
 
+                const norm = flattenRegistrationFields(data);
                 return {
-                    '이름': data.userName || data.name || data.userInfo?.name || 'Unknown',
-                    '전화번호': data.phone || data.mobile || data.userInfo?.phone || data.userInfo?.mobile || '',
-                    '이메일': data.userEmail || data.email || data.userInfo?.email || '',
-                    '면허번호': data.licenseNumber || data.license || data.userInfo?.licenseNumber || data.userInfo?.license || '',
-                    '소속': data.affiliation || data.organization || data.userOrg || data.userInfo?.affiliation || '',
-                    '회원등급': data.memberGrade || data.tier || data.userTier || data.grade || data.categoryName || data.userInfo?.grade || data.userInfo?.memberGrade || '',
+                    '이름': norm.userName || 'Unknown',
+                    '전화번호': data.phone || data.mobile || norm.userPhone || '',
+                    '이메일': norm.userEmail || '',
+                    '면허번호': norm.licenseNumber || '',
+                    '소속': norm.affiliation || '',
+                    '직급': norm.position || '',
+                    '회원등급': data.memberGrade || norm.tier || data.userInfo?.memberGrade || '',
                     '구분': '내부등록',
                     '결제금액': Number(data.amount) || Number(data.paymentAmount) || 0,
                     '최초입장시간': formatTime(times.firstEntryTime),
@@ -259,13 +262,15 @@ export default function DashboardPage() {
                     return acc;
                 }, {} as Record<string, unknown>);
 
+                const extNorm = flattenRegistrationFields(data);
                 return {
-                    '이름': data.name || 'Unknown',
-                    '전화번호': data.phone || data.mobile || '',
-                    '이메일': data.email || '',
-                    '면허번호': data.licenseNumber || data.license || '',
-                    '소속': data.organization || data.affiliation || '',
-                    '회원등급': data.memberGrade || data.tier || data.userTier || data.grade || data.categoryName || '비회원 (외부)',
+                    '이름': extNorm.userName || 'Unknown',
+                    '전화번호': data.phone || data.mobile || extNorm.userPhone || '',
+                    '이메일': extNorm.userEmail || '',
+                    '면허번호': extNorm.licenseNumber || '',
+                    '소속': extNorm.affiliation || '',
+                    '직급': extNorm.position || '',
+                    '회원등급': data.memberGrade || extNorm.tier || '비회원 (외부)',
                     '구분': '외부등록',
                     '결제금액': Number(data.amount) || 0,
                     '최초입장시간': formatTime(times.firstEntryTime),

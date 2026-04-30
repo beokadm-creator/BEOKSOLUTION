@@ -3,6 +3,7 @@ import { collection, query, where, doc, updateDoc, getDoc, Timestamp, addDoc, or
 import { db } from '@/firebase';
 import toast from 'react-hot-toast';
 import { getKstToday } from '@/utils/dateUtils';
+import { flattenRegistrationFields } from '@/utils/registrationMapper';
 import type { AttendanceZone } from '@/types/attendance';
 
 // ─── Local interfaces ───────────────────────────────────────────────
@@ -210,15 +211,12 @@ export function useAttendanceLive(confId: string | undefined, _zoneId?: string) 
                         isExternal: false
                     } as Registration;
 
-                    flattened.userName = docData.userName || docData.name || docData.userInfo?.name || 'Unknown';
-                    flattened.userEmail = docData.userEmail || docData.userInfo?.email || '';
-                    flattened.affiliation = docData.userOrg || docData.organization || docData.affiliation || docData.userInfo?.affiliation || docData.userInfo?.organization || '';
+                    const norm = flattenRegistrationFields(docData);
+                    flattened.userName = norm.userName || 'Unknown';
+                    flattened.userEmail = norm.userEmail || '';
+                    flattened.affiliation = norm.affiliation || '';
+                    flattened.position = norm.position || '';
 
-                    if (docData.userInfo) {
-                        flattened.userName = docData.userInfo.name || flattened.userName;
-                        flattened.userEmail = docData.userInfo.email || flattened.userEmail;
-                        flattened.affiliation = docData.userInfo.affiliation || docData.userInfo.organization || flattened.affiliation;
-                    }
                     return flattened;
                 });
             updateCombined();
@@ -232,10 +230,11 @@ export function useAttendanceLive(confId: string | undefined, _zoneId?: string) 
                 })
                 .map(d => {
                     const docData = d.data();
+                    const norm = flattenRegistrationFields(docData);
                     return {
                         id: d.id,
-                        userName: docData.name || 'Unknown',
-                        userEmail: docData.email || '',
+                        userName: docData.name || norm.userName || 'Unknown',
+                        userEmail: docData.email || norm.userEmail || '',
                         attendanceStatus: docData.attendanceStatus || 'OUTSIDE',
                         currentZone: docData.currentZone || null,
                         lastCheckIn: docData.lastCheckIn,
@@ -245,7 +244,7 @@ export function useAttendanceLive(confId: string | undefined, _zoneId?: string) 
                         zoneCompleted: docData.zoneCompleted || {},
                         isCompleted: !!docData.isCompleted,
                         slug: docData.slug || '',
-                        affiliation: docData.userOrg || docData.organization || docData.affiliation || '',
+                        affiliation: docData.organization || docData.affiliation || norm.affiliation || '',
                         isExternal: true
                     } as Registration;
                 });

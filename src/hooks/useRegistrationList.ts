@@ -3,52 +3,16 @@ import { useExcel } from './useExcel';
 import { useRegistrationsPagination } from './useRegistrationsPagination';
 import { useBixolon } from './useBixolon';
 import toast from 'react-hot-toast';
-import { query, collection, getDocs, getDoc, doc, Timestamp, orderBy as fbOrderBy } from 'firebase/firestore';
+import { query, collection, getDocs, getDoc, doc, orderBy as fbOrderBy } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../firebase';
 import { safeFormatDate } from '../utils/dateUtils';
 import { handleDeleteRegistrationWithCleanup } from '../utils/registrationDeleteHandler';
 import { normalizeFieldSettings } from '../utils/registrationFieldSettings';
-import type { RegistrationFieldSettings } from '../types/schema';
+import { flattenRegistrationFields } from '../utils/registrationMapper';
+import type { RegistrationFieldSettings, RootRegistration } from '../types/schema';
 
-// Define the root-level registration type based on PaymentSuccessHandler
-export interface RootRegistration {
-    id: string; // orderId
-    orderId?: string; // Add optional orderId
-    originalRegId: string;
-    slug: string;
-    societyId: string;
-    conferenceId: string;
-    userId: string;
-    userName?: string; // Optional for safety
-    userEmail?: string;
-    userPhone?: string;
-    userOrg?: string; // Optional
-    affiliation?: string; // Optional
-    position?: string; // Optional
-    tier: string; // Changed from grade to tier to match Firestore field
-    categoryName?: string; // For fallback display
-    amount: number;
-    status: string; // 'PAID'
-    paymentKey?: string;
-    licenseNumber?: string; // Added
-    paymentType?: string; // Added (e.g., '카드', '계좌이체')
-    method?: string; // Fallback for payment method
-    paymentMethod?: string; // Direct field from Firestore
-    createdAt: Timestamp;
-    badgeIssued?: boolean;
-    badgeIssuedAt?: Timestamp;
-    virtualAccount?: {
-        bank: string;
-        accountNumber: string;
-        customerName?: string;
-        dueDate?: string;
-    };
-    options?: RegistrationOptionSummary[];
-    badgeQr?: string; // Added for QR printing
-    baseAmount?: number;
-    optionsTotal?: number;
-}
+export type { RootRegistration } from '../types/schema';
 
 export interface RegistrationOptionSummary {
     name?: string | { ko?: string };
@@ -228,21 +192,18 @@ export function useRegistrationList(conferenceId: string | null) {
             const docData = d.data();
             const flattened = { id: d.id, ...docData } as RootRegistration;
             if (!flattened.orderId) flattened.orderId = flattened.id;
-            if (docData.userInfo) {
-                flattened.userName = docData.userInfo.name || docData.userName;
-                flattened.userEmail = docData.userInfo.email || docData.userEmail;
-                flattened.userPhone = docData.userInfo.phone || docData.userPhone;
-                flattened.affiliation = docData.userInfo.affiliation || docData.affiliation;
-                flattened.licenseNumber = docData.userInfo.licenseNumber || docData.licenseNumber;
-                if (!flattened.tier && docData.userInfo.grade) flattened.tier = docData.userInfo.grade;
-            }
-            if (!flattened.tier && docData.userTier) flattened.tier = docData.userTier;
-            if (!flattened.tier && docData.categoryName) flattened.tier = docData.categoryName;
-            if (!flattened.licenseNumber) {
-                if (docData.license) flattened.licenseNumber = docData.license;
-                else if (docData.userInfo?.licensenumber) flattened.licenseNumber = docData.userInfo.licensenumber;
-                else if (docData.formData?.licenseNumber) flattened.licenseNumber = docData.formData.licenseNumber;
-            }
+
+            const norm = flattenRegistrationFields(docData);
+            Object.assign(flattened, {
+                userName: flattened.userName || norm.userName,
+                userEmail: flattened.userEmail || norm.userEmail,
+                userPhone: flattened.userPhone || norm.userPhone,
+                affiliation: norm.affiliation,
+                position: norm.position,
+                licenseNumber: norm.licenseNumber,
+                tier: flattened.tier || norm.tier,
+            });
+
             if (docData.badgeQr) flattened.badgeQr = docData.badgeQr;
             return flattened;
         });

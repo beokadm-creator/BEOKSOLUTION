@@ -6,6 +6,7 @@ import { Loader2, AlertCircle, CheckCircle, X, MapPin, LogIn } from 'lucide-reac
 import { Button } from '../../components/ui/button';
 import toast from 'react-hot-toast';
 import { getKstToday } from '../../utils/dateUtils';
+import { flattenRegistrationFields } from '../../utils/registrationMapper';
 import type { AttendanceZone, AttendanceRulesMap, BreakTime } from '../../types/attendance';
 import { cn } from '../../lib/utils';
 
@@ -17,6 +18,7 @@ interface ScannerState {
     userData?: {
         name: string;
         affiliation: string;
+        position?: string;
     };
     actionType?: 'ENTER' | 'EXIT';
 }
@@ -125,7 +127,7 @@ const AttendanceScannerPage: React.FC = () => {
                 message: res.actionText,
                 subMessage: res.userName,
                 lastScanned: id,
-                userData: { name: res.userName, affiliation: res.affiliation },
+                userData: { name: res.userName, affiliation: res.affiliation, position: res.position },
                 actionType: res.actionType
             });
         } catch (e: unknown) {
@@ -147,8 +149,10 @@ const AttendanceScannerPage: React.FC = () => {
 
             if (data.status !== 'PAID' && data.paymentStatus !== 'PAID') throw new Error('결제 미완료');
 
-            const name = data.userName || data.name || data.userInfo?.name || 'Unknown';
-            const aff = data.userOrg || data.organization || data.affiliation || data.userInfo?.affiliation || data.userInfo?.organization || data.userEmail || '';
+            const norm = flattenRegistrationFields(data);
+            const name = norm.userName || 'Unknown';
+            const aff = norm.affiliation || '';
+            const position = norm.position || '';
             const status = data.attendanceStatus || 'OUTSIDE';
             const curZoneId = data.currentZone;
             const lastIn = data.lastCheckIn?.toDate();
@@ -301,7 +305,7 @@ const AttendanceScannerPage: React.FC = () => {
                 tx.set(accRef, { action: action === 'ENTER' ? 'ENTRY' : 'EXIT', scannedQr: data.badgeQr || id, locationId: action === 'ENTER' ? targetZoneId : curZoneId, timestamp: tsNow, date: fallbackDateStr, method: 'KIOSK_DESK', registrationId: id, isExternal: isExt, rawDuration: action === 'EXIT' ? rawDuration : 0, deduction: action === 'EXIT' ? deduction : 0, recognizedMinutes: minsToAdd, accumulatedTotal: newTotal });
             }
 
-            return { actionText, actionType: action, userName: name, affiliation: aff };
+            return { actionText, actionType: action, userName: name, affiliation: aff, position };
         });
     };
 
@@ -352,7 +356,7 @@ const AttendanceScannerPage: React.FC = () => {
                         </div>
                     )}
                     {scannerState.subMessage && <p className="text-3xl font-bold text-slate-700">{scannerState.subMessage}</p>}
-                    {scannerState.userData && <p className="text-xl text-slate-400 mt-4 font-bold">{scannerState.userData.affiliation}</p>}
+                    {scannerState.userData && <p className="text-xl text-slate-400 mt-4 font-bold">{scannerState.userData.affiliation}{scannerState.userData.position ? ` · ${scannerState.userData.position}` : ''}</p>}
                 </div>
 
                 <div className="mt-12 flex items-center gap-3 text-slate-300 font-black uppercase tracking-[0.3em]">

@@ -1,43 +1,10 @@
 import { useState, useEffect } from 'react';
-import { collection, query, getDocs, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
+import type { RootRegistration } from '@/types/schema';
+import { flattenRegistrationFields } from '@/utils/registrationMapper';
 
-// Define the root-level registration type based on PaymentSuccessHandler
-export interface RootRegistration {
-    id: string; // orderId
-    orderId?: string; // Add optional orderId
-    originalRegId: string;
-    slug: string;
-    societyId: string;
-    conferenceId: string;
-    userId: string;
-    userName?: string; // Optional for safety
-    userEmail?: string;
-    userPhone?: string;
-    userOrg?: string; // Optional
-    affiliation?: string; // Optional
-    tier: string; // Changed from grade to tier to match Firestore field
-    categoryName?: string; // For fallback display
-    amount: number;
-    status: string; // 'PAID'
-    paymentKey?: string;
-    licenseNumber?: string; // Added
-    position?: string; // 직급
-    paymentType?: string; // Added (e.g., '카드', '계좌이체')
-    method?: string; // Fallback for payment method
-    paymentMethod?: string; // Direct field from Firestore
-    createdAt: Timestamp;
-    badgeIssued?: boolean;
-    badgeIssuedAt?: Timestamp;
-    badgeQr?: string; // Added for printing
-    virtualAccount?: {
-        bank: string;
-        accountNumber: string;
-        customerName?: string;
-        dueDate?: string;
-    };
-    options?: unknown[]; // Snapshot of selected options
-}
+export type { RootRegistration } from '@/types/schema';
 
 interface UseRegistrationsPaginationParams {
     conferenceId: string | null;
@@ -100,25 +67,16 @@ export function useRegistrationsPagination({
 
                     if (!flattened.orderId) flattened.orderId = flattened.id;
 
-                    // Flatten userInfo fields to top level for display
-                    if (docData.userInfo) {
-                        flattened.userName = docData.userInfo.name || docData.userName;
-                        flattened.userEmail = docData.userInfo.email || docData.userEmail;
-                        flattened.userPhone = docData.userInfo.phone || docData.userPhone;
-                        flattened.affiliation = docData.userInfo.affiliation || docData.affiliation;
-                        flattened.position = docData.userInfo.position || docData.position;
-                        flattened.licenseNumber = docData.userInfo.licenseNumber || docData.licenseNumber;
-                        if (!flattened.tier && docData.userInfo.grade) flattened.tier = docData.userInfo.grade;
-                    }
-
-                    if (!flattened.tier && docData.userTier) flattened.tier = docData.userTier;
-                    if (!flattened.tier && docData.categoryName) flattened.tier = docData.categoryName;
-
-                    if (!flattened.licenseNumber) {
-                        if (docData.license) flattened.licenseNumber = docData.license;
-                        else if (docData.userInfo?.licensenumber) flattened.licenseNumber = docData.userInfo.licensenumber;
-                        else if (docData.formData?.licenseNumber) flattened.licenseNumber = docData.formData.licenseNumber;
-                    }
+                    const norm = flattenRegistrationFields(docData);
+                    Object.assign(flattened, {
+                        userName: flattened.userName || norm.userName,
+                        userEmail: flattened.userEmail || norm.userEmail,
+                        userPhone: flattened.userPhone || norm.userPhone,
+                        affiliation: norm.affiliation,
+                        position: norm.position,
+                        licenseNumber: norm.licenseNumber,
+                        tier: flattened.tier || norm.tier,
+                    });
 
                     if (docData.badgeQr) flattened.badgeQr = docData.badgeQr;
 

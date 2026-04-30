@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { Registration } from '../types/schema';
 import { DOMAIN_CONFIG, extractSocietyFromHost } from '../utils/domainHelper';
 import { normalizeFieldSettings } from '../utils/registrationFieldSettings';
+import { flattenRegistrationFields } from '../utils/registrationMapper';
 import type { RegistrationFieldSettings } from '../types/schema';
 
 // Extended type for flattened data in UI
@@ -131,20 +132,14 @@ export const useRegistrationDetail = (confId: string | null, regId: string | nul
                     const docData = snap.data();
                     const flattened = { id: snap.id, ...docData } as ExtendedRegistration;
 
-                    // Flatten userInfo fields to top level for display
-                    if (docData.userInfo) {
-                        flattened.userName = docData.userInfo.name || docData.userName;
-                        flattened.userEmail = docData.userInfo.email || docData.userEmail;
-                        flattened.userPhone = docData.userInfo.phone || docData.userPhone;
-                        flattened.affiliation = docData.userInfo.affiliation || docData.affiliation;
-                        flattened.position = docData.userInfo.position || docData.position;
-                        flattened.licenseNumber = docData.userInfo.licenseNumber || docData.licenseNumber;
-
-                        // [Fix] Map grade/tier from userInfo if available
-                        if (!flattened.tier && docData.userInfo.grade) {
-                            flattened.tier = docData.userInfo.grade;
-                        }
-                    }
+                    const norm = flattenRegistrationFields(docData);
+                    flattened.userName = norm.userName || '';
+                    flattened.userEmail = norm.userEmail || '';
+                    flattened.userPhone = norm.userPhone || '';
+                    flattened.affiliation = norm.affiliation || '';
+                    flattened.position = norm.position || '';
+                    flattened.licenseNumber = norm.licenseNumber || '';
+                    if (!flattened.tier) flattened.tier = norm.tier as string;
 
                     // [Fix] Ensure optionsTotal is accurate by calculating from array if missing/zero
                     const optionsList = flattened.options || flattened.selectedOptions || [];
@@ -152,16 +147,6 @@ export const useRegistrationDetail = (confId: string | null, regId: string | nul
 
                     if (calculatedOptionsTotal > 0 && (!flattened.optionsTotal || flattened.optionsTotal === 0)) {
                         flattened.optionsTotal = calculatedOptionsTotal;
-                    }
-
-                    // [Fix] Map schema-defined userTier to tier if tier is missing
-                    if (!flattened.tier && docData.userTier) {
-                        flattened.tier = docData.userTier as string;
-                    }
-
-                    // [Fix] Fallback for licenseNumber
-                    if (!flattened.licenseNumber && docData.license) {
-                        flattened.licenseNumber = docData.license;
                     }
 
                     // [Fix] Extract payment details from nested object if available
