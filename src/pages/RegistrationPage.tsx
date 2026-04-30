@@ -75,6 +75,7 @@ export default function RegistrationPage() {
         setShowRefundModal,
         memberVerified,
         paramMemberCode,
+        lockNameField,
         handleLoginAndLoad,
         handleSaveBasicInfo,
         handlePayment,
@@ -130,6 +131,7 @@ export default function RegistrationPage() {
                         isProcessing={isProcessing}
                         memberVerified={memberVerified}
                         paramMemberCode={paramMemberCode}
+                        lockNameField={lockNameField}
                         showLoadExistingInfo={regSettings?.paymentMode !== 'FREE_ALL'}
                         handleLoginAndLoad={handleLoginAndLoad}
                         handleSaveBasicInfo={handleSaveBasicInfo}

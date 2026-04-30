@@ -89,6 +89,7 @@ export function useRegistrationPage(slug: string | undefined) {
     const paramMemberName = state.memberName || searchParams.get('memberName') || '';
     const paramMemberGrade = state.memberGrade || searchParams.get('memberGrade') || '';
     const paramMemberCode = state.memberCode || searchParams.get('memberCode') || '';
+    const lockNameField = memberVerified && !!paramMemberName;
 
     // Try to get calculated totalPrice - sessionStorage FIRST for reliability
     let paramCalculatedPrice: number | undefined = undefined;
@@ -881,6 +882,7 @@ export function useRegistrationPage(slug: string | undefined) {
         // Member verification
         memberVerified,
         paramMemberCode,
+        lockNameField,
 
         // Handlers
         handleLoginAndLoad,

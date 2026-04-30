@@ -26,6 +26,7 @@ interface RegistrationFormProps {
     isProcessing: boolean;
     memberVerified: boolean;
     paramMemberCode: string;
+    lockNameField: boolean;
     showLoadExistingInfo: boolean;
     handleLoginAndLoad: () => Promise<void>;
     handleSaveBasicInfo: () => Promise<void>;
@@ -42,6 +43,7 @@ export default function RegistrationForm({
     isProcessing,
     memberVerified,
     paramMemberCode,
+    lockNameField,
     showLoadExistingInfo,
     handleLoginAndLoad,
     handleSaveBasicInfo,
@@ -130,8 +132,8 @@ export default function RegistrationForm({
                                         <Input
                                             value={formData.name}
                                             onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                            readOnly={isInfoSaved || (memberVerified && !!formData.name)}
-                                            className={isInfoSaved || (memberVerified && !!formData.name) ? 'bg-gray-100' : ''}
+                                            readOnly={isInfoSaved || lockNameField}
+                                            className={isInfoSaved || lockNameField ? 'bg-gray-100' : ''}
                                             placeholder="이름을 입력하세요"
                                         />
                                     </div>
