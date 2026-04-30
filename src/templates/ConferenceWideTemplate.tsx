@@ -60,12 +60,19 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
     }, 100); // Small delay to ensure content is rendered
   };
 
+  const paymentMode = typeof config?.paymentMode === 'string' ? config.paymentMode : '';
+  const isFreeAll = paymentMode === 'FREE_ALL';
+
+  useEffect(() => {
+    if (isFreeAll && activeSection === 'pricing') setActiveSection('welcome');
+  }, [isFreeAll, activeSection]);
+
   // Tab items configuration
   const tabItems = [
     { id: 'welcome', icon: Home, label: { ko: '홈', en: 'Home' } },
     { id: 'program', icon: Calendar, label: { ko: '프로그램', en: 'Program' } },
     { id: 'speakers', icon: Users, label: { ko: '연자진', en: 'Speakers' } },
-    { id: 'pricing', icon: CreditCard, label: { ko: '등록비', en: 'Pricing' } },
+    ...(isFreeAll ? [] : [{ id: 'pricing', icon: CreditCard, label: { ko: '등록비', en: 'Pricing' } }]),
     { id: 'location', icon: MapPin, label: { ko: '위치', en: 'Location' } },
     { id: 'sponsors', icon: Building2, label: { ko: '스폰서', en: 'Sponsors' } },
   ];

@@ -518,6 +518,7 @@ export function useRegistrationList(conferenceId: string | null) {
                 '이메일': r.userEmail || '-',
                 '전화번호': r.userPhone || '-',
                 '소속': r.userOrg || r.affiliation || '-',
+                '직급': r.position || '-',
                 '면허번호': r.licenseNumber || '-',
                 '등급': displayTier(r.tier),
                 '결제금액': r.amount,
