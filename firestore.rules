@@ -60,7 +60,7 @@ service cloud.firestore {
         allow write: if isSuperAdmin() || isSocietyAdmin(societyId);
 
         match /settings/{settingId} {
-          allow read: if settingId in ['identity', 'visual', 'registration'];
+          allow read: if settingId in ['identity', 'visual', 'registration', 'ui'];
           allow write: if isSuperAdmin() || isSocietyAdmin(societyId);
         }
 
@@ -214,6 +214,11 @@ service cloud.firestore {
       match /settings/stamp_tour {
         allow read: if true;
         allow write: if isSuperAdmin();
+      }
+
+      match /settings/ui {
+        allow read: if true;
+        allow write: if isSuperAdmin() || isConferenceAdmin(confId);
       }
 
       // Stamp Tour Progress

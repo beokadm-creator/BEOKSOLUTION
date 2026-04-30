@@ -198,12 +198,13 @@ export const useTranslation = (slug: string): UseTranslationResult => {
                     return null;
                 };
 
-                const [identityRes, societyRes, visualRes, infoRes, regRes] = await Promise.allSettled([
+                const [identityRes, societyRes, visualRes, infoRes, regRes, uiRes] = await Promise.allSettled([
                     readFirstExistingDoc('settings/identity'),
                     getDoc(doc(db, 'societies', societyId)),
                     readFirstExistingDoc('settings/visual'),
                     readFirstExistingDoc('info/general'),
-                    readFirstExistingDoc('settings/registration')
+                    readFirstExistingDoc('settings/registration'),
+                    readFirstExistingDoc('settings/ui')
                 ]);
 
                 const identitySnap = identityRes.status === 'fulfilled' ? identityRes.value : null;
@@ -211,8 +212,10 @@ export const useTranslation = (slug: string): UseTranslationResult => {
                 const visualSnap = visualRes.status === 'fulfilled' ? visualRes.value : null;
                 const infoSnap = infoRes.status === 'fulfilled' ? infoRes.value : null;
                 const regSnap = regRes.status === 'fulfilled' ? regRes.value : null;
+                const uiSnap = uiRes.status === 'fulfilled' ? uiRes.value : null;
 
                 const registrationSettings = regSnap?.exists() ? regSnap.data() : null;
+                const uiSettings = uiSnap?.exists() ? uiSnap.data() : null;
 
                 const baseConfig = {
                     ...confData,
@@ -226,6 +229,8 @@ export const useTranslation = (slug: string): UseTranslationResult => {
                     paymentMode: (registrationSettings as { paymentMode?: string } | null)?.paymentMode,
                     fieldSettings: (registrationSettings as { fieldSettings?: unknown } | null)?.fieldSettings,
                     pricing: (registrationSettings as { periods?: unknown[] } | null)?.periods || [],
+                    uiSettings,
+                    ctaButtons: (uiSettings as { ctaButtons?: unknown } | null)?.ctaButtons || [],
                     pages: [],
                     agendas: [],
                     speakers: [],

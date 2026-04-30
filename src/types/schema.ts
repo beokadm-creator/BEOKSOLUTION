@@ -9,6 +9,21 @@ export interface LocalizedText {
   en?: string;
 }
 
+export type CtaButtonActionType = 'EXTERNAL_URL' | 'INTERNAL_ROUTE' | 'SCROLL_SECTION';
+
+export interface ConferenceCtaButton {
+  enabled: boolean;
+  label: LocalizedText;
+  actionType: CtaButtonActionType;
+  actionValue: string;
+  openInNewTab?: boolean;
+  variant?: 'primary' | 'secondary';
+}
+
+export interface ConferenceUiSettings {
+  ctaButtons?: ConferenceCtaButton[];
+}
+
 export type BadgeElementType = 'NAME' | 'ORG' | 'QR' | 'CUSTOM' | 'CATEGORY' | 'LICENSE' | 'PRICE' | 'AFFILIATION' | 'POSITION' | 'IMAGE';
 
 export interface BadgeElement {
@@ -1476,4 +1491,3 @@ export interface ModeratorToken {
   isActive: boolean;                // 활성/비활성 토글
   lastAccessedAt?: Timestamp;       // 마지막 접속 시간 (통계용)
 }
-

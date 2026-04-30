@@ -64,6 +64,44 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
   const isFreeAll = paymentMode === 'FREE_ALL';
   const effectiveActiveSection = isFreeAll && activeSection === 'pricing' ? 'welcome' : activeSection;
 
+  const rawCtaButtons = Array.isArray((config as Record<string, unknown>)?.ctaButtons)
+    ? ((config as Record<string, unknown>)?.ctaButtons as unknown[])
+    : [];
+  const ctaButtons = rawCtaButtons
+    .map((b) => (b && typeof b === 'object' ? (b as Record<string, unknown>) : {}))
+    .map((btn) => {
+      const label = (btn.label && typeof btn.label === 'object') ? (btn.label as Record<string, unknown>) : {};
+      return {
+        enabled: btn.enabled === true,
+        label: { ko: String(label.ko || ''), en: String(label.en || '') },
+        actionType: String(btn.actionType || 'EXTERNAL_URL'),
+        actionValue: String(btn.actionValue || ''),
+        openInNewTab: btn.openInNewTab !== false,
+        variant: btn.variant === 'secondary' ? 'secondary' : 'primary'
+      };
+    })
+    .filter((btn) => btn.enabled && (btn.label.ko || btn.label.en) && btn.actionValue)
+    .slice(0, 2);
+
+  const getCtaLabel = (label: { ko: string; en: string }) => {
+    return (currentLang === 'en' ? label.en : label.ko) || label.ko || label.en;
+  };
+
+  const handleCtaClick = (btn: { actionType: string; actionValue: string; openInNewTab: boolean }) => {
+    if (btn.actionType === 'SCROLL_SECTION') {
+      handleTabClick(btn.actionValue);
+      return;
+    }
+    if (btn.actionType === 'INTERNAL_ROUTE') {
+      navigate(btn.actionValue);
+      return;
+    }
+    const url = btn.actionValue;
+    if (!/^https?:\/\//i.test(url)) return;
+    if (btn.openInNewTab) window.open(url, '_blank', 'noopener,noreferrer');
+    else window.location.assign(url);
+  };
+
   // Tab items configuration
   const tabItems = [
     { id: 'welcome', icon: Home, label: { ko: '홈', en: 'Home' } },
@@ -162,6 +200,23 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
                 );
               })}
             </div>
+            {ctaButtons.length > 0 && (
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {ctaButtons.map((btn, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleCtaClick(btn)}
+                    className={`h-10 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${btn.variant === 'secondary'
+                      ? 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                      : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                      }`}
+                  >
+                    {getCtaLabel(btn.label)}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

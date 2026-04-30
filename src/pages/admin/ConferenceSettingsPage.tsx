@@ -24,6 +24,8 @@ import { CertificateSettingsPanel } from '../../components/admin/conference/Cert
 import { defaultStampTourConfig } from '../../utils/stampTour';
 import { GeneralSettingsForm } from '../../components/admin/conference/GeneralSettingsForm';
 import { VisualAssetsForm } from '../../components/admin/conference/VisualAssetsForm';
+import { CtaButtonsSettingsPanel } from '../../components/admin/conference/CtaButtonsSettingsPanel';
+import type { ConferenceCtaButton } from '../../types/schema';
 
 interface ConferenceData {
     title: { ko: string; en: string };
@@ -102,6 +104,7 @@ export default function ConferenceSettingsPage() {
     const [stampTourConfig, setStampTourConfig] = useState<StampTourConfigForm>(defaultStampTourConfig);
     const [stampTourProgress, setStampTourProgress] = useState<StampTourProgressRow[]>([]);
     const [drawingUserId, setDrawingUserId] = useState<string | null>(null);
+    const [ctaButtons, setCtaButtons] = useState<ConferenceCtaButton[]>([]);
 
     const getKstEndOfDayTimestamp = (dtStr: string): Timestamp | null => {
         if (!dtStr) return null;
@@ -250,6 +253,24 @@ export default function ConferenceSettingsPage() {
                             endAt: getKstEndOfDayTimestamp(endStr) || undefined
                         }));
                     }
+
+                    const uiRef = doc(db, `conferences/${cid}/settings`, 'ui');
+                    const uiSnap = await getDoc(uiRef);
+                    const uiData = uiSnap.exists() ? uiSnap.data() : {};
+                    const rawButtons = (uiData as { ctaButtons?: unknown })?.ctaButtons;
+                    const normalizedButtons = Array.isArray(rawButtons) ? rawButtons.slice(0, 2).map((b) => {
+                        const btn = (b || {}) as Record<string, unknown>;
+                        const label = (btn.label || {}) as Record<string, unknown>;
+                        return {
+                            enabled: btn.enabled === true,
+                            label: { ko: String(label.ko || ''), en: String(label.en || '') },
+                            actionType: (btn.actionType === 'INTERNAL_ROUTE' || btn.actionType === 'SCROLL_SECTION') ? btn.actionType : 'EXTERNAL_URL',
+                            actionValue: String(btn.actionValue || ''),
+                            openInNewTab: btn.openInNewTab !== false,
+                            variant: btn.variant === 'secondary' ? 'secondary' : 'primary'
+                        } as ConferenceCtaButton;
+                    }) : [];
+                    setCtaButtons(normalizedButtons);
                 }
             } catch (error) {
                 console.error("Error fetching conference settings:", error);
@@ -420,6 +441,9 @@ export default function ConferenceSettingsPage() {
                 rewards: sanitizedRewards
             }, { merge: true });
 
+            const uiRef = doc(db, `conferences/${cid}/settings`, 'ui');
+            await setDoc(uiRef, { ctaButtons: (ctaButtons || []).slice(0, 2) }, { merge: true });
+
             if (
                 data.features.stampTourEnabled &&
                 stampTourConfig.completionRule.type === 'COUNT' &&
@@ -564,6 +588,9 @@ export default function ConferenceSettingsPage() {
 
             <div className="max-w-6xl mx-auto px-6 py-10 space-y-12">
                 <GeneralSettingsForm data={data} setData={setData} />
+                <hr className="border-slate-100" />
+
+                <CtaButtonsSettingsPanel buttons={ctaButtons} setButtons={setCtaButtons} />
                 <hr className="border-slate-100" />
                 
                 {data.features?.qnaEnabled && (
