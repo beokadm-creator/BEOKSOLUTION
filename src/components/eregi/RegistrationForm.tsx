@@ -130,8 +130,8 @@ export default function RegistrationForm({
                                         <Input
                                             value={formData.name}
                                             onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                            readOnly={memberVerified || isInfoSaved}
-                                            className={memberVerified || isInfoSaved ? 'bg-gray-100' : ''}
+                                            readOnly={isInfoSaved || (memberVerified && !!formData.name)}
+                                            className={isInfoSaved || (memberVerified && !!formData.name) ? 'bg-gray-100' : ''}
                                             placeholder="이름을 입력하세요"
                                         />
                                     </div>

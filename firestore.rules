@@ -58,6 +58,36 @@ service cloud.firestore {
       match /conferences/{confDocId} {
         allow read: if true;
         allow write: if isSuperAdmin() || isSocietyAdmin(societyId);
+
+        match /settings/{settingId} {
+          allow read: if settingId in ['identity', 'visual', 'registration'];
+          allow write: if isSuperAdmin() || isSocietyAdmin(societyId);
+        }
+
+        match /info/{docId} {
+          allow read: if docId == 'general';
+          allow write: if isSuperAdmin() || isSocietyAdmin(societyId);
+        }
+
+        match /pages/{pageId} {
+          allow read: if true;
+          allow write: if isSuperAdmin() || isSocietyAdmin(societyId);
+        }
+
+        match /agendas/{agendaId} {
+          allow read: if true;
+          allow write: if isSuperAdmin() || isSocietyAdmin(societyId);
+        }
+
+        match /speakers/{speakerId} {
+          allow read: if true;
+          allow write: if isSuperAdmin() || isSocietyAdmin(societyId);
+        }
+
+        match /sponsors/{sponsorId} {
+          allow read: if true;
+          allow write: if isSuperAdmin() || isSocietyAdmin(societyId);
+        }
       }
 
       // Public settings required by landing/registration flows
@@ -113,6 +143,11 @@ service cloud.firestore {
                    (resource != null && isSocietyAdmin(resource.data.societyId)) ||
                    (request.resource != null && isSocietyAdmin(request.resource.data.societyId));
 
+      match /conference_options/{optionId} {
+        allow read: if true;
+        allow write: if isSuperAdmin() || isConferenceAdmin(confId);
+      }
+
       // Public conference subcollections except explicitly restricted collections.
       // Restricted collections are handled by dedicated rules below.
       match /{subCollection}/{docPath=**} {
@@ -131,7 +166,6 @@ service cloud.firestore {
           'admins',
           'private_config',
           'notification_logs',
-          'conference_options',
           'submissions',
           'whitelists',
           'vendors'
