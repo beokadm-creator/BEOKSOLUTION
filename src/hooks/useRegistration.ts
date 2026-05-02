@@ -1,32 +1,10 @@
 import { useState, useEffect } from 'react';
-import { doc, runTransaction, Timestamp, collection, getDoc, setDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
-import { db, auth as firebaseAuth } from '../firebase';
-import { Registration, RegistrationPeriod, ConferenceUser, RegistrationSettings } from '../types/schema';
-import { generateReceiptNumber, generateConfirmationQr } from '../utils/transaction';
-import type { TransactionHelper } from '../utils/transaction';
+import { getDoc, doc, query, where, getDocs, collection, Timestamp } from 'firebase/firestore';
+import { db } from '../firebase';
+import { RegistrationPeriod, ConferenceUser, RegistrationSettings } from '../types/schema';
 import toast from 'react-hot-toast';
-import { toFirestoreUserData } from '../utils/userDataMapper';
 
-interface RegistrationState {
-    loading: boolean;
-    error: string | null;
-    success: boolean;
-    regId: string | null;
-}
-
-// Mock Toss Payment
-const mockRequestPayment = async (_amount: number, _orderId: string): Promise<boolean> => {
-    return new Promise(resolve => setTimeout(() => resolve(true), 1500));
-};
-
-export const useRegistration = (conferenceId: string, user: ConferenceUser | null) => {
-    const [status, setStatus] = useState<RegistrationState>({
-        loading: false,
-        error: null,
-        success: false,
-        regId: null
-    });
-
+export const useRegistration = (conferenceId: string, _user: ConferenceUser | null) => {
     const [availablePeriods, setAvailablePeriods] = useState<RegistrationPeriod[]>([]);
 
     useEffect(() => {
@@ -51,7 +29,6 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
         fetchPeriods();
     }, [conferenceId]);
 
-    // [Fix-Step 368] Resume Registration
     const resumeRegistration = async (userId: string): Promise<Record<string, unknown> | null> => {
         if (!conferenceId || !userId) return null;
 
@@ -82,179 +59,8 @@ export const useRegistration = (conferenceId: string, user: ConferenceUser | nul
         return null;
     };
 
-    const removeUndefined = (obj: Record<string, unknown>): Record<string, unknown> | null => {
-        if (obj === null || obj === undefined) {
-            return null;
-        }
-        if (typeof obj !== 'object') {
-            return obj;
-        }
-        if (Array.isArray(obj)) {
-            return obj.map(removeUndefined) as unknown as Record<string, unknown>;
-        }
-        const result: Record<string, unknown> = {};
-        for (const key in obj) {
-            if (Object.prototype.hasOwnProperty.call(obj, key)) {
-                const value = removeUndefined(obj[key] as Record<string, unknown>);
-                if (value !== undefined) {
-                    result[key] = value;
-                }
-            }
-        }
-        return result;
-    };
-
-    const autoSave = async (step: number, formData: Record<string, unknown>, regId?: string | null) => {
-        const currentUser = firebaseAuth.currentUser;
-        if (!user || !conferenceId || !currentUser) return null;
-
-        try {
-            // Determine Doc Ref
-            let ref;
-            if (regId) {
-                ref = doc(db, `conferences/${conferenceId}/registrations`, regId);
-            } else {
-                // Create or Find Draft by User
-                // For anonymous/guest users, allow auto-save by creating a new document
-                // Firestore rules now allow writing with userId = currentUser.uid for guests
-                ref = doc(collection(db, `conferences/${conferenceId}/registrations`));
-            }
-
-            const cleanedFormData = removeUndefined(formData);
-
-            const dataToSave: Record<string, unknown> = {
-                userId: currentUser.uid, // All users are authenticated (email/password)
-                conferenceId,
-                status: 'PENDING',
-                currentStep: step,
-                formData: cleanedFormData,
-                lastUpdated: serverTimestamp(),
-                // Basic info if creating
-                ...(regId ? {} : { createdAt: serverTimestamp() })
-            };
-
-            await setDoc(ref, dataToSave, { merge: true });
-
-            if (cleanedFormData.name) {
-                const userDataToSave = toFirestoreUserData({
-                    name: cleanedFormData.name as string,
-                    email: cleanedFormData.email as string,
-                    phone: cleanedFormData.phone as string,
-                    organization: cleanedFormData.affiliation as string,
-                    licenseNumber: cleanedFormData.licenseNumber as string
-                });
-
-                await setDoc(doc(db, 'users', currentUser.uid), {
-                    ...userDataToSave,
-                    name: userDataToSave.name, // Ensure specific fields (compatibility)
-                    userName: userDataToSave.name, // Legacy
-                    simplePassword: cleanedFormData.simplePassword,
-                    lastUpdated: serverTimestamp()
-                }, { merge: true });
-            }
-
-            return ref.id;
-
-        } catch (e) {
-            console.error("Auto-Save Error:", e);
-            return null;
-        }
-    };
-
-    const calculatePrice = (period: RegistrationPeriod): number => {
-        if (!user) return 0;
-        // Logic: Check user tier and find price
-        // If price not defined for tier, fallback to NON_MEMBER or default
-        const price = period.prices[user.tier] ?? period.prices['NON_MEMBER'] ?? 0;
-        return price;
-    };
-
-    const register = async (period: RegistrationPeriod): Promise<boolean> => {
-        if (!user) {
-            setStatus({ ...status, error: "User not logged in" });
-            return false;
-        }
-
-        const amount = calculatePrice(period);
-        const paymentMethod = 'CARD'; // Hardcoded for now, could be passed
-
-        setStatus({ loading: true, error: null, success: false, regId: null });
-
-        try {
-            // 1. Process Payment (if not free/admin)
-            if (amount > 0 && paymentMethod === 'CARD') {
-                const orderId = `ORDER-${user.id}-${Date.now()}`;
-                const paymentSuccess = await mockRequestPayment(amount, orderId);
-                if (!paymentSuccess) throw new Error("Payment Failed");
-            }
-
-            // 2. Create Registration (Atomic Transaction)
-            const newRegId = await runTransaction(db, async (transaction) => {
-                // Generate ID
-                const regRef = doc(collection(db, `conferences/${conferenceId}/registrations`));
-                const regId = regRef.id;
-
-                // Generate Receipt Number (Atomic Increment)
-                 
-                const receiptNumber = await generateReceiptNumber(conferenceId, transaction as unknown as TransactionHelper);
-
-                // Generate Confirmation QR (Phase 1)
-                const confirmationQr = generateConfirmationQr(regId, user.id);
-
-                const newRegistration: Registration = {
-                    id: regId,
-                    userId: user.id,
-                    conferenceId,
-                    paymentStatus: 'PAID',
-                    paymentMethod,
-                    amount,
-                    baseAmount: amount,
-                    optionsTotal: 0,
-                    refundAmount: 0,
-                    receiptNumber,
-                    userTier: user.tier,
-
-                    // Snapshot User Info
-                    userName: user.name,
-                    userEmail: user.email,
-                    userPhone: user.phone,
-                    affiliation: user.organization, // Map new field to legacy schema
-                    licenseNumber: user.licenseNumber,
-
-                    confirmationQr,
-                    badgeQr: null, // Phase 2: Null until check-in
-                    isCheckedIn: false,
-                    checkInTime: null,
-                    createdAt: Timestamp.now(),
-                    updatedAt: Timestamp.now()
-                };
-
-                transaction.set(regRef, newRegistration);
-
-                return regId;
-            });
-
-            // 3. Send Notification (Async, non-blocking)
-
-            setStatus({ loading: false, error: null, success: true, regId: newRegId });
-            return true;
-
-        } catch (err: unknown) {
-            console.error(err);
-            const message = err instanceof Error ? err.message : 'Unknown error';
-            setStatus({ loading: false, error: message, success: false, regId: null });
-            return false;
-        }
-    };
-
     return {
-        register,
-        loading: status.loading,
-        error: status.error,
-        success: status.success,
         availablePeriods,
-        calculatePrice,
-        resumeRegistration,
-        autoSave
+        resumeRegistration
     };
 };

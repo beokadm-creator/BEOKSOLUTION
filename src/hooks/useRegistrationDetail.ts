@@ -356,6 +356,17 @@ export const useRegistrationDetail = (confId: string | null, regId: string | nul
 
             await updateDoc(regRef, regUpdatePayload);
 
+            try {
+                await addDoc(collection(db, `conferences/${effectiveCid}/registrations/${regId}/logs`), {
+                    type: 'FIELD_EDIT',
+                    timestamp: Timestamp.now(),
+                    method: 'ADMIN_MANUAL',
+                    editedFields: Object.keys(editData)
+                });
+            } catch (logError) {
+                console.error('Failed to write audit log:', logError);
+            }
+
             // 2. Update Glob User Document (if valid user ID)
             if (data.userId && data.userId !== 'GUEST' && !data.userId.startsWith('offline_')) {
                 try {

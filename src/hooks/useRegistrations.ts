@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { collection, getDocs, doc, getDoc, updateDoc, Timestamp, query, where } from 'firebase/firestore';
-import { db } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../firebase';
 import { Registration, ConferenceUser } from '../types/schema';
 
 export interface RegistrationWithUser extends Registration {
@@ -78,16 +79,27 @@ export const useRegistrations = (conferenceId: string) => {
     // Refund Logic (Reused/Extended)
     const processRefund = async (regId: string, amount: number) => {
         try {
-            // Mock API Call
-
             const regRef = doc(db, `conferences/${conferenceId}/registrations/${regId}`);
-            await updateDoc(regRef, {
-                paymentStatus: amount > 0 ? 'PARTIAL_REFUNDED' : 'REFUNDED', // Logic check needed: if amount < total, partial.
-                refundAmount: amount, // Accumulate? Or set? For now set.
-                updatedAt: Timestamp.now()
-            });
+            const regSnap = await getDoc(regRef);
+            const regData = regSnap.data();
+            const paymentKey = regData?.paymentKey;
 
-            // Refresh
+            if (!paymentKey || paymentKey === 'FREE') {
+                await updateDoc(regRef, {
+                    paymentStatus: amount > 0 ? 'PARTIAL_REFUNDED' : 'REFUNDED',
+                    refundAmount: amount,
+                    updatedAt: Timestamp.now()
+                });
+            } else {
+                const cancelFn = httpsCallable(functions, 'cancelTossPayment');
+                await cancelFn({
+                    paymentKey: paymentKey,
+                    cancelReason: `Admin refund: ${amount}원`,
+                    confId: conferenceId,
+                    regId: regId
+                });
+            }
+
             fetchRegistrations();
             return true;
         } catch (err) {

@@ -694,12 +694,19 @@ exports.cancelTossPayment = functions
     ingressSettings: 'ALLOW_ALL'
 })
     .https.onCall(async (data, context) => {
-    var _a, _b, _c;
-    // Auth Check (Admin Only recommended, strictly speaking, but for now Check Context)
+    var _a, _b, _c, _d;
+    // Auth Check — Admin only
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
-    const { paymentKey, cancelReason, confId, regId } = data;
+    const callerEmail = ((_a = context.auth.token) === null || _a === void 0 ? void 0 : _a.email) || '';
+    const callerToken = context.auth.token;
+    const { confId } = data;
+    const isAdmin = isSuperAdminToken(callerToken) || (confId && await isConferenceAdminEmail(confId, callerEmail));
+    if (!isAdmin) {
+        throw new functions.https.HttpsError('permission-denied', 'Admin permission required to cancel payments.');
+    }
+    const { paymentKey, cancelReason, regId } = data;
     if (!paymentKey || !cancelReason || !confId) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing paymentKey, cancelReason, or confId');
     }
@@ -707,13 +714,13 @@ exports.cancelTossPayment = functions
         // [Secure Key Fetch]
         const db = admin.firestore();
         const confSnap = await db.collection('conferences').doc(confId).get();
-        const societyId = (_a = confSnap.data()) === null || _a === void 0 ? void 0 : _a.societyId;
+        const societyId = (_b = confSnap.data()) === null || _b === void 0 ? void 0 : _b.societyId;
         let finalSecretKey = '';
         if (societyId) {
             const infraSnap = await db.collection('societies').doc(societyId).collection('settings').doc('infrastructure').get();
             if (infraSnap.exists) {
                 const infraData = infraSnap.data();
-                if ((_c = (_b = infraData === null || infraData === void 0 ? void 0 : infraData.payment) === null || _b === void 0 ? void 0 : _b.domestic) === null || _c === void 0 ? void 0 : _c.secretKey) {
+                if ((_d = (_c = infraData === null || infraData === void 0 ? void 0 : infraData.payment) === null || _c === void 0 ? void 0 : _c.domestic) === null || _d === void 0 ? void 0 : _d.secretKey) {
                     finalSecretKey = infraData.payment.domestic.secretKey;
                 }
             }

@@ -1,13 +1,9 @@
 import { useState } from 'react';
-import { doc, updateDoc, collection, getDocs, query, where, Timestamp, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { doc, getDoc, updateDoc, collection, getDocs, query, where, Timestamp, setDoc } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../firebase';
 import { BadgeElement, Registration } from '../types/schema';
 import { clearConferenceCache } from './useConference';
-
-// Mock Toss Cancel
-const mockCancelPayment = async (_amount: number, _paymentKey: string): Promise<boolean> => {
-    return new Promise(resolve => setTimeout(() => resolve(true), 1000));
-};
 
 export const useAdmin = (conferenceId: string) => {
     const [loading, setLoading] = useState(false);
@@ -77,18 +73,28 @@ export const useAdmin = (conferenceId: string) => {
     const processRefund = async (regId: string, amount: number) => {
         setLoading(true);
         try {
-            // Get current reg to check payment details (mocking paymentKey retrieval)
             const regRef = doc(db, `conferences/${conferenceId}/registrations/${regId}`);
+            const regSnap = await getDoc(regRef);
+            const regData = regSnap.data();
+            const paymentKey = regData?.paymentKey;
 
-            // Call API
-            await mockCancelPayment(amount, 'mock_payment_key');
-
-            // Update DB
-            await updateDoc(regRef, {
-                paymentStatus: amount > 0 ? 'PARTIAL_REFUNDED' : 'REFUNDED', // Simplification
-                refundAmount: amount,
-                updatedAt: Timestamp.now()
-            });
+            if (!paymentKey || paymentKey === 'FREE') {
+                // No PG payment to cancel — just update status
+                await updateDoc(regRef, {
+                    paymentStatus: amount > 0 ? 'PARTIAL_REFUNDED' : 'REFUNDED',
+                    refundAmount: amount,
+                    updatedAt: Timestamp.now()
+                });
+            } else {
+                // Call Cloud Function to cancel via PG API
+                const cancelFn = httpsCallable(functions, 'cancelTossPayment');
+                await cancelFn({
+                    paymentKey: paymentKey,
+                    cancelReason: `Admin refund: ${amount}원`,
+                    confId: conferenceId,
+                    regId: regId
+                });
+            }
 
             setLoading(false);
         } catch (err: unknown) {

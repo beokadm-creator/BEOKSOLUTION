@@ -715,12 +715,19 @@ export const cancelTossPayment = functions
         ingressSettings: 'ALLOW_ALL'
     })
     .https.onCall(async (data, context) => {
-        // Auth Check (Admin Only recommended, strictly speaking, but for now Check Context)
+        // Auth Check — Admin only
         if (!context.auth) {
             throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
         }
+        const callerEmail = context.auth.token?.email as string || '';
+        const callerToken = context.auth.token as AuthToken;
+        const { confId } = data;
+        const isAdmin = isSuperAdminToken(callerToken) || (confId && await isConferenceAdminEmail(confId, callerEmail));
+        if (!isAdmin) {
+            throw new functions.https.HttpsError('permission-denied', 'Admin permission required to cancel payments.');
+        }
 
-        const { paymentKey, cancelReason, confId, regId } = data;
+        const { paymentKey, cancelReason, regId } = data;
 
         if (!paymentKey || !cancelReason || !confId) {
             throw new functions.https.HttpsError('invalid-argument', 'Missing paymentKey, cancelReason, or confId');
