@@ -132,7 +132,7 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
   const logoUrl = config?.society?.logoUrl;
 
   return (
-      <div className={`min-h-screen flex flex-col bg-white font-sans text-slate-900 ${ctaButtons.length > 0 ? 'pb-28' : 'pb-20'}`}>
+      <div className={`min-h-screen flex flex-col bg-white font-sans text-slate-900 ${ctaButtons.length > 0 ? 'pb-36' : 'pb-24'}`}>
       {/* 1. Sticky Header */}
       <WideHeaderPreview
         lang={currentLang}
@@ -169,68 +169,76 @@ export const ConferenceWideTemplate = ({ slug }: Props) => {
       </div>
 
       {/* 4. Mobile-Optimized Bottom Tab Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-lg z-50 safe-area-inset-bottom">
-        <div className="max-w-7xl mx-auto px-2 sm:px-4">
-          <div className={`flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 py-3 sm:py-4 ${ctaButtons.length > 0 ? 'pb-2 sm:pb-0' : ''}`}>
-            {/* Tab Buttons */}
-            <div className="flex justify-around sm:justify-center sm:gap-8 flex-1 overflow-x-auto scrollbar-hide">
-              {tabItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = effectiveActiveSection === item.id;
+      <div className="fixed bottom-0 left-0 right-0 z-50">
+        {ctaButtons.length > 0 && (
+          <div className="px-2 sm:px-4 pb-2">
+            <div className="max-w-7xl mx-auto flex justify-end">
+              <div className="bg-white/95 backdrop-blur-md border border-slate-200 shadow-lg rounded-2xl p-2 overflow-x-auto scrollbar-hide">
+                <div className="flex items-center gap-2 flex-nowrap">
+                  {ctaButtons.map((btn, idx) => {
+                    const className = `h-10 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap max-w-[140px] truncate flex-shrink-0 ${btn.variant === 'secondary'
+                      ? 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                      : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                      }`;
 
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => handleTabClick(item.id)}
-                    className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 sm:px-6 py-2 rounded-xl font-medium transition-all duration-200 min-w-[60px] sm:min-w-[100px] ${isActive
-                      ? 'text-blue-600 bg-blue-50'
-                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-                      }`}
-                  >
-                    <Icon className={`w-6 h-6 sm:w-5 sm:h-5 md:w-6 md:h-6 ${isActive ? 'text-blue-600' : ''}`} />
-                    <span className="text-[10px] sm:text-sm md:text-base font-medium">
-                      {getLabel(item.label)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            {ctaButtons.length > 0 && (
-              <div className="flex items-center justify-end flex-wrap gap-2 flex-shrink-0">
-                {ctaButtons.map((btn, idx) => {
-                  const className = `h-9 sm:h-10 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap max-w-[130px] truncate ${btn.variant === 'secondary'
-                    ? 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
-                    }`;
+                    if (btn.actionType === 'EXTERNAL_URL' && /^https?:\/\//i.test(btn.actionValue)) {
+                      return (
+                        <a
+                          key={idx}
+                          href={btn.actionValue}
+                          target={btn.openInNewTab ? '_blank' : '_self'}
+                          rel={btn.openInNewTab ? 'noopener noreferrer' : undefined}
+                          className={className}
+                        >
+                          {getCtaLabel(btn.label)}
+                        </a>
+                      );
+                    }
 
-                  if (btn.actionType === 'EXTERNAL_URL' && /^https?:\/\//i.test(btn.actionValue)) {
                     return (
-                      <a
+                      <button
                         key={idx}
-                        href={btn.actionValue}
-                        target={btn.openInNewTab ? '_blank' : '_self'}
-                        rel={btn.openInNewTab ? 'noopener noreferrer' : undefined}
+                        type="button"
+                        onClick={() => handleCtaClick(btn)}
                         className={className}
                       >
                         {getCtaLabel(btn.label)}
-                      </a>
+                      </button>
                     );
-                  }
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-lg safe-area-inset-bottom">
+          <div className="max-w-7xl mx-auto px-2 sm:px-4">
+            <div className="flex items-center justify-between gap-2 py-3 sm:py-4">
+              <div className="flex justify-around sm:justify-center sm:gap-8 flex-1 overflow-x-auto scrollbar-hide">
+                {tabItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = effectiveActiveSection === item.id;
 
                   return (
                     <button
-                      key={idx}
+                      key={item.id}
                       type="button"
-                      onClick={() => handleCtaClick(btn)}
-                      className={className}
+                      onClick={() => handleTabClick(item.id)}
+                      className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 sm:px-6 py-2 rounded-xl font-medium transition-all duration-200 min-w-[60px] sm:min-w-[100px] ${isActive
+                        ? 'text-blue-600 bg-blue-50'
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                        }`}
                     >
-                      {getCtaLabel(btn.label)}
+                      <Icon className={`w-6 h-6 sm:w-5 sm:h-5 md:w-6 md:h-6 ${isActive ? 'text-blue-600' : ''}`} />
+                      <span className="text-[10px] sm:text-sm md:text-base font-medium">
+                        {getLabel(item.label)}
+                      </span>
                     </button>
                   );
                 })}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>
