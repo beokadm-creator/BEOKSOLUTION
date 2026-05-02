@@ -4,12 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
 import { MapPin, User, Mic2, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { tryParseDate, hasToDate, hasSeconds } from '../../../utils/dateUtils';
-import {
-    Dialog,
-    DialogContent,
-    DialogTitle,
-    DialogDescription
-} from '../../ui/dialog';
+import { SpeakerDetailDialog } from '../SpeakerDetailDialog';
 
 export const WideProgram = ({ agendas, speakers = [], lang = 'ko' }: { agendas?: Agenda[], speakers?: Speaker[], lang?: string }) => {
     // Cast to Schema types for better type safety internally
@@ -223,7 +218,7 @@ export const WideProgram = ({ agendas, speakers = [], lang = 'ko' }: { agendas?:
                                                                 <div className="flex-shrink-0">
                                                                     <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-white border-2 border-white shadow-sm overflow-hidden mx-auto sm:mx-0">
                                                                         {speaker.photoUrl ? (
-                                                                            <img src={speaker.photoUrl} alt={t(speaker.name)} className="w-full h-full object-cover" />
+                                                                            <img src={speaker.photoUrl} alt={t(speaker.name)} className="w-full h-full object-contain" />
                                                                         ) : (
                                                                             <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-300">
                                                                                 <User className="w-7 h-7 md:w-8 md:h-8" />
@@ -275,130 +270,11 @@ export const WideProgram = ({ agendas, speakers = [], lang = 'ko' }: { agendas?:
                 })}
             </Tabs>
 
-            {/* Enhanced Bio Modal with Mobile Optimization & Scroll */}
-            <Dialog open={!!selectedSpeaker} onOpenChange={() => setSelectedSpeaker(null)}>
-                <DialogContent className="max-w-xl md:max-w-2xl max-h-[85vh] md:max-h-[80vh] overflow-y-auto rounded-2xl md:rounded-3xl p-0 border-0 shadow-2xl data-[state=open]:fade-in data-[state=closed]:fade-out data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 custom-scrollbar">
-                    {/* Hide default close button from Radix UI */}
-                    <DialogTitle className="sr-only">Speaker Details</DialogTitle>
-                    <DialogDescription className="sr-only">Detailed speaker information</DialogDescription>
-
-                    {selectedSpeaker && (
-                        <>
-                            {/* Header with Gradient & Close Button */}
-                            <div className="relative h-36 md:h-48 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 overflow-hidden shrink-0">
-                                {/* Decorative Pattern Overlay */}
-                                <div className="absolute inset-0 opacity-10">
-                                    <div className="absolute top-0 left-0 w-40 h-40 bg-white rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2" />
-                                    <div className="absolute bottom-0 right-0 w-32 h-32 bg-white rounded-full blur-2xl transform translate-x-1/3 translate-y-1/3" />
-                                </div>
-                                {/* Custom Close Button - Hides default Radix UI close button */}
-                                <button
-                                    type="button"
-                                    onClick={() => setSelectedSpeaker(null)}
-                                    className="absolute top-3 right-3 md:top-4 md:right-4 text-white/90 hover:text-white hover:bg-white/20 rounded-full w-10 h-10 md:w-11 md:h-11 p-0 transition-all duration-200 shadow-lg backdrop-blur-sm z-20"
-                                    aria-label="Close modal"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                                    <span className="sr-only">Close</span>
-                                </button>
-                            </div>
-
-                            {/* Content Area (Part of overall modal scroll) */}
-                            <div className="px-5 md:px-8 pb-6 md:pb-8 -mt-20 md:-mt-24">
-                                <div className="flex flex-col items-center text-center relative z-10">
-                                    {/* Avatar with Glow Effect */}
-                                    <div className="w-28 h-28 md:w-36 md:h-36 rounded-full bg-white p-1.5 md:p-2 shadow-2xl mb-4 md:mb-5 ring-4 ring-white/50">
-                                        <div className="w-full h-full rounded-full overflow-hidden bg-slate-100 relative">
-                                            {selectedSpeaker.photoUrl ? (
-                                                <img
-                                                    src={selectedSpeaker.photoUrl}
-                                                    alt={`${t(selectedSpeaker.name)} profile`}
-                                                    className="w-full h-full object-cover"
-                                                    loading="lazy"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
-                                                    <User className="w-14 h-14 md:w-16 md:h-16 text-slate-400" />
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Name & Org Section */}
-                                    <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-slate-900 mb-2 tracking-tight">
-                                        {t(selectedSpeaker.name)}
-                                    </h2>
-                                    {selectedSpeaker.organization && (
-                                        <p className="text-sm md:text-base lg:text-lg font-semibold text-blue-600 mb-5 md:mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-2 rounded-full border border-blue-100 shadow-sm inline-block">
-                                            {t(selectedSpeaker.organization)}
-                                        </p>
-                                    )}
-
-                                    {/* Enhanced Presentation Title Card */}
-                                    {selectedSpeaker.presentationTitle && (
-                                        <div className="w-full bg-gradient-to-br from-slate-50 to-slate-100 p-5 md:p-6 rounded-2xl mb-5 md:mb-6 border border-slate-200 shadow-lg text-left">
-                                            <h3 className="text-sm md:text-base font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                                <span className="bg-blue-100 text-blue-600 p-1.5 md:p-2 rounded-lg">
-                                                    <Mic2 className="w-4 h-4 md:w-5 md:h-5" />
-                                                </span>
-                                                {lang === 'ko' ? '발표 주제' : 'Presentation Topic'}
-                                            </h3>
-                                            <p className="font-bold text-slate-900 text-base md:text-lg lg:text-xl leading-relaxed">
-                                                {t(selectedSpeaker.presentationTitle)}
-                                            </p>
-                                        </div>
-                                    )}
-
-                                    {/* Enhanced Bio Section (No separate scroll - part of modal scroll) */}
-                                    {selectedSpeaker.bio && (
-                                        <div className="w-full text-left bg-white rounded-2xl p-5 md:p-6 border border-slate-200 shadow-sm">
-                                            <h3 className="text-sm md:text-base font-bold text-slate-900 mb-3 pb-3 border-b-2 border-slate-100 flex items-center gap-2">
-                                                <span className="w-2 h-2 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500" />
-                                                {lang === 'ko' ? '약력' : 'Biography'}
-                                            </h3>
-                                            {/* Bio content without separate scroll - part of overall modal scroll */}
-                                            <div className="text-sm md:text-base lg:text-lg text-slate-600 leading-relaxed whitespace-pre-wrap">
-                                                {t(selectedSpeaker.bio)}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </>
-                    )}
-                </DialogContent>
-            </Dialog>
+            <SpeakerDetailDialog
+                speaker={selectedSpeaker}
+                lang={lang}
+                onClose={() => setSelectedSpeaker(null)}
+            />
         </div>
     );
 };
-
-// Custom scrollbar and hide default close button styles
-const customScrollbarStyles = `
-    /* Custom scrollbar styles for modal */
-    .custom-scrollbar::-webkit-scrollbar {
-        width: 6px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-track {
-        background: #f1f5f9;
-        border-radius: 3px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 3px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
-    }
-
-    /* Hide default Radix UI close button inside our custom dialog */
-    [data-radix-dialog-content] .absolute.right-4.top-4[data-radix-dialog-close] {
-        display: none !important;
-    }
-`;
-
-// Inject custom styles
-if (typeof document !== 'undefined') {
-    const styleElement = document.createElement('style');
-    styleElement.textContent = customScrollbarStyles;
-    document.head.appendChild(styleElement);
-}

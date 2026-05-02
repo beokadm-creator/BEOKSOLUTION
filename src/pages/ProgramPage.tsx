@@ -4,15 +4,11 @@ import { useConference } from '../hooks/useConference';
 import { useUserStore } from '../store/userStore';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { Button } from '../components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogTitle
-} from '../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { ChevronLeft, MapPin, User, Mic2, Calendar } from 'lucide-react';
 import { Agenda, Speaker } from '../types/schema';
 import { format } from 'date-fns';
+import { SpeakerDetailDialog } from '../components/conference/SpeakerDetailDialog';
 
 const ProgramPage: React.FC = () => {
     const { slug } = useParams<{ slug: string }>();
@@ -200,7 +196,7 @@ const ProgramPage: React.FC = () => {
                                                                          <div className="flex-shrink-0">
                                                                              <div className="w-16 h-16 rounded-full bg-white border-2 border-white shadow-sm overflow-hidden mx-auto sm:mx-0">
                                                                                  {speaker.photoUrl ? (
-                                                                                     <img src={speaker.photoUrl} alt={t(speaker.name)} className="w-full h-full object-cover" />
+                                                                                     <img src={speaker.photoUrl} alt={t(speaker.name)} className="w-full h-full object-contain" />
                                                                                  ) : (
                                                                                      <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-300">
                                                                                          <User className="w-8 h-8" />
@@ -261,77 +257,11 @@ const ProgramPage: React.FC = () => {
                 )}
             </main>
 
-            {/* Bio Modal */}
-            <Dialog open={!!selectedSpeaker} onOpenChange={() => setSelectedSpeaker(null)}>
-                <DialogContent className="max-w-md sm:max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl p-0 overflow-hidden border-0">
-                    {/* Header Image Background */}
-                    <div className="h-24 bg-gradient-to-r from-blue-600 to-indigo-700 relative">
-                        <DialogTitle className="sr-only">Speaker Details</DialogTitle>
-                        <Button 
-                            variant="ghost" 
-                            className="absolute top-2 right-2 text-white/80 hover:text-white hover:bg-white/20 rounded-full w-8 h-8 p-0"
-                            onClick={() => setSelectedSpeaker(null)}
-                        >
-                            <span className="sr-only">Close</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                        </Button>
-                    </div>
-
-                    {selectedSpeaker && (
-                        <div className="px-6 pb-8 -mt-12 flex flex-col items-center text-center relative z-10">
-                            {/* Avatar */}
-                            <div className="w-24 h-24 rounded-full bg-white p-1 shadow-lg mb-4">
-                                <div className="w-full h-full rounded-full overflow-hidden bg-slate-100">
-                                    {selectedSpeaker.photoUrl ? (
-                                        <img src={selectedSpeaker.photoUrl} alt={t(selectedSpeaker.name)} className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center">
-                                            <User className="w-10 h-10 text-slate-300" />
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            
-                            {/* Name & Org */}
-                            <h2 className="text-2xl font-bold text-slate-900 mb-1">
-                                {t(selectedSpeaker.name)}
-                            </h2>
-                            {selectedSpeaker.organization && (
-                                <p className="text-blue-600 font-medium mb-6 bg-blue-50 px-3 py-1 rounded-full text-sm">
-                                    {t(selectedSpeaker.organization)}
-                                </p>
-                            )}
-
-                            {/* Presentation Title */}
-                            <div className="w-full bg-slate-50 p-5 rounded-xl mb-6 border border-slate-100 text-left">
-                                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                                    <Mic2 className="w-3.5 h-3.5" />
-                                    Lecture
-                                </h3>
-                                <p className="font-bold text-slate-900 text-lg leading-relaxed">
-                                    {selectedSpeaker.presentationTitle ? t(selectedSpeaker.presentationTitle) : (
-                                        <span className="text-slate-400 italic">
-                                            {language === 'ko' ? '주제 미정' : 'Topic TBD'}
-                                        </span>
-                                    )}
-                                </p>
-                            </div>
-                            
-                            {/* Bio */}
-                            {selectedSpeaker.bio && (
-                                <div className="w-full text-left">
-                                    <h3 className="text-sm font-bold text-slate-900 mb-3 border-b border-slate-100 pb-2">
-                                        {language === 'ko' ? '약력' : 'Biography'}
-                                    </h3>
-                                    <div className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
-                                        {t(selectedSpeaker.bio)}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
+            <SpeakerDetailDialog
+                speaker={selectedSpeaker}
+                lang={language}
+                onClose={() => setSelectedSpeaker(null)}
+            />
         </div>
     );
 };
