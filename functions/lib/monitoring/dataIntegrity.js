@@ -71,9 +71,9 @@ exports.monitorRegistrationIntegrity = functions.firestore
             severity: 'CRITICAL',
         });
     }
-    // Rule 2: If paymentStatus is PAID, amount must be > 0 (unless FREE/ADMIN_FREE)
+    // Rule 2: If paymentStatus is PAID, amount must be > 0 (unless FREE/ADMIN_FREE/ADMIN_MANUAL)
     if (newData.paymentStatus === 'PAID' && newData.amount === 0
-        && newData.paymentMethod !== 'FREE' && newData.paymentMethod !== 'ADMIN_FREE') {
+        && newData.paymentMethod !== 'FREE' && newData.paymentMethod !== 'ADMIN_FREE' && newData.paymentMethod !== 'ADMIN_MANUAL') {
         issues.push({
             field: 'amount',
             expected: '> 0 when PAID (non-free)',

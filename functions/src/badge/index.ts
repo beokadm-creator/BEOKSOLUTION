@@ -221,6 +221,7 @@ export async function sendBadgeNotification(
         const affiliation = regData.organization || regData.affiliation || regData.userInfo?.affiliation || '';
 
         // Variables Map
+        const amount = regData.amount ?? 0;
         const variables: { [key: string]: string } = {
           userName: regData.name || regData.userInfo?.name || '',
           society: societyName,
@@ -232,8 +233,8 @@ export async function sendBadgeNotification(
           registrationId: regId,
           startDate: startDate,
           venue: venueName,
-          amount: (regData.amount || 0).toLocaleString() + '원',
-          price: (regData.amount || 0).toLocaleString() + '원',
+          amount: amount > 0 ? amount.toLocaleString() + '원' : '무료',
+          price: amount > 0 ? amount.toLocaleString() + '원' : '무료',
         };
 
         const recipientPhone = regData.phone || regData.userInfo?.phone;
@@ -805,6 +806,7 @@ export const bulkSendNotifications = functions
           const badgePrepUrl = `${domain}/${redirectSlug}/badge-prep/${newToken}`;
           const affiliation = regData.organization || regData.affiliation || regData.userInfo?.affiliation || '';
 
+          const amount = regData.amount ?? 0;
           return {
             recipientNo: phone,
             templateParameter: {
@@ -818,8 +820,8 @@ export const bulkSendNotifications = functions
               registrationId: regId,
               startDate,
               venue: venueName,
-              amount: (regData.amount || 0).toLocaleString() + '원',
-              price: (regData.amount || 0).toLocaleString() + '원',
+              amount: amount > 0 ? amount.toLocaleString() + '원' : '무료',
+              price: amount > 0 ? amount.toLocaleString() + '원' : '무료',
             }
           };
         } catch (err) {

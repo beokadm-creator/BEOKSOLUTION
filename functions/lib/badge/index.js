@@ -137,7 +137,7 @@ exports.onRegistrationCreated = functions.firestore
  * Helper: Send Badge Notification (AlimTalk)
  */
 async function sendBadgeNotification(db, conference, regId, regData, token) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r;
     if (!conference.societyId)
         return;
     try {
@@ -180,8 +180,9 @@ async function sendBadgeNotification(db, conference, regId, regData, token) {
                 const digitalBadgeQrUrl = `${domain}/${redirectSlug}/badge-prep/${token}`;
                 const affiliation = regData.organization || regData.affiliation || ((_m = regData.userInfo) === null || _m === void 0 ? void 0 : _m.affiliation) || '';
                 // Variables Map
+                const amount = (_o = regData.amount) !== null && _o !== void 0 ? _o : 0;
                 const variables = {
-                    userName: regData.name || ((_o = regData.userInfo) === null || _o === void 0 ? void 0 : _o.name) || '',
+                    userName: regData.name || ((_p = regData.userInfo) === null || _p === void 0 ? void 0 : _p.name) || '',
                     society: societyName,
                     eventName: eventName,
                     badgePrepUrl: badgePrepUrl,
@@ -191,11 +192,11 @@ async function sendBadgeNotification(db, conference, regId, regData, token) {
                     registrationId: regId,
                     startDate: startDate,
                     venue: venueName,
-                    amount: (regData.amount || 0).toLocaleString() + '원',
-                    price: (regData.amount || 0).toLocaleString() + '원',
+                    amount: amount > 0 ? amount.toLocaleString() + '원' : '무료',
+                    price: amount > 0 ? amount.toLocaleString() + '원' : '무료',
                 };
-                const recipientPhone = regData.phone || ((_p = regData.userInfo) === null || _p === void 0 ? void 0 : _p.phone);
-                const recipientEmail = regData.email || ((_q = regData.userInfo) === null || _q === void 0 ? void 0 : _q.email);
+                const recipientPhone = regData.phone || ((_q = regData.userInfo) === null || _q === void 0 ? void 0 : _q.phone);
+                const recipientEmail = regData.email || ((_r = regData.userInfo) === null || _r === void 0 ? void 0 : _r.email);
                 const emailParams = {
                     userName: variables.userName,
                     societyName: variables.society,
@@ -658,7 +659,7 @@ exports.bulkSendNotifications = functions
     for (let i = 0; i < regIds.length; i += CONCURRENCY) {
         const chunk = regIds.slice(i, i + CONCURRENCY);
         const chunkResults = await Promise.allSettled(chunk.map(async (regId) => {
-            var _a, _b, _c;
+            var _a, _b, _c, _d;
             try {
                 // registration 또는 external_attendees 에서 조회
                 let isExternal = false;
@@ -701,10 +702,11 @@ exports.bulkSendNotifications = functions
                 await batch.commit();
                 const badgePrepUrl = `${domain}/${redirectSlug}/badge-prep/${newToken}`;
                 const affiliation = regData.organization || regData.affiliation || ((_b = regData.userInfo) === null || _b === void 0 ? void 0 : _b.affiliation) || '';
+                const amount = (_c = regData.amount) !== null && _c !== void 0 ? _c : 0;
                 return {
                     recipientNo: phone,
                     templateParameter: {
-                        userName: regData.name || ((_c = regData.userInfo) === null || _c === void 0 ? void 0 : _c.name) || '',
+                        userName: regData.name || ((_d = regData.userInfo) === null || _d === void 0 ? void 0 : _d.name) || '',
                         society: societyName,
                         eventName,
                         badgePrepUrl,
@@ -714,8 +716,8 @@ exports.bulkSendNotifications = functions
                         registrationId: regId,
                         startDate,
                         venue: venueName,
-                        amount: (regData.amount || 0).toLocaleString() + '원',
-                        price: (regData.amount || 0).toLocaleString() + '원',
+                        amount: amount > 0 ? amount.toLocaleString() + '원' : '무료',
+                        price: amount > 0 ? amount.toLocaleString() + '원' : '무료',
                     }
                 };
             }

@@ -188,8 +188,7 @@ service cloud.firestore {
       match /registrations/{regId} {
         allow read: if isSuperAdmin() || isConferenceAdmin(confId) ||
           (isAuthenticated() && resource.data.userId == request.auth.uid);
-        allow write: if isSuperAdmin() || isConferenceAdmin(confId) ||
-          (isAuthenticated() && request.resource.data.userId == request.auth.uid);
+        allow write: if isSuperAdmin() || isConferenceAdmin(confId);
         
          match /logs/{logId} {
            allow read, write: if isSuperAdmin() || isConferenceAdmin(confId) ||

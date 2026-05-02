@@ -37,7 +37,7 @@ const ReceiptTemplate: React.FC<ReceiptTemplateProps> = ({ data, config }) => {
             <tr key={index}>
               <td style={{ padding: '10px', border: '1px solid #ddd' }}>{item.name}</td>
               <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right' }}>
-                {item.amount.toLocaleString()}
+                {item.amount === 0 ? '무료' : item.amount.toLocaleString()}
               </td>
             </tr>
           ))}
@@ -46,7 +46,7 @@ const ReceiptTemplate: React.FC<ReceiptTemplateProps> = ({ data, config }) => {
           <tr style={{ fontWeight: 'bold', backgroundColor: '#f9f9f9' }}>
             <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right' }}>Total</td>
             <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right' }}>
-              {data.totalAmount.toLocaleString()}
+              {data.totalAmount === 0 ? '무료 등록' : data.totalAmount.toLocaleString()}
             </td>
           </tr>
         </tfoot>

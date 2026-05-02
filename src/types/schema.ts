@@ -400,7 +400,7 @@ export interface AgreementDetails {
 }
 
 export type PaymentStatus = 'PAID' | 'REFUND_REQUESTED' | 'REFUNDED' | 'PARTIAL_REFUNDED' | 'PENDING' | 'FAILED';
-export type PaymentMethod = 'CARD' | 'VIRTUAL' | 'CASH' | 'ADMIN_FREE' | 'FREE';
+export type PaymentMethod = 'CARD' | 'VIRTUAL' | 'CASH' | 'ADMIN_FREE' | 'ADMIN_MANUAL' | 'FREE';
 
 /**
  * Collection: `registrations`

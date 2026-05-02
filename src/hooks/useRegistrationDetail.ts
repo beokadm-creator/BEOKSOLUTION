@@ -414,8 +414,9 @@ export const useRegistrationDetail = (confId: string | null, regId: string | nul
         });
     };
 
-    const canCancel = data?.status === 'PAID' && !!data.paymentKey;
-    const canRequestRefund = data?.status === 'PAID';
+    const isFreeRegistration = data?.paymentMethod === 'FREE' || data?.paymentMethod === 'ADMIN_FREE';
+    const canCancel = data?.status === 'PAID' && !!data.paymentKey && !isFreeRegistration;
+    const canRequestRefund = data?.status === 'PAID' && !isFreeRegistration;
     const canManualApprove = !!data && (
         data.status === 'PENDING' ||
         data.status === 'FAILED' ||
